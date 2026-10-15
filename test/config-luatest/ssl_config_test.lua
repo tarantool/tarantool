@@ -525,6 +525,20 @@ local function cluster_wait_for_fullmesh(cl, opts)
     if not opts then opts = {} end
     local config = {timeout = opts.timeout or 60, delay = opts.delay or 0.1}
     local instances = cluster_collect_instances(cl)
+    -- The replication may be reconnected in background after a reload.
+    helpers.retrying(config, function()
+        cl:each(function(server)
+            t.assert(server:exec(function()
+                local name = 'config.box_cfg.replication_reconnect'
+                for _, f in pairs(require('fiber').info()) do
+                    if f.name == name then
+                        return false
+                    end
+                end
+                return true
+            end))
+        end)
+    end)
     helpers.retrying(config, function(cluster, instances)
         for _, server1_alias in ipairs(instances) do
             for _, server2_alias in ipairs(instances) do
@@ -1317,3 +1331,199 @@ g.test_replication_and_connpool_ssl_reconfig = function()
 end
 
 -- }}} Replication and connpool tests.
+
+-- {{{ Deferred replication reconnect tests.
+
+local function cluster_replication_has_ssl(cl)
+    local res = true
+    cl:each(function(server)
+        local replication = server:exec(function()
+            return box.cfg.replication
+        end)
+        for _, u in ipairs(uri.parse_many(replication)) do
+            local transport = u.params and u.params.transport
+            res = res and transport ~= nil and transport[1] == 'ssl'
+        end
+    end)
+    return res
+end
+
+local function cluster_replication_has_cert(cl, cert)
+    local res = true
+    cl:each(function(server)
+        local replication = server:exec(function()
+            return box.cfg.replication
+        end)
+        for _, u in ipairs(uri.parse_many(replication)) do
+            local cert_file = u.params and u.params.ssl_cert_file
+            res = res and cert_file ~= nil and cert_file[1] == cert
+        end
+    end)
+    return res
+end
+
+local function cluster_grep_log(cl, pattern)
+    local res = false
+    cl:each(function(server)
+        res = res or server:grep_log(pattern) ~= nil
+    end)
+    return res
+end
+
+-- gh-13172: a reload that changes URIs of the replicaset
+-- instances applies iproto.listen at once and reconnects the
+-- replication with the new URIs after the reload jitter.
+local function check_replication_reconnect_delay(jitter)
+    t.tarantool.skip_if_not_enterprise()
+    local message = 'URIs of the replicaset instances are changed'
+
+    local cfg_plain = cbuilder:new(
+            cluster_config_base({instances = {'i1', 'i2'}}))
+        :set_global_option('config.reload_jitter', jitter)
+        :config()
+    local cl = cluster_new(cfg_plain)
+    cl:start()
+    cluster_wait_for_fullmesh(cl)
+
+    local cfg_ssl = cbuilder:new(cfg_plain)
+        :set_global_option('iproto.listen', {SSL_SOCK})
+        :set_global_option('iproto.ssl', CERTS.NC_CA1_S1)
+        :config()
+    local start = clock.monotonic()
+    cluster_reload(cl, cfg_ssl, {'ssl'})
+
+    if jitter > 0 then
+        t.assert_not(cluster_replication_has_ssl(cl))
+        t.assert(cluster_grep_log(cl, message))
+        cl:each(function(server)
+            t.assert(server:exec(function()
+                local name = 'config.box_cfg.replication_reconnect'
+                for _, f in pairs(require('fiber').info()) do
+                    if f.name == name then
+                        return true
+                    end
+                end
+                return false
+            end))
+        end)
+        helpers.retrying({timeout = jitter + 5}, function()
+            t.assert(cluster_replication_has_ssl(cl))
+        end)
+        t.assert_ge(clock.monotonic() - start, jitter)
+    else
+        t.assert(cluster_replication_has_ssl(cl))
+        t.assert_not(cluster_grep_log(cl, message))
+    end
+    cluster_wait_for_fullmesh(cl)
+end
+
+g.test_replication_reconnect_delay = function()
+    check_replication_reconnect_delay(2)
+end
+
+g.test_replication_reconnect_no_delay = function()
+    check_replication_reconnect_delay(0)
+end
+
+-- gh-13172: a reload that changes only the SSL certificates of the
+-- instances reconnects the replication after the reload jitter too.
+g.test_replication_reconnect_ssl_only_change = function()
+    t.tarantool.skip_if_not_enterprise()
+    local jitter = 2
+
+    local cfg_plain = cbuilder:new(
+            cluster_config_base({instances = {'i1', 'i2'}}))
+        :set_global_option('config.reload_jitter', jitter)
+        :config()
+    local cl = cluster_new(cfg_plain)
+    cl:start()
+    cluster_wait_for_fullmesh(cl)
+
+    local cfg_ca1 = cbuilder:new(cfg_plain)
+        :set_global_option('iproto.listen', {SSL_SOCK})
+        :set_global_option('iproto.ssl', CERTS.NC_CA1_S1)
+        :config()
+    cluster_reload(cl, cfg_ca1, {'ssl'})
+    helpers.retrying({timeout = jitter + 5}, function()
+        t.assert(cluster_replication_has_cert(cl, CERTS.NC_CA1_S1.ssl_cert))
+    end)
+    cluster_wait_for_fullmesh(cl)
+
+    local cfg_ca2 = cbuilder:new(cfg_ca1)
+        :set_global_option('iproto.ssl', CERTS.NC_CA2_S1)
+        :config()
+    local start = clock.monotonic()
+    cluster_reload(cl, cfg_ca2, {'ssl'})
+    t.assert(cluster_replication_has_cert(cl, CERTS.NC_CA1_S1.ssl_cert))
+    helpers.retrying({timeout = jitter + 5}, function()
+        t.assert(cluster_replication_has_cert(cl, CERTS.NC_CA2_S1.ssl_cert))
+    end)
+    t.assert_ge(clock.monotonic() - start, jitter)
+    cluster_wait_for_fullmesh(cl)
+end
+
+-- gh-13172: a reload during the reconnect delay doesn't lose the
+-- pending reconnect: the latest configuration is applied at the
+-- original deadline, also if the reload fails. A reload changing
+-- the URIs again starts a new delay.
+local function check_replication_reconnect_second_reload(cfg_func, cert,
+                                                         new_delay)
+    t.tarantool.skip_if_not_enterprise()
+    local jitter = 4
+
+    local cfg_plain = cbuilder:new(
+            cluster_config_base({instances = {'i1', 'i2'}}))
+        :set_global_option('config.reload_jitter', jitter)
+        :config()
+    local cl = cluster_new(cfg_plain)
+    cl:start()
+    cluster_wait_for_fullmesh(cl)
+
+    local cfg_ssl1 = cbuilder:new(cfg_plain)
+        :set_global_option('iproto.listen', {SSL_SOCK})
+        :set_global_option('iproto.ssl', CERTS.NC_CA1_S1)
+        :config()
+    local start = clock.monotonic()
+    cluster_reload(cl, cfg_ssl1, {'ssl'})
+    require('fiber').sleep(jitter / 2)
+
+    local start2 = clock.monotonic()
+    pcall(cluster_reload, cl, cfg_func(cfg_ssl1), {'ssl'})
+    t.assert_not(cluster_replication_has_ssl(cl))
+    helpers.retrying({timeout = jitter + 5}, function()
+        t.assert(cluster_replication_has_ssl(cl))
+    end)
+    if new_delay then
+        t.assert_ge(clock.monotonic() - start2, jitter)
+    else
+        local elapsed = clock.monotonic() - start
+        t.assert_ge(elapsed, jitter)
+        t.assert_lt(elapsed, jitter * 1.5)
+    end
+    t.assert(cluster_replication_has_cert(cl, cert))
+    cluster_wait_for_fullmesh(cl)
+end
+
+g.test_replication_reconnect_unrelated_second_reload = function()
+    check_replication_reconnect_second_reload(function(cfg)
+        return cbuilder:new(cfg):set_global_option('log.level', 'verbose')
+            :config()
+    end, CERTS.NC_CA1_S1.ssl_cert)
+end
+
+g.test_replication_reconnect_ssl_second_reload = function()
+    check_replication_reconnect_second_reload(function(cfg)
+        return cbuilder:new(cfg):set_global_option('iproto.ssl',
+            CERTS.NC_CA2_S1):config()
+    end, CERTS.NC_CA2_S1.ssl_cert, true)
+end
+
+g.test_replication_reconnect_failed_second_reload = function()
+    check_replication_reconnect_second_reload(function(cfg)
+        local res = table.deepcopy(cfg)
+        res.unknown_option = true
+        return res
+    end, CERTS.NC_CA1_S1.ssl_cert)
+end
+
+-- }}} Deferred replication reconnect tests.
