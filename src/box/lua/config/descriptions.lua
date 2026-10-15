@@ -502,6 +502,15 @@ I['compat.datetime_setfn_timestamp_type_check'] = format_text([[
     - `old` (3.x default): don't check
 ]])
 
+I['compat.sql_legacy_name_normalization'] = format_text([[
+    If an object is not found using an exact match against the specified name
+    in SQL, try searching by the name normalized using legacy rules:
+
+    - `new` (3.x default): search exact name match only
+    - `old` (2.x default): first tries an exact match; if none is found,
+      retries with the name converted to uppercase.
+]])
+
 -- }}} compat configuration
 
 -- {{{ config configuration
