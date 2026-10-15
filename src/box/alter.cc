@@ -4716,14 +4716,10 @@ on_replace_cluster_set_name(struct trigger *trigger, void * /* event */)
 	return 0;
 }
 
-/** Set instance name on _cluster update. */
+/** Validate an instance name change. */
 static int
-on_replace_dd_cluster_set_name(struct replica *replica, const char *new_name,
-			       struct txn_stmt *stmt)
+cluster_check_name_change(const struct replica *replica, const char *new_name)
 {
-	assert(replica->id != REPLICA_ID_NIL);
-	if (strcmp(replica->name, new_name) == 0)
-		return 0;
 	if (tt_uuid_is_equal(&replica->uuid, &INSTANCE_UUID) &&
 	    box_is_configured() && *INSTANCE_NAME != 0 &&
 	    strcmp(new_name, INSTANCE_NAME) != 0) {
@@ -4740,6 +4736,19 @@ on_replace_dd_cluster_set_name(struct replica *replica, const char *new_name,
 			 node_name_str(new_name), tt_uuid_str(&other->uuid));
 		return -1;
 	}
+	return 0;
+}
+
+/** Set instance name on _cluster update. */
+static int
+on_replace_dd_cluster_set_name(struct replica *replica, const char *new_name,
+			       struct txn_stmt *stmt)
+{
+	assert(replica->id != REPLICA_ID_NIL);
+	if (strcmp(replica->name, new_name) == 0)
+		return 0;
+	if (cluster_check_name_change(replica, new_name) != 0)
+		return -1;
 	struct replica_def *def = xregion_alloc_object(
 		&in_txn()->region, typeof(*def));
 	memset(def, 0, sizeof(*def));
@@ -4758,11 +4767,10 @@ on_replace_dd_cluster_set_name(struct replica *replica, const char *new_name,
 	return 0;
 }
 
-/** Set instance UUID on _cluster update. */
+/** Validate an instance UUID change. */
 static int
-on_replace_dd_cluster_set_uuid(struct replica *replica,
-			       const struct replica_def *new_def,
-			       struct txn_stmt *stmt)
+cluster_check_uuid_change(struct replica *replica,
+			  const struct replica_def *new_def)
 {
 	struct replica *old_replica = replica;
 	if (replica_has_connections(old_replica)) {
@@ -4786,6 +4794,19 @@ on_replace_dd_cluster_set_uuid(struct replica *replica,
 			 "UUID and name update together");
 		return -1;
 	}
+	return 0;
+}
+
+/** Set instance UUID on _cluster update. */
+static int
+on_replace_dd_cluster_set_uuid(struct replica *replica,
+			       const struct replica_def *new_def,
+			       struct txn_stmt *stmt)
+{
+	if (cluster_check_uuid_change(replica, new_def) != 0)
+		return -1;
+	struct replica *old_replica = replica;
+	struct replica *new_replica = replica_by_uuid(&new_def->uuid);
 	struct trigger *on_rollback_drop_new = txn_alter_trigger_new(
 		on_replace_cluster_clear_id, NULL);
 	struct trigger *on_rollback_add_old = txn_alter_trigger_new(
