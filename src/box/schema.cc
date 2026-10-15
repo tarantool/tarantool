@@ -271,6 +271,46 @@ sc_space_new(uint32_t id, const char *name,
 }
 
 int
+schema_find_replica_by_name(const char *name, uint32_t exclude_id,
+			    struct tuple **result)
+{
+	*result = NULL;
+	if (*name == 0)
+		return 0;
+	struct space *space = space_cache_find(BOX_CLUSTER_ID);
+	if (space == NULL)
+		return -1;
+	struct index *index = index_find(space, 0);
+	if (index == NULL)
+		return -1;
+	struct iterator *it = index_create_iterator(index, ITER_ALL, NULL, 0);
+	if (it == NULL)
+		return -1;
+	IteratorGuard guard(it);
+	size_t name_len = strlen(name);
+	struct tuple *tuple;
+	int rc;
+	while ((rc = iterator_next(it, &tuple)) == 0 && tuple != NULL) {
+		uint32_t id;
+		if (tuple_field_u32(tuple, BOX_CLUSTER_FIELD_ID, &id) != 0)
+			return -1;
+		const char *field = tuple_field(tuple, BOX_CLUSTER_FIELD_NAME);
+		if (id == exclude_id || field == NULL || mp_typeof(*field) == MP_NIL)
+			continue;
+		uint32_t len;
+		const char *tuple_name = tuple_field_str(
+			tuple, BOX_CLUSTER_FIELD_NAME, &len);
+		if (tuple_name == NULL)
+			return -1;
+		if (len == name_len && memcmp(name, tuple_name, len) == 0) {
+			*result = tuple;
+			break;
+		}
+	}
+	return rc;
+}
+
+int
 schema_find_id(uint32_t system_space_id, uint32_t index_id,
 	       const char *name, uint32_t len, uint32_t *object_id)
 {

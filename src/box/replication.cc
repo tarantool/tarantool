@@ -1892,19 +1892,6 @@ replica_to_string(const struct replica *replica, const char *addr)
 	return tt_sprintf("%s (id = %u)", replica_label, replica->id);
 }
 
-int
-replica_find_new_id(uint32_t *replica_id)
-{
-	for (uint32_t i = 1; i < VCLOCK_MAX; ++i) {
-		if (replicaset.replica_by_id[i] == NULL) {
-			*replica_id = i;
-			return 0;
-		}
-	}
-	diag_set(ClientError, ER_REPLICA_MAX, VCLOCK_MAX);
-	return -1;
-}
-
 void
 replicaset_option_update_wakeup(void)
 {
