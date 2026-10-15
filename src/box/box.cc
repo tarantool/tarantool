@@ -4967,6 +4967,10 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 		coio_write_xrow(io, &row);
 		sent_raft_term = raft_req.term;
 	}
+	/* The replica may have been unregistered while we yielded. */
+	if (!replica->anon && replica->id == REPLICA_ID_NIL)
+		tnt_raise(ClientError, ER_TOO_EARLY_SUBSCRIBE,
+			  tt_uuid_str(&req.instance_uuid));
 	/*
 	 * Process SUBSCRIBE request via replication relay
 	 * Send current recovery vector clock as a marker
