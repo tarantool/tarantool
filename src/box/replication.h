@@ -529,9 +529,9 @@ replica_to_string(const struct replica *replica, const char *addr);
 struct replica *
 replica_by_id(uint32_t replica_id);
 
-/** Find the smallest empty replica ID in the available range. */
+/** Find the smallest empty replica ID not present in reserved_ids. */
 int
-replica_find_new_id(uint32_t *replica_id);
+replica_find_new_id(uint32_t *replica_id, uint32_t reserved_ids);
 
 /**
  * Find a node in the replicaset on which the instance can try to register to

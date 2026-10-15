@@ -23,8 +23,8 @@ g.after_each(function(cg)
     end
 end)
 
-g.test_delete = function(cg)
-    cg.server:exec(function(listen)
+local function test_subscribe_during_change(cg, delete)
+    cg.server:exec(function(listen, delete)
         local fiber = require('fiber')
         local msgpack = require('msgpack')
         local socket = require('socket')
@@ -32,7 +32,7 @@ g.test_delete = function(cg)
         local uuid = require('uuid')
         local key = box.iproto.key
         local iproto_type = box.iproto.type
-        local old_uuid = uuid.str()
+        local old_uuid, new_uuid = uuid.str(), uuid.str()
         box.space._cluster:insert{2, old_uuid, 'replica'}
 
         local function subscribe(instance_uuid)
@@ -66,15 +66,22 @@ g.test_delete = function(cg)
         box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
         local writer = fiber.create(function()
             fiber.self():set_joinable(true)
-            return pcall(box.space._cluster.delete, box.space._cluster, 2)
+            if delete then
+                return pcall(box.space._cluster.delete, box.space._cluster, 2)
+            end
+            return pcall(box.space._cluster.update, box.space._cluster,
+                         2, {{'=', 2, new_uuid}})
         end)
         t.helpers.retrying({}, function()
             t.assert(box.error.injection.get('ERRINJ_WAL_DELAY'))
         end)
         local s = subscribe(old_uuid)
+        -- Wait for either an early rejection or the GC consumer's WAL write.
         t.helpers.retrying({}, function()
-            t.assert(box.space._gc_consumers:get{old_uuid})
+            t.assert(s:readable(0) or box.space._gc_consumers:get{old_uuid})
         end)
+        local waiting_for_wal = box.space._gc_consumers:get{old_uuid} ~= nil
+        t.assert_equals(waiting_for_wal, delete)
         box.error.injection.set('ERRINJ_WAL_DELAY', false)
         local joined, ok, err = writer:join()
         t.assert(joined)
@@ -85,11 +92,27 @@ g.test_delete = function(cg)
         end
         t.assert_equals(response_type, iproto_type.TYPE_ERROR +
                                        box.error.TOO_EARLY_SUBSCRIBE)
+        if not delete then
+            t.assert_equals(box.space._gc_consumers:get{old_uuid}, nil)
+        end
         s:close()
 
-        t.assert_equals(box.space._cluster:get{2}, nil)
-        t.assert_equals(box.info.replication[2], nil)
-    end, {cg.server.net_box_uri})
+        if delete then
+            t.assert_equals(box.space._cluster:get{2}, nil)
+            t.assert_equals(box.info.replication[2], nil)
+        else
+            t.assert_equals(box.space._cluster:get{2}[2], new_uuid)
+            t.assert_equals(box.info.replication[2].uuid, new_uuid)
+        end
+    end, {cg.server.net_box_uri, delete})
+end
+
+g.test_uuid_update = function(cg)
+    test_subscribe_during_change(cg, false)
+end
+
+g.test_delete = function(cg)
+    test_subscribe_during_change(cg, true)
 end
 
 g.test_subscribe_acks_delete = function(cg)

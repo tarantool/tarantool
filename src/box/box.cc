@@ -36,6 +36,7 @@
 #include <spawn.h>
 
 #include "box/allocator.h"
+#include "alter.h"
 #include "lua/utils.h"
 #include "fiber_pool.h"
 #include <say.h>
@@ -4400,7 +4401,7 @@ box_register_replica(const struct tt_uuid *uuid,
 			diag_raise();
 		return;
 	}
-	if (replica_find_new_id(&replica_id) != 0)
+	if (replica_find_new_id(&replica_id, cluster_get_reserved_ids()) != 0)
 		diag_raise();
 	box_insert_replica_record(replica_id, uuid, name);
 }
@@ -4921,6 +4922,28 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 		 */
 		tnt_raise(ClientError, ER_TOO_EARLY_SUBSCRIBE,
 			  tt_uuid_str(&req.instance_uuid));
+	}
+	if (!req.is_anon) {
+		struct space *space = space_cache_find_xc(BOX_CLUSTER_ID);
+		struct index *index = index_find(space, 0);
+		if (index == NULL)
+			diag_raise();
+		char key[5];
+		mp_encode_uint(key, replica->id);
+		struct tuple *tuple;
+		if (index_get(index, key, 1, &tuple) != 0)
+			diag_raise();
+		/* A pending deletion may still need this replica's ACK. */
+		if (tuple != NULL) {
+			struct tt_uuid uuid;
+			int rc = tuple_field_uuid(
+				tuple, BOX_CLUSTER_FIELD_UUID, &uuid);
+			if (rc != 0)
+				diag_raise();
+			if (!tt_uuid_is_equal(&uuid, &req.instance_uuid))
+				tnt_raise(ClientError, ER_TOO_EARLY_SUBSCRIBE,
+					  tt_uuid_str(&req.instance_uuid));
+		}
 	}
 	/*
 	 * Replica name mismatch is not considered a critical error. It can

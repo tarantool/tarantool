@@ -1893,10 +1893,11 @@ replica_to_string(const struct replica *replica, const char *addr)
 }
 
 int
-replica_find_new_id(uint32_t *replica_id)
+replica_find_new_id(uint32_t *replica_id, uint32_t reserved_ids)
 {
 	for (uint32_t i = 1; i < VCLOCK_MAX; ++i) {
-		if (replicaset.replica_by_id[i] == NULL) {
+		if (replicaset.replica_by_id[i] == NULL &&
+		    (reserved_ids & (1U << i)) == 0) {
 			*replica_id = i;
 			return 0;
 		}
