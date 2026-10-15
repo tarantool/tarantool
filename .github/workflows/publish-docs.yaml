@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/actions/setup-emmylua-analyzer/**'
       - '.github/workflows/publish-docs.yaml'
+      - 'cmake/CAPIDoc.cmake'
       - 'cmake/LuaAnnotations.cmake'
       - 'Doxyfile.API.in'
       - 'src/**'
@@ -72,12 +73,10 @@ jobs:
       - name: Setup tarantool dependencies
         run: sudo apt install -y libreadline-dev
 
-      - name: Build module API documentation using Doxygen
+      - name: Build C API documentation
         run: |
             cmake .
-            make api
-            sed -e "s%@PROJECT_.\+_DIR@/%%" Doxyfile.API.in > Doxyfile.API
-            doxygen Doxyfile.API
+            make capi-doc
             mkdir -p site/capi
             cp -r doc/capi-site/. site/capi/
 
