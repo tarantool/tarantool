@@ -63,7 +63,7 @@ box.schema.user.drop('testus')
 -- Check 'guest' user
 --
 session.su('guest')
-session.uid()
+session.euid()
 box.space._user:select(1)
 s:select(1)
 s:insert({4})
@@ -88,7 +88,7 @@ s:select()
 box.schema.user.create('uniuser')
 box.schema.user.grant('uniuser', 'read, write, execute, create', 'universe')
 session.su('uniuser')
-uid = session.uid()
+uid = session.euid()
 --
 -- Check universal user
 -- Check delete currently authenticated user
@@ -149,10 +149,10 @@ maxuid = box.space._user.index.primary:max()[1]
 box.schema.user.grant('testuser', 'write', 'space', '_user')
 box.schema.user.grant('testuser', 'create', 'universe')
 session.su('testuser')
-testuser_uid = session.uid()
+testuser_uid = session.euid()
 _ = box.space._user:delete(2)
 box.space._user:select(1)
-uid = box.space._user:insert{maxuid+1, session.uid(), 'someone', 'user', EMPTY_MAP, {}, 0}[1]
+uid = box.space._user:insert{maxuid+1, session.euid(), 'someone', 'user', EMPTY_MAP, {}, 0}[1]
 _ = box.space._user:delete(uid)
 
 session.su('admin')
