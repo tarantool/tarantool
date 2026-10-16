@@ -1617,6 +1617,7 @@ wal_write_vy_log_f(struct cbus_call_msg *msg)
 			return -1;
 	}
 
+	ERROR_INJECT_SLEEP_FOR(ERRINJ_VY_LOG_DELAY_DURATION);
 	if (xlog_write_entry(&vy_log_writer.xlog, entry) < 0)
 		return -1;
 
