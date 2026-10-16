@@ -174,6 +174,7 @@ struct errinj {
 	_(ERRINJ_VY_GC, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_INDEX_DUMP, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_VY_INDEX_FILE_RENAME, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_VY_LOG_DELAY_DURATION, ERRINJ_DOUBLE, {.dparam = 0}) \
 	_(ERRINJ_VY_LOG_FILE_RENAME, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_LOG_FLUSH, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_LOG_WRITE_BAD_RECORDS, ERRINJ_BOOL, {.bparam = false}) \

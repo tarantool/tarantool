@@ -1140,8 +1140,14 @@ vy_log_end_recovery(void)
 {
 	assert(vy_log.recovery != NULL);
 
-	/* Flush all pending records. */
-	if (vy_log_flush() < 0) {
+	/*
+	 * Flush all pending records. Serialize with flusher which may
+	 * run on recovery.
+	 */
+	latch_lock(&vy_log.latch);
+	int rc = vy_log_flush();
+	latch_unlock(&vy_log.latch);
+	if (rc != 0) {
 		diag_log();
 		say_error("failed to flush vylog after recovery");
 		return -1;
