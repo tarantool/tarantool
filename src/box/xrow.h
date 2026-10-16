@@ -106,6 +106,13 @@ struct xrow_header {
 	const char *audit_context;
 	/** Length of audit context. */
 	uint32_t audit_context_len;
+	/**
+	 * Traceparent. Propagated to all child fibers and requests.
+	 * This is necessary to link the spans together.
+	 */
+	const char *traceparent;
+	/** Length of traceparent context. */
+	uint32_t traceparent_len;
 	/** Transaction meta flags set only in the last transaction row. */
 	union {
 		uint8_t flags;

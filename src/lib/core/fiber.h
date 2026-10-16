@@ -1320,6 +1320,14 @@ fiber_set_system(struct fiber *f, bool yesno);
 void
 fiber_set_managed_shutdown(struct fiber *f);
 
+/** Set null traceparent. */
+void
+fiber_set_traceparent_null(char traceparent[TRACEPARENT_LEN]);
+
+/** If traceparent is blank returns true, otherwise returns false. */
+bool
+fiber_is_traceparent_null(const char traceparent[TRACEPARENT_LEN]);
+
 /** Set tracing context in fiber. */
 void
 fiber_set_traceparent(struct fiber *f, const char traceparent[TRACEPARENT_LEN]);

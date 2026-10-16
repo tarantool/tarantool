@@ -100,6 +100,11 @@ extern const char *iproto_flag_bit_strs[];
 	  * or modify the value.
 	  */								\
 	 _(AUDIT_CONTEXT, 0x0c, MP_STR)					\
+	/**
+	 * Traceparent propagated to all child requests and fibers.
+	 * This is necessary to link the spans together.
+	 */								\
+	_(TRACEPARENT, 0x0d, MP_STR)					\
 	/* Leave a gap for other keys in the header. */			\
 	_(SPACE_ID, 0x10, MP_UINT)					\
 	_(INDEX_ID, 0x11, MP_UINT)					\

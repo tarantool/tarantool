@@ -255,6 +255,10 @@ xrow_decode(struct xrow_header *header, const char **pos,
 			header->audit_context = mp_decode_str(
 				pos, &header->audit_context_len);
 			break;
+		case IPROTO_TRACEPARENT:
+			header->traceparent = mp_decode_str(
+				pos, &header->traceparent_len);
+			break;
 		default:
 			/* unknown header */
 			mp_next(pos);
@@ -439,6 +443,7 @@ xrow_header_encode(const struct xrow_header *header, uint64_t sync, char *data)
 		map_size++;
 	}
 	assert(header->audit_context == NULL);
+	assert(header->traceparent == NULL);
 	assert(d <= data + XROW_HEADER_LEN_MAX);
 	mp_encode_map(data, map_size);
 	ERROR_INJECT(ERRINJ_XLOG_WRITE_INVALID_HEADER, {

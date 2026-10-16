@@ -2542,6 +2542,10 @@ srv_accept_msg(struct cmsg *m)
 		fiber_set_audit_context(msg->fiber, msg->header.audit_context,
 					msg->header.audit_context_len);
 	}
+	if (msg->header.traceparent != NULL) {
+		assert(msg->header.traceparent_len == TRACEPARENT_LEN);
+		fiber_set_traceparent(msg->fiber, msg->header.traceparent);
+	}
 	return msg;
 }
 
@@ -2606,6 +2610,7 @@ srv_end_msg(struct iproto_msg *msg)
 	rlist_del(&msg->in_inprogress);
 	msg->fiber->storage.runtime_credentials = NULL;
 	fiber_set_audit_context(msg->fiber, NULL, 0);
+	fiber_set_traceparent_null(msg->fiber->storage.traceparent);
 	msg->fiber = NULL;
 }
 

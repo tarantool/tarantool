@@ -125,3 +125,61 @@ g.test_check_tracer_with_fibers_successive = function(cg)
         'TRACER:.* parent_id=0000000000000000 .*name=span_fiber_3'
     ), nil)
 end
+
+--
+-- Verify that `parent_id` is not lost in iproto calls.
+--
+g.test_check_tracer_with_iproto = function(cg)
+    cg.server:exec(function()
+        box.schema.user.create('test_user', {password = 'test'})
+        box.schema.user.grant('test_user', 'read, write, execute', 'universe')
+        box.schema.user.grant('test_user', 'create', 'space')
+
+        local function f2()
+            box.schema.func.create('f1', {
+                if_not_exists = true,
+                body = [[
+                    function()
+                        local tracer = require('tracer')
+                        tracer.enable()
+                        tracer.call_span("span_f0", function() return 0 end)
+                    end
+                ]]
+            })
+            box.schema.func.create('f1', {if_not_exists = true})
+            local net_box = require('net.box')
+            local cn = net_box.connect(box.cfg.listen,
+                                       {user = 'test_user', password = 'test'})
+            cn:call('f1', {})
+        end
+
+        local tracer = require('tracer')
+        tracer.enable()
+
+        tracer.call_span("span_f2", f2)
+
+        local function f3()
+            rawset(_G, 'f0', function() return 0 end)
+            local net_box = require('net.box')
+            local cn = net_box.connect(box.cfg.listen,
+                                       {user = 'test_user',
+                                        password = 'test'})
+            local eval_str = 'local tracer = require("tracer") '..
+                             'tracer.enable() '..
+                             'tracer.call_span("span_f00", f0)'
+            cn:eval(eval_str, {})
+        end
+        tracer.call_span("span_f3", f3)
+    end)
+    t.assert(cg.server:grep_log('TRACER: .*name=span_f2'))
+    t.assert(cg.server:grep_log('TRACER: .*name=span_f0'))
+    t.assert_equals(cg.server:grep_log(
+        'TRACER:.* parent_id=0000000000000000 .*name=span_f0'
+    ), nil)
+
+    t.assert(cg.server:grep_log('TRACER: .*name=span_f3'))
+    t.assert(cg.server:grep_log('TRACER: .*name=span_f00'))
+    t.assert_equals(cg.server:grep_log(
+        'TRACER:.* parent_id=0000000000000000 .*name=span_f00'
+    ), nil)
+end
