@@ -1314,6 +1314,10 @@ fiber_set_system(struct fiber *f, bool yesno);
 void
 fiber_set_managed_shutdown(struct fiber *f);
 
+/** If traceparent is blank returns true, otherwise returns false. */
+bool
+fiber_is_traceparent_null(const struct fiber *fiber);
+
 /**
  * Cancel all client (non system) fibers and wait until they finished.
  *

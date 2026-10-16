@@ -2383,6 +2383,16 @@ fiber_set_managed_shutdown(struct fiber *f)
 	}
 }
 
+bool
+fiber_is_traceparent_null(const struct fiber *fiber)
+{
+	if (fiber->storage.traceparent.span_id != 0)
+		return false;
+	if (fiber->storage.traceparent.trace_flag)
+		return false;
+	return true;
+}
+
 int
 fiber_shutdown(double timeout)
 {

@@ -255,6 +255,12 @@ xrow_decode(struct xrow_header *header, const char **pos,
 			header->audit_context = mp_decode_str(
 				pos, &header->audit_context_len);
 			break;
+		case IPROTO_TRACE_CONTEXT_SPAN_ID:
+			header->trace_context_span_id = mp_decode_uint(pos);
+			break;
+		case IPROTO_TRACE_CONTEXT_FLAG:
+			header->trace_context_flag = mp_decode_bool(pos);
+			break;
 		default:
 			/* unknown header */
 			mp_next(pos);
