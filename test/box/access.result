@@ -134,7 +134,7 @@ session.su('rich')
 uid = session.uid()
 ---
 ...
-box.schema.func.create('dummy')
+box.schema.func.create('dummy', {body = 'function() end', is_sandboxed = true})
 ---
 ...
 session.su('admin')
@@ -700,7 +700,7 @@ twostep = box.schema.space.create('twostep')
 index2 = twostep:create_index('primary')
 ---
 ...
-box.schema.func.create('test')
+box.schema.func.create('test', {body = 'function() end', is_sandboxed = true})
 ---
 ...
 box.session.su('admin')
@@ -1589,7 +1589,7 @@ _ = s1:create_index("primary")
 _ = box.schema.user.create('test_user')
 ---
 ...
-_ = box.schema.func.create('test_func')
+_ = box.schema.func.create('test_func', {body = 'function() end', is_sandboxed = true})
 ---
 ...
 seq1 = box.schema.sequence.create('test_seq')
