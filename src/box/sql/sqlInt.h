@@ -1276,7 +1276,6 @@ struct Expr {
 	 * access them will result in a segfault or malfunction.
 	 ********************************************************************/
 
-	int nHeight;		/* Height of the tree headed by this node */
 	int iTable;		/* TK_COLUMN_REF: cursor number of table holding column
 				 * TK_REGISTER: register number
 				 * TK_TRIGGER: 1 -> new, 0 -> old
@@ -1892,7 +1891,6 @@ struct Parse {
 	int aTempReg[8];	/* Holding area for temporary registers */
 	ynVar nVar;		/* Number of '?' variables seen in the SQL so far */
 	u8 explain;		/* True if the EXPLAIN flag is found on the query */
-	int nHeight;		/* Expression tree height of current sub-select */
 	int iSelectId;		/* ID of current select for EXPLAIN output */
 	int iNextSelectId;	/* Next available select ID for EXPLAIN output */
 	VList *pVList;		/* Mapping between variable names and numbers */
@@ -2425,7 +2423,10 @@ sqlExprAttachSubtrees(struct Expr *pRoot, struct Expr *pLeft,
 		      struct Expr *pRight);
 
 Expr *sqlPExpr(Parse *, int, Expr *, Expr *);
-void sqlPExprAddSelect(Parse *, Expr *, Select *);
+
+/** Set the subquery of the expression. */
+void
+sqlPExprAddSelect(struct Expr *expr, struct Select *select);
 
 /**
  * Join two expressions using an AND operator. If either
@@ -2443,7 +2444,6 @@ void sqlPExprAddSelect(Parse *, Expr *, Select *);
 struct Expr *
 sql_and_expr_new(struct Expr *left_expr, struct Expr *right_expr);
 
-Expr *sqlExprFunction(Parse *, ExprList *, Token *);
 void sqlExprAssignVarNumber(Parse *, Expr *, u32);
 
 /** Check if the token type denotes a bind variable. */
@@ -4308,10 +4308,6 @@ void sqlWithPush(Parse *, With *, u8);
 #define IN_INDEX_MEMBERSHIP  0x0002	/* IN operator used for membership test */
 #define IN_INDEX_LOOP        0x0004	/* IN operator used as a loop */
 int sqlFindInIndex(Parse *, Expr *, u32, int *, int *, int *);
-
-void sqlExprSetHeightAndFlags(Parse * pParse, Expr * p);
-int sqlSelectExprHeight(Select *);
-int sqlExprCheckHeight(Parse *, int);
 
 #ifdef SQL_DEBUG
 void sqlParserTrace(FILE *, char *);

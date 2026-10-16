@@ -5497,15 +5497,6 @@ sqlSelect(Parse * pParse,		/* The parser context */
 			continue;
 		}
 
-		/* Increment Parse.nHeight by the height of the largest expression
-		 * tree referred to by this, the parent select. The child select
-		 * may contain expression trees of at most
-		 * (SQL_MAX_EXPR_DEPTH-Parse.nHeight) height. This is a bit
-		 * more conservative than necessary, but much easier than enforcing
-		 * an exact limit.
-		 */
-		pParse->nHeight += sqlSelectExprHeight(p);
-
 		/* Make copies of constant WHERE-clause terms in the outer query down
 		 * inside the subquery.  This can help the subquery to run more efficiently.
 		 */
@@ -5602,7 +5593,6 @@ sqlSelect(Parse * pParse,		/* The parser context */
 			sqlVdbeChangeP1(v, topAddr, retAddr);
 			sqlClearTempRegCache(pParse);
 		}
-		pParse->nHeight -= sqlSelectExprHeight(p);
 	}
 
 	/* Various elements of the SELECT copied into local variables for
