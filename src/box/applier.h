@@ -191,6 +191,13 @@ struct applier {
 	bool is_paused;
 	/** Condition variable signaled to resume the applier. */
 	struct fiber_cond resume_cond;
+	/**
+	 * Set by box.cfg() for the master applier of a named replica which
+	 * recovered a snapshot written by the new bootstrap protocol before it
+	 * managed to register. Such an applier must first catch up as an
+	 * anonymous subscriber and only then send REGISTER - see applier_f().
+	 */
+	bool register_after_catchup;
 	/* Diag to raise an error. */
 	struct diag diag;
 	/* Master's vclock at the time of SUBSCRIBE. */
