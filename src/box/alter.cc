@@ -3577,6 +3577,20 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 		if (access_check_ddl(def->name, def->uid, NULL,
 				     SC_FUNCTION, PRIV_C) != 0)
 			return -1;
+		/*
+		 * Registering a non-sandboxed function requires execute on
+		 * universe: it runs arbitrary code, which is equivalent to
+		 * that privilege.
+		 */
+		if (!def->is_sandboxed && access_check_universe(PRIV_X) != 0) {
+			const char *details = tt_sprintf(
+				"Failed to create function '%s': Can't create"
+				" `is_sandboxed = false` function without"
+				" execute privilege on universe.", def->name);
+			error_set_str(diag_last_error(diag_get()),
+				      "details", details);
+			return -1;
+		}
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(on_create_func_rollback, NULL);
 		if (on_rollback == NULL)

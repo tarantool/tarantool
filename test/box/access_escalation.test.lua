@@ -63,9 +63,12 @@ connection:close()
 box.schema.user.create('underprivileged')
 box.schema.user.grant('underprivileged', 'read,write', 'space', '_func')
 box.schema.user.grant('underprivileged', 'create', 'function')
+-- Creating a function requires execute on universe, revoke it right after.
+box.schema.user.grant('underprivileged', 'execute', 'universe')
 box.session.su('underprivileged')
 box.schema.func.create('setuid', {setuid=true})
 box.session.su('admin')
+box.schema.user.revoke('underprivileged', 'execute', 'universe')
 --
 -- create a deprived function
 --
