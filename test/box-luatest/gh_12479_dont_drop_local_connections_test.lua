@@ -33,7 +33,7 @@ g.test_local_connections_survive = function()
 
         chan:get()
         -- Check dropping is successful.
-        box.iproto.internal.drop_connections(30)
+        box.iproto.drop_connections(30)
         assert(conn.state == 'active', 'connection state: ' .. conn.state)
         -- Check long polling request is not cancelled.
         assert(chan:put(2, 30), 'put error')
