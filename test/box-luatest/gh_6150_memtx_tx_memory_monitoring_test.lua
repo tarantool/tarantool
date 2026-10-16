@@ -16,10 +16,10 @@ local SIZE_OF_STORY_LINK = 80
 local SIZE_OF_DEL_STORY_LINK = 24
 -- Size of tuple with 2 number fields
 local SIZE_OF_TUPLE = 9
--- Size of xrow for tuples with 2 number fields
-local SIZE_OF_XROW = 179
 -- Size of xrow for tuples with a number field and a 3-number array field
 local SIZE_OF_MULTIKEY_XROW = 182
+-- Size of xrow for tuples with 2 number fields
+local SIZE_OF_XROW = 195
 -- Size of rollback info.
 local SIZE_OF_UNDO = 16
 -- Tracker can allocate additional memory, be careful!

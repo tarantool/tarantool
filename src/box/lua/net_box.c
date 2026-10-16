@@ -648,10 +648,12 @@ netbox_begin_encode(struct mpstream *stream, uint64_t sync,
 		fiber(), &audit_context_len);
 
 	/* encode header */
+	bool is_traceparent_null = fiber_is_traceparent_null(fiber());
 	mpstream_encode_map(stream, (1 + (sync != 0) +
 				     (thread_id != XROW_THREAD_UNSPEC) +
 				     (stream_id != 0) +
-				     (audit_context != NULL)));
+				     (audit_context != NULL) +
+				     2 * (!is_traceparent_null)));
 
 	if (sync != 0) {
 		mpstream_encode_uint(stream, IPROTO_SYNC);
@@ -672,6 +674,14 @@ netbox_begin_encode(struct mpstream *stream, uint64_t sync,
 	if (audit_context != NULL) {
 		mpstream_encode_uint(stream, IPROTO_AUDIT_CONTEXT);
 		mpstream_encode_strn(stream, audit_context, audit_context_len);
+	}
+	if (!is_traceparent_null) {
+		mpstream_encode_uint(stream, IPROTO_TRACE_CONTEXT_SPAN_ID);
+		mpstream_encode_uint(stream,
+				     fiber()->storage.traceparent.span_id);
+		mpstream_encode_uint(stream, IPROTO_TRACE_CONTEXT_FLAG);
+		mpstream_encode_bool(stream,
+				     fiber()->storage.traceparent.trace_flag);
 	}
 	/* Caller should remember how many bytes was used in ibuf */
 	return used;

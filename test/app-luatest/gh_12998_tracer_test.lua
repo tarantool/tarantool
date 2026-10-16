@@ -141,3 +141,65 @@ g.test_check_tracer_with_fibers_successive = function(cg)
         t.assert_equals(_G.storage_span[1].parent_id, _G.storage_span[2].id)
     end)
 end
+
+--
+-- Verify that `parent_id` is not lost in iproto calls.
+--
+g.test_check_tracer_with_iproto = function(cg)
+    cg.server:exec(function()
+        local storage_span = {}
+        rawset(_G, 'storage_span', storage_span)
+
+        local function record_span(span)
+            table.insert(_G.storage_span, span)
+        end
+
+        box.schema.user.create('test_user', {password = 'test'})
+        box.schema.user.grant('test_user', 'read, write, execute', 'universe')
+        box.schema.user.grant('test_user', 'create', 'space')
+
+        local function f2()
+            box.schema.func.create('f1', {
+                if_not_exists = true,
+                body = [[
+                    function()
+                        local tracer = require('tracer')
+                        tracer.enable()
+                        tracer.call_span("span_f0", function() return 0 end)
+                    end
+                ]]
+            })
+            box.schema.func.create('f1', {if_not_exists = true})
+            local net_box = require('net.box')
+            local cn = net_box.connect(box.cfg.listen,
+                                       {user = 'test_user', password = 'test'})
+            cn:call('f1', {})
+        end
+
+        local tracer = require('tracer')
+        tracer.enable()
+        tracer.on_span_end(record_span)
+
+        tracer.call_span("span_f2", f2)
+
+        local function f3()
+            rawset(_G, 'f0', function() return 0 end)
+            local net_box = require('net.box')
+            local cn = net_box.connect(box.cfg.listen,
+                                       {user = 'test_user',
+                                        password = 'test'})
+            local eval_str = 'local tracer = require("tracer") '..
+                             'tracer.enable() '..
+                             'tracer.call_span("span_f00", f0)'
+            cn:eval(eval_str, {})
+        end
+        tracer.call_span("span_f3", f3)
+        t.assert_equals(#_G.storage_span, 4)
+        t.assert_equals(_G.storage_span[1].name, "span_f0")
+        t.assert_equals(_G.storage_span[2].name, "span_f2")
+        t.assert_equals(_G.storage_span[1].parent_id, _G.storage_span[2].id)
+        t.assert_equals(_G.storage_span[3].name, "span_f00")
+        t.assert_equals(_G.storage_span[4].name, "span_f3")
+        t.assert_equals(_G.storage_span[3].parent_id, _G.storage_span[4].id)
+    end)
+end

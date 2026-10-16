@@ -180,8 +180,7 @@ static int (*fiber_invoke)(fiber_func f, va_list ap);
 #define ASAN_FINISH_SWITCH_FIBER(fake_stack_save)
 #endif
 
-/** Set null traceparent. */
-static void
+void
 fiber_set_traceparent_null(struct fiber *fiber)
 {
 	fiber->storage.traceparent.span_id = 0;
@@ -2391,6 +2390,16 @@ fiber_set_managed_shutdown(struct fiber *f)
 		f->flags |= FIBER_MANAGED_SHUTDOWN;
 		cord()->managed_shutdown_fiber_count++;
 	}
+}
+
+bool
+fiber_is_traceparent_null(const struct fiber *fiber)
+{
+	if (fiber->storage.traceparent.span_id != 0)
+		return false;
+	if (fiber->storage.traceparent.trace_flag != true)
+		return false;
+	return true;
 }
 
 int
