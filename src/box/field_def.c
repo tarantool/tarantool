@@ -36,6 +36,7 @@
 #include "mp_extension_types.h"
 #include "mp_uuid.h"
 #include "schema_def.h"
+#include "tt_compression.h"
 #include "tt_uuid.h"
 #include "tt_static.h"
 #include "tuple_constraint_def.h"
@@ -521,7 +522,7 @@ const struct field_def field_def_default = {
 	.default_value_size = 0,
 	.default_func_id = 0,
 	.layout = NULL,
-	.compression_opts = compression_opts_default,
+	.compression_opts = {.type = COMPRESSION_TYPE_NONE},
 	.constraint_count = 0,
 	.constraint_def = NULL,
 };

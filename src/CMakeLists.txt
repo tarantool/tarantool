@@ -439,6 +439,7 @@ if(BUILD_STATIC AND OPENSSL_USE_STATIC_LIBS)
             -DFILE=${PROJECT_BINARY_DIR}/src/tarantool
             -DCMAKE_CXX_COMPILER_ID=${CMAKE_CXX_COMPILER_ID}
             -DENABLE_ASAN=${ENABLE_ASAN}
+            -DENABLE_TSAN=${ENABLE_TSAN}
             -DOSS_FUZZ=${OSS_FUZZ}
             -P ${PROJECT_SOURCE_DIR}/cmake/CheckDependencies.cmake
     )

@@ -29,6 +29,7 @@ plain_iostream_create(struct iostream *io, int fd)
 	io->fd = fd;
 }
 
+__attribute__((no_sanitize("thread")))
 void
 iostream_close(struct iostream *io)
 {
