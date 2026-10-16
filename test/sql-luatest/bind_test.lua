@@ -333,3 +333,61 @@ g.test_bind_numbering_in_compound_select = function(cg)
         t.assert_equals(res.rows, {{1, 1}, {2, 2}, {3, 3}})
     end)
 end
+
+--
+-- Make sure anonymous bind variables are numbered in the order they appear in
+-- the query, regardless of the clause they belong to.
+--
+g.test_bind_numbering_in_select_clauses = function(cg)
+    cg.server:exec(function()
+        box.execute([[CREATE TABLE t (id INT PRIMARY KEY, x INT);]])
+        box.execute([[INSERT INTO t VALUES (1, 10), (2, 20), (3, 30);]])
+
+        local sql = [[SELECT ?, x FROM SEQSCAN t WHERE x = ?;]]
+        local res = _G.execute(sql, {'a', 10})
+        t.assert_equals(res.rows, {{'a', 10}})
+
+        sql = [[SELECT ?, x FROM SEQSCAN t GROUP BY x + ? HAVING x = ?;]]
+        res = _G.execute(sql, {'a', 0, 10})
+        t.assert_equals(res.rows, {{'a', 10}})
+
+        sql = [[SELECT x FROM SEQSCAN t ORDER BY x * ? LIMIT ?;]]
+        res = _G.execute(sql, {-1, 1})
+        t.assert_equals(res.rows, {{30}})
+
+        sql = [[SELECT x FROM SEQSCAN t ORDER BY x LIMIT ? OFFSET ?;]]
+        res = _G.execute(sql, {2, 1})
+        t.assert_equals(res.rows, {{20}, {30}})
+
+        sql = [[SELECT x FROM SEQSCAN t ORDER BY x LIMIT ?, ?;]]
+        res = _G.execute(sql, {2, 1})
+        t.assert_equals(res.rows, {{30}})
+
+        sql = [[SELECT ?, v FROM (SELECT ? AS v);]]
+        res = _G.execute(sql, {'a', 'b'})
+        t.assert_equals(res.rows, {{'a', 'b'}})
+
+        sql = [[SELECT ?, t1.x FROM SEQSCAN t AS t1 JOIN SEQSCAN t AS t2
+                ON t2.x = ? WHERE t1.x = ?;]]
+        res = _G.execute(sql, {'a', 10, 20})
+        t.assert_equals(res.rows, {{'a', 20}})
+
+        sql = [[SELECT ? FROM SEQSCAN t WHERE x IN (SELECT ?);]]
+        res = _G.execute(sql, {'a', 10})
+        t.assert_equals(res.rows, {{'a'}})
+
+        sql = [[WITH c(v) AS (SELECT ?) SELECT ?, v FROM SEQSCAN c;]]
+        res = _G.execute(sql, {'a', 'b'})
+        t.assert_equals(res.rows, {{'b', 'a'}})
+
+        sql = [[WITH c(v) AS (SELECT ?)
+                SELECT v FROM SEQSCAN c UNION ALL SELECT ?;]]
+        res = _G.execute(sql, {'a', 'b'})
+        t.assert_equals(res.rows, {{'a'}, {'b'}})
+
+        res = _G.execute([[SELECT ?, [?, ?][?];]], {'a', 10, 20, 2})
+        t.assert_equals(res.rows, {{'a', 20}})
+
+        box.execute([[DROP TABLE t;]])
+    end)
+end
