@@ -367,6 +367,13 @@ if (EXPORT_LIBCURL_SYMBOLS)
         ${PROJECT_SOURCE_DIR}/extra/exports_libcurl)
 endif()
 
+if (TARGET_OS_DARWIN AND MIMALLOC_OVERRIDE_CPP)
+    include(MimallocExports)
+    set(mimalloc_exports ${PROJECT_BINARY_DIR}/extra/exports_mimalloc)
+    BuildMimallocNewDeleteSymbols(${mimalloc_exports})
+    set(exports_file_sources ${exports_file_sources} ${mimalloc_exports})
+endif()
+
 if (ENABLE_FUZZER AND ENABLE_LIBFUZZER_STATIC_LINKAGE)
     include(LibFuzzer)
     set(libfuzzer_exports ${PROJECT_BINARY_DIR}/extra/exports_libfuzzer)
