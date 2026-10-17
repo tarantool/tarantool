@@ -39,6 +39,7 @@ local reference_table = {
         STREAM_ID = 0x0a,
         THREAD_ID = 0x0b,
         AUDIT_CONTEXT = 0x0c,
+        TRACEPARENT = 0x0d,
         SPACE_ID = 0x10,
         INDEX_ID = 0x11,
         LIMIT = 0x12,

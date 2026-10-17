@@ -60,6 +60,17 @@
  */
 #define FIBER_LUA_NOREF (-2)
 
+/**
+ * Len of traceparent in opentelemetry
+ * traceparent: version-trace_id-span_id-trace_flag
+ * version 2 symbols
+ * trace_id 32 symbols
+ * span_id 16 symbols
+ * trace_flag 2 symbols
+ * 3 separator characters `-`
+ */
+#define TRACEPARENT_LEN 55
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -794,6 +805,8 @@ struct fiber {
 		/** Length of `audit_context`. */
 		size_t audit_context_len;
 
+		/** Tracing data in OpenTelemetry format. */
+		char traceparent[TRACEPARENT_LEN];
 	} storage;
 	/** An object to wait for incoming message or a reader. */
 	struct ipc_wait_pad *wait_pad;
@@ -1306,6 +1319,22 @@ fiber_set_system(struct fiber *f, bool yesno);
 /** Turn managed shutdown on. See FIBER_MANAGED_SHUTDOWN. */
 void
 fiber_set_managed_shutdown(struct fiber *f);
+
+/** Set null traceparent. */
+void
+fiber_set_traceparent_null(char traceparent[TRACEPARENT_LEN]);
+
+/** If traceparent is blank returns true, otherwise returns false. */
+bool
+fiber_is_traceparent_null(const char traceparent[TRACEPARENT_LEN]);
+
+/** Set tracing context in fiber. */
+void
+fiber_set_traceparent(struct fiber *f, const char traceparent[TRACEPARENT_LEN]);
+
+/** Get traceparent. */
+void
+fiber_get_traceparent(struct fiber *f, char traceparent[TRACEPARENT_LEN]);
 
 /**
  * Cancel all client (non system) fibers and wait until they finished.

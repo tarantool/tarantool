@@ -180,6 +180,16 @@ static int (*fiber_invoke)(fiber_func f, va_list ap);
 #define ASAN_FINISH_SWITCH_FIBER(fake_stack_save)
 #endif
 
+void
+fiber_set_traceparent_null(char traceparent[TRACEPARENT_LEN])
+{
+	for (int i = 0; i < TRACEPARENT_LEN; i++)
+		traceparent[i] = '0';
+	traceparent[2] = '-';
+	traceparent[35] = '-';
+	traceparent[52] = '-';
+}
+
 static inline int
 fiber_madvise(void *addr, size_t len, int advice)
 {
@@ -1093,6 +1103,7 @@ fiber_recycle(struct fiber *fiber)
 	memset(&fiber->storage, 0, sizeof(fiber->storage));
 	fiber->storage.lua.storage_ref = FIBER_LUA_NOREF;
 	fiber->storage.lua.fid_ref = FIBER_LUA_NOREF;
+	fiber_set_traceparent_null(fiber->storage.traceparent);
 	unregister_fid(fiber);
 	fiber->fid = 0;
 	fiber->gc_initial_size = 0;
@@ -1614,6 +1625,7 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 	}
 	fiber->fid = cord->next_fid;
 	fiber_set_name(fiber, name);
+	fiber_set_traceparent_null(fiber->storage.traceparent);
 	register_fid(fiber);
 	fiber->max_slice = zero_slice;
 	fiber->csw = 0;
@@ -1625,7 +1637,6 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 	assert(cord->next_fid > FIBER_ID_MAX_RESERVED);
 	if (!(fiber->flags & FIBER_IS_SYSTEM))
 		cord()->client_fiber_count++;
-
 	return fiber;
 
 }
@@ -2380,6 +2391,32 @@ fiber_set_managed_shutdown(struct fiber *f)
 		f->flags |= FIBER_MANAGED_SHUTDOWN;
 		cord()->managed_shutdown_fiber_count++;
 	}
+}
+
+bool
+fiber_is_traceparent_null(const char traceparent[TRACEPARENT_LEN])
+{
+	for (int i = 0; i < TRACEPARENT_LEN; i++) {
+		if (traceparent[i] != '0') {
+			if (traceparent[i] != '-')
+				return false;
+			else if (i != 2 && i != 35 && i != 52)
+				return false;
+		}
+	}
+	return true;
+}
+
+void
+fiber_set_traceparent(struct fiber *f, const char traceparent[TRACEPARENT_LEN])
+{
+	memcpy(f->storage.traceparent, traceparent, TRACEPARENT_LEN);
+}
+
+void
+fiber_get_traceparent(struct fiber *f, char traceparent[TRACEPARENT_LEN])
+{
+	memcpy(traceparent, f->storage.traceparent, TRACEPARENT_LEN);
 }
 
 int
