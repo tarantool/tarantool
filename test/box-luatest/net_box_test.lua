@@ -428,3 +428,60 @@ end
 g.after_test('test_audit_context', function()
     box.internal.set_audit_context(nil)
 end)
+
+--
+-- ghs-165: decoding of deeply nested MsgPack values received over the network
+-- or passed to a server must be limited to prevent a stack overflow.
+--
+local g_ghs_165 = t.group('ghs_165')
+
+-- The depth is big enough to overflow the C stack when the recursion is
+-- not limited.
+local deep_depth = 200 * 1000
+
+local function nested_array(depth)
+    return string.rep('\x91', depth) .. '\xc0'
+end
+
+g_ghs_165.before_all(function(cg)
+    cg.server = server:new({alias = 'ghs_165'})
+    cg.server:start()
+    cg.server:exec(function()
+        rawset(_G, 'ghs_165_noop', function()
+            return true
+        end)
+        rawset(_G, 'ghs_165_deep', function(depth)
+            return require('msgpack').object_from_raw(
+                string.rep('\x91', depth) .. '\xc0')
+        end)
+    end)
+end)
+
+g_ghs_165.after_all(function(cg)
+    cg.server:drop()
+end)
+
+-- Check that net.box decoding of a deeply nested response received from a
+-- server raises an error instead of overflowing the C stack (net_box.c).
+g_ghs_165.test_netbox_deep_response = function(cg)
+    local c = net.connect(cg.server.net_box_uri)
+    local msg = 'msgpack.decode: too high nest level - 129'
+    t.assert_error_msg_content_equals(msg, function()
+        c:call('ghs_165_deep', {deep_depth})
+    end)
+    c:close()
+end
+
+-- Check that decoding of deeply nested arguments received by a server
+-- raises an error instead of overflowing the C stack (misc.cc). The server
+-- must survive.
+g_ghs_165.test_server_deep_call_args = function(cg)
+    local c = net.connect(cg.server.net_box_uri)
+    local args = msgpack.object_from_raw(nested_array(deep_depth))
+    local msg = 'msgpack.decode: too high nest level - 129'
+    t.assert_error_msg_content_equals(msg, function()
+        c:call('ghs_165_noop', args)
+    end)
+    t.assert(c:ping())
+    c:close()
+end
