@@ -55,6 +55,7 @@ set(core_sources
     rmean.c
     tnt_thread.cc
     opt_def.c
+    tracer.c
 )
 
 if (ENABLE_BACKTRACE)
