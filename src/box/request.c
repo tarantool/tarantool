@@ -85,8 +85,7 @@ request_create_from_tuple(struct request *request, struct space *space,
 		 * turn this request into no-op.
 		 */
 		request->type = IPROTO_NOP;
-		request_update_header(request, row, region);
-		return 0;
+		goto out;
 	}
 	/*
 	 * Space pointer may be zero in case of NOP, in which case
@@ -122,6 +121,8 @@ request_create_from_tuple(struct request *request, struct space *space,
 			request->ops_end = upsert_ops_end;
 		}
 	}
+out:
+	txn_current_stmt(in_txn())->type = request->type;
 	request_update_header(request, row, region);
 	return 0;
 }
