@@ -182,6 +182,11 @@ static bool is_storage_shutdown = false;
 static bool is_ro = true;
 /** Whether the read_only option has been applied at least once. */
 static bool is_ro_cfg_applied;
+/**
+ * Custom description set via box.cfg.ro_details. NULL when not configured.
+ * Owns its memory, since cfg_gets() returns a transient buffer.
+ */
+static char *box_ro_details_cfg;
 static fiber_cond ro_cond;
 
 /**
@@ -419,10 +424,20 @@ box_ro_state_msg_snprint(char *buf, int size)
 				" and is frozen until promotion");
 		}
 	} else {
-		if (is_ro)
+		if (is_ro) {
 			SNPRINT(total, snprintf, buf, size,
 				"box.cfg.read_only is true");
-		else if (is_waiting_for_own_rows)
+			if (box_ro_details_cfg != NULL) {
+				/*
+				 * Escape arbitrary user text to keep log/error
+				 * records single-line. Introspection and error
+				 * fields retain the original value.
+				 */
+				SNPRINT(total, snprintf, buf, size, " - ");
+				SNPRINT(total, json_escape, buf, size,
+					box_ro_details_cfg);
+			}
+		} else if (is_waiting_for_own_rows)
 			SNPRINT(total, snprintf, buf, size,
 				"it has lost some of its own transactions "
 				"and is waiting to receive them back from "
@@ -489,6 +504,14 @@ box_ro_reason(void)
 	return NULL;
 }
 
+const char *
+box_ro_details(void)
+{
+	if (is_box_configured && box_raft_is_ro())
+		return NULL;
+	return is_ro ? box_ro_details_cfg : NULL;
+}
+
 int
 box_check_slice_slow(void)
 {
@@ -504,6 +527,9 @@ box_check_writable(void)
 	struct raft *raft = box_raft();
 	error_append_msg(e, " - %s", box_ro_state_msg());
 	error_set_str(e, "reason", box_ro_reason());
+	const char *details = box_ro_details();
+	if (details != NULL)
+		error_set_str(e, "details", details);
 	/*
 	 * In case of multiple reasons at the same time only one is reported.
 	 * But the order is important. For example, if the instance has election
@@ -613,11 +639,16 @@ error:
 static bool
 box_check_ro(void);
 
+/** Update box_ro_details_cfg from box.cfg.ro_details. */
+static void
+box_update_ro_details_cfg(void);
+
 void
 box_set_ro(void)
 {
 	is_ro = box_check_ro();
 	is_ro_cfg_applied = true;
+	box_update_ro_details_cfg();
 	box_update_ro_summary();
 }
 
@@ -1788,6 +1819,20 @@ box_check_ro(void)
 	if (mode == RO_CFG_UNLESS_BOOTSTRAP)
 		return !box_is_bootstrap_leader();
 	return mode == RO_CFG_TRUE;
+}
+
+static void
+box_update_ro_details_cfg(void)
+{
+	free(box_ro_details_cfg);
+	box_ro_details_cfg = NULL;
+	if (!is_ro)
+		return;
+	if (!is_box_configured)
+		return;
+	const char *details = cfg_gets("ro_details");
+	if (details != NULL)
+		box_ro_details_cfg = (char *)xstrdup(details);
 }
 
 static bool
@@ -6893,6 +6938,8 @@ box_free(void)
 	coll_id_cache_destroy();
 	port_free();
 	box_lua_call_runtime_priv_reset();
+	free(box_ro_details_cfg);
+	box_ro_details_cfg = NULL;
 	/* schema_module_free(); */
 	/* session_free(); */
 }
