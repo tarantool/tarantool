@@ -115,6 +115,11 @@ if(TARGET_OS_DARWIN AND ENABLE_BACKTRACE)
     add_dependencies(backtrace.test dladdr_no_symbol)
 endif()
 
+create_unit_test(PREFIX tt_pthread
+                 SOURCES tt_pthread.c
+                 LIBRARIES unit pthread
+)
+
 create_unit_test(PREFIX heap
                  SOURCES heap.c
                  LIBRARIES unit
