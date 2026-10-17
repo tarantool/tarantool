@@ -4,6 +4,7 @@
  * Copyright 2010-2022, Tarantool AUTHORS, please see AUTHORS file.
  */
 #include <assert.h>
+#include <pmatomic.h>
 #include <pthread.h>
 #include <stdbool.h>
 #include "tt_sigaction.h"
@@ -15,25 +16,40 @@ static bool main_thread_initialized;
 /** Main thread id, it is set on first tt_sigaction call. */
 static pthread_t main_thread_id;
 
-static void (*sighandlers[SIGMAX])(int signum);
+/** User signal handlers registered with tt_sigaction. */
+static void (*sighandlers[SIGMAX])(int, siginfo_t *, void *);
+/** PID of an unhandled signal sender per signal, 0 if none. */
+static pid_t signal_sender_pid[SIGMAX];
 
 /**
  * Check that signal has been delivered to the main thread
  * and call signal handler or redirect it if thread is not main.
  */
 static void
-sighandler_dispatcher(int signum)
+sighandler_dispatcher(int signum, siginfo_t *info, void *ctx)
 {
+	/*
+	 * No guarantee on which signal sender's PID will be logged in case
+	 * of high contention is provided, but some sender PID will totally
+	 * be logged (and the first logged one will totally be correct PID
+	 * of one of signal senders).
+	 */
 	if (!pthread_equal(pthread_self(), main_thread_id)) {
+		pm_atomic_store(&signal_sender_pid[signum], info->si_pid);
 		pthread_kill(main_thread_id, signum);
 		return;
 	}
+
+	/* Use the redirected PID if provided, use our one otherwise. */
+	pid_t redirected_pid = pm_atomic_load(&signal_sender_pid[signum]);
+	info->si_pid = redirected_pid != 0 ? redirected_pid : info->si_pid;
 	assert(sighandlers[signum] != NULL);
-	sighandlers[signum](signum);
+	sighandlers[signum](signum, info, ctx);
+	pm_atomic_store(&signal_sender_pid[signum], 0);
 }
 
 int
-tt_sigaction(int signum, struct sigaction *sa, struct sigaction *osa)
+tt_sigaction(int signum, struct sigaction *sa)
 {
 	assert(signum < SIGMAX);
 	assert(sa != NULL);
@@ -44,15 +60,14 @@ tt_sigaction(int signum, struct sigaction *sa, struct sigaction *osa)
 		main_thread_initialized = true;
 	}
 
-	void (*old_handler)(int) = sighandlers[signum];
+	/* Update the corresponding sighandlers entry. */
 	if (sa->sa_handler == SIG_DFL || sa->sa_handler == SIG_IGN) {
 		sighandlers[signum] = NULL;
 	} else {
-		sighandlers[signum] = sa->sa_handler;
-		sa->sa_handler = sighandler_dispatcher;
+		assert(sa->sa_flags & SA_SIGINFO);
+		assert(sa->sa_sigaction != NULL);
+		sighandlers[signum] = sa->sa_sigaction;
+		sa->sa_sigaction = sighandler_dispatcher;
 	}
-	int rc = sigaction(signum, sa, osa);
-	if (osa != NULL && old_handler != NULL)
-		osa->sa_handler = old_handler;
-	return rc;
+	return sigaction(signum, sa, NULL);
 }

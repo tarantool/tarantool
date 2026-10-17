@@ -447,6 +447,8 @@ fiber_delete(struct cord *cord, struct fiber *f);
 static void
 cord_add_garbage(struct cord *cord, struct fiber *f);
 
+pid_t fiber_sigurg_pid = 0;
+
 /**
  * Reset slice for currently running fiber.
  * The function is used on yields by main cord.
@@ -2313,11 +2315,22 @@ fiber_wakeup_trigger_cb(struct trigger *trigger, void *event)
 
 /** Reset current slice on SIGURG. */
 static void
-signal_sigurg_cb(int signum)
+signal_sigurg_cb(int signum, siginfo_t *info, void *ctx)
 {
 	(void)signum;
+	(void)ctx;
+
 	assert(cord_is_main());
+
+	/*
+	 * Reset the slice and remember the first SIGURG
+	 * sender to log it in the next fiber slice check.
+	 *
+	 * Pass if a SIGURG was received before and not logged.
+	 */
 	fiber_set_slice(zero_slice);
+	if (fiber_sigurg_pid == 0)
+		fiber_sigurg_pid = info->si_pid;
 }
 
 void
@@ -2328,8 +2341,9 @@ fiber_signal_init(void)
 
 	struct sigaction sa;
 	memset(&sa, 0, sizeof(sa));
-	sa.sa_handler = signal_sigurg_cb;
-	if (tt_sigaction(SIGURG, &sa, NULL) == -1)
+	sa.sa_flags = SA_SIGINFO;
+	sa.sa_sigaction = signal_sigurg_cb;
+	if (tt_sigaction(SIGURG, &sa) == -1)
 		panic_syserror("cannot set fiber sigurg handler");
 }
 

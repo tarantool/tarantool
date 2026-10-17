@@ -1112,6 +1112,13 @@ fiber_time_from_call(void)
 }
 
 /**
+ * The SIGURG sender PID if the main cord fiber slice had been reset by the
+ * signal, 0 otherwise. Checking the fiber slice in the main cord resets the
+ * field back to 0.
+ */
+extern pid_t fiber_sigurg_pid;
+
+/**
  * Set slice for current fiber execution.
  * Slices must be greater than 0.
  */
@@ -1179,6 +1186,12 @@ fiber_get_max_slice(struct fiber *fib)
 static inline int
 fiber_check_slice(void)
 {
+	if (unlikely(fiber_sigurg_pid != 0) && cord_is_main()) {
+		say_warn("got signal #%d (%s) from PID %ld,"
+			 " fiber slice has been zeroed",
+			 SIGURG, strsignal(SIGURG), (long)fiber_sigurg_pid);
+		fiber_sigurg_pid = 0;
+	}
 	double time_from_call = fiber_time_from_call();
 	struct fiber_slice slice = cord()->slice;
 	if (unlikely(slice.warn < time_from_call)) {
