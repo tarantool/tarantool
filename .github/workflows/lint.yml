@@ -89,6 +89,30 @@ jobs:
       - name: Run emmylua_check
         run: emmylua_check --warnings-as-errors --config .emmyrc.json .
 
+  nix:
+    # Run on push to the 'master' and release branches of tarantool/tarantool
+    # or on pull request if the 'notest' label is not set.
+    if: github.repository == 'tarantool/tarantool' &&
+        ( github.event_name != 'pull_request' ||
+          ( github.event_name == 'pull_request' &&
+            !contains(github.event.pull_request.labels.*.name, 'notest') ) )
+
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31.11.1
+      - name: Parse Nix files
+        run: nix-instantiate --parse shell.nix flake.nix
+      - name: Evaluate Nix dev shell
+        run: nix eval --raw .#devShells.x86_64-linux.default.drvPath
+      - name: Lint Nix files
+        run: nix run --inputs-from . nixpkgs#statix -- check .
+      - name: Check Nix formatting
+        run: nix run --inputs-from . nixpkgs#nixfmt -- --check shell.nix flake.nix
+
   release-notes:
     # Run on push to the 'master' and release branches of tarantool/tarantool
     # or on pull request if the 'notest' label is not set.
