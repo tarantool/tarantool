@@ -8,6 +8,7 @@
 #include "vclock/vclock.h"
 
 #include "lua/utils.h"
+#include "lua_test_utils.h"
 
 #define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
@@ -79,6 +80,52 @@ test_call(lua_State *L)
 	check_error("LuajitError", "test error");
 	/* See comment is test_toerror about stack size. */
 	lua_pop(L, 2);
+
+	footer();
+	check_plan();
+}
+
+/** Allocator state for failing Lua allocations. */
+struct fail_alloc_ctx {
+	/** Original allocation function. */
+	lua_Alloc alloc;
+	/** Original allocator's context. */
+	void *ud;
+};
+
+static void *
+fail_alloc(void *ud, void *ptr, size_t osize, size_t nsize)
+{
+	struct fail_alloc_ctx *ctx = ud;
+	if (nsize > osize)
+		return NULL;
+	return ctx->alloc(ctx->ud, ptr, osize, nsize);
+}
+
+static void
+test_newthread(lua_State *L)
+{
+	plan(7);
+	header();
+
+	fail_unless(lua_checkstack(L, LUA_MINSTACK));
+	lua_pushliteral(L, "existing value");
+	int top = lua_gettop(L);
+	struct fail_alloc_ctx ctx;
+	ctx.alloc = lua_getallocf(L, &ctx.ud);
+	lua_setallocf(L, fail_alloc, &ctx);
+	struct lua_State *thread = luaT_newthread(L);
+	lua_setallocf(L, ctx.alloc, ctx.ud);
+	is(thread, NULL, "allocation failure is reported");
+	is(lua_gettop(L), top, "failed creation preserves stack height");
+	check_error("LuajitError", "not enough memory");
+
+	thread = luaT_newthread(L);
+	ok(thread != NULL, "creation succeeds after allocation is restored");
+	is(lua_gettop(L), top + 1, "successful creation pushes one coroutine");
+	is(lua_tothread(L, -1), thread,
+	   "the created coroutine is on the stack");
+	lua_settop(L, 0);
 
 	footer();
 	check_plan();
@@ -563,17 +610,18 @@ test_tovclock(lua_State *L)
 int
 main(void)
 {
-	plan(13);
+	plan(14);
 	header();
 
-	struct lua_State *L = luaL_newstate();
-	luaL_openlibs(L);
+	struct lua_State *L = luaT_newteststate();
 	memory_init();
 	fiber_init(fiber_c_invoke);
 	tarantool_lua_error_init(L);
+	tarantool_lua_utils_init(L);
 
 	test_toerror(L);
 	test_call(L);
+	test_newthread(L);
 	test_dostring(L);
 	test_tolstring_strict(L);
 	test_tointeger_strict(L);
