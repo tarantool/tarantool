@@ -211,6 +211,14 @@ int
 iproto_drop_connections(double timeout);
 
 /**
+ * The same is iproto_drop_connections, but if stale_only is set,
+ * only the connections that correspond to the uris that are not being
+ * listened will be dropped.
+ */
+int
+iproto_drop_connections_ex(double timeout, bool stale_only);
+
+/**
  * Prepare for freeing resources in iproto_free while TX event loop is still
  * running.
  *

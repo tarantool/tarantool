@@ -17,7 +17,7 @@ local clock = require('clock')
 -- {{{ Common test config.
 
 local common = {
-    -- https://github.com/tarantool/tarantool-ee/issues/1660
+    -- https://github.com/tarantool/tarantool/pull/13070
     cfg_conn_reset_option = false,
     -- https://github.com/tarantool/tarantool-ee/issues/1667
     gh1667_solved = true,
@@ -601,13 +601,19 @@ local function cluster_check_net_box_conn(cluster,
     end)
 end
 
--- Checks existing conn to server is closed
--- after security options changed and 'cfg_conn_reset_option' is enabled.
--- Note: the option and closing are not implemented yet (gh-1660).
+local function cluster_drop_stale_iproto_connections(cluster)
+    checks('table')
+    cluster:each(function(server)
+        server:exec(function()
+            box.iproto.drop_connections()
+        end)
+    end)
+end
+
+-- Checks existing conn to server is closed after security options changed.
 g.test_net_box_conn = function()
     t.skip_if(want_to_skip.test_net_box_conn)
     local tc = test_cfg.test_net_box_conn
-    local cn_reset_enabled = common.cfg_conn_reset_option
     local done_tm
 
     done_tm = start_tm('Start with plain transport.')
@@ -621,6 +627,7 @@ g.test_net_box_conn = function()
     })
     cl:start({wait_until_ready = false})
     cluster_wait_until_ready(cl)
+    cluster_drop_stale_iproto_connections(cl)
     done_tm()
 
     -- Test new conn.
@@ -635,10 +642,11 @@ g.test_net_box_conn = function()
         :set_instance_option('i1', 'iproto.ssl', CERTS.NC_CA1_S1)
         :config()
     cluster_reload(cl, cfg_ssl0, {'ssl'})
+    cluster_drop_stale_iproto_connections(cl)
     done_tm()
 
     -- Test old conn became invalid.
-    utils.assert_conn_reset_if_enabled(cl.old_cn.i1, cn_reset_enabled)
+    utils.assert_conn_reset_if_enabled(cl.old_cn.i1, true)
     cluster_close_net_box_conns(cl, 'old_cn')
     -- Test new conn.
     -- Non SSL: error.
@@ -660,10 +668,11 @@ g.test_net_box_conn = function()
         :set_instance_option('i1', 'iproto.ssl', CERTS.CA1_S1)
         :config()
     cluster_reload(cl, cfg_ssl1, CERTS.CA1_C1)
+    cluster_drop_stale_iproto_connections(cl)
     done_tm()
 
     -- Test old conn became invalid.
-    utils.assert_conn_reset_if_enabled(cl.old_cn.i1, cn_reset_enabled)
+    utils.assert_conn_reset_if_enabled(cl.old_cn.i1, true)
     cluster_close_net_box_conns(cl, 'old_cn')
     -- Test new conn.
     -- Non SSL: error.
@@ -685,10 +694,11 @@ g.test_net_box_conn = function()
         :set_instance_option('i1', 'iproto.ssl', CERTS.CA2_S1)
         :config()
     cluster_reload(cl, cfg_ssl2, CERTS.CA2_C1)
+    cluster_drop_stale_iproto_connections(cl)
     done_tm()
 
     -- Test old conn became invalid.
-    utils.assert_conn_reset_if_enabled(cl.old_cn.i1, cn_reset_enabled)
+    utils.assert_conn_reset_if_enabled(cl.old_cn.i1, true)
     cluster_close_net_box_conns(cl, 'old_cn')
     -- Test new conn.
     -- Non SSL: error.
