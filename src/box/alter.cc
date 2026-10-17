@@ -39,7 +39,6 @@
 #include "coll_id_cache.h"
 #include "coll_id_def.h"
 #include "txn.h"
-#include "txn_limbo.h"
 #include "tuple.h"
 #include "tuple_constraint.h"
 #include "fiber.h" /* for gc_pool */
@@ -4275,42 +4274,19 @@ on_commit_replicaset_name(struct trigger *trigger, void * /* event */)
 	return 0;
 }
 
-static int
-start_synchro_filtering(va_list /* ap */)
-{
-	txn_limbo_filter_enable(&txn_limbo);
-	return 0;
-}
-
-static int
-stop_synchro_filtering(va_list /* ap */)
-{
-	txn_limbo_filter_disable(&txn_limbo);
-	return 0;
-}
-
 /** Data passed to on_commit_dd_version trigger. */
 struct on_commit_dd_version_data {
-	/** A fiber to perform async work after commit. */
-	struct fiber *fiber;
 	/** New version. */
 	uint32_t version_id;
 };
 
-/**
- * Update the cached schema version and enable version-dependent features, like
- * split-brain detection. Reenabling is done asynchronously by a separate fiber
- * prepared by on_replace trigger.
- */
+/** Update the cached schema version. */
 static int
 on_commit_dd_version(struct trigger *trigger, void * /* event */)
 {
 	struct on_commit_dd_version_data *data =
 		(struct on_commit_dd_version_data *)trigger->data;
 	dd_version_id = data->version_id;
-	struct fiber *fiber = data->fiber;
-	if (fiber != NULL)
-		fiber_wakeup(fiber);
 	box_broadcast_status();
 	return 0;
 }
@@ -4507,7 +4483,6 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 		struct on_commit_dd_version_data *data = xregion_alloc_object(
 			&txn->region, typeof(*data));
 		data->version_id = version;
-		data->fiber = NULL;
 		struct trigger *on_commit = txn_alter_trigger_new(
 			on_commit_dd_version, data);
 		if (on_commit == NULL)
@@ -4516,22 +4491,6 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 		if (recovery_state != FINISHED_RECOVERY) {
 			return 0;
 		}
-		/*
-		 * Set data->fiber after on_commit is created, because we can't
-		 * remove a not-yet-run fiber in case of on_commit creation
-		 * failure.
-		 */
-		struct fiber *fiber = NULL;
-		if (version > version_id(2, 10, 1) &&
-		    recovery_state == FINISHED_RECOVERY) {
-			fiber = fiber_new_system("synchro_filter_enabler",
-						 start_synchro_filtering);
-		} else if (version <= version_id(2, 10, 1) &&
-			   recovery_state == FINISHED_RECOVERY) {
-			fiber = fiber_new_system("synchro_filter_disabler",
-						 stop_synchro_filtering);
-		}
-		data->fiber = fiber;
 		/*
 		 * When upgrading to 3.3.0, new local space _gc_consumers
 		 * is created on each replica and we need to fill it with
