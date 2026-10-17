@@ -138,6 +138,11 @@ int
 schema_find_id(uint32_t system_space_id, uint32_t index_id, const char *name,
 	       uint32_t len, uint32_t *object_id);
 
+/** Find a named _cluster tuple, excluding the given ID (0 to include all). */
+int
+schema_find_replica_by_name(const char *name, uint32_t exclude_id,
+			    struct tuple **result);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 

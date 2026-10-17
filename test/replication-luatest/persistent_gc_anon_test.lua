@@ -282,6 +282,51 @@ g.test_checkpoint_join = function(g)
                     'checkpoint from snapshot')
 end
 
+g.test_gc_keeps_stopped_applier = function(g)
+    local replica_uuid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    g.replica = server:new({
+        alias = 'replica',
+        box_cfg = {
+            instance_uuid = replica_uuid,
+            replication = {g.server.net_box_uri},
+            replication_anon = true,
+            read_only = true,
+        },
+    })
+    g.replica:start()
+    local message = g.server:exec(function(replica_uri, replica_uuid)
+        box.cfg{replication = {replica_uri}}
+        t.helpers.retrying({}, function()
+            local upstream = box.info.replication_anon()[replica_uuid].upstream
+            t.assert_equals(upstream.status, 'stopped')
+            t.assert_str_contains(upstream.message, 'non-anonymous followers')
+        end)
+        return box.info.replication_anon()[replica_uuid].upstream.message
+    end, {g.replica.net_box_uri, replica_uuid})
+    g.replica:stop()
+    g.server:exec(function(replica_uuid)
+        t.helpers.retrying({}, function()
+            local replica = box.info.replication_anon()[replica_uuid]
+            t.assert_equals(replica.downstream.status, 'stopped')
+        end)
+    end, {replica_uuid})
+
+    local sentinel_uuid = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+    write_fetch_snapshot(g.s, sentinel_uuid)
+    read_fetch_snapshot_response(g)
+    g.server:exec(function(replica_uuid, sentinel_uuid, message)
+        t.assert_not_equals(box.info.replication_anon()[sentinel_uuid], nil)
+        box.cfg{replication_anon_ttl = 0.1}
+        t.helpers.retrying({}, function()
+            t.assert_equals(box.info.replication_anon()[sentinel_uuid], nil)
+        end)
+        local replica = box.info.replication_anon()[replica_uuid]
+        t.assert_not_equals(replica, nil)
+        t.assert_equals(replica.upstream.status, 'stopped')
+        t.assert_equals(replica.upstream.message, message)
+    end, {replica_uuid, sentinel_uuid, message})
+end
+
 g = t.group('Expiration of anonymous replicas')
 
 g.before_each(function(g)

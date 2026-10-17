@@ -529,10 +529,6 @@ replica_to_string(const struct replica *replica, const char *addr);
 struct replica *
 replica_by_id(uint32_t replica_id);
 
-/** Find the smallest empty replica ID in the available range. */
-int
-replica_find_new_id(uint32_t *replica_id);
-
 /**
  * Find a node in the replicaset on which the instance can try to register to
  * join the replicaset.
@@ -562,7 +558,7 @@ void
 replica_set_name(struct replica *replica, const char *name);
 
 /*
- * Clear the numeric replica-set-local id of a replica.
+ * Clear the numeric replica-set-local id and name of a replica.
  *
  * The replica is removed from the replication vector clock.
  */
@@ -575,6 +571,18 @@ replica_clear_id(struct replica *replica);
  */
 bool
 replica_has_connections(const struct replica *replica);
+
+/**
+ * Check for incoming connections or a non-stopped applier.
+ * This includes disconnected appliers.
+ */
+bool
+replica_has_alive_connections(const struct replica *replica);
+
+/** Transfer a stopped applier, or log its error if the destination has one. */
+void
+replica_rebind_stopped_applier(struct replica *old_replica,
+			       struct replica *new_replica);
 
 /**
  * Collects garbage of a replica that is gone for a while: removes associated

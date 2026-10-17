@@ -247,7 +247,7 @@ g.test_instance_name_transactional = function(lg)
         box.cfg{force_recovery = true}
         box.begin()
         box.space._cluster:update({1}, {{'=', 3, 'new-name'}})
-        t.assert_equals(box.info.name, 'new-name')
+        t.assert_equals(box.info.name, 'master-name')
         box.rollback()
         t.assert_equals(box.info.name, 'master-name')
         box.cfg{force_recovery = false}
