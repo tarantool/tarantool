@@ -163,6 +163,17 @@ local function reconnect_delay(configdata)
     return 0
 end
 
+local function is_fullmesh()
+    for _, peer in pairs(box.info.replication) do
+        if peer.id ~= box.info.id and
+           (peer.upstream == nil or peer.upstream.status ~= 'follow' or
+            peer.downstream == nil or peer.downstream.status ~= 'follow') then
+            return false
+        end
+    end
+    return true
+end
+
 local function do_replication_reconnect(config, reconnect)
     local alert_key = 'box_cfg_replication_reconnect'
     local function run(action, func, ...)
@@ -182,11 +193,33 @@ local function do_replication_reconnect(config, reconnect)
         ok = run('reconnect the replication with the new instance URIs',
                  box.cfg, {replication = reconnect.replication})
     end
+    -- Dropping stale connections also drops the replication from
+    -- the peers that still use the old URIs, so it is done while
+    -- election fencing is disabled.
     if ok and reconnect.drop_stale then
         log.info('dropping iproto connections accepted on the URIs that ' ..
             'are no longer listened on')
         ok = run('drop stale iproto connections', box.iproto.drop_connections,
                  {stale_only = true})
+    end
+    -- Election fencing must not stay disabled even if the steps
+    -- above fail.
+    if reconnect.fencing_mode ~= nil then
+        -- A leader resigns if fencing is enabled before all the
+        -- peers are reconnected in both directions.
+        local deadline = clock.monotonic() +
+            box.cfg.replication_connect_timeout
+        while not is_fullmesh() and clock.monotonic() < deadline and
+              pending_reconnect == reconnect do
+            fiber.sleep(0.1)
+        end
+        -- A newer reconfiguration restores fencing itself.
+        if pending_reconnect == reconnect then
+            log.info('restoring election fencing mode %q',
+                reconnect.fencing_mode)
+            ok = run('restore the election fencing mode', box.cfg,
+                     {election_fencing_mode = reconnect.fencing_mode}) and ok
+        end
     end
     if ok then
         config._aboard:drop(alert_key)
@@ -1617,6 +1650,12 @@ local function apply(config)
                 drop_stale = configdata:get('iproto.drop_stale_connections',
                     {use_default = true}),
             }
+            -- Reconfiguring the replication starts a new election
+            -- term if election fencing is enabled (gh-13287).
+            if box_cfg.election_fencing_mode ~= 'off' then
+                reconnect.fencing_mode = box_cfg.election_fencing_mode
+                box_cfg.election_fencing_mode = 'off'
+            end
             if box_cfg.replication ~= nil then
                 if changed and delay > 0 then
                     log.info('URIs of the replicaset instances are ' ..
