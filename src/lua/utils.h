@@ -444,6 +444,10 @@ luaT_toibuf(struct lua_State *L, int idx);
 /**
  * Convert the last value on the stack into Tarantool error and
  * set diagnostics.
+ *
+ * The resulting error does not depend on the Lua stack: its message is
+ * copied, or an existing Tarantool error is referenced. The caller may
+ * remove the stack values after this function returns.
  */
 int
 luaT_toerror(lua_State *L);
