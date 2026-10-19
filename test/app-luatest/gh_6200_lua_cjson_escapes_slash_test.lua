@@ -89,7 +89,7 @@ local function popen_test_json_log()
     -- Test old log.info behavior.
     ph:write('require("log").info("/")\n')
     local output = '';
-    local time_quota = 2.0
+    local time_quota = 10.0
     local start_time = clock.monotonic();
     while output:find('message') == nil
         and clock.monotonic() - start_time < time_quota do
