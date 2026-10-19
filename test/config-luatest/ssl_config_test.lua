@@ -1568,4 +1568,83 @@ g.test_keep_stale_connections = function()
     check_drop_stale_connections(false)
 end
 
+-- gh-13172, gh-13287: the replication reconnect with the new URIs
+-- doesn't start a new election term. It requires the instances to
+-- disable election fencing before any of them reconnects, so a
+-- reload interval is needed.
+local function check_replication_reconnect_keeps_term(opts)
+    t.tarantool.skip_if_not_enterprise()
+    local jitter = 2
+    local cfg_plain = cbuilder:new(cluster_config_base({
+            instances = {'i1', 'i2', 'i3'},
+            election = true,
+        }))
+        :set_global_option('config.reload_jitter', jitter)
+        :set_global_option('iproto.drop_stale_connections',
+            opts.drop_stale or false)
+        :config()
+    local cl = cluster_new(cfg_plain)
+    cl:start()
+    cluster_wait_for_fullmesh(cl)
+    if opts.drop_stale then
+        cluster_check_net_box_conn(cl, {'plain'}, 'assert_conn_active',
+            'old_cn')
+    end
+
+    local function terms()
+        local res = {}
+        cl:each(function(server)
+            res[server.alias] = server:exec(function()
+                return box.info.election.term
+            end)
+        end)
+        return res
+    end
+    local old_terms = terms()
+
+    local cfg_ssl = cbuilder:new(cfg_plain)
+        :set_global_option('iproto.listen', {SSL_SOCK})
+        :set_global_option('iproto.ssl', CERTS.NC_CA1_S1)
+        :config()
+    cluster_reload(cl, cfg_ssl, {'ssl'})
+    if opts.second_reload then
+        require('fiber').sleep(jitter / 4)
+        local cfg_ssl2 = cbuilder:new(cfg_ssl)
+            :set_global_option('log.level', 'verbose')
+            :config()
+        cluster_reload(cl, cfg_ssl2, {'ssl'})
+    end
+
+    helpers.retrying({timeout = jitter + 10}, function()
+        t.assert(cluster_replication_has_ssl(cl))
+        cl:each(function(server)
+            t.assert_equals(server:exec(function()
+                return box.cfg.election_fencing_mode
+            end), 'soft')
+        end)
+        if opts.drop_stale then
+            for _, conn in pairs(cl.old_cn) do
+                t.assert_not(conn:is_connected())
+            end
+        end
+    end)
+    if opts.drop_stale then
+        cluster_close_net_box_conns(cl, 'old_cn')
+    end
+    cluster_wait_for_fullmesh(cl)
+    t.assert_equals(terms(), old_terms)
+end
+
+g.test_replication_reconnect_keeps_term = function()
+    check_replication_reconnect_keeps_term({})
+end
+
+g.test_drop_stale_connections_keeps_term = function()
+    check_replication_reconnect_keeps_term({drop_stale = true})
+end
+
+g.test_second_reload_keeps_term = function()
+    check_replication_reconnect_keeps_term({second_reload = true})
+end
+
 -- }}} Deferred replication reconnect tests.

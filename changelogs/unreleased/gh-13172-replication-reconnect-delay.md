@@ -10,3 +10,7 @@
   connections accepted on the URIs that are no longer listened on (for example,
   with the old SSL certificates) once the replication is reconnected after
   a configuration reload (gh-13172).
+* Election fencing is now disabled while the replication is reconnected
+  with the new URIs of the replica set instances after a configuration
+  reload, so the reconnect starts no new election term any longer
+  (gh-13172, gh-13287).
