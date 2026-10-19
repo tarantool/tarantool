@@ -108,6 +108,8 @@ extern const char *memtx_tx_story_status_strs[];
  */
 struct memtx_tx_snapshot_cleaner {
 	struct mh_snapshot_cleaner_t *ht;
+	/** Index whose entries are cleaned. */
+	struct index *index;
 };
 
 /**
