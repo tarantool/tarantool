@@ -25,26 +25,38 @@ check_error(const char *type, const char *msg)
 static void
 test_toerror(lua_State *L)
 {
-	plan(4);
+	plan(6);
 	header();
 
 	/* test NON Tarantool error on stack */
 	lua_pushstring(L, "test Lua error");
 	luaT_toerror(L);
-	check_error("LuajitError", "test Lua error");
 	/*
 	 * luaT_toerror adds param on stack thru luaT_tolstring.
 	 * Unfortunately the latter is public API.
 	 */
 	lua_pop(L, 2);
+	lua_gc(L, LUA_GCCOLLECT, 0);
+	check_error("LuajitError", "test Lua error");
+
+	/* Check that messages exceeding the inline buffer survive Lua GC. */
+	char long_msg[DIAG_ERRMSG_MAX + 1];
+	memset(long_msg, 'a', sizeof(long_msg) - 1);
+	long_msg[sizeof(long_msg) - 1] = '\0';
+	lua_pushstring(L, long_msg);
+	luaT_toerror(L);
+	lua_pop(L, 2);
+	lua_gc(L, LUA_GCCOLLECT, 0);
+	check_error("LuajitError", long_msg);
 
 	/* test Tarantool error on stack */
 	struct error *e = BuildIllegalParams(__FILE__, __LINE__,
 					     "test non-Lua error");
 	luaT_pusherror(L, e);
 	luaT_toerror(L);
-	check_error("IllegalParams", "test non-Lua error");
 	lua_pop(L, 1);
+	lua_gc(L, LUA_GCCOLLECT, 0);
+	check_error("IllegalParams", "test non-Lua error");
 
 	footer();
 	check_plan();
