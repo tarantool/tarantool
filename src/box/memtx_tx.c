@@ -4147,7 +4147,10 @@ struct memtx_tx_snapshot_cleaner_entry
 	struct tuple *from;
 	/* Cleaned version of the tuple. */
 	struct tuple *to;
-	/* The tuples share the same key, so one hint is enough. */
+	/*
+	 * The tuples share the same key, so one hint is enough. The functional
+	 * key of a functional index is referenced.
+	 */
 	hint_t hint;
 };
 
@@ -4167,6 +4170,7 @@ memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
 				 struct space *space, struct index *index)
 {
 	cleaner->ht = NULL;
+	cleaner->index = index;
 	if (rlist_empty(&space->memtx_stories) &&
 	    rlist_empty(&space->alter_stmts))
 		return;
@@ -4185,6 +4189,8 @@ memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
 		entry.to = clean;
 		entry.hint = memtx_tx_tuple_hint(tuple, index,
 						 index->def->cmp_def);
+		if (index->def->key_def->for_func_index)
+			tuple_ref((struct tuple *)entry.hint);
 		mh_snapshot_cleaner_put(ht,  &entry, NULL, 0);
 	});
 	/*
@@ -4234,8 +4240,22 @@ memtx_tx_snapshot_clarify_slow(struct memtx_tx_snapshot_cleaner *cleaner,
 void
 memtx_tx_snapshot_cleaner_destroy(struct memtx_tx_snapshot_cleaner *cleaner)
 {
-	if (cleaner->ht != NULL)
-		mh_snapshot_cleaner_delete(cleaner->ht);
+	if (cleaner->ht == NULL)
+		return;
+	/*
+	 * With MVCC off the records are the ones of the alter statements of
+	 * the space, which hold no key, see memtx_tx_snapshot_cleaner_create().
+	 */
+	if (memtx_tx_manager_use_mvcc_engine &&
+	    cleaner->index->def->key_def->for_func_index) {
+		mh_int_t i;
+		mh_foreach(cleaner->ht, i) {
+			struct memtx_tx_snapshot_cleaner_entry *entry =
+				mh_snapshot_cleaner_node(cleaner->ht, i);
+			tuple_unref((struct tuple *)entry->hint);
+		}
+	}
+	mh_snapshot_cleaner_delete(cleaner->ht);
 }
 
 #if defined(ENABLE_READ_VIEW)
