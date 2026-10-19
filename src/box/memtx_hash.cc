@@ -590,8 +590,9 @@ hash_read_view_free(struct index_read_view *base)
 {
 	struct hash_read_view *rv = (struct hash_read_view *)base;
 	light_index_view_destroy(&rv->view);
-	index_unref(&rv->index->base);
+	/* The cleaner uses the index, destroy it before the index is gone. */
 	memtx_tx_snapshot_cleaner_destroy(&rv->cleaner);
+	index_unref(&rv->index->base);
 	TRASH(rv);
 	free(rv);
 }
