@@ -935,6 +935,14 @@ memtx_tx_tuple_key_is_excluded(struct tuple *tuple, struct index *index,
 			       struct key_def *def)
 {
 	assert(tuple_has_flag(tuple, TUPLE_IS_DIRTY));
+	/*
+	 * A disabled functional index, whose function is detached, has no
+	 * function to build the keys with and holds no entries, so every
+	 * tuple is excluded from it.
+	 */
+	if (def->for_func_index &&
+	    index->def->key_def->func_index_func == NULL)
+		return true;
 	/* Return early to avoid func key calculation. */
 	if (likely(!def->has_exclude_null))
 		return false;
