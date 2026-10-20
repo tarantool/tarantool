@@ -1,8 +1,24 @@
 local fio = require('fio')
 local xlog = require('xlog')
 local instance_config = require('internal.config.instance_config')
+local workdir = require('internal.config.utils.workdir')
 
 local snapshot_path = nil
+
+-- Initial validation precedes workdir creation. Allow missing/../snap
+-- as before, but don't collapse an existing symlink followed by '..'.
+local function normalize_missing_parents(path)
+    local parts = {}
+    for part in path:gmatch('[^/]+') do
+        if part == '..' and #parts > 0 and
+           not fio.path.lexists('/' .. table.concat(parts, '/')) then
+            table.remove(parts)
+        elseif part ~= '.' then
+            table.insert(parts, part)
+        end
+    end
+    return '/' .. table.concat(parts, '/')
+end
 
 -- Determine where snapshot should reside based on the given
 -- configuration.
@@ -23,26 +39,14 @@ local function effective_snapshot_dir(iconfig)
         return snap_dir
     end
 
-    -- We assume that the startup working directory is the current
-    -- working directory. IOW, that this function is called before
-    -- first box.cfg() call. Let's verify it.
-    assert(type(box.cfg) == 'function')
-
-    -- If the snapshot directory is not absolute, it is relative
-    -- to the working directory.
-    --
-    -- Determine an absolute path to the configured working
-    -- directory considering that it may be relative to the
-    -- working directory at the startup moment.
-    local work_dir = instance_config:get(iconfig, 'process.work_dir')
-    if work_dir == nil then
-        work_dir = '.'
+    -- Absence is not cached: another lookup may happen after entry,
+    -- but still before box.cfg(). Only rebase before entry.
+    local work_dir = instance_config:base_dir(iconfig)
+    if work_dir ~= nil then
+        return normalize_missing_parents(workdir.resolve(work_dir) .. '/' ..
+                                         snap_dir)
     end
-    work_dir = fio.abspath(work_dir)
-
-    -- Now we know the absolute path to the configured working
-    -- directory. Let's determine the snapshot directory path.
-    return fio.abspath(fio.pathjoin(work_dir, snap_dir))
+    return fio.cwd() .. '/' .. snap_dir
 end
 
 -- Determine whether the instance will be recovered from an existing

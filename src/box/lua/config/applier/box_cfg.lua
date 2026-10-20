@@ -5,6 +5,7 @@ local snapshot = require('internal.config.utils.snapshot')
 local schedule_task = fiber._internal.schedule_task
 local version = require('version')
 local clock = require('clock')
+local workdir = require('internal.config.utils.workdir')
 
 -- {{{ Collect options with the box_cfg annotation
 
@@ -482,6 +483,8 @@ local function revert_non_dynamic_options(config, box_cfg)
     box_cfg_nondynamic.audit_log = box_cfg.audit_log
     box_cfg_nondynamic.audit_filter = box_cfg.audit_filter
     box_cfg_nondynamic.audit_spaces = box_cfg.audit_spaces
+    box_cfg_nondynamic.work_dir =
+        workdir.resolve(box_cfg_nondynamic.work_dir)
     for k, v in pairs(box_cfg_nondynamic) do
         if v ~= box.cfg[k] then
             local warning = 'box_cfg.apply: non-dynamic option '..k..
@@ -1457,6 +1460,7 @@ local function apply(config)
     local configdata = config._configdata
 
     local box_cfg = collect_by_box_cfg_annotation(configdata)
+    box_cfg.work_dir = workdir.resolve(box_cfg.work_dir)
     set_listen(configdata, box_cfg)
     set_replication_peers(configdata, box_cfg)
     set_log(configdata, box_cfg)

@@ -2278,7 +2278,10 @@ I['process.work_dir'] = format_text([[
     A directory where Tarantool working files will be stored (database files,
     logs, a PID file, a console Unix socket, and other files if an application
     generates them in the current directory). The server instance switches to
-    `process.work_dir` with chdir(2) after start.
+    `process.work_dir` with chdir(2) after initial configuration validation,
+    before startup appliers and early-loaded roles and applications run.
+    Initial validation may execute module code while evaluating defaults
+    before the directory is entered.
 
     If set as a relative file path, it is relative to the current working
     directory, from where Tarantool is started. If not specified, defaults

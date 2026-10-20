@@ -9,6 +9,7 @@ local funcutils = require('internal.config.utils.funcutils')
 local network = require('internal.config.utils.network')
 local loaders = require('internal.loaders')
 local expression = require('internal.config.utils.expression')
+local workdir = require('internal.config.utils.workdir')
 
 local TIMEOUT_INFINITY = 500 * 365 * 86400
 
@@ -259,26 +260,16 @@ local function apply_vars_f(data, w, vars)
     return data
 end
 
--- The file path is interpreted as relative to `process.work_dir`.
--- The first box.cfg() call sets a current working directory to this path.
---
--- However, we should prepend paths manually before the first
--- box.cfg() call.
---
--- This function returns the prefix to add into config's paths.
---
--- TODO: Glue all such code from applier/mkdir.lua and
--- utils/snapshot.lua.
+-- Initial validation reads context files before entering process.work_dir.
 local function base_dir(self, iconfig)
     local work_dir = self:get(iconfig, 'process.work_dir')
-    return type(box.cfg) == 'function' and work_dir or nil
+    return not workdir.is_prepared() and work_dir or nil
 end
 
 -- Interpret the given path as relative to the given working
 -- directory from the config.
 --
--- This function takes care to the chdir performed by the first
--- box.cfg() call if the working directory is set.
+-- Before directory preparation, rebase against process.work_dir.
 local function prepare_file_path(self, iconfig, path)
     local base_dir = self:base_dir(iconfig)
     return file.rebase_file_path(base_dir, path)
