@@ -80,6 +80,7 @@ local instance_config_fields = {
     'sql',
     'memtx',
     'vinyl',
+    'memcs',
     'quiver',
     'wal',
     'snapshot',
@@ -297,6 +298,9 @@ g.test_defaults = function()
             memory = 134217728,
             timeout = 60,
         },
+        memcs = is_enterprise and {
+            dir = 'var/lib/{{ instance_name }}',
+        } or nil,
         quiver = is_enterprise and {
             dir = 'var/lib/{{ instance_name }}',
             memory = 134217728,

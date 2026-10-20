@@ -1541,6 +1541,15 @@ local function upgrade_to_3_8_0()
 end
 
 --------------------------------------------------------------------------------
+-- Tarantool 3.9.0
+--------------------------------------------------------------------------------
+local function upgrade_to_3_9_0()
+    -- NoOp. We need to bump the schema version to switch between old and new
+    -- MemCS snapshot mechanisms.
+    return
+end
+
+--------------------------------------------------------------------------------
 
 local handlers = {
     {version = mkversion.new(1, 7, 5), func = upgrade_to_1_7_5},
@@ -1567,6 +1576,7 @@ local handlers = {
     {version = mkversion.new(3, 1, 0), func = upgrade_to_3_1_0},
     {version = mkversion.new(3, 3, 0), func = upgrade_to_3_3_0},
     {version = mkversion.new(3, 8, 0), func = upgrade_to_3_8_0},
+    {version = mkversion.new(3, 9, 0), func = upgrade_to_3_9_0},
 }
 
 builtin.box_init_latest_dd_version_id(
