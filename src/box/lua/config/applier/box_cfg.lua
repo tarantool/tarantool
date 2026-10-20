@@ -182,6 +182,12 @@ local function do_replication_reconnect(config, reconnect)
         ok = run('reconnect the replication with the new instance URIs',
                  box.cfg, {replication = reconnect.replication})
     end
+    if ok and reconnect.drop_stale then
+        log.info('dropping iproto connections accepted on the URIs that ' ..
+            'are no longer listened on')
+        ok = run('drop stale iproto connections', box.iproto.drop_connections,
+                 {stale_only = true})
+    end
     if ok then
         config._aboard:drop(alert_key)
     end
@@ -1608,6 +1614,8 @@ local function apply(config)
                 -- Unrelated reloads don't defer the reconnect.
                 deadline = changed and clock.monotonic() + delay or
                     pending_reconnect.deadline,
+                drop_stale = configdata:get('iproto.drop_stale_connections',
+                    {use_default = true}),
             }
             if box_cfg.replication ~= nil then
                 if changed and delay > 0 then

@@ -530,6 +530,7 @@ g.test_iproto = function()
             threads = 1,
             net_msg_max = 1,
             readahead = 1,
+            drop_stale_connections = true,
             ssl = {
                 ssl_key = 'one',
                 ssl_cert = 'two',
@@ -550,6 +551,7 @@ g.test_iproto = function()
         threads = 1,
         net_msg_max = 768,
         readahead = 16320,
+        drop_stale_connections = false,
     }
     local res = instance_config:apply_default({}).iproto
     t.assert_equals(res, exp)
