@@ -1842,6 +1842,14 @@ I['iproto.readahead'] = format_bytes_text([[
     leave this setting at its default.
 ]])
 
+I['iproto.drop_stale_connections'] = format_text([[
+    If a configuration reload changes the URI (including its SSL parameters)
+    to connect to any instance of the replicaset, drop the incoming
+    connections accepted on the URIs that are no longer listened on, e.g. the
+    connections established with the old SSL certificates. The connections
+    are dropped once the replication is reconnected with the new URIs.
+]])
+
 I['iproto.ssl'] = format_text([[
     SSL parameters required for encrypted connections. These parameters would be
     used to set up SSL IProto sockets and to connect to other instances which

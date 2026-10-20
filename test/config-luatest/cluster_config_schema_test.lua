@@ -272,6 +272,7 @@ g.test_defaults = function()
             threads = 1,
             net_msg_max = 768,
             readahead = 16320,
+            drop_stale_connections = false,
         },
         process = {
             strip_core = true,

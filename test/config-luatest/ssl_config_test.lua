@@ -1526,4 +1526,46 @@ g.test_replication_reconnect_failed_second_reload = function()
     end, CERTS.NC_CA1_S1.ssl_cert)
 end
 
+-- gh-13172: iproto.drop_stale_connections drops connections
+-- accepted on the old URIs once the reload interval is over.
+local function check_drop_stale_connections(drop_stale)
+    t.tarantool.skip_if_not_enterprise()
+    local jitter = 2
+
+    local cfg_plain = cbuilder:new(cluster_config_base())
+        :set_global_option('config.reload_jitter', jitter)
+        :set_global_option('iproto.drop_stale_connections', drop_stale)
+        :config()
+    local cl = cluster_new(cfg_plain)
+    cl:start()
+    cluster_check_net_box_conn(cl, {'plain'}, 'assert_conn_active', 'old_cn')
+
+    local cfg_ssl = cbuilder:new(cfg_plain)
+        :set_global_option('iproto.listen', {SSL_SOCK})
+        :set_global_option('iproto.ssl', CERTS.NC_CA1_S1)
+        :config()
+    local start = clock.monotonic()
+    cluster_reload(cl, cfg_ssl, {'ssl'})
+    t.assert(cl.old_cn.i1:is_connected())
+
+    if drop_stale then
+        helpers.retrying({timeout = jitter + 5}, function()
+            t.assert_not(cl.old_cn.i1:is_connected())
+        end)
+        t.assert_ge(clock.monotonic() - start, jitter)
+    else
+        require('fiber').sleep(jitter + 1)
+        t.assert(cl.old_cn.i1:is_connected())
+    end
+    cluster_close_net_box_conns(cl, 'old_cn')
+end
+
+g.test_drop_stale_connections = function()
+    check_drop_stale_connections(true)
+end
+
+g.test_keep_stale_connections = function()
+    check_drop_stale_connections(false)
+end
+
 -- }}} Deferred replication reconnect tests.

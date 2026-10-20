@@ -914,6 +914,10 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'readahead',
             default = 16320,
         })),
+        drop_stale_connections = schema.scalar({
+            type = 'boolean',
+            default = false,
+        }),
         ssl = schema.record({
             ca_file = schema.scalar({
                 type = 'string',
