@@ -411,9 +411,14 @@ tree_iterator_free(struct iterator *iterator)
 /*
  * If the iterator's underlying tuple does not match its last tuple, it needs
  * to be repositioned.
+ *
+ * Returns the element the iterator is positioned at: the last element, if it
+ * is still in the index, or the next one, which is NULL at the end of the
+ * index. The last element may be gone, e.g. if the transaction of the
+ * iterator was aborted, or the iterator was created out of a transaction.
  */
 template <bool USE_HINT>
-static void
+static struct memtx_tree_data<USE_HINT> *
 tree_iterator_prev_reposition(struct tree_iterator<USE_HINT> *iterator,
 			      struct memtx_tree_index<USE_HINT> *index)
 {
@@ -421,18 +426,12 @@ tree_iterator_prev_reposition(struct tree_iterator<USE_HINT> *iterator,
 	iterator->tree_iterator =
 		memtx_tree_lower_bound_elem(&index->tree, iterator->last,
 					    &exact);
-	if (exact) {
-		struct memtx_tree_data<USE_HINT> *successor =
+	struct memtx_tree_data<USE_HINT> *successor =
 		memtx_tree_iterator_get_elem(&index->tree,
 					     &iterator->tree_iterator);
+	if (exact)
 		tree_iterator_set_last(iterator, successor);
-	}
-	/*
-	 * Since we previously clarified a tuple from the iterator
-	 * last tuple's story chain, a tuple with same primary key
-	 * must always exist in the index.
-	 */
-	assert(exact || in_txn() == NULL || !memtx_tx_manager_use_mvcc_engine);
+	return successor;
 }
 
 template <bool USE_HINT>
@@ -492,10 +491,12 @@ tree_iterator_prev_base(struct iterator *iterator, struct tuple **ret)
 	struct memtx_tree_data<USE_HINT> *check =
 		memtx_tree_iterator_get_elem(&index->tree, &it->tree_iterator);
 	if (check == NULL || !tree_iterator_at_last(check, &it->last))
-		tree_iterator_prev_reposition(it, index);
+		check = tree_iterator_prev_reposition(it, index);
 	memtx_tree_iterator_prev(&index->tree, &it->tree_iterator);
-	struct tuple *successor = it->last.tuple;
-	tuple_ref(successor);
+	/* The gap is tracked on the element in the index, not the last one. */
+	struct tuple *successor = check != NULL ? check->tuple : NULL;
+	if (successor != NULL)
+		tuple_ref(successor);
 	struct memtx_tree_data<USE_HINT> *res =
 		memtx_tree_iterator_get_elem(&index->tree, &it->tree_iterator);
 	*ret = res != NULL ? res->tuple : NULL;
@@ -516,7 +517,8 @@ tree_iterator_prev_base(struct iterator *iterator, struct tuple **ret)
 	memtx_tx_track_gap(in_txn(), space, index_base, successor, ITER_LE,
 			   NULL, 0);
 
-	tuple_unref(successor);
+	if (successor != NULL)
+		tuple_unref(successor);
 	return 0;
 }
 
@@ -591,10 +593,12 @@ tree_iterator_prev_equal_base(struct iterator *iterator, struct tuple **ret)
 	struct memtx_tree_data<USE_HINT> *check =
 		memtx_tree_iterator_get_elem(&index->tree, &it->tree_iterator);
 	if (check == NULL || !tree_iterator_at_last(check, &it->last))
-		tree_iterator_prev_reposition(it, index);
+		check = tree_iterator_prev_reposition(it, index);
 	memtx_tree_iterator_prev(&index->tree, &it->tree_iterator);
-	struct tuple *successor = it->last.tuple;
-	tuple_ref(successor);
+	/* The gap is tracked on the element in the index, not the last one. */
+	struct tuple *successor = check != NULL ? check->tuple : NULL;
+	if (successor != NULL)
+		tuple_ref(successor);
 	struct memtx_tree_data<USE_HINT> *res =
 		memtx_tree_iterator_get_elem(&index->tree, &it->tree_iterator);
 	/* Use user key def to save a few loops. */
@@ -628,7 +632,8 @@ tree_iterator_prev_equal_base(struct iterator *iterator, struct tuple **ret)
 		memtx_tx_track_gap(in_txn(), space, index_base, successor,
 				   ITER_LE, NULL, 0);
 	}
-	tuple_unref(successor);
+	if (successor != NULL)
+		tuple_unref(successor);
 	return 0;
 }
 
