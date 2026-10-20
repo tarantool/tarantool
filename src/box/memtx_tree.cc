@@ -1955,19 +1955,18 @@ memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
 		 */
 		if (key_list_iterator_create(&it, old_tuple, index_def, false,
 					     tuple_format_runtime) != 0)
-			goto end;
+			goto rollback;
 		struct memtx_tree_data<true> data, deleted_data;
 		data.tuple = old_tuple;
 		struct tuple *key;
-		while (key_list_iterator_next(&it, &key) == 0 && key != NULL) {
+		int err;
+		while ((err = key_list_iterator_next(&it, &key)) == 0 &&
+		       key != NULL) {
 			data.hint = (hint_t) key;
 			deleted_data.tuple = NULL;
 			if (memtx_tree_index_delete_value_impl(
-					index, data, &deleted_data) != 0) {
-				memtx_tree_func_index_replace_rollback(
-					index, &old_keys, &new_keys);
-				return -1;
-			}
+					index, data, &deleted_data) != 0)
+				goto rollback;
 			if (deleted_data.tuple != NULL) {
 				*result = old_tuple;
 				struct func_key_undo *undo =
@@ -1977,6 +1976,8 @@ memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
 				rlist_add(&old_keys, &undo->link);
 			}
 		}
+		if (err != 0)
+			goto rollback;
 		assert(key == NULL);
 	}
 	/*
@@ -1987,6 +1988,9 @@ memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
 	rlist_foreach_entry(undo, &old_keys, link)
 		tuple_unref((struct tuple *)undo->key.hint);
 	rc = 0;
+	goto end;
+rollback:
+	memtx_tree_func_index_replace_rollback(index, &old_keys, &new_keys);
 end:
 	region_truncate(region, region_svp);
 	return rc;
