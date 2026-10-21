@@ -201,19 +201,6 @@ local function contains(t, value)
     return false
 end
 
-local function rmtree(path)
-    log.info('CLEANUP %s', path)
-    if (fio.path.is_file(path) or fio.path.is_link(path)) then
-        fio.unlink(path)
-        return
-    end
-    if fio.path.is_dir(path) then
-        for _, p in pairs(fio.listdir(path)) do
-            rmtree(fio.pathjoin(path, p))
-        end
-    end
-end
-
 local function rand_char()
     return string.char(math.random(97, 97 + 25))
 end
@@ -764,10 +751,13 @@ local function setup_space(engine_name, space_name)
 end
 
 local function cleanup_dir(dir)
-    log.info('CLEANUP')
-    if dir ~= nil then
-        rmtree(dir)
-        dir = nil -- luacheck: ignore
+    if dir == nil or not fio.path.exists(dir) then
+        return
+    end
+    log.info('CLEANUP %s', dir)
+    local ok, err = fio.rmtree(dir)
+    if not ok then
+        error(('failed to clean up %s: %s'):format(dir, err))
     end
 end
 
@@ -2082,10 +2072,9 @@ local function run_test(num_workers, test_duration, test_dir,
     math.randomseed(seed)
     log.info('Random seed: %d', seed)
 
-    if fio.path.exists(test_dir) then
-        cleanup_dir(test_dir)
-    else
-        fio.mkdir(test_dir)
+    cleanup_dir(test_dir)
+    if not fio.mkdir(test_dir) then
+        error(('failed to create test directory %s'):format(test_dir))
     end
     index_id_func = counter()
 
