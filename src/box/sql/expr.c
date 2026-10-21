@@ -833,128 +833,6 @@ codeVectorCompare(Parse * pParse,	/* Code generator context */
 	sqlVdbeResolveLabel(v, addrDone);
 }
 
-/*
- * Check that argument nHeight is less than or equal to the maximum
- * expression depth allowed. If it is not, leave an error message in
- * pParse.
- *
- * @param pParse Parser context.
- * @param zName Depth to check.
- *
- * @retval 0 on success.
- * @retval -1 on error.
- */
-int
-sqlExprCheckHeight(Parse * pParse, int nHeight)
-{
-	if (nHeight > SQL_MAX_EXPR_DEPTH) {
-		diag_set(ClientError, ER_SQL_PARSER_LIMIT, "Number of nodes "\
-			 "in expression tree", nHeight, SQL_MAX_EXPR_DEPTH);
-		pParse->is_aborted = true;
-		return -1;
-	}
-	return 0;
-}
-
-/* The following three functions, heightOfExpr(), heightOfExprList()
- * and heightOfSelect(), are used to determine the maximum height
- * of any expression tree referenced by the structure passed as the
- * first argument.
- *
- * If this maximum height is greater than the current value pointed
- * to by pnHeight, the second parameter, then set *pnHeight to that
- * value.
- */
-static void
-heightOfExpr(Expr * p, int *pnHeight)
-{
-	if (p) {
-		if (p->nHeight > *pnHeight) {
-			*pnHeight = p->nHeight;
-		}
-	}
-}
-
-static void
-heightOfExprList(ExprList * p, int *pnHeight)
-{
-	if (p) {
-		int i;
-		for (i = 0; i < p->nExpr; i++) {
-			heightOfExpr(p->a[i].pExpr, pnHeight);
-		}
-	}
-}
-
-static void
-heightOfSelect(Select * p, int *pnHeight)
-{
-	if (p) {
-		heightOfExpr(p->pWhere, pnHeight);
-		heightOfExpr(p->pHaving, pnHeight);
-		heightOfExpr(p->pLimit, pnHeight);
-		heightOfExpr(p->pOffset, pnHeight);
-		heightOfExprList(p->pEList, pnHeight);
-		heightOfExprList(p->pGroupBy, pnHeight);
-		heightOfExprList(p->pOrderBy, pnHeight);
-		heightOfSelect(p->pPrior, pnHeight);
-	}
-}
-
-/*
- * Set the Expr.nHeight variable in the structure passed as an
- * argument. An expression with no children, Expr.pList or
- * Expr.pSelect member has a height of 1. Any other expression
- * has a height equal to the maximum height of any other
- * referenced Expr plus one.
- *
- * Also propagate EP_Propagate flags up from Expr.x.pList to Expr.flags,
- * if appropriate.
- */
-static void
-exprSetHeight(Expr * p)
-{
-	int nHeight = 0;
-	heightOfExpr(p->pLeft, &nHeight);
-	heightOfExpr(p->pRight, &nHeight);
-	if (ExprHasProperty(p, EP_xIsSelect)) {
-		heightOfSelect(p->x.pSelect, &nHeight);
-	} else if (p->x.pList) {
-		heightOfExprList(p->x.pList, &nHeight);
-		p->flags |= EP_Propagate & sqlExprListFlags(p->x.pList);
-	}
-	p->nHeight = nHeight + 1;
-}
-
-/*
- * Set the Expr.nHeight variable using the exprSetHeight() function. If
- * the height is greater than the maximum allowed expression depth,
- * leave an error in pParse.
- *
- * Also propagate all EP_Propagate flags from the Expr.x.pList into
- * Expr.flags.
- */
-void
-sqlExprSetHeightAndFlags(Parse * pParse, Expr * p)
-{
-	if (pParse->is_aborted)
-		return;
-	exprSetHeight(p);
-	sqlExprCheckHeight(pParse, p->nHeight);
-}
-
-/*
- * Return the maximum height of any expression tree referenced
- * by the select statement passed as an argument.
- */
-int
-sqlSelectExprHeight(Select * p)
-{
-	int nHeight = 0;
-	heightOfSelect(p, &nHeight);
-	return nHeight;
-}
-
 /**
  * Allocate a new empty expression object with reserved extra
  * memory.
@@ -972,7 +850,6 @@ sql_expr_new_empty(int op, int extra_size)
 	memset(e, 0, sizeof(*e));
 	e->op = (u8)op;
 	e->iAgg = -1;
-	e->nHeight = 1;
 	return e;
 }
 
@@ -1060,7 +937,6 @@ sqlExprAttachSubtrees(struct Expr *pRoot, struct Expr *pLeft,
 		pRoot->pLeft = pLeft;
 		pRoot->flags |= EP_Propagate & pLeft->flags;
 	}
-	exprSetHeight(pRoot);
 }
 
 /*
@@ -1090,21 +966,15 @@ sqlPExpr(Parse * pParse,	/* Parsing context */
 		p->iAgg = -1;
 		sqlExprAttachSubtrees(p, pLeft, pRight);
 	}
-	sqlExprCheckHeight(pParse, p->nHeight);
 	return p;
 }
 
-/*
- * Add pSelect to the Expr.x.pSelect field.  Or, if pExpr is NULL (due
- * do a memory allocation failure) then delete the pSelect object.
- */
 void
-sqlPExprAddSelect(Parse * pParse, Expr * pExpr, Select * pSelect)
+sqlPExprAddSelect(struct Expr *expr, struct Select *select)
 {
-	assert(pExpr != NULL);
-	pExpr->x.pSelect = pSelect;
-	ExprSetProperty(pExpr, EP_xIsSelect | EP_Subquery);
-	sqlExprSetHeightAndFlags(pParse, pExpr);
+	assert(expr != NULL);
+	expr->x.pSelect = select;
+	ExprSetProperty(expr, EP_xIsSelect | EP_Subquery);
 }
 
 /**
@@ -1147,21 +1017,6 @@ sql_and_expr_new(struct Expr *left_expr, struct Expr *right_expr)
 		sqlExprAttachSubtrees(new_expr, left_expr, right_expr);
 		return new_expr;
 	}
-}
-
-/*
- * Construct a new expression node for a function with multiple
- * arguments.
- */
-Expr *
-sqlExprFunction(Parse * pParse, ExprList * pList, Token * pToken)
-{
-	assert(pToken != NULL);
-	struct Expr *new_expr = sql_expr_new_dequoted(TK_FUNCTION, pToken);
-	new_expr->x.pList = pList;
-	assert(!ExprHasProperty(new_expr, EP_xIsSelect));
-	sqlExprSetHeightAndFlags(pParse, new_expr);
-	return new_expr;
 }
 
 /*
