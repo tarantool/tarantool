@@ -102,8 +102,15 @@ local function gen_search_func(path_fn, templates, need_traverse)
     assert(type(templates) == 'table', 'templates must be a table')
 
     return function(name)
-        local path = path_fn() or '.'
-        local paths = need_traverse and traverse_path(path) or { path }
+        local path = path_fn()
+        local paths = { path or '.' }
+        -- package.searchroot() returns nil if getcwd() fails, for
+        -- example, if the current directory is removed. Then search
+        -- only in '.': the traversal up to '/' needs an absolute
+        -- path to start from.
+        if path ~= nil and need_traverse then
+            paths = traverse_path(path)
+        end
 
         local searchpaths = {}
 
