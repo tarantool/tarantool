@@ -874,6 +874,15 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 
 	builtin_modcache_init();
 
+	/* Initialize ffi to enable luaL_pushcdata/luaL_checkcdata functions */
+	luaL_loadstring(L, "return require('ffi')");
+	lua_call(L, 0, 0);
+	/*
+	 * The loaders may push errors (for example, when the current
+	 * directory is removed), so register the error ctype first.
+	 */
+	tarantool_lua_error_init(L);
+
 	/*
 	 * Setup paths and loaders.
 	 *
@@ -886,9 +895,6 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 	luaT_set_module_from_source(L, "internal.minifio", minifio_lua);
 	luaT_set_module_from_source(L, "internal.loaders", loaders_lua);
 
-	/* Initialize ffi to enable luaL_pushcdata/luaL_checkcdata functions */
-	luaL_loadstring(L, "return require('ffi')");
-	lua_call(L, 0, 0);
 	lua_register(L, "tonumber64", lbox_tonumber64);
 
 	tarantool_lua_tweaks_init(L);
@@ -900,7 +906,6 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 	tarantool_lua_fiber_cond_init(L);
 	tarantool_lua_fiber_channel_init(L);
 	tarantool_lua_errno_init(L);
-	tarantool_lua_error_init(L);
 	tarantool_lua_fio_init(L);
 	tarantool_lua_popen_init(L);
 	tarantool_lua_socket_init(L);
