@@ -2016,3 +2016,27 @@ g.test_gh_8226_multiple_updates = function(cg)
         t.assert_equals(r[2].a.b.x.x.y, 4)
     end)
 end
+
+-- ghs-171: INT32_MIN splice offset/cut_length bypass the bounds check via
+-- signed overflow of unary minus, leading to OOB memcpy.
+g.test_ghs_171_splice_int32_min_offset = function(cg)
+    cg.server:exec(function()
+        local tuple = box.tuple.new({'hello'})
+        t.assert_error_msg_equals(
+            'SPLICE error on field 1: offset is out of bound',
+            tuple.update, tuple, {{':', 1, -2147483648, 0, 'X'}}
+        )
+    end)
+end
+
+g.test_ghs_171_splice_int32_min_cut_length = function(cg)
+    cg.server:exec(function()
+        -- INT32_MIN cut_length overflows on negation; after the fix it is
+        -- clamped to 0 (nothing cut), so the insert is prepended.
+        local tuple = box.tuple.new({'hello'})
+        t.assert_equals(
+            tuple:update({{':', 1, 1, -2147483648, 'X'}})[1],
+            'Xhello'
+        )
+    end)
+end
