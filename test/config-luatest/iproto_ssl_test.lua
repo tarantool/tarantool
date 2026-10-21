@@ -1,11 +1,12 @@
+-- tags: parallel
+
 local t = require('luatest')
 local server = require('luatest.server')
 local treegen = require('luatest.treegen')
 local cbuilder = require('luatest.cbuilder')
 local fio = require('fio')
 local yaml = require('yaml')
-
-local g = t.group()
+local tarantool = require('tarantool')
 
 local passwd = '123qwe'
 local cert_dir = fio.pathjoin(fio.abspath(os.getenv('SOURCEDIR') or '.'),
@@ -14,6 +15,73 @@ local ca_file = fio.pathjoin(cert_dir, 'ca.crt')
 local cert_file = fio.pathjoin(cert_dir, 'client.crt')
 local key_file = fio.pathjoin(cert_dir, 'client.enc.key')
 local ciphers = 'ECDHE-RSA-AES256-GCM-SHA384'
+
+-- Whether the truncated SSL parameter names are accepted alongside
+-- the full ones (Tarantool 3.x). When off (4.x), only the full names
+-- are accepted.
+local ssl_allow_double_names = tarantool.build.ssl_params_allow_double_names
+
+-- iproto.ssl section variants.
+--
+-- `full`:  only the full names (ssl_ca_file, ssl_cert_file, ssl_key_file).
+-- `short`: only the truncated names (ca_file, ssl_cert, ssl_key) -- 3.x
+--          only, they are deprecated aliases of the full names.
+-- `both`:  both name variants are present; the full names hold the correct
+--          values, the truncated names hold wrong ones to verify that
+--          the full names take priority -- 3.x only.
+local function ssl_opts_full(passwd_file)
+    return {
+        ssl_ca_file = ca_file,
+        ssl_cert_file = cert_file,
+        ssl_key_file = key_file,
+        ssl_password = passwd,
+        ssl_password_file = passwd_file,
+        ssl_ciphers = ciphers,
+    }
+end
+
+local function ssl_opts_short(passwd_file)
+    return {
+        ca_file = ca_file,
+        ssl_cert = cert_file,
+        ssl_key = key_file,
+        ssl_password = passwd,
+        ssl_password_file = passwd_file,
+        ssl_ciphers = ciphers,
+    }
+end
+
+local function ssl_opts_both(passwd_file)
+    return {
+        ssl_ca_file = ca_file,
+        ssl_cert_file = cert_file,
+        ssl_key_file = key_file,
+        ca_file = cert_file,
+        ssl_cert = ca_file,
+        ssl_key = ca_file,
+        ssl_password = passwd,
+        ssl_password_file = passwd_file,
+        ssl_ciphers = ciphers,
+    }
+end
+
+local ssl_opts_builders = {
+    full = ssl_opts_full,
+    short = ssl_opts_short,
+    both = ssl_opts_both,
+}
+
+-- In 3.x test all three variants; in 4.x only the full names are
+-- accepted, so the truncated-name variants are not applicable.
+local variants = ssl_allow_double_names and {
+    {ssl_opts_variant = 'full'},
+    {ssl_opts_variant = 'short'},
+    {ssl_opts_variant= 'both'},
+} or {
+    {ssl_opts_variant = 'full'}
+}
+
+local g = t.group('iproto_ssl', variants)
 
 local function base_config(g)
     return cbuilder:new()
@@ -43,15 +111,8 @@ g.before_each(function(g)
     file:write(passwd)
     file:close()
 
-    -- ssl configuration section.
-    g.ssl_opts = {
-        ca_file = ca_file,
-        ssl_cert = cert_file,
-        ssl_key = key_file,
-        ssl_password = passwd,
-        ssl_password_file = g.passwd_file,
-        ssl_ciphers = ciphers,
-    }
+    -- ssl configuration section for the current variant.
+    g.ssl_opts = ssl_opts_builders[g.params.ssl_opts_variant](g.passwd_file)
     -- ssl net.box connection parameters
     g.ssl_params = {
         transport = 'ssl',
