@@ -2764,6 +2764,7 @@ box_register_on_master(void)
 	box_restart_replication();
 	struct replica *master = replicaset_find_join_master();
 	if (master == NULL || master->applier == NULL ||
+	    tt_uuid_is_equal(&master->uuid, &INSTANCE_UUID) ||
 	    master->applier->state != APPLIER_CONNECTED) {
 		tnt_raise(ClientError, ER_CANNOT_REGISTER);
 	} else {
