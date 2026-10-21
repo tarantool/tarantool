@@ -339,7 +339,8 @@ end
 -- the ENGINES tables.
 local SCHEMA_CODE = [[
 box.schema.func.create('func',
-    {body = 'function(tuple) return tuple end', is_deterministic = true,
+    {body = 'function(tuple) return {tuple[1], tuple[2]} end',
+     is_deterministic = true,
      is_sandboxed = true, if_not_exists = true})
 box.schema.space.create('m', {engine = 'memtx'})
 box.space.m:create_index('p', {parts = {
