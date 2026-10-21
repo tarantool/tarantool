@@ -6,11 +6,9 @@
 
 # to be removed in scope of gh-10184
 leak:lua_yaml_encode
-leak:l_load
 
 # to be removed in scope of gh-10565
 leak:lbox_console_format_yaml
-leak:yaml_parser_initialize
 leak:yaml_emitter_initialize
 
 # to be removed in scope gh-12065
