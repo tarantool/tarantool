@@ -2230,6 +2230,7 @@ local downgrade_versions = {
     "2.11.7",
     "2.11.8",
     "2.11.9",
+    "2.11.10",
     "3.0.0",
     "3.0.1",
     "3.0.2",
@@ -2260,6 +2261,7 @@ local downgrade_versions = {
     "3.6.4",
     "3.7.0",
     "3.7.1",
+    "3.7.2",
     -- DOWNGRADE VERSIONS END
 }
 
