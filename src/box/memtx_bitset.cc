@@ -124,13 +124,19 @@ memtx_bitset_index_unregister_tuple(struct memtx_bitset_index *index,
 	mh_bitset_index_del(index->tuple_to_id, k, 0);
 }
 
-static uint32_t
+/**
+ * Get the value of @a tuple in @a index. Return false if the tuple is not
+ * in the index.
+ */
+static bool
 memtx_bitset_index_tuple_to_value(struct memtx_bitset_index *index,
-				  struct tuple *tuple)
+				  struct tuple *tuple, uint32_t *value)
 {
 	uint32_t k = mh_bitset_index_find(index->tuple_to_id, tuple, 0);
-	struct bitset_hash_entry *e = mh_bitset_index_node(index->tuple_to_id, k);
-	return e->id;
+	if (k == mh_end(index->tuple_to_id))
+		return false;
+	*value = mh_bitset_index_node(index->tuple_to_id, k)->id;
+	return true;
 }
 
 static struct tuple *
@@ -299,12 +305,15 @@ memtx_bitset_index_replace(struct index *base, struct tuple *old_tuple,
 
 	if (old_tuple != NULL) {
 #ifndef OLD_GOOD_BITSET
-		uint32_t value = memtx_bitset_index_tuple_to_value(index, old_tuple);
+		uint32_t value;
+		bool is_present = memtx_bitset_index_tuple_to_value(
+			index, old_tuple, &value);
 #else /* #ifndef OLD_GOOD_BITSET */
 		size_t value = tuple_to_value(old_tuple);
+		bool is_present = tt_bitset_index_contains_value(&index->index,
+								 value);
 #endif /* #ifndef OLD_GOOD_BITSET */
-		if (tt_bitset_index_contains_value(&index->index,
-						   (size_t) value)) {
+		if (is_present) {
 			*result = old_tuple;
 
 			assert(old_tuple != new_tuple);
@@ -330,7 +339,10 @@ memtx_bitset_index_replace(struct index *base, struct tuple *old_tuple,
 			assert(*result == NULL);
 			return -1;
 		}
-		uint32_t value = memtx_bitset_index_tuple_to_value(index, new_tuple);
+		uint32_t value;
+		if (!memtx_bitset_index_tuple_to_value(index, new_tuple,
+						       &value))
+			unreachable();
 #else /* #ifndef OLD_GOOD_BITSET */
 		uint32_t value = tuple_to_value(new_tuple);
 #endif /* #ifndef OLD_GOOD_BITSET */
