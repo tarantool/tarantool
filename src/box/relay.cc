@@ -566,6 +566,7 @@ relay_initial_join(struct replica *replica, struct iostream *io, uint64_t sync,
 	vclock_copy(vclock, &box_ckpt.journal.vclock);
 	ctx.vclock = vclock;
 	engine_join_xc(&ctx, &relay->stream);
+	ERROR_INJECT_YIELD(ERRINJ_RELAY_INITIAL_JOIN_DELAY);
 	if (relay_flush(relay) < 0)
 		diag_raise();
 }

@@ -4514,6 +4514,17 @@ box_register_replica(const struct tt_uuid *uuid,
 	if (schema_find_replica_by_name(name, REPLICA_ID_NIL, &other) != 0)
 		diag_raise();
 	if (other.id != REPLICA_ID_NIL) {
+		/*
+		 * Do not steal a live replica's name: bootstrap must report
+		 * the same duplicate-name error as JOIN does. gh-12984 allows
+		 * replacement only when the old applier is absent/stopped.
+		 */
+		struct replica *old = replica_by_uuid(&other.uuid);
+		if (old != NULL && replica_has_alive_connections(old)) {
+			tnt_raise(ClientError, ER_INSTANCE_NAME_DUPLICATE,
+				  node_name_str(name),
+				  tt_uuid_str(&other.uuid));
+		}
 		if (boxk(IPROTO_UPDATE, BOX_CLUSTER_ID, "[%u][[%s%d%s]]",
 			 (unsigned)other.id, "=", BOX_CLUSTER_FIELD_UUID,
 			 tt_uuid_str(uuid)) != 0)
@@ -4701,6 +4712,8 @@ box_process_fetch_snapshot(struct iostream *io,
 	relay_initial_join(replica, io, header->sync, &start_vclock,
 			   req.version_id, cursor_ptr);
 	say_info("read-view sent.");
+	ERROR_INJECT(ERRINJ_RELAY_FETCH_SNAPSHOT_FAIL,
+		     tnt_raise(ClientError, ER_INJECTION, "fetch snapshot"));
 
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
@@ -4772,6 +4785,7 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 		 tt_uuid_str(&req.instance_uuid), sio_socketname(io->fd));
 	ERROR_INJECT_YIELD(ERRINJ_REPLICA_JOIN_DELAY);
 	box_register_replica(&req.instance_uuid, req.instance_name);
+	ERROR_INJECT_YIELD(ERRINJ_REPLICA_REGISTER_DELAY);
 
 	replica = replica_by_uuid(&req.instance_uuid);
 	if (replica == NULL)
@@ -5308,9 +5322,14 @@ check_bootstrap_unanimity(void)
 	}
 }
 
-/** Ensure the configured and stored global identifiers (UUID) match. */
+/**
+ * Ensure the configured and stored global identifiers (names, UUID) match.
+ *
+ * If @a require_name is set, the instance name must be known by now. It is
+ * not when the check is done before the registration of a joining replica.
+ */
 static int
-check_global_ids_integrity(void)
+check_global_ids_integrity(bool require_name)
 {
 	char cluster_name[NODE_NAME_SIZE_MAX];
 	char replicaset_name[NODE_NAME_SIZE_MAX];
@@ -5342,13 +5361,24 @@ check_global_ids_integrity(void)
 			 tt_uuid_str(&REPLICASET_UUID));
 		return -1;
 	}
-	/* A checkpoint taken before registration does not have our name yet. */
-	if (!box_is_anon() && *instance_name != 0 &&
-	    strcmp(instance_name, INSTANCE_NAME) != 0) {
-		diag_set(ClientError, ER_INSTANCE_NAME_MISMATCH,
-			 node_name_str(instance_name),
-			 node_name_str(INSTANCE_NAME));
-		return -1;
+	/*
+	 * A checkpoint taken before registration does not have our name yet,
+	 * so the name is unknown until the registration row is recovered from
+	 * WAL or the registration is done on the master.
+	 */
+	if (!box_is_anon() && *instance_name != 0) {
+		if (*INSTANCE_NAME == '\0' && require_name) {
+			diag_set(ClientError, ER_UNKNOWN_REPLICA,
+				 tt_uuid_str(&INSTANCE_UUID),
+				 tt_uuid_str(&REPLICASET_UUID));
+				return -1;
+		}
+		if (strcmp(instance_name, INSTANCE_NAME) != 0) {
+			diag_set(ClientError, ER_INSTANCE_NAME_MISMATCH,
+				 node_name_str(instance_name),
+				 node_name_str(INSTANCE_NAME));
+			return -1;
+		}
 	}
 	return 0;
 }
@@ -5461,8 +5491,8 @@ bootstrap_from_master(struct replica *master)
 		 applier_addr_str(applier));
 
 	/*
-	 * Send JOIN request to master
-	 * See box_process_join().
+	 * Send FETCH_SNAPSHOT request to master.
+	 * See box_process_fetch_snapshot().
 	 */
 	assert(!tt_uuid_is_nil(&INSTANCE_UUID));
 	try {
@@ -5485,23 +5515,18 @@ bootstrap_from_master(struct replica *master)
 	 * Process initial data (snapshot or dirty disk data).
 	 */
 	engine_begin_initial_recovery_xc(NULL);
-	enum applier_state wait_state = cfg_replication_anon ?
-					APPLIER_FETCHED_SNAPSHOT :
-					APPLIER_FINAL_JOIN;
-	applier_resume_to_state(applier, wait_state, TIMEOUT_INFINITY);
+	applier_resume_to_state(applier, APPLIER_FETCHED_SNAPSHOT,
+				TIMEOUT_INFINITY);
 
 	box_run_on_recovery_state(RECOVERY_STATE_SNAPSHOT_RECOVERED);
 
 	/*
-	 * Process final data (WALs).
+	 * Finalize recovery. WALs will be received later via
+	 * REGISTER and SUBSCRIBE after the initial checkpoint.
 	 */
 	engine_begin_final_recovery_xc();
 	recovery_journal_create(&instance_vclock_storage);
 
-	if (!cfg_replication_anon) {
-		applier_resume_to_state(applier, APPLIER_JOINED,
-					TIMEOUT_INFINITY);
-	}
 	/* Finalize the new replica */
 	engine_end_recovery_xc();
 	if (box_set_replication_synchro_queue_max_size() != 0)
@@ -5512,7 +5537,7 @@ bootstrap_from_master(struct replica *master)
 	assert(applier->state == APPLIER_READY);
 
 	/*
-	 * An engine may write to WAL on its own during the join
+	 * An engine may write to WAL on its own during the bootstrap
 	 * stage (e.g. Vinyl's deferred DELETEs). That's OK - those
 	 * records will pass through the recovery journal and wind
 	 * up in the initial checkpoint. However, we must enable
@@ -5528,6 +5553,13 @@ bootstrap_from_master(struct replica *master)
 	if (gc_checkpoint() != 0) {
 		say_error("failed to create a checkpoint");
 		diag_raise();
+	}
+
+	if (!cfg_replication_anon && box_is_anon()) {
+		applier_resume_to_state(applier, APPLIER_REGISTERED,
+					TIMEOUT_INFINITY);
+		applier_resume_to_state(applier, APPLIER_READY,
+					TIMEOUT_INFINITY);
 	}
 
 	box_run_on_recovery_state(RECOVERY_STATE_WAL_RECOVERED);
@@ -5605,7 +5637,7 @@ bootstrap(bool *is_bootstrap_leader)
 			break;
 		}
 		if (bootstrap_from_master(master)) {
-			if (check_global_ids_integrity() != 0)
+			if (check_global_ids_integrity(false) != 0)
 				diag_raise();
 			*is_bootstrap_leader = false;
 			break;
@@ -5839,7 +5871,7 @@ local_recovery(const struct vclock *checkpoint_vclock)
 	if (box_set_replication_synchro_queue_max_size() != 0)
 		diag_raise();
 
-	if (check_global_ids_integrity() != 0)
+	if (check_global_ids_integrity(false) != 0)
 		diag_raise();
 	box_run_on_recovery_state(RECOVERY_STATE_WAL_RECOVERED);
 }
@@ -6022,7 +6054,7 @@ box_cfg_xc(void)
 		if (!cfg_replication_anon && box_is_anon() &&
 		    replicaset_is_registered_remotely()) {
 			box_register_on_master();
-			if (check_global_ids_integrity() != 0)
+			if (check_global_ids_integrity(true) != 0)
 				diag_raise();
 		} else {
 			/*

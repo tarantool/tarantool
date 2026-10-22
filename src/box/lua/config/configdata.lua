@@ -9,6 +9,7 @@ local uuid = require('uuid')
 local instance_config = require('internal.config.instance_config')
 local cluster_config = require('internal.config.cluster_config')
 local snapshot = require('internal.config.utils.snapshot')
+local log = require('internal.config.utils.log')
 
 -- {{{ General-purpose utils
 
@@ -562,10 +563,14 @@ local function validate_names(saved_names, config_names, iconfig, opts)
        not skip_names then
         if saved_names.instance_name == nil and
            config_names.instance_uuid == nil then
-            error(string.format('Instance name for %s is not set in snapshot' ..
-                                ' and UUID is missing in the config. Found ' ..
-                                '%s in snapshot.', config_names.instance_name,
-                                saved_names.instance_uuid), 0)
+            -- The snapshot has our UUID in the header (checked above),
+            -- so it belongs to this instance and recovery will either
+            -- find our registration in WAL or register us on the
+            -- master. Do not abort, defer to the post-recovery check.
+            log.warn('Instance name for %s is not set in the snapshot. ' ..
+                     'It is expected to arrive with the registration ' ..
+                     'during WAL recovery and will be validated after it.',
+                     config_names.instance_name)
         end
         if saved_names.replicaset_name == nil and
            config_names.replicaset_uuid == nil then

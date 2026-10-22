@@ -1232,14 +1232,27 @@ g.test_closes_unused_connections = function()
 end
 
 g.test_tries_to_reconnect = function()
+    -- Bootstrap now goes: fetch_snapshot -> initial checkpoint ->
+    -- register -> subscribe, so the initial snapshot may not contain
+    -- the instance's own name yet. Pin instance_uuid in the config so
+    -- a restart from such a snapshot still works.
     local config = cbuilder:new()
         :set_global_option('credentials.users.myuser',
             {password =  'secret',
              roles = { 'replication' },
              privileges = {{permissions = {'execute'}, universe = true}}})
         :set_global_option('iproto.advertise.peer.login', 'myuser')
-        :add_instance('i-001', { database = { mode = 'rw' } })
-        :add_instance('i-002', {})
+        :add_instance('i-001', {
+            database = {
+                mode = 'rw',
+                instance_uuid = '11111111-1111-1111-1111-111111111111',
+            },
+        })
+        :add_instance('i-002', {
+            database = {
+                instance_uuid = '22222222-2222-2222-2222-222222222222',
+            },
+        })
         :config()
 
     local cluster = cluster:new(config)
