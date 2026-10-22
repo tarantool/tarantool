@@ -61,18 +61,16 @@ enum { APPLIER_SOURCE_MAXLEN = 1024 }; /* enough to fit URI with passwords */
 	_(APPLIER_CONNECTED, 2)                                      \
 	_(APPLIER_AUTH, 3)                                           \
 	_(APPLIER_READY, 4)                                          \
-	_(APPLIER_FINAL_JOIN, 5)                                     \
-	_(APPLIER_JOINED, 6)                                         \
-	_(APPLIER_SYNC, 7)                                           \
-	_(APPLIER_FOLLOW, 8)                                         \
-	_(APPLIER_STOPPED, 9)                                        \
-	_(APPLIER_DISCONNECTED, 10)                                  \
-	_(APPLIER_LOADING, 11)                                       \
-	_(APPLIER_FETCH_SNAPSHOT, 12)                                \
-	_(APPLIER_FETCHED_SNAPSHOT, 13)                              \
-	_(APPLIER_WAIT_SNAPSHOT, 14)                                 \
-	_(APPLIER_REGISTER, 15)                                      \
-	_(APPLIER_REGISTERED, 16)                                    \
+	_(APPLIER_SYNC, 5)                                           \
+	_(APPLIER_FOLLOW, 6)                                         \
+	_(APPLIER_STOPPED, 7)                                        \
+	_(APPLIER_DISCONNECTED, 8)                                   \
+	_(APPLIER_LOADING, 9)                                        \
+	_(APPLIER_FETCH_SNAPSHOT, 10)                                \
+	_(APPLIER_FETCHED_SNAPSHOT, 11)                              \
+	_(APPLIER_WAIT_SNAPSHOT, 12)                                 \
+	_(APPLIER_REGISTER, 13)                                      \
+	_(APPLIER_REGISTERED, 14)                                    \
 
 /** States for the applier */
 ENUM(applier_state, applier_STATE);
@@ -226,7 +224,7 @@ struct applier {
 	bool is_ack_sent;
 	/** True if ACK was signalled in tx while ack_msg was en route. */
 	bool is_ack_pending;
-	/** Number of rows received during initial and final join. */
+	/** Number of rows received during snapshot fetch and register. */
 	uint64_t row_count;
 	/** Fields used only by applier thread. */
 	struct {

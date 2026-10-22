@@ -4498,6 +4498,11 @@ box_register_replica(const struct tt_uuid *uuid,
 	}
 	struct replica *other = replica_by_name(name);
 	if (other != NULL && other != replica) {
+		if (replica_has_connections(other)) {
+			tnt_raise(ClientError, ER_INSTANCE_NAME_DUPLICATE,
+				  node_name_str(name),
+				  tt_uuid_str(&other->uuid));
+		}
 		if (boxk(IPROTO_UPDATE, BOX_CLUSTER_ID, "[%u][[%s%d%s]]",
 			 (unsigned)other->id, "=", BOX_CLUSTER_FIELD_UUID,
 			 tt_uuid_str(uuid)) != 0)
@@ -4756,6 +4761,7 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 		 tt_uuid_str(&req.instance_uuid), sio_socketname(io->fd));
 	ERROR_INJECT_YIELD(ERRINJ_REPLICA_JOIN_DELAY);
 	box_register_replica(&req.instance_uuid, req.instance_name);
+	ERROR_INJECT_YIELD(ERRINJ_REPLICA_REGISTER_DELAY);
 
 	replica = replica_by_uuid(&req.instance_uuid);
 	if (replica == NULL)
@@ -5443,8 +5449,8 @@ bootstrap_from_master(struct replica *master)
 		 applier_addr_str(applier));
 
 	/*
-	 * Send JOIN request to master
-	 * See box_process_join().
+	 * Send FETCH_SNAPSHOT request to master.
+	 * See box_process_fetch_snapshot().
 	 */
 	assert(!tt_uuid_is_nil(&INSTANCE_UUID));
 	try {
@@ -5460,23 +5466,18 @@ bootstrap_from_master(struct replica *master)
 	 * Process initial data (snapshot or dirty disk data).
 	 */
 	engine_begin_initial_recovery_xc(NULL);
-	enum applier_state wait_state = cfg_replication_anon ?
-					APPLIER_FETCHED_SNAPSHOT :
-					APPLIER_FINAL_JOIN;
-	applier_resume_to_state(applier, wait_state, TIMEOUT_INFINITY);
+	applier_resume_to_state(applier, APPLIER_FETCHED_SNAPSHOT,
+				TIMEOUT_INFINITY);
 
 	box_run_on_recovery_state(RECOVERY_STATE_SNAPSHOT_RECOVERED);
 
 	/*
-	 * Process final data (WALs).
+	 * Finalize recovery. WALs will be received later via
+	 * REGISTER and SUBSCRIBE after the initial checkpoint.
 	 */
 	engine_begin_final_recovery_xc();
 	recovery_journal_create(&instance_vclock_storage);
 
-	if (!cfg_replication_anon) {
-		applier_resume_to_state(applier, APPLIER_JOINED,
-					TIMEOUT_INFINITY);
-	}
 	/* Finalize the new replica */
 	engine_end_recovery_xc();
 	if (box_set_replication_synchro_queue_max_size() != 0)
@@ -5487,7 +5488,7 @@ bootstrap_from_master(struct replica *master)
 	assert(applier->state == APPLIER_READY);
 
 	/*
-	 * An engine may write to WAL on its own during the join
+	 * An engine may write to WAL on its own during the bootstrap
 	 * stage (e.g. Vinyl's deferred DELETEs). That's OK - those
 	 * records will pass through the recovery journal and wind
 	 * up in the initial checkpoint. However, we must enable
@@ -5503,6 +5504,14 @@ bootstrap_from_master(struct replica *master)
 	if (gc_checkpoint() != 0) {
 		say_error("failed to create a checkpoint");
 		diag_raise();
+	}
+
+	if (!cfg_replication_anon && box_is_anon()) {
+		vclock_copy(&replicaset.applier.vclock, instance_vclock);
+		applier_resume_to_state(applier, APPLIER_REGISTERED,
+					TIMEOUT_INFINITY);
+		applier_resume_to_state(applier, APPLIER_READY,
+					TIMEOUT_INFINITY);
 	}
 
 	box_run_on_recovery_state(RECOVERY_STATE_WAL_RECOVERED);

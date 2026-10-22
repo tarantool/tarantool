@@ -22,7 +22,7 @@ end)
 g.test_applier_stops_on_error_during_fetch_snapshot = function(cg)
     local replica_uuid = uuid.str()
     cg.master:exec(function()
-        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
+        box.error.injection.set('ERRINJ_RELAY_INITIAL_JOIN_DELAY', true)
     end)
     local replica = server:new{
         alias = 'replica',
@@ -31,26 +31,10 @@ g.test_applier_stops_on_error_during_fetch_snapshot = function(cg)
     }
 
     replica:start({wait_until_ready = false})
-    -- Block _cluster WAL write after snapshot is sent but before OK marker.
-    local initial_cluster_count = cg.master:exec(function()
-        return box.space._cluster:count()
+    t.helpers.retrying({timeout = 10}, function()
+        t.assert_not_equals(replica:grep_log('replicaset uuid'), nil)
     end)
-    cg.master:exec(function(initial_count)
-        t.helpers.retrying({timeout=10}, function(initial_count)
-            t.assert(box.error.injection.get('ERRINJ_WAL_DELAY'))
-            local is_cluster_write = box.space._cluster:count() > initial_count
-            if not is_cluster_write then
-                box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
-                box.error.injection.set('ERRINJ_WAL_DELAY', false)
-            end
-            t.assert(is_cluster_write)
-        end, initial_count)
-    end, {initial_cluster_count})
-
-    t.helpers.retrying({timeout=10}, function()
-        t.assert_not_equals(cg.master:grep_log('initial data sent'), nil)
-    end)
-    cg.master.process:kill("KILL");
+    cg.master.process:kill("KILL")
     cg.master:restart()
 
     -- Applier should see that replica has some data and stop itself from
@@ -64,7 +48,7 @@ g.test_applier_stops_on_error_during_fetch_snapshot = function(cg)
     end)
 
     cg.master:exec(function(replica_uuid)
-        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', -1)
+        box.error.injection.set('ERRINJ_RELAY_INITIAL_JOIN_DELAY', false)
         box.ctl.replica_gc(replica_uuid)
     end, {replica_uuid})
     replica:drop()
@@ -85,15 +69,15 @@ g.test_applier_stops_on_error_during_fetch_snapshot_rebootstrap = function(cg)
         box.cfg{wal_cleanup_delay = 0, checkpoint_count = 1}
         box.space.test:insert{3, 'data'}
         box.snapshot()
-        box.error.injection.set('ERRINJ_REPLICA_JOIN_DELAY', true)
+        box.error.injection.set('ERRINJ_RELAY_INITIAL_JOIN_DELAY', true)
     end, {replica_uuid})
 
     replica:start({wait_until_ready = false})
     t.helpers.retrying({timeout=10}, function()
         t.assert_not_equals(replica:grep_log('initiating rebootstrap'), nil)
-        t.assert_not_equals(cg.master:grep_log('initial data sent'), nil)
+        t.assert_not_equals(replica:grep_log('replicaset uuid'), nil)
     end)
-    cg.master.process:kill("KILL");
+    cg.master.process:kill("KILL")
     cg.master:restart()
 
     t.helpers.retrying({timeout = 10}, function()
@@ -105,7 +89,7 @@ g.test_applier_stops_on_error_during_fetch_snapshot_rebootstrap = function(cg)
     end)
 
     cg.master:exec(function()
-        box.error.injection.set('ERRINJ_REPLICA_JOIN_DELAY', false)
+        box.error.injection.set('ERRINJ_RELAY_INITIAL_JOIN_DELAY', false)
     end)
     replica:drop()
 end
