@@ -110,7 +110,6 @@ applier_log_error(struct applier *applier, struct error *e, bool try_reconnect)
 	case APPLIER_FOLLOW:
 	case APPLIER_WAIT_SNAPSHOT:
 	case APPLIER_FETCH_SNAPSHOT:
-	case APPLIER_FINAL_JOIN:
 		say_info("can't read row");
 		break;
 	default:
@@ -793,7 +792,7 @@ applier_wait_snapshot(struct applier *applier)
 	 * response, but a stream of rows from checkpoint.
 	 */
 	if (applier->version_id >= version_id(1, 7, 0)) {
-		/* Decode JOIN/FETCH_SNAPSHOT response */
+		/* Decode FETCH_SNAPSHOT response */
 		coio_read_xrow(io, ibuf, &row);
 		if (iproto_type_is_error(row.type)) {
 			xrow_decode_error_xc(&row); /* re-throw error */
@@ -887,6 +886,29 @@ applier_is_registered(const struct applier *applier)
 static void
 applier_fetch_snapshot(struct applier *applier)
 {
+	/* Fail before fetching data so bootstrap can choose another master. */
+	if (!cfg_replication_anon && applier->ballot.is_anon) {
+		tnt_raise(ClientError, ER_UNSUPPORTED, "Anonymous replica",
+			  "registration of non-anonymous nodes.");
+	}
+	/*
+	 * A non-anonymous instance registers itself after the initial
+	 * checkpoint, and a read-only master can't do that. Fail before any
+	 * data is fetched: the checkpoint can't be rolled back, so otherwise
+	 * the bootstrap would have no way to complete, while the bootstrap
+	 * loop may still choose another master or self-bootstrap now.
+	 *
+	 * An instance which the master already has in _cluster needs no write,
+	 * so it may be served by a read-only master. A master which hasn't
+	 * finished its own bootstrap is asked anyway and reports ER_LOADING.
+	 */
+	if (!cfg_replication_anon && applier->ballot.is_booted &&
+	    applier->ballot.is_ro && !applier_is_registered(applier)) {
+		say_info("can't bootstrap from the read-only master at %s: "
+			 "this instance has no ID there",
+			 applier_addr_str(applier));
+		tnt_raise(ClientError, ER_READONLY);
+	}
 	/* Send FETCH SNAPSHOT request */
 	struct iostream *io = &applier->io;
 	struct xrow_header row;
@@ -957,8 +979,7 @@ static struct applier_tx_row *
 tx_alloc_row(struct applier *applier)
 {
 	assert(cord_is_main());
-	assert(applier->state == APPLIER_FINAL_JOIN ||
-	       applier->state == APPLIER_REGISTER);
+	assert(applier->state == APPLIER_REGISTER);
 	(void)applier;
 	size_t size;
 	struct applier_tx_row *tx_row =
@@ -973,8 +994,7 @@ static void
 tx_save_body(struct applier *applier, struct xrow_header *row)
 {
 	assert(cord_is_main());
-	assert(applier->state == APPLIER_FINAL_JOIN ||
-	       applier->state == APPLIER_REGISTER);
+	assert(applier->state == APPLIER_REGISTER);
 	(void)applier;
 	assert(row->bodycnt <= 1);
 	if (!row->is_commit && row->bodycnt == 1) {
@@ -1102,6 +1122,19 @@ applier_wait_register(struct applier *applier)
 		}
 		if (applier_apply_tx(applier, &tx.rows) != 0)
 			diag_raise();
+		/*
+		 * Deletions from _cluster release IDs only on commit. A later
+		 * row in this stream may reuse one of those IDs.
+		 */
+		struct applier_tx_row *tx_row;
+		stailq_foreach_entry(tx_row, &tx.rows, next) {
+			if (iproto_type_is_dml(tx_row->row.type) &&
+			    tx_row->req.dml.space_id == BOX_CLUSTER_ID) {
+				if (journal_sync(NULL) != 0)
+					diag_raise();
+				break;
+			}
+		}
 	}
 	/*
 	 * Registration becomes visible only on commit. Async registrations
@@ -1113,7 +1146,7 @@ applier_wait_register(struct applier *applier)
 }
 
 static void
-applier_register(struct applier *applier, bool was_anon)
+applier_register(struct applier *applier)
 {
 	/* Send REGISTER request */
 	struct iostream *io = &applier->io;
@@ -1128,60 +1161,9 @@ applier_register(struct applier *applier, bool was_anon)
 	row.type = IPROTO_REGISTER;
 	coio_write_xrow(io, &row);
 
-	/*
-	 * Register may serve as a retry for final join. Set corresponding
-	 * states to unblock anyone who's waiting for final join to start or
-	 * end.
-	 */
-	applier_set_state(applier, was_anon ? APPLIER_REGISTER :
-					      APPLIER_FINAL_JOIN);
+	applier_set_state(applier, APPLIER_REGISTER);
 	applier_wait_register(applier);
-	applier_set_state(applier, was_anon ? APPLIER_REGISTERED :
-					      APPLIER_JOINED);
-	applier_set_state(applier, APPLIER_READY);
-}
-
-/**
- * Execute and process JOIN request (bootstrap the instance).
- */
-static void
-applier_join(struct applier *applier)
-{
-	/* Send JOIN request */
-	struct iostream *io = &applier->io;
-	struct xrow_header row;
-	uint64_t prev_row_count;
-	struct join_request req;
-	memset(&req, 0, sizeof(req));
-	req.instance_uuid = INSTANCE_UUID;
-	strlcpy(req.instance_name, cfg_instance_name, NODE_NAME_SIZE_MAX);
-	req.version_id = tarantool_version_id();
-	RegionGuard region_guard(&fiber()->gc);
-	xrow_encode_join(&row, &req);
-	coio_write_xrow(io, &row);
-
-	applier_set_state(applier, APPLIER_WAIT_SNAPSHOT);
-
-	applier_wait_snapshot(applier);
-
-	say_info("initial data received");
-
-	applier_set_state(applier, APPLIER_FINAL_JOIN);
-
-	prev_row_count = applier->row_count;
-	applier_wait_register(applier);
-	if (applier->row_count == prev_row_count) {
-		/*
-		 * We didn't receive any rows during registration.
-		 * Proceed to "subscribe" and do not finish bootstrap
-		 * until replica id is received.
-		 */
-		return;
-	}
-
-	say_info("final data received");
-
-	applier_set_state(applier, APPLIER_JOINED);
+	applier_set_state(applier, APPLIER_REGISTERED);
 	applier_set_state(applier, APPLIER_READY);
 }
 
@@ -1962,13 +1944,6 @@ applier_process_batch(struct cmsg *base)
 		} else if (applier_apply_tx(applier, &tx->rows) != 0) {
 			diag_raise();
 		}
-		if (applier->state == APPLIER_FINAL_JOIN &&
-		    instance_id != REPLICA_ID_NIL) {
-			say_info("final data received");
-			applier_set_state(applier, APPLIER_JOINED);
-			applier_set_state(applier, APPLIER_READY);
-			applier_set_state(applier, APPLIER_FOLLOW);
-		}
 	}
 
 	/* Return the message to applier thread. */
@@ -2511,14 +2486,6 @@ applier_subscribe(struct applier *applier)
 			applier_set_state(applier, APPLIER_SYNC);
 		else
 			applier_set_state(applier, APPLIER_FOLLOW);
-	} else {
-		/*
-		 * Tarantool < 1.7.0 sends replica id during
-		 * "subscribe" stage. We can't finish bootstrap
-		 * until it is received.
-		 */
-		assert(applier->state == APPLIER_FINAL_JOIN);
-		assert(applier->version_id < version_id(1, 7, 0));
 	}
 
 	/* Re-enable warnings after successful execution of SUBSCRIBE */
@@ -2680,13 +2647,6 @@ applier_f(va_list ap)
 	 */
 	struct session *session = session_new_on_demand();
 	session_set_type(session, SESSION_TYPE_APPLIER);
-	/*
-	 * The instance saves replicaset anon cfg-value on bootstrap.
-	 * If a freshly started instance sees it has received
-	 * REPLICASET_UUID but hasn't yet registered, it must be an
-	 * anonymous replica, hence the default value 'true'.
-	 */
-	bool was_anon = true;
 
 	/* Re-connect loop */
 	while (true) {
@@ -2701,22 +2661,17 @@ applier_f(va_list ap)
 			applier_connect(applier);
 			if (tt_uuid_is_nil(&REPLICASET_UUID)) {
 				/*
-				 * Execute JOIN if this is a bootstrap.
-				 * In case of anonymous replication, don't
-				 * join but just fetch master's snapshot.
-				 *
-				 * The join will pause the applier
-				 * until WAL is created.
+				 * Bootstrap: always fetch snapshot first.
+				 * Named replicas will register after the
+				 * initial checkpoint is built, so that
+				 * unconfirmed sync txns cannot deadlock
+				 * the bootstrap (#11039).
 				 */
-				was_anon = cfg_replication_anon;
-				if (was_anon)
-					applier_fetch_snapshot(applier);
-				else
-					applier_join(applier);
+				applier_fetch_snapshot(applier);
 			}
 			/*
 			 * The instance transitioned from anonymous or is
-			 * retrying final join.
+			 * retrying registration.
 			 */
 			bool need_id = box_is_anon() &&
 				       !cfg_replication_anon;
@@ -2732,9 +2687,9 @@ applier_f(va_list ap)
 				 * Startup configures Raft and may finish while
 				 * we are paused at REGISTERED or READY.
 				 */
-				bool configure_raft = need_id && was_anon &&
-						      box_is_configured();
-				applier_register(applier, was_anon);
+				bool configure_raft =
+					need_id && box_is_configured();
+				applier_register(applier);
 				/*
 				 * It's hard to catch the exact moment when
 				 * instance id settles, for example, it could

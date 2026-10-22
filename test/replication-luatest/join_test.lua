@@ -24,7 +24,7 @@ end)
 -- delete the replica from _cluster before the replica tried to rejoin or join
 -- first time via a previously existing UUID.
 --
-g.test_fetch_self_delete_during_final_join = function(lg)
+g.test_fetch_self_delete_during_register = function(lg)
     t.tarantool.skip_if_not_debug()
     lg.master:exec(function()
         local s = box.schema.create_space('test')
@@ -41,7 +41,7 @@ g.test_fetch_self_delete_during_final_join = function(lg)
         box_cfg = box_cfg,
     })
     replica:start({wait_until_ready = false})
-    local msg = ('joining replica %s'):format(replica_uuid):gsub('%-', '%%-')
+    local msg = 'sending read%-view to replica'
     t.helpers.retrying({}, function()
         t.assert(lg.master:grep_log(msg))
     end)
@@ -140,7 +140,8 @@ g.test_join_with_the_same_uuid = function(lg)
     })
     replica1:start({wait_until_ready = false})
     replica2:start({wait_until_ready = false})
-    local msg = ('joining replica'):format(replica_uuid):gsub('%-', '%%-')
+    local msg = ('registering replica %s'):format(replica_uuid)
+    msg = msg:gsub('%-', '%%-')
     t.helpers.retrying({}, function()
         t.assert(lg.master:grep_log(msg))
     end)

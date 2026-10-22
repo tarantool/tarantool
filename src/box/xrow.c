@@ -2577,18 +2577,6 @@ xrow_decode_subscribe(const struct xrow_header *row,
 	return xrow_decode_replication_request(row, &base_req);
 }
 
-void
-xrow_encode_join(struct xrow_header *row, const struct join_request *req)
-{
-	struct join_request *cast = (struct join_request *)req;
-	const struct replication_request base_req = {
-		.instance_uuid = &cast->instance_uuid,
-		.instance_name = cast->instance_name,
-		.version_id = &cast->version_id,
-	};
-	xrow_encode_replication_request(row, &base_req, IPROTO_JOIN);
-}
-
 int
 xrow_decode_join(const struct xrow_header *row, struct join_request *req)
 {

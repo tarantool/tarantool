@@ -35,7 +35,18 @@ g.test_invalid_recovery_from_xlog = function(cg)
         box.snapshot()
     end)
 
-    -- Wait until everything is replicated from the master to the replica
+    -- The initial checkpoint is created before REGISTER (see the bootstrap
+    -- flow in box.cc:bootstrap_from_master), so it does not yet contain the
+    -- replica's own _cluster row. Persist it in a new snapshot, otherwise
+    -- deleting xlogs below would erase the replica's registration.
+    cg.replica:exec(function() box.snapshot() end)
+
+    -- Advance the master so its GC consumer for the replica is ahead of
+    -- the vclock the replica will recover to after the xlogs are gone.
+    -- This is what triggers the gc_consumer_advance path the test covers.
+    cg.master:exec(function()
+        for i = 1, 10 do box.space.test:insert{i} end
+    end)
     t.helpers.retrying({}, function()
         cg.replica:wait_for_vclock_of(cg.master)
     end)
