@@ -6,6 +6,7 @@
 #include "lua/minifio.h"
 
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <lua.h>
 #include <lauxlib.h>
@@ -105,6 +106,23 @@ lbox_minifio_dirname(struct lua_State *L)
 	return 1;
 }
 
+/** Return entry existence, distinguishing ENOENT from other errors. */
+static int
+lbox_minifio_lexists(struct lua_State *L)
+{
+	const char *path = luaL_checkstring(L, 1);
+	struct stat st;
+	if (lstat(path, &st) == 0) {
+		lua_pushboolean(L, true);
+		return 1;
+	}
+	if (errno == ENOENT) {
+		lua_pushboolean(L, false);
+		return 1;
+	}
+	return luaT_minifio_pushsyserror(L);
+}
+
 /**
  * minifio.script() -- get path of the main script.
  *
@@ -133,6 +151,7 @@ tarantool_lua_minifio_init(struct lua_State *L)
 	static const struct luaL_Reg minifio_methods[] = {
 		{"cwd", lbox_minifio_cwd},
 		{"dirname", lbox_minifio_dirname},
+		{"lexists", lbox_minifio_lexists},
 		{"script", lbox_minifio_script},
 		{NULL, NULL}
 	};

@@ -26,19 +26,8 @@ local function run(config, opts)
     if file ~= nil then
         assert(module == nil)
 
-        -- A relative path is interpreted against process.work_dir.
-        -- The first box.cfg() call changes the current working
-        -- directory to it, but before that the path has to be
-        -- rebased manually.
-        local path = file
-        if type(box.cfg) == 'function' then
-            local work_dir = configdata:get('process.work_dir',
-                                            {use_default = true})
-            path = utils_file.rebase_file_abspath(work_dir, file)
-        end
-
         local metadata = {}
-        local ok, res = pcall(utils_file.get_file_metadata, path)
+        local ok, res = pcall(utils_file.get_file_metadata, file)
         if not ok then
             log.error(('Unable to get metadata for file %q: %s'):format(
                 file, res))
@@ -73,7 +62,7 @@ local function run(config, opts)
             return
         end
 
-        local fn = assert(loadfile(path))
+        local fn = assert(loadfile(file))
         log.verbose('app.run: loading '..file)
         fn(file)
 

@@ -28,9 +28,29 @@ local function load_lua(file)
     return loadfile(file)
 end
 
+-- Initial configuration can use missing/../wd before directory creation.
+-- Cancel missing parents only; existing symlinks retain their traversal.
+local function normalize_missing_parents(path)
+    if not path:find('..', 1, true) then
+        return path
+    end
+    local parts = {}
+    for part in path:gmatch('[^/]+') do
+        if part == '..' and #parts > 0 and
+           minifio.lexists('/' .. table.concat(parts, '/')) == false then
+            table.remove(parts)
+        elseif part ~= '.' then
+            table.insert(parts, part)
+        end
+    end
+    return '/' .. table.concat(parts, '/')
+end
+
 local function traverse_path(path)
+    -- Keep the root's filesystem target, including symlink/.. .
+    -- Only ancestor traversal uses lexical normalization.
+    local paths = { normalize_missing_parents(path) }
     path = minifio.abspath(path)
-    local paths = { path }
 
     while path ~= '/' do
         path = minifio.dirname(path)
