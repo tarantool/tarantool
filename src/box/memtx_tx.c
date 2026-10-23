@@ -2580,7 +2580,8 @@ memtx_tx_handle_gap_write(struct memtx_story_link *link,
 			(struct nearby_gap_item *)item_base;
 		int cmp = 0;
 		if (item->key != NULL) {
-			struct key_def *def = index->def->key_def;
+			/* Pagination can use `pk` parts, so use `cmp_def`. */
+			struct key_def *def = index->def->cmp_def;
 			hint_t oh = key_hint(item->key, item->part_count, def);
 			hint_t kh = memtx_tx_story_link_hint(link, index, def);
 			cmp = tuple_compare_with_key(tuple, kh, item->key,
