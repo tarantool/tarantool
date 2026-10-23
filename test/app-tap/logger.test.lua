@@ -72,7 +72,7 @@ test_invalid_cfg(log.cfg, {xxx = 1},
 -- gh-5121: Allow to use 'json' output before box.cfg()
 --
 local _, err = pcall(log.log_format, 'json')
-test:ok(err == nil)
+test:ok(err == nil, 'log format is allowed before box.cfg')
 
 -- switch back to plain to next tests
 log.log_format('plain')
