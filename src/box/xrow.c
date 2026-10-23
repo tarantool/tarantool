@@ -202,6 +202,12 @@ xrow_decode(struct xrow_header *header, const char **pos,
 	header->header = start;
 	header->header_end = tmp;
 	header->thread_id = XROW_THREAD_UNSPEC;
+	/*
+	 * A null traceparent is represented by a zero span id and
+	 * a set trace flag (see fiber_set_traceparent_null()). Default
+	 * to it when the header carries no trace context at all.
+	 */
+	header->trace_context_flag = true;
 	bool has_tsn = false;
 	uint32_t flags = 0;
 	uint64_t lsn = 0;
@@ -254,6 +260,12 @@ xrow_decode(struct xrow_header *header, const char **pos,
 		case IPROTO_AUDIT_CONTEXT:
 			header->audit_context = mp_decode_str(
 				pos, &header->audit_context_len);
+			break;
+		case IPROTO_TRACE_CONTEXT_SPAN_ID:
+			header->trace_context_span_id = mp_decode_uint(pos);
+			break;
+		case IPROTO_TRACE_CONTEXT_FLAG:
+			header->trace_context_flag = mp_decode_bool(pos);
 			break;
 		default:
 			/* unknown header */
