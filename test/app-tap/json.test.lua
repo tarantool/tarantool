@@ -101,10 +101,14 @@ test:test("json", function(test)
     --
     -- gh-3514: fix parsing integers with exponent in json
     --
-    test:is(serializer.decode('{"var":2.0e+3}')["var"], 2000)
-    test:is(serializer.decode('{"var":2.0e+3}')["var"], 2000)
-    test:is(serializer.decode('{"var":2.0e+3}')["var"], 2000)
-    test:is(serializer.decode('{"var":2.0e+3}')["var"], 2000)
+    test:is(serializer.decode('{"var":2.0e+3}')["var"], 2000,
+            'exponent number is decoded')
+    test:is(serializer.decode('{"var":2.0e+3}')["var"], 2000,
+            'exponent number is decoded')
+    test:is(serializer.decode('{"var":2.0e+3}')["var"], 2000,
+            'exponent number is decoded')
+    test:is(serializer.decode('{"var":2.0e+3}')["var"], 2000,
+            'exponent number is decoded')
 
     --
     -- gh-4366: segmentation fault with recursive table
@@ -112,19 +116,23 @@ test:test("json", function(test)
     serializer.cfg({encode_max_depth = 2})
     local rec1 = {}
     rec1[1] = rec1
-    test:is(serializer.encode(rec1), '[[null]]')
+    test:is(serializer.encode(rec1), '[[null]]',
+            'recursive table with one element is encoded')
     local rec2 = {}
     rec2['x'] = rec2
-    test:is(serializer.encode(rec2), '{"x":{"x":null}}')
+    test:is(serializer.encode(rec2), '{"x":{"x":null}}',
+            'recursive table with key is encoded')
     local rec3 = {}
     rec3[1] = rec3
     rec3[2] = rec3
-    test:is(serializer.encode(rec3), '[[null,null],[null,null]]')
+    test:is(serializer.encode(rec3), '[[null,null],[null,null]]',
+            'recursive table with two elements is encoded')
     local rec4 = {}
     rec4['a'] = rec4
     rec4['b'] = rec4
     test:is(serializer.encode(rec4),
-            '{"a":{"a":null,"b":null},"b":{"a":null,"b":null}}')
+            '{"a":{"a":null,"b":null},"b":{"a":null,"b":null}}',
+            'recursive table with two keys is encoded')
     serializer.cfg({encode_max_depth = orig_encode_max_depth,
                     encode_deep_as_nil = orig_encode_deep_as_nil})
 

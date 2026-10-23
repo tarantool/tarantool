@@ -771,7 +771,7 @@ test:test('no sources', function(test)
 
     local m = merger.new(key_def, {})
     local res = m:select()
-    test:is_deeply(res, {})
+    test:is_deeply(res, {}, 'merger select result is empty')
 end)
 
 os.exit(test:check() and 0 or 1)
