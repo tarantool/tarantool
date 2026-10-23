@@ -180,6 +180,16 @@ static int (*fiber_invoke)(fiber_func f, va_list ap);
 #define ASAN_FINISH_SWITCH_FIBER(fake_stack_save)
 #endif
 
+/** Set null traceparent. */
+static void
+fiber_set_traceparent_null(struct fiber *fiber)
+{
+	fiber->storage.traceparent.span_id = 0;
+	fiber->storage.traceparent.trace_id_start = 0;
+	fiber->storage.traceparent.trace_id_end = 0;
+	fiber->storage.traceparent.trace_flag = true;
+}
+
 static inline int
 fiber_madvise(void *addr, size_t len, int advice)
 {
@@ -1093,6 +1103,7 @@ fiber_recycle(struct fiber *fiber)
 	memset(&fiber->storage, 0, sizeof(fiber->storage));
 	fiber->storage.lua.storage_ref = FIBER_LUA_NOREF;
 	fiber->storage.lua.fid_ref = FIBER_LUA_NOREF;
+	fiber_set_traceparent_null(fiber);
 	unregister_fid(fiber);
 	fiber->fid = 0;
 	fiber->gc_initial_size = 0;
@@ -1614,6 +1625,7 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 	}
 	fiber->fid = cord->next_fid;
 	fiber_set_name(fiber, name);
+	fiber_set_traceparent_null(fiber);
 	register_fid(fiber);
 	fiber->max_slice = zero_slice;
 	fiber->csw = 0;
@@ -1625,7 +1637,6 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 	assert(cord->next_fid > FIBER_ID_MAX_RESERVED);
 	if (!(fiber->flags & FIBER_IS_SYSTEM))
 		cord()->client_fiber_count++;
-
 	return fiber;
 
 }
