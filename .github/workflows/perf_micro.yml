@@ -85,13 +85,12 @@ jobs:
 
     # 'performance' label _must_ be set only for the single runner
     # to guarantee that results are not dependent on the machine.
-    # For runs whose statistics are not collected, it is OK to use
-    # any runner.
-    runs-on:
-      - self-hosted
-      - Linux
-      - x86_64
-      - ${{ matrix.runner_label }}
+    # The runs whose statistics are not collected only check that
+    # the benchmarks build and work: they use a GitHub-hosted runner
+    # with the same Ubuntu release as the benchmarking machine.
+    runs-on: ${{ matrix.runner_label == 'performance' &&
+      fromJSON('["self-hosted", "Linux", "x86_64", "performance"]') ||
+      'ubuntu-24.04' }}
 
     timeout-minutes: 60
 
@@ -136,7 +135,12 @@ jobs:
           # round-robin scheduling mechanism.
           # Hardware machine for benchmarking has a group of
           # isolated CPUs 1-24.
-          BENCH_CMD: "taskset 0x01fffffe chrt 50"
+          #
+          # Skip it on GitHub-hosted runners: chrt fails when run
+          # as a non-root user. The results from these runs are
+          # not stored, so it is harmless to skip CPU pinning.
+          BENCH_CMD: ${{ matrix.runner_label == 'performance' &&
+            'taskset 0x01fffffe chrt 50' || '' }}
       - name: Aggregate benchmark results
         run: make -f .test.mk test-perf-aggregate
       - name: Send statistics to InfluxDB
