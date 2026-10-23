@@ -32,6 +32,8 @@ lua_source(lua_sources lua/recovery_point_manager.lua recovery_point_manager_lua
 lua_source(lua_sources lua/healthcheck.lua healthcheck_lua)
 lua_source(lua_sources lua/healthcheck_defaults.lua healthcheck_defaults_lua)
 
+lua_stub(xlog FILES lua/xlog.lua)
+
 # {{{ config
 lua_source(lua_sources lua/config/applier/app.lua          config_applier_app_lua)
 lua_source(lua_sources lua/config/applier/autoexpel.lua    config_applier_autoexpel_lua)
