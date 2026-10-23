@@ -201,19 +201,6 @@ local function contains(t, value)
     return false
 end
 
-local function rmtree(path)
-    log.info('CLEANUP %s', path)
-    if (fio.path.is_file(path) or fio.path.is_link(path)) then
-        fio.unlink(path)
-        return
-    end
-    if fio.path.is_dir(path) then
-        for _, p in pairs(fio.listdir(path)) do
-            rmtree(fio.pathjoin(path, p))
-        end
-    end
-end
-
 local function rand_char()
     return string.char(math.random(97, 97 + 25))
 end
@@ -764,10 +751,13 @@ local function setup_space(engine_name, space_name)
 end
 
 local function cleanup_dir(dir)
-    log.info('CLEANUP')
-    if dir ~= nil then
-        rmtree(dir)
-        dir = nil -- luacheck: ignore
+    if dir == nil or not fio.path.exists(dir) then
+        return
+    end
+    log.info('CLEANUP %s', dir)
+    local ok, err = fio.rmtree(dir)
+    if not ok then
+        error(('failed to clean up %s: %s'):format(dir, err))
     end
 end
 
@@ -816,7 +806,7 @@ local function index_opts(space, is_primary)
     -- 'hint' is only reasonable with non-multikey memtx tree index.
     if space.engine == 'memtx' and not is_multikey and
        opts.type == 'TREE' then
-        opts.hint = true
+        opts.hint = oneof({true, false})
     end
 
     if opts.type == 'RTREE' then
@@ -1567,6 +1557,11 @@ local errinj_set = {
         enable = enable_errinj_boolean,
         disable = disable_errinj_boolean,
     },
+    -- Set to true to fail index operations due to OOM.
+    ERRINJ_INDEX_OOM = {
+        enable = enable_errinj_boolean,
+        disable = disable_errinj_boolean,
+    },
     -- Set to number of passes before starting to fail primitive index data
     -- operations.
     ERRINJ_INDEX_OOM_COUNTDOWN = {
@@ -1604,10 +1599,22 @@ local errinj_set = {
         enable = enable_errinj_timeout,
         disable = disable_errinj_timeout,
     },
+    -- Set to timeout in seconds to inject before dumping a portion of
+    -- sort data.
+    ERRINJ_SORTDATA_WRITE_TIMEOUT = {
+        enable = enable_errinj_timeout,
+        disable = disable_errinj_timeout,
+    },
     -- Set to true to fail index select.
     ERRINJ_TESTING = {
         enable = enable_errinj_boolean,
         disable = disable_errinj_boolean,
+    },
+    -- Set to timeout in seconds to inject while checking whether
+    -- data is presorted.
+    ERRINJ_TT_SORT_CHECK_PRESORTED_DELAY = {
+        enable = enable_errinj_timeout,
+        disable = disable_errinj_timeout,
     },
     -- Set to true to fail allocation of memtx tuple.
     ERRINJ_TUPLE_ALLOC = {
@@ -1743,6 +1750,15 @@ local errinj_set = {
             return -1
         end,
     },
+    -- Set to number of passes before failing vinyl statement decode.
+    ERRINJ_VY_STMT_DECODE_COUNTDOWN = {
+        enable = function()
+            return math.random(10)
+        end,
+        disable = function()
+            return -1
+        end,
+    },
     -- Set to true to fail completion of vinyl dump/compaction.
     ERRINJ_VY_TASK_COMPLETE = {
         enable = enable_errinj_boolean,
@@ -1829,6 +1845,184 @@ local errinj_set = {
     },
 }
 
+-- Error injections that are not safe or not applicable for this test.
+-- Every CE injection from `box.error.injection.info()` must be either in
+-- `errinj_set` above or in this table, see `check_errinj_set()`.
+-- Tarantool EE adds its own error injections in errinj_extras.h, they
+-- are ignored with a warning.
+-- The initial audit is in [1].
+local errinj_blacklist = {
+    -- Replication, networking, and raft are not exercised by this test.
+    ERRINJ_APPLIER_DESTROY_DELAY = true,
+    ERRINJ_APPLIER_READ_TX_ROW_DELAY = true,
+    ERRINJ_APPLIER_SLOW_ACK = true,
+    ERRINJ_APPLIER_STOP_DELAY = true,
+    ERRINJ_APPLIER_SUBSCRIBE_DELAY = true,
+    ERRINJ_APPLIER_WRITER_DELAY = true,
+    ERRINJ_BOX_INFO_REPL_WRITE_SECRET = true,
+    ERRINJ_ENGINE_JOIN_DELAY = true,
+    ERRINJ_IPROTO_CFG_LISTEN = true,
+    ERRINJ_IPROTO_DISABLE_ID = true,
+    ERRINJ_IPROTO_DISABLE_WATCH = true,
+    ERRINJ_IPROTO_FLIP_FEATURE = true,
+    ERRINJ_IPROTO_FLUSH_DELAY = true,
+    ERRINJ_IPROTO_PROCESS_REPLICATION_DELAY = true,
+    ERRINJ_IPROTO_SET_VERSION = true,
+    ERRINJ_IPROTO_TX_DELAY = true,
+    ERRINJ_IPROTO_WRITE_ERROR_DELAY = true,
+    ERRINJ_NETBOX_DISABLE_ID = true,
+    ERRINJ_NETBOX_FLIP_FEATURE = true,
+    ERRINJ_NETBOX_IO_DELAY = true,
+    ERRINJ_NETBOX_IO_ERROR = true,
+    ERRINJ_RAFT_PROMOTE_DELAY = true,
+    ERRINJ_RAFT_WAIT_TERM_PERSISTED_DELAY = true,
+    ERRINJ_RELAY_BREAK_LSN = true,
+    ERRINJ_RELAY_EXIT_DELAY = true,
+    ERRINJ_RELAY_FASTER_THAN_TX = true,
+    ERRINJ_RELAY_FINAL_JOIN = true,
+    ERRINJ_RELAY_FINAL_SLEEP = true,
+    ERRINJ_RELAY_FROM_TX_DELAY = true,
+    ERRINJ_RELAY_READ_ACK_DELAY = true,
+    ERRINJ_RELAY_REPORT_INTERVAL = true,
+    ERRINJ_RELAY_SEND_DELAY = true,
+    ERRINJ_RELAY_TIMEOUT = true,
+    ERRINJ_RELAY_TX_STATUS_UPDATE_DELAY = true,
+    ERRINJ_RELAY_WAL_START_DELAY = true,
+    ERRINJ_REPLICA_JOIN_DELAY = true,
+    ERRINJ_REPLICASET_VCLOCK = true,
+    ERRINJ_SWIM_FD_ONLY = true,
+    ERRINJ_TXN_COMMIT_ASYNC = true,
+    ERRINJ_TXN_LIMBO_BEGIN_DELAY = true,
+    ERRINJ_TXN_LIMBO_BEGIN_DELAY_COUNTDOWN = true,
+    ERRINJ_TXN_LIMBO_WORKER_DELAY = true,
+    ERRINJ_WAIT_QUORUM_COUNT = true,
+
+    -- These injections crash or exit the process.
+    ERRINJ_FIBER_MADVISE = true,
+    ERRINJ_FIBER_MPROTECT = true,
+    ERRINJ_SIGILL_MAIN_THREAD = true,
+    ERRINJ_SIGILL_NONMAIN_THREAD = true,
+    ERRINJ_WRITE_EXIT_CODE_TO_STDERR = true,
+
+    -- These injections corrupt persisted data or emulate a crash.
+    ERRINJ_SNAP_COMMIT_FAIL = true,
+    ERRINJ_SNAP_SKIP_ALL_ROWS = true,
+    ERRINJ_SNAP_SKIP_DDL_ROWS = true,
+    ERRINJ_SNAP_WRITE_CORRUPTED_INSERT_ROW = true,
+    ERRINJ_SNAP_WRITE_INVALID_SYSTEM_ROW = true,
+    ERRINJ_SNAP_WRITE_MISSING_SPACE_ROW = true,
+    ERRINJ_SNAP_WRITE_UNKNOWN_ROW_TYPE = true,
+    ERRINJ_VY_LOG_WRITE_BAD_RECORDS = true,
+    ERRINJ_VY_RUN_WRITE_CRASH_COUNTDOWN = true,
+    ERRINJ_WAL_BREAK_LSN = true,
+    ERRINJ_WAL_IO_COUNTDOWN = true,
+    ERRINJ_WAL_WRITE_COUNT = true,
+    ERRINJ_WAL_WRITE_EOF = true,
+    ERRINJ_XLOG_GARBAGE = true,
+    ERRINJ_XLOG_WRITE_CORRUPTED_BODY = true,
+    ERRINJ_XLOG_WRITE_CORRUPTED_HEADER = true,
+    ERRINJ_XLOG_WRITE_INVALID_BODY = true,
+    ERRINJ_XLOG_WRITE_INVALID_HEADER = true,
+    ERRINJ_XLOG_WRITE_INVALID_KEY = true,
+    ERRINJ_XLOG_WRITE_INVALID_VALUE = true,
+    ERRINJ_XLOG_WRITE_UNKNOWN_KEY = true,
+    ERRINJ_XLOG_WRITE_UNKNOWN_TYPE = true,
+
+    -- These injections are unsafe or not applicable.
+    ERRINJ_COIO_SENDFILE_CHUNK = true,
+    ERRINJ_COIO_WRITE_CHUNK = true,
+    ERRINJ_DYN_MODULE_COUNT = true,
+    ERRINJ_HTTPC_EXECUTE = true,
+    ERRINJ_HTTP_RESPONSE_ADD_WAIT = true,
+    ERRINJ_INDEX_RESERVE = true,
+    ERRINJ_LOG_ROTATE = true,
+    ERRINJ_SIO_READ_MAX = true,
+    ERRINJ_TUPLE_FIELD = true,
+    ERRINJ_WAL_DELAY_COUNTDOWN = true,
+
+    -- These injections were added after the initial audit and are not
+    -- triaged yet.
+    ERRINJ_BUILD_INDEX_DISABLE_YIELD = true,
+    ERRINJ_CHECK_FORMAT_DELAY_COUNTDOWN = true,
+    ERRINJ_READ_VIEW_HANDLE_NEW = true,
+    ERRINJ_SQL_PREPARED_STATEMENT_ID_OVERFLOW = true,
+    ERRINJ_TUPLE_ALLOC_COUNTDOWN = true,
+    ERRINJ_ULID_RAND_OVERFLOW = true,
+    ERRINJ_ULID_TIME_FREEZE = true,
+    ERRINJ_VY_LOG_DELAY_DURATION = true,
+    ERRINJ_WAL_DELAY_DURATION = true,
+    ERRINJ_XLOG_READ_ROW_DELAY = true,
+
+    -- Safe per the initial audit, but the resulting error is not
+    -- expected by the test.
+    ERRINJ_TUPLE_FORMAT_COUNT = true,
+
+    -- Needs a fix before it can be used, see the initial audit.
+    ERRINJ_TUPLE_FIELD_COUNT_LIMIT = true,
+
+    -- Recovery is not exercised by the test: the injection can only
+    -- fire inside `box.cfg()` before error injections are started.
+    ERRINJ_VY_RUN_RECOVER_COUNTDOWN = true,
+}
+
+local is_enterprise = require('tarantool').package == 'Tarantool Enterprise'
+
+local function check_errinj_set(errinj_set, errinj_blacklist)
+    if box.error.injection == nil then
+        return
+    end
+
+    local info = box.error.injection.info()
+
+    local unknown = fun.iter(info)
+        :filter(function(name)
+            return errinj_set[name] == nil and
+                   errinj_blacklist[name] == nil
+        end)
+        :totable()
+    if #unknown > 0 then
+        local msg = ('Error injections %s are neither in errinj_set ' ..
+                     'nor in errinj_blacklist'):format(
+                         table.concat(unknown, ', '))
+        if is_enterprise then
+            -- Tarantool EE adds its own error injections in
+            -- errinj_extras.h, do not couple the CE test to them.
+            log.warn('%s; ignoring them in Tarantool Enterprise', msg)
+        else
+            error(msg)
+        end
+    end
+
+    fun.iter(errinj_set)
+        :filter(function(name)
+            return info[name] == nil
+        end)
+        :each(function(name)
+            error(('Error injection %s from errinj_set is not available')
+                  :format(name))
+        end)
+
+    fun.iter(errinj_blacklist)
+        :filter(function(name)
+            return info[name] == nil
+        end)
+        :each(function(name)
+            error(('Error injection %s from errinj_blacklist is not '
+                   .. 'available'):format(name))
+        end)
+
+    fun.iter(errinj_blacklist)
+        :filter(function(name)
+            return errinj_set[name] ~= nil
+        end)
+        :each(function(name)
+            error(('Error injection %s is listed in both tables')
+                  :format(name))
+        end)
+end
+
+check_errinj_set(errinj_set, errinj_blacklist)
+
 local function is_error_expected(err_msg, err_whitelist)
     local is_expected = false
     for _, err_pat in ipairs(err_whitelist) do
@@ -1878,10 +2072,9 @@ local function run_test(num_workers, test_duration, test_dir,
     math.randomseed(seed)
     log.info('Random seed: %d', seed)
 
-    if fio.path.exists(test_dir) then
-        cleanup_dir(test_dir)
-    else
-        fio.mkdir(test_dir)
+    cleanup_dir(test_dir)
+    if not fio.mkdir(test_dir) then
+        error(('failed to create test directory %s'):format(test_dir))
     end
     index_id_func = counter()
 
