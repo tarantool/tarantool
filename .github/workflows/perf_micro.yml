@@ -195,11 +195,6 @@ jobs:
           export OTAVA_CONFIG=$(realpath otava.yaml)
           MAGNITUDE=0.2
           otava analyze --magnitude ${MAGNITUDE} tarantool
-      - name: Send VK Teams message on failure
-        if: failure()
-        uses: ./.github/actions/report-job-status
-        with:
-          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
       - name: artifacts
         uses: actions/upload-artifact@v4
         if: failure()
