@@ -3064,8 +3064,18 @@ box_promote_qsync(void)
 	auto promote_guard = make_scoped_guard([&] {
 		is_in_box_promote = false;
 	});
-	return txn_limbo_promote(&txn_limbo, IPROTO_RAFT_PROMOTE,
-				 TIMEOUT_INFINITY);
+	/*
+	 * XXX: with the elections disabled the votes can't guard the promotion,
+	 * and the election quorum is just 1. Hence the legacy protocol: the
+	 * transactions get their quorums collected before the PROMOTE, and the
+	 * PROMOTE itself doesn't wait for anything.
+	 *
+	 * Still, this scenario is broken even with the preliminary waiting, and
+	 * is expected to be deleted eventually.
+	 */
+	if (box_election_mode == ELECTION_MODE_OFF)
+		return txn_limbo_promote_legacy(&txn_limbo, TIMEOUT_INFINITY);
+	return txn_limbo_promote(&txn_limbo, TIMEOUT_INFINITY);
 }
 
 int
@@ -3191,8 +3201,7 @@ box_demote(void)
 		diag_set(ClientError, ER_INTERFERING_ELECTIONS);
 		return -1;
 	}
-	return txn_limbo_promote(&txn_limbo, IPROTO_RAFT_DEMOTE,
-				 replication_synchro_timeout);
+	return txn_limbo_demote(&txn_limbo, replication_synchro_timeout);
 }
 
 int
@@ -5464,6 +5473,13 @@ bootstrap_from_master(struct replica *master)
 	} catch (FiberIsCancelled *e) {
 		throw e;
 	} catch (...) {
+		/*
+		 * The join metadata is applied while waiting here. It changes
+		 * the local state, so a retry is not possible after it, same
+		 * as after the snapshot data. See applier_f().
+		 */
+		if (applier->row_count > 0)
+			throw;
 		return false;
 	}
 
@@ -6055,15 +6071,6 @@ box_cfg_xc(void)
 	if (box_set_election_mode() != 0)
 		diag_raise();
 
-	/*
-	 * Enable split brain detection once node is fully recovered or
-	 * bootstrapped. No split brain could happen during bootstrap or local
-	 * recovery. Only do so in an upgraded cluster. Unfortunately, schema
-	 * version 2.10.1 was used in 2.10.0 release, while split-brain
-	 * detection appeared in 2.10.1. So use the schema version after 2.10.1.
-	 */
-	if (dd_version_id > version_id(2, 10, 1))
-		txn_limbo_filter_enable(&txn_limbo);
 	box_raft_finish_recovery();
 	txn_limbo_finish_recovery(&txn_limbo);
 
