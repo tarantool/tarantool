@@ -1037,18 +1037,11 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	}
 	if (key_is_full && !eq_match)
 		memtx_tx_track_point(txn, space, index_base, it->key_data.key);
-	/*
-	 * Since MVCC operates with `key_def` of index but `start_data` can
-	 * contain key extracted with `cmp_def`, we should crop it by passing
-	 * `part_count` not greater than `key_def->part_count`.
-	 */
 	if (!key_is_full ||
 	    ((type == ITER_GE || type == ITER_LE) && !equals) ||
 	    (type == ITER_GT || type == ITER_LT))
 		memtx_tx_track_gap(txn, space, index_base, successor_entry,
-				   type, start_data.key,
-				   MIN(start_data.part_count,
-				       index_base->def->key_def->part_count));
+				   type, start_data.key, start_data.part_count);
 
 end:
 
