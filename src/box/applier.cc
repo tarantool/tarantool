@@ -2758,9 +2758,10 @@ applier_f(va_list ap)
 		}
 
 		struct error *err = diag_last_error(diag_get());
-		if (log_error) {
+		if (err != NULL) {
 			applier_set_last_error(applier, err);
-			applier_log_error(applier, err, try_reconnect);
+			if (log_error)
+				applier_log_error(applier, err, try_reconnect);
 		}
 		applier_disconnect(applier, applier_next_state);
 		if (!try_reconnect)
