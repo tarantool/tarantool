@@ -15,6 +15,47 @@ on:
         type: string
 
 jobs:
+  nix:
+    # The flake builds the repository checkout, so build it only once,
+    # for the x86_64 variant of the reusable workflow.
+    if: inputs.arch == 'x86_64'
+
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 60
+
+    steps:
+      - name: Prepare checkout
+        uses: tarantool/actions/prepare-checkout@master
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # The flake builds this checkout, so the submodules are needed.
+          submodules: recursive
+
+      - uses: cachix/install-nix-action@v31.11.1
+
+      - uses: nix-community/cache-nix-action@v7
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+          # The flake builds the checkout itself, so only the build
+          # dependencies are reused between runs.
+          gc-max-store-size-linux: 5G
+
+      - name: Build Tarantool
+        run: nix build .#tarantool --print-build-logs
+
+      - name: Smoke test
+        run: ./result/bin/tarantool --version
+
+      - name: Send VK Teams message on failure
+        if: failure()
+        uses: ./.github/actions/report-job-status
+        with:
+          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
+
   build:
     runs-on: ${{ inputs.arch == 'aarch64' && 'ubuntu-26.04-arm' ||
                  fromJSON('["self-hosted", "Linux", "x86_64", "regular"]') }}
