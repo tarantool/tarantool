@@ -157,7 +157,7 @@
 ---@field ok fun(
 ---    self: taptest,
 ---    cond: boolean,
----    message?: string,
+---    message: string,
 ---    extra?: table
 ---): boolean This is a basic function which is used by other functions.
 ---
@@ -236,7 +236,7 @@
 ---    self: taptest,
 ---    got: any,
 ---    expected: any,
----    message?: string,
+---    message: string,
 ---    extra?: table
 ---): boolean Check whether the first argument equals the second argument.
 ---
@@ -254,7 +254,7 @@
 ---    self: taptest,
 ---    got: any,
 ---    unexpected: any,
----    message?: string,
+---    message: string,
 ---    extra?: table
 ---): boolean This is the negation of `taptest:is()`.
 ---
@@ -270,7 +270,7 @@
 ---    self: taptest,
 ---    got: any,
 ---    expected: any,
----    message?: string,
+---    message: string,
 ---    extra?: table
 ---): boolean Recursive version of `taptest:is(...)`.
 ---
@@ -288,7 +288,7 @@
 ---    self: taptest,
 ---    got: any,
 ---    pattern: string,
----    message?: string,
+---    message: string,
 ---    extra?: table
 ---): boolean Verify a string against a pattern. Ok if match is found.
 ---
@@ -310,7 +310,7 @@
 ---    self: taptest,
 ---    got: any,
 ---    pattern: string,
----    message?: string,
+---    message: string,
 ---    extra?: table
 ---): boolean This is the negation of `taptest:like()`.
 ---
@@ -327,7 +327,7 @@
 ---@field isnil fun(
 ---    self: taptest,
 ---    v: any,
----    message?: string,
+---    message: string,
 ---    extra?: table
 ---): boolean Test whether a value is nil.
 ---
@@ -343,7 +343,7 @@
 ---@field isnumber fun(
 ---    self: taptest,
 ---    v: any,
----    message?: string,
+---    message: string,
 ---    extra?: table
 ---): boolean Test whether a value is a number.
 ---
@@ -359,7 +359,7 @@
 ---@field isstring fun(
 ---    self: taptest,
 ---    v: any,
----    message?: string,
+---    message: string,
 ---    extra?: table
 ---): boolean Test whether a value is a string.
 ---
@@ -375,7 +375,7 @@
 ---@field istable fun(
 ---    self: taptest,
 ---    v: any,
----    message?: string,
+---    message: string,
 ---    extra?: table
 ---): boolean Test whether a value is a table.
 ---
@@ -391,7 +391,7 @@
 ---@field isboolean fun(
 ---    self: taptest,
 ---    v: any,
----    message?: string,
+---    message: string,
 ---    extra?: table
 ---): boolean Test whether a value is a boolean.
 ---
@@ -407,7 +407,7 @@
 ---@field isfunction fun(
 ---    self: taptest,
 ---    v: any,
----    message?: string,
+---    message: string,
 ---    extra?: table
 ---): boolean Test whether a value is a function.
 ---
@@ -424,7 +424,7 @@
 ---    self: taptest,
 ---    v: any,
 ---    utype: string,
----    message?: string,
+---    message: string,
 ---    extra?: table
 ---): boolean Test whether a value is a userdata with the specified
 ---    metatable type.
@@ -443,7 +443,7 @@
 ---    self: taptest,
 ---    v: any,
 ---    ctype: string,
----    message?: string,
+---    message: string,
 ---    extra?: table
 ---): boolean Test whether a value is a cdata of the specified type.
 ---
@@ -509,7 +509,7 @@ end
 
 ---@param test taptest
 ---@param cond boolean an expression which is true or false.
----@param message? string name of the test.
+---@param message string name of the test.
 ---@param extra? table extra information to print in case of failure.
 ---@return boolean result true if the condition is true, otherwise false
 local function ok(test, cond, message, extra)
@@ -539,7 +539,7 @@ local function ok(test, cond, message, extra)
 end
 
 ---@param test taptest
----@param message? string name of the test.
+---@param message string name of the test.
 ---@param extra? table extra information to print in case of failure.
 ---@return boolean result always false
 local function fail(test, message, extra)
@@ -607,7 +607,7 @@ end
 ---@param test taptest
 ---@param got any actual result.
 ---@param pattern string the pattern to search for.
----@param message? string name of the test.
+---@param message string name of the test.
 ---@param extra? table extra information to print in case of failure.
 ---@return boolean result true if the pattern matches, otherwise false
 local function like(test, got, pattern, message, extra)
@@ -620,7 +620,7 @@ end
 ---@param test taptest
 ---@param got any actual result.
 ---@param pattern string the pattern to search for.
----@param message? string name of the test.
+---@param message string name of the test.
 ---@param extra? table extra information to print in case of failure.
 ---@return boolean result true if the pattern does not match, otherwise false
 local function unlike(test, got, pattern, message, extra)
@@ -633,7 +633,7 @@ end
 ---@param test taptest
 ---@param got any actual result.
 ---@param expected any expected result.
----@param message? string name of the test.
+---@param message string name of the test.
 ---@param extra? table extra information to print in case of failure.
 ---@return boolean result true if the arguments are equal, otherwise false
 local function is(test, got, expected, message, extra)
@@ -648,7 +648,7 @@ end
 ---@param test taptest
 ---@param got any actual result.
 ---@param unexpected any unexpected result.
----@param message? string name of the test.
+---@param message string name of the test.
 ---@param extra? table extra information to print in case of failure.
 ---@return boolean result true if the arguments are different, otherwise false
 local function isnt(test, got, unexpected, message, extra)
@@ -664,7 +664,7 @@ end
 ---@param test taptest
 ---@param got any actual result.
 ---@param expected any expected result.
----@param message? string name of the test.
+---@param message string name of the test.
 ---@param extra? table extra information to print in case of failure.
 ---@return boolean result true if the arguments are equal, otherwise false
 local function is_deeply(test, got, expected, message, extra)
@@ -677,7 +677,7 @@ end
 
 ---@param test taptest
 ---@param v any value the type of which is to be checked.
----@param message? string text that will be shown to the user in case of
+---@param message string text that will be shown to the user in case of
 ---    failure.
 ---@param extra? table extra information to print in case of failure.
 ---@return boolean result true if the value has the specified type
@@ -687,7 +687,7 @@ end
 
 ---@param test taptest
 ---@param v any value the type of which is to be checked.
----@param message? string text that will be shown to the user in case of
+---@param message string text that will be shown to the user in case of
 ---    failure.
 ---@param extra? table extra information to print in case of failure.
 ---@return boolean result true if the value has the specified type
@@ -697,7 +697,7 @@ end
 
 ---@param test taptest
 ---@param v any value the type of which is to be checked.
----@param message? string text that will be shown to the user in case of
+---@param message string text that will be shown to the user in case of
 ---    failure.
 ---@param extra? table extra information to print in case of failure.
 ---@return boolean result true if the value has the specified type
@@ -707,7 +707,7 @@ end
 
 ---@param test taptest
 ---@param v any value the type of which is to be checked.
----@param message? string text that will be shown to the user in case of
+---@param message string text that will be shown to the user in case of
 ---    failure.
 ---@param extra? table extra information to print in case of failure.
 ---@return boolean result true if the value has the specified type
@@ -717,7 +717,7 @@ end
 
 ---@param test taptest
 ---@param v any value the type of which is to be checked.
----@param message? string text that will be shown to the user in case of
+---@param message string text that will be shown to the user in case of
 ---    failure.
 ---@param extra? table extra information to print in case of failure.
 ---@return boolean result true if the value has the specified type
@@ -727,7 +727,7 @@ end
 
 ---@param test taptest
 ---@param v any value the type of which is to be checked.
----@param message? string text that will be shown to the user in case of
+---@param message string text that will be shown to the user in case of
 ---    failure.
 ---@param extra? table extra information to print in case of failure.
 ---@return boolean result true if the value has the specified type
@@ -738,7 +738,7 @@ end
 ---@param test taptest
 ---@param v any value the type of which is to be checked.
 ---@param utype string type of data that a passed value should have.
----@param message? string text that will be shown to the user in case of
+---@param message string text that will be shown to the user in case of
 ---    failure.
 ---@param extra? table extra information to print in case of failure.
 ---@return boolean result true if the value has the specified type
@@ -757,7 +757,7 @@ end
 ---@param test taptest
 ---@param v any value the type of which is to be checked.
 ---@param ctype string type of data that a passed value should have.
----@param message? string text that will be shown to the user in case of
+---@param message string text that will be shown to the user in case of
 ---    failure.
 ---@param extra? table extra information to print in case of failure.
 ---@return boolean result true if the value has the specified type
