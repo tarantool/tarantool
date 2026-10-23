@@ -225,7 +225,8 @@ struct sql_column_metadata {
 struct Vdbe {
 	Vdbe *pPrev, *pNext;	/* Linked list of VDBEs with the same Vdbe.db */
 	Parse *pParse;		/* Parsing context used to create this Vdbe */
-	ynVar nVar;		/* Number of entries in aVar[] */
+	/** Number of parameters reported in the statement's bind metadata. */
+	ynVar nVar;
 	u32 magic;		/* Magic number for sanity checking */
 	int nMem;		/* Number of memory locations currently allocated */
 	int nCursor;		/* Number of slots in apCsr[] */
@@ -265,7 +266,6 @@ struct Vdbe {
 	struct sql_column_metadata *metadata;
 	Mem *pResultSet;	/* Pointer to an array of results */
 	VdbeCursor **apCsr;	/* One element of this array for each open cursor */
-	Mem *aVar;		/* Values for the OP_Variable opcode. */
 	/**
 	 * Array which contains positions of variables to be
 	 * bound in resulting set of SELECT.
@@ -306,6 +306,12 @@ struct Vdbe {
 	uint32_t id;
 	/* Field for storing a function variable. */
 	struct vdbe_field_ref *func_arg;
+	uint32_t bind_count; /** Number of elements in bind. */
+	/**
+	 * Array of all parameters of the current execution.
+	 * Each element of array consists of a name and a value.
+	 */
+	const struct sql_bind *bind;
 };
 
 /*
