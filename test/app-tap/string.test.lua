@@ -126,11 +126,14 @@ test:test("fromhex", function(test)
     test:is(string.fromhex("6a6b6c6d6e6f"), "jklmno", "from hex to bin")
     local _, err = pcall(string.fromhex, "aaa")
     test:ok(err and err:match("(even amount of chars expected," ..
-                              " got odd amount)"))
+                              " got odd amount)"),
+            'even amount of chars expected')
     local _, err = pcall(string.fromhex, "qq")
-    test:ok(err and err:match("(hex string expected, got non hex chars)"))
+    test:ok(err and err:match("(hex string expected, got non hex chars)"),
+            'non-hex characters are rejected')
     local _, err = pcall(string.fromhex, 795)
-    test:ok(err and err:match("(string expected, got number)"))
+    test:ok(err and err:match("(string expected, got number)"),
+            'number argument is rejected')
 end)
 
 test:test("strip", function(test)
