@@ -72,7 +72,7 @@ g.test_encode_decode_greeting = function()
 
     local greeting = decode(str)
     t.assert_type(greeting, 'table')
-    t.assert_equals(greeting.version, tarantool.version:match('%d%.%d%.%d'))
+    t.assert_equals(greeting.version, tarantool.version:match('%d+%.%d+%.%d+'))
     t.assert_equals(greeting.protocol, 'Binary')
     t.assert(uuid.fromstr(greeting.uuid))
     t.assert_not_equals(uuid.fromstr(greeting.uuid), uuid.NULL)
