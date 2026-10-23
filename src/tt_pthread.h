@@ -35,6 +35,7 @@
 #include "trivia/util.h"
 
 #include <stdio.h>
+#include <stdint.h>
 #include <errno.h>
 #include <pthread.h>
 #if HAVE_PTHREAD_NP_H || (__OpenBSD__)
@@ -351,7 +352,9 @@ tt_pthread_attr_getstack(pthread_t thread, void **stackaddr, size_t *stacksize)
 #elif (HAVE_PTHREAD_GET_STACKSIZE_NP && HAVE_PTHREAD_GET_STACKADDR_NP)
 	/* Old macOS */
 	*stacksize = pthread_get_stacksize_np(thread);
-	*stackaddr = pthread_get_stackaddr_np(thread);
+	/* Darwin returns the upper boundary of the downward-growing stack. */
+	*stackaddr = (void *)((uintptr_t)pthread_get_stackaddr_np(thread) -
+			     *stacksize);
 #elif (__OpenBSD__)
 	stack_t *sinfo = (stack_t*)malloc(sizeof(stack_t));
 	pthread_stackseg_np(thread, sinfo);
