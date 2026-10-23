@@ -46,7 +46,9 @@ local expected = {
 }
 
 http_version_group.before_each(function(g)
-    g.server = socket.tcp_server('127.0.0.1', 0, function(_s) end)
+    -- Read the request before closing the connection: libcurl on macOS
+    -- breaks on early EOF. See https://github.com/curl/curl/issues/23445.
+    g.server = socket.tcp_server('127.0.0.1', 0, function(s) s:read(1) end)
 end)
 
 http_version_group.after_each(function(g)
@@ -62,13 +64,12 @@ local http_request_script = string.dump(function()
 
     log.cfg({log = 'tarantool.log'})
 
-    local ok = pcall(http_client.get, http_client, uri, {
+    -- Closing the connection can produce either an HTTP error response or
+    -- a Lua exception, depending on the protocol. Only verbose output matters.
+    pcall(http_client.get, http_client, uri, {
         verbose = true,
         http_version = os.getenv('HTTP_VERSION'),
     })
-    -- The server accepts the connection and closes it immediately so
-    -- the http request is expected to fail.
-    assert(not ok)
 end)
 
 http_version_group.test_http_version = function(g)
@@ -80,7 +81,8 @@ http_version_group.test_http_version = function(g)
     local env = {HTTP_SERVER_PORT = g.server:name().port}
     env.PROTO = g.params.proto
     env.HTTP_VERSION = g.params.version
-    justrun.tarantool(dir, env, args, opts)
+    local res = justrun.tarantool(dir, env, args, opts)
+    t.assert_equals(res.exit_code, 0, res.stderr)
 
     local log_path = fio.pathjoin(dir, 'tarantool.log')
     local log_file = fio.open(log_path)
