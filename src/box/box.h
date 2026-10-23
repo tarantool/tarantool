@@ -290,6 +290,14 @@ box_ro_reason(void);
 /** \endcond public */
 
 /**
+ * Return custom details if configuration is the effective read-only cause.
+ * The text is for human consumption, not for programmatic interpretation.
+ * Return NULL if no details are configured or another cause takes precedence.
+ */
+const char *
+box_ro_details(void);
+
+/**
  * Iterate over all spaces and save them to the
  * snapshot file.
  */
