@@ -1085,6 +1085,9 @@ applier_wait_register(struct applier *applier)
 		if (applier_apply_tx(applier, &tx.rows) != 0)
 			diag_raise();
 	}
+	/* Registration becomes visible on commit, not on submission to WAL. */
+	if (box_is_configured() && journal_sync(NULL) != 0)
+		diag_raise();
 }
 
 static void
