@@ -115,7 +115,7 @@ g.test_applier_console = function()
         local path = data:get('console.socket', {use_default = true})
         local s = socket.tcp_connect('unix/', path)
         local greeting = s:read(128)
-        local expr = '(%a+) %d.%d.%d (%(%a+ %a+%))'
+        local expr = '(%a+) %d+.%d+.%d+ (%(%a+ %a+%))'
         print(table.concat({greeting:gmatch(expr)()}, ' '))
     ]]
     treegen.write_file(dir, 'main.lua', appliers_script:format(injection))
