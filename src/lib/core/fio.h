@@ -48,6 +48,21 @@ extern "C" {
 const char *
 fio_filename(int fd);
 
+/**
+ * Flush file data and metadata, including the device write cache on macOS.
+ * Return 0 on success, or -1 and set errno on failure.
+ */
+int
+fio_fsync(int fd);
+
+/**
+ * Flush file data and metadata needed to retrieve it. On macOS, perform
+ * the same full synchronization as fio_fsync().
+ * Return 0 on success, or -1 and set errno on failure.
+ */
+int
+fio_fdatasync(int fd);
+
 struct iovec;
 
 /**
