@@ -4105,6 +4105,11 @@ struct sql_space_info {
 	 * is also NULL.
 	 */
 	uint32_t part_count;
+	/**
+	 * A flag indicating whether this structure belongs
+	 * to a regular box/space or an sql_ephemeral_space.
+	 */
+	bool is_lite;
 };
 
 /**
@@ -4456,5 +4461,49 @@ sql_generate_column_name(uint32_t number)
 {
 	return tt_sprintf("COLUMN_%d", number);
 }
+
+/**
+ * Scratchpad for SQL queries involving `ORDER BY`, `GROUP BY`, and `DISTINCT`.
+ */
+struct sql_ephemeral_space {
+	uint32_t field_count; /* Count of columns in ephemeral space */
+	uint32_t tuple_count; /* Count of row in ephemeral space */
+	uint32_t max_tuple_count; /* Max count of row in ephemeral space */
+	/* Array of names of columns */
+	enum field_type *header;
+	/* Array of tuples with values in ephemeral table */
+	char **tuples; /* Rows in ephemeral table */
+	uint32_t *tuple_sizes;
+	/** Key definition used to compare tuples, with collations. */
+	struct key_def *key_def;
+};
+
+/**
+ * Create sql_ephemeral_space object.
+ */
+struct sql_ephemeral_space *
+sql_ephemeral_new(const struct sql_space_info *info);
+
+/**
+ * This function inserts tuple in sql_ephemeral_space.
+ */
+int
+sql_ephemeral_insert(struct sql_ephemeral_space *space, const char *tuple,
+		     const char *tuple_end);
+
+/**
+ * This function finds tuple in sql_ephemeral_space.
+ * Returns -1 if nothing finds.
+ * Otherwise returns number of this tuple in space.
+ */
+int
+sql_ephemeral_find(struct sql_ephemeral_space *space,
+		   struct UnpackedRecord *key);
+
+/**
+ * This function deletes sql_ephemeral_space.
+ */
+void
+sql_ephemeral_delete(struct sql_ephemeral_space *eph_space);
 
 #endif				/* sqlINT_H */
