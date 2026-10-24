@@ -41,12 +41,8 @@ build: configure
 run-luajit-test:
 	${LUAJIT_TEST_ENV} cmake --build ${LUAJIT_TEST_BUILD_DIR} --parallel ${NPROC} --target LuaJIT-test
 
-.PHONY: install-test-deps
-install-test-deps:
-	python3 -m pip install -r test-run/requirements.txt
-
 .PHONY: run-test
-run-test: install-test-deps
+run-test:
 	cd test && ${TEST_RUN_ENV} ./test-run.py --force --vardir ${VARDIR} ${TEST_RUN_PARAMS} ${TEST_RUN_EXTRA_PARAMS}
 
 .PHONY: run-perf-test
