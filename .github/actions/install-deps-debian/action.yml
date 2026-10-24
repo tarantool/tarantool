@@ -20,7 +20,9 @@ runs:
           libbenchmark-dev \
           autoconf \
           automake \
-          libtool
+          libtool \
+          python3-gevent \
+          python3-yaml
 
         # Install cmake 3.26.0 if cmake was missing or the cmake version was
         # less than 3.26.0.
