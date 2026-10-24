@@ -4551,6 +4551,14 @@ memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
 				const char *key, uint32_t part_count,
 				struct tuple *until, hint_t until_hint)
 {
+	/*
+	 * The index can belong to a new space object being built by DDL,
+	 * while the space found by id is still the old one. The new index
+	 * has no stories, and its gap items would leak with the new space.
+	 */
+	if (space_index(space, index->def->iid) != index)
+		return 0;
+
 	struct key_def *cmp_def = index->def->cmp_def;
 
 	/*
