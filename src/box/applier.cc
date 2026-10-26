@@ -2705,6 +2705,12 @@ applier_f(va_list ap)
 				*cfg_instance_name != 0 &&
 				strcmp(INSTANCE_NAME, cfg_instance_name) != 0;
 			if (need_id || need_name) {
+				/*
+				 * Startup configures Raft and may finish while
+				 * we are paused at REGISTERED or READY.
+				 */
+				bool configure_raft = need_id && was_anon &&
+						      box_is_configured();
 				applier_register(applier, was_anon);
 				/*
 				 * It's hard to catch the exact moment when
@@ -2714,7 +2720,7 @@ applier_f(va_list ap)
 				 * `applier_subscribe` starts, because we'll
 				 * start receiving raft messages there.
 				 */
-				if (need_id && was_anon) {
+				if (configure_raft) {
 					assert(instance_id != 0);
 					raft_cfg_instance_id(box_raft(),
 							     instance_id);
