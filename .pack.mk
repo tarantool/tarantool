@@ -56,27 +56,38 @@ package: prepare
 # Verify that the systemd service files are included into the
 # Debian package. The check is motivated by gh-11234.
 #
+# The files are in /usr/lib since Ubuntu 24.04 and Debian 13, where
+# systemd's pkg-config file points, so a new release needs no change
+# here: the older releases are listed below, with /lib.
+#
 # Assumes that the package is in the build/ directory (it is where
 # the files reside after the `package` target).
 .PHONY: verify-package
 verify-package:
 	set -ex; \
 	case "${OS}:${DIST}" in \
-	ubuntu:noble) \
-		LIBDIR=/usr/lib; \
+	debian:stretch | \
+	debian:buster | \
+	debian:bullseye | \
+	debian:bookworm | \
+	ubuntu:xenial | \
+	ubuntu:bionic | \
+	ubuntu:focal | \
+	ubuntu:jammy) \
+		LIBDIR=/lib; \
 		;; \
 	esac; \
 	case "${OS}:${DIST}" in \
 	debian:* | \
 	ubuntu:*) \
-		LIBDIR="$${LIBDIR:-/lib}"; \
+		LIBDIR="$${LIBDIR:-/usr/lib}"; \
 		TMP="$$(mktemp -d)"; \
 		CONTENT="$$TMP/content.txt"; \
 		dpkg -c build/tarantool-common_*.deb > "$${CONTENT}"; \
 		cat "$${CONTENT}"; \
-		grep "$${LIBDIR}/systemd/system/tarantool.service" "$${CONTENT}"; \
-		grep "$${LIBDIR}/systemd/system/tarantool@.service" "$${CONTENT}"; \
-		grep "$${LIBDIR}/systemd/system-generators/tarantool-generator" "$${CONTENT}"; \
+		grep -F ".$${LIBDIR}/systemd/system/tarantool.service" "$${CONTENT}"; \
+		grep -F ".$${LIBDIR}/systemd/system/tarantool@.service" "$${CONTENT}"; \
+		grep -F ".$${LIBDIR}/systemd/system-generators/tarantool-generator" "$${CONTENT}"; \
 		rm "$${CONTENT}"; \
 		rmdir "$${TMP}"; \
 		;; \
