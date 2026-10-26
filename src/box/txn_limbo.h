@@ -37,6 +37,7 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct info_handler;
 struct raft;
 struct synchro_request;
 
@@ -411,6 +412,10 @@ txn_limbo_shutdown(void);
 /** Set maximal limbo size in bytes. */
 void
 txn_limbo_set_max_size(struct txn_limbo *limbo, int64_t size);
+
+/** Fill box.info.synchro. */
+void
+txn_limbo_info(struct txn_limbo *limbo, struct info_handler *h);
 
 #if defined(__cplusplus)
 }
