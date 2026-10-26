@@ -31,6 +31,7 @@
 #include "txn.h"
 #include "txn_limbo.h"
 #include "replication.h"
+#include "info/info.h"
 #include "iproto_constants.h"
 #include "journal.h"
 #include "box.h"
@@ -688,6 +689,26 @@ void
 txn_limbo_set_max_size(struct txn_limbo *limbo, int64_t size)
 {
 	limbo->queue.max_size = size;
+}
+
+void
+txn_limbo_info(struct txn_limbo *limbo, struct info_handler *h)
+{
+	struct txn_limbo_queue *queue = &limbo->queue;
+	info_begin(h);
+	/* Quorum value may be evaluated via formula */
+	info_set_key_int(h, "quorum", replication_synchro_quorum);
+	info_begin_key_table(h, "queue");
+	info_set_key_int(h, "len", queue->len);
+	info_set_key_int(h, "size", queue->size);
+	info_set_key_int(h, "owner", queue->owner_id);
+	info_set_key_bool(h, "busy", latch_is_locked(&limbo->state_latch));
+	info_set_key_int(h, "term", limbo->term);
+	info_set_key_double(h, "age", queue->len == 0 ? 0 :
+			    txn_limbo_queue_age(queue));
+	info_set_key_double(h, "confirm_lag", queue->confirm_lag);
+	info_end_table(h);
+	info_end(h);
 }
 
 static inline void
