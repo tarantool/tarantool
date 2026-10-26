@@ -376,6 +376,13 @@ applier_uri_str(const struct applier *applier);
 const char *
 applier_addr_str(const struct applier *applier);
 
+/**
+ * Check whether the remote master has this instance registered, i.e. whether
+ * it already has an entry for us in its _cluster space.
+ */
+bool
+applier_is_registered(const struct applier *applier);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

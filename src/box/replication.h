@@ -832,6 +832,13 @@ replicaset_check_quorum(void);
 int64_t
 replicaset_max_instance_lsn(void);
 
+/**
+ * Check whether any peer's ballot lists the given UUID among
+ * registered replicas.
+ */
+bool
+replicaset_is_registered_remotely();
+
 #endif /* defined(__cplusplus) */
 
 #endif

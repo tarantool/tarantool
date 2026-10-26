@@ -4598,7 +4598,10 @@ commit_replica_clear_id(struct replica *replica, struct txn_stmt *stmt)
 	if (replica->id == instance_id) {
 		assert(stmt->row->replica_id != 0 ||
 		       recovery_state != FINISHED_RECOVERY);
-		if (recovery_state == FINISHED_RECOVERY) {
+		/*
+		 * Registration may replace our ID after engine recovery.
+		 */
+		if (box_is_configured()) {
 			diag_set(ClientError, ER_LOCAL_INSTANCE_ID_IS_READ_ONLY,
 				 (unsigned)instance_id);
 			struct diag *diag = diag_get();

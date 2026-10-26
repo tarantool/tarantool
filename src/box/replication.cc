@@ -2087,3 +2087,16 @@ replicaset_collect_confirmed_vclock(struct vclock *confirmed_vclock,
 	}
 	return 0;
 }
+
+bool
+replicaset_is_registered_remotely()
+{
+	replicaset_foreach(replica) {
+		struct applier *applier = replica->applier;
+		if (applier == NULL || applier->state != APPLIER_CONNECTED)
+			continue;
+		if (applier_is_registered(applier))
+			return true;
+	}
+	return false;
+}
