@@ -583,6 +583,22 @@ g.test_status_no_pending = function(cg)
     t.assert_str_contains(res.stdout, 'No pending review')
 end
 
+-- The origin remote can be a fork, while the PR lives in another repo.
+g.test_repo_option = function(cg)
+    table.insert(cg.gh.routes, {
+        method = 'GET', pattern = '^/repos/other/repo/pulls/' .. PR,
+        reply = {body = {}},
+    })
+    local res = run_tool_ok(cg, 'status --pr ' .. PR .. ' --repo other/repo')
+    t.assert_str_contains(res.stdout, 'No pending review')
+    t.assert_equals(gh_log(cg), {
+        'GET /repos/other/repo/pulls/' .. PR .. '/reviews?per_page=100',
+    })
+    res = run_tool_err(cg, 'status --pr ' .. PR .. ' --repo bad')
+    t.assert_str_contains(res.stderr,
+                          '--repo must be in the owner/repo format: bad')
+end
+
 g.test_list_pagination = function(cg)
     -- The pending review is on the second page: without following the
     -- Link headers it is invisible.

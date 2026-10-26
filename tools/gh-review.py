@@ -614,11 +614,17 @@ def main():
     for sub in subs.choices.values():
         sub.add_argument('--pr', type=int, required=True,
                          help='PR number')
+        sub.add_argument('--repo',
+                         help='owner/repo of the PR; default - parsed from '
+                              'the `origin` remote')
 
     args = parser.parse_args()
+    repo_format = r'[\w.-]+/[\w.-]+'
+    if args.repo is not None and re.fullmatch(repo_format, args.repo) is None:
+        fail(f'--repo must be in the owner/repo format: {args.repo}')
     # The environment is read only here: everything below takes the
     # values as parameters, so the tests can inject their own.
-    api = Api(repo=repo_full_name(),
+    api = Api(repo=args.repo or repo_full_name(),
               token=os.environ.get('GH_TOKEN'),
               cookie_pair=os.environ.get('GH_COOKIE'),
               api_url=os.environ.get('GH_API_URL', API_URL),
