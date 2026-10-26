@@ -16,13 +16,13 @@ on:
         type: string
       dist:
         description: 'The version of the OS'
-        default: focal
+        default: noble
         required: false
         type: string
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     env:
       OS: ${{ inputs.os }}
       DIST: ${{ inputs.dist }}
@@ -47,7 +47,7 @@ jobs:
           PRESERVE_ENVVARS: 'MAKE_CHECK,${{ env.PRESERVE_ENVVARS }}'
         run: make -f .pack.mk package
       - name: 'Upload build artifacts'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: tarantool-${{ env.OS }}-${{ env.DIST }}-${{ steps.get_sha.outputs.sha }}
           retention-days: 21
@@ -57,7 +57,7 @@ jobs:
           if-no-files-found: error
       - name: 'Upload logs if the build failed'
         if: failure() && steps.run_build.conclusion == 'failure'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: tarantool-build-log-${{ env.OS }}-${{ env.DIST }}-${{ steps.get_sha.outputs.sha }}
           retention-days: 21
