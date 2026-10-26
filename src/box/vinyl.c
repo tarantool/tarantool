@@ -235,20 +235,20 @@ vy_info_append_scheduler(struct vy_env *env, struct info_handler *h)
 {
 	struct vy_scheduler_stat *stat = &env->scheduler.stat;
 
-	info_table_begin(h, "scheduler");
-	info_append_int(h, "tasks_inprogress", stat->tasks_inprogress);
-	info_append_int(h, "tasks_completed", stat->tasks_completed);
-	info_append_int(h, "tasks_failed", stat->tasks_failed);
-	info_append_int(h, "dump_count", stat->dump_count);
-	info_append_double(h, "dump_time", stat->dump_time);
-	info_append_int(h, "dump_input", stat->dump_input);
-	info_append_int(h, "dump_output", stat->dump_output);
-	info_append_double(h, "compaction_time", stat->compaction_time);
-	info_append_int(h, "compaction_input", stat->compaction_input);
-	info_append_int(h, "compaction_output", stat->compaction_output);
-	info_append_int(h, "compaction_queue",
+	info_begin_key_table(h, "scheduler");
+	info_set_key_int(h, "tasks_inprogress", stat->tasks_inprogress);
+	info_set_key_int(h, "tasks_completed", stat->tasks_completed);
+	info_set_key_int(h, "tasks_failed", stat->tasks_failed);
+	info_set_key_int(h, "dump_count", stat->dump_count);
+	info_set_key_double(h, "dump_time", stat->dump_time);
+	info_set_key_int(h, "dump_input", stat->dump_input);
+	info_set_key_int(h, "dump_output", stat->dump_output);
+	info_set_key_double(h, "compaction_time", stat->compaction_time);
+	info_set_key_int(h, "compaction_input", stat->compaction_input);
+	info_set_key_int(h, "compaction_output", stat->compaction_output);
+	info_set_key_int(h, "compaction_queue",
 			env->lsm_env.compaction_queue_size);
-	info_table_end(h); /* scheduler */
+	info_end_table(h); /* scheduler */
 }
 
 static void
@@ -256,14 +256,14 @@ vy_info_append_regulator(struct vy_env *env, struct info_handler *h)
 {
 	struct vy_regulator *r = &env->regulator;
 
-	info_table_begin(h, "regulator");
-	info_append_int(h, "write_rate", r->write_rate);
-	info_append_int(h, "dump_bandwidth", r->dump_bandwidth);
-	info_append_int(h, "dump_watermark", r->dump_watermark);
-	info_append_int(h, "rate_limit", vy_quota_get_rate_limit(r->quota,
+	info_begin_key_table(h, "regulator");
+	info_set_key_int(h, "write_rate", r->write_rate);
+	info_set_key_int(h, "dump_bandwidth", r->dump_bandwidth);
+	info_set_key_int(h, "dump_watermark", r->dump_watermark);
+	info_set_key_int(h, "rate_limit", vy_quota_get_rate_limit(r->quota,
 							VY_QUOTA_CONSUMER_TX));
-	info_append_int(h, "blocked_writers", r->quota->n_blocked);
-	info_table_end(h); /* regulator */
+	info_set_key_int(h, "blocked_writers", r->quota->n_blocked);
+	info_end_table(h); /* regulator */
 }
 
 static void
@@ -271,31 +271,31 @@ vy_info_append_tx(struct vy_env *env, struct info_handler *h)
 {
 	struct vy_tx_manager *xm = env->xm;
 
-	info_table_begin(h, "tx");
+	info_begin_key_table(h, "tx");
 
-	info_append_int(h, "commit", xm->stat.commit);
-	info_append_int(h, "rollback", xm->stat.rollback);
-	info_append_int(h, "conflict", xm->stat.conflict);
+	info_set_key_int(h, "commit", xm->stat.commit);
+	info_set_key_int(h, "rollback", xm->stat.rollback);
+	info_set_key_int(h, "conflict", xm->stat.conflict);
 
 	struct mempool_stats mstats;
 	mempool_stats(&xm->tx_mempool, &mstats);
-	info_append_int(h, "transactions", mstats.objcount);
+	info_set_key_int(h, "transactions", mstats.objcount);
 	mempool_stats(&xm->txv_mempool, &mstats);
-	info_append_int(h, "statements", mstats.objcount);
+	info_set_key_int(h, "statements", mstats.objcount);
 	mempool_stats(&xm->read_interval_mempool, &mstats);
-	info_append_int(h, "gap_locks", mstats.objcount);
+	info_set_key_int(h, "gap_locks", mstats.objcount);
 	mempool_stats(&xm->read_view_mempool, &mstats);
-	info_append_int(h, "read_views", mstats.objcount);
+	info_set_key_int(h, "read_views", mstats.objcount);
 
-	info_table_end(h); /* tx */
+	info_end_table(h); /* tx */
 }
 
 static void
 vy_info_append_memory(struct vy_env *env, struct info_handler *h)
 {
-	info_table_begin(h, "memory");
-	info_append_int(h, "tx", vy_tx_manager_mem_used(env->xm));
-	info_append_int(h, "level0", lsregion_used(&env->mem_env.allocator));
+	info_begin_key_table(h, "memory");
+	info_set_key_int(h, "tx", vy_tx_manager_mem_used(env->xm));
+	info_set_key_int(h, "level0", lsregion_used(&env->mem_env.allocator));
 	/*
 	 * Exclude the empty key from accounting so as to show zero
 	 * if Vinyl isn't used.
@@ -303,21 +303,21 @@ vy_info_append_memory(struct vy_env *env, struct info_handler *h)
 	int64_t sum_tuple_size = env->stmt_env.sum_tuple_size;
 	sum_tuple_size -= tuple_size(env->lsm_env.empty_key.stmt);
 	assert(sum_tuple_size >= 0);
-	info_append_int(h, "tuple", sum_tuple_size);
-	info_append_int(h, "tuple_cache", env->cache_env.mem_used);
-	info_append_int(h, "page_index", env->lsm_env.page_index_size);
-	info_append_int(h, "bloom_filter", env->lsm_env.bloom_size);
-	info_table_end(h); /* memory */
+	info_set_key_int(h, "tuple", sum_tuple_size);
+	info_set_key_int(h, "tuple_cache", env->cache_env.mem_used);
+	info_set_key_int(h, "page_index", env->lsm_env.page_index_size);
+	info_set_key_int(h, "bloom_filter", env->lsm_env.bloom_size);
+	info_end_table(h); /* memory */
 }
 
 static void
 vy_info_append_disk(struct vy_env *env, struct info_handler *h)
 {
-	info_table_begin(h, "disk");
-	info_append_int(h, "data", env->lsm_env.disk_data_size);
-	info_append_int(h, "index", env->lsm_env.disk_index_size);
-	info_append_int(h, "data_compacted", env->lsm_env.compacted_data_size);
-	info_table_end(h); /* disk */
+	info_begin_key_table(h, "disk");
+	info_set_key_int(h, "data", env->lsm_env.disk_data_size);
+	info_set_key_int(h, "index", env->lsm_env.disk_index_size);
+	info_set_key_int(h, "data_compacted", env->lsm_env.compacted_data_size);
+	info_end_table(h); /* disk */
 }
 
 void
@@ -339,11 +339,11 @@ vy_info_append_stmt_counter(struct info_handler *h, const char *name,
 			    const struct vy_stmt_counter *count)
 {
 	if (name != NULL)
-		info_table_begin(h, name);
-	info_append_int(h, "rows", count->rows);
-	info_append_int(h, "bytes", count->bytes);
+		info_begin_key_table(h, name);
+	info_set_key_int(h, "rows", count->rows);
+	info_set_key_int(h, "bytes", count->bytes);
 	if (name != NULL)
-		info_table_end(h);
+		info_end_table(h);
 }
 
 static void
@@ -351,13 +351,13 @@ vy_info_append_disk_stmt_counter(struct info_handler *h, const char *name,
 				 const struct vy_disk_stmt_counter *count)
 {
 	if (name != NULL)
-		info_table_begin(h, name);
-	info_append_int(h, "rows", count->rows);
-	info_append_int(h, "bytes", count->bytes);
-	info_append_int(h, "bytes_compressed", count->bytes_compressed);
-	info_append_int(h, "pages", count->pages);
+		info_begin_key_table(h, name);
+	info_set_key_int(h, "rows", count->rows);
+	info_set_key_int(h, "bytes", count->bytes);
+	info_set_key_int(h, "bytes_compressed", count->bytes_compressed);
+	info_set_key_int(h, "pages", count->pages);
 	if (name != NULL)
-		info_table_end(h);
+		info_end_table(h);
 }
 
 static void
@@ -373,95 +373,95 @@ vinyl_index_stat(struct index *index, struct info_handler *h)
 	vy_stmt_counter_add_disk(&count, &stat->disk.count);
 	vy_info_append_stmt_counter(h, NULL, &count);
 
-	info_append_int(h, "lookup", stat->lookup);
+	info_set_key_int(h, "lookup", stat->lookup);
 	vy_info_append_stmt_counter(h, "get", &stat->get);
 	vy_info_append_stmt_counter(h, "skip", &stat->skip);
 	vy_info_append_stmt_counter(h, "put", &stat->put);
 
-	info_table_begin(h, "latency");
-	info_append_double(h, "p50", latency_get(&stat->latency, 50));
-	info_append_double(h, "p75", latency_get(&stat->latency, 75));
-	info_append_double(h, "p90", latency_get(&stat->latency, 90));
-	info_append_double(h, "p95", latency_get(&stat->latency, 95));
-	info_append_double(h, "p99", latency_get(&stat->latency, 99));
-	info_table_end(h); /* latency */
+	info_begin_key_table(h, "latency");
+	info_set_key_double(h, "p50", latency_get(&stat->latency, 50));
+	info_set_key_double(h, "p75", latency_get(&stat->latency, 75));
+	info_set_key_double(h, "p90", latency_get(&stat->latency, 90));
+	info_set_key_double(h, "p95", latency_get(&stat->latency, 95));
+	info_set_key_double(h, "p99", latency_get(&stat->latency, 99));
+	info_end_table(h); /* latency */
 
-	info_table_begin(h, "upsert");
-	info_append_int(h, "squashed", stat->upsert.squashed);
-	info_append_int(h, "applied", stat->upsert.applied);
-	info_table_end(h); /* upsert */
+	info_begin_key_table(h, "upsert");
+	info_set_key_int(h, "squashed", stat->upsert.squashed);
+	info_set_key_int(h, "applied", stat->upsert.applied);
+	info_end_table(h); /* upsert */
 
-	info_table_begin(h, "memory");
+	info_begin_key_table(h, "memory");
 	vy_info_append_stmt_counter(h, NULL, &stat->memory.count);
-	info_table_begin(h, "iterator");
-	info_append_int(h, "lookup", stat->memory.iterator.lookup);
+	info_begin_key_table(h, "iterator");
+	info_set_key_int(h, "lookup", stat->memory.iterator.lookup);
 	vy_info_append_stmt_counter(h, "get", &stat->memory.iterator.get);
-	info_table_end(h); /* iterator */
-	info_append_int(h, "index_size", vy_lsm_mem_tree_size(lsm));
-	info_table_end(h); /* memory */
+	info_end_table(h); /* iterator */
+	info_set_key_int(h, "index_size", vy_lsm_mem_tree_size(lsm));
+	info_end_table(h); /* memory */
 
-	info_table_begin(h, "disk");
+	info_begin_key_table(h, "disk");
 	vy_info_append_disk_stmt_counter(h, NULL, &stat->disk.count);
 	vy_info_append_disk_stmt_counter(h, "last_level",
 					 &stat->disk.last_level_count);
-	info_table_begin(h, "statement");
-	info_append_int(h, "inserts", stat->disk.stmt.inserts);
-	info_append_int(h, "replaces", stat->disk.stmt.replaces);
-	info_append_int(h, "deletes", stat->disk.stmt.deletes);
-	info_append_int(h, "upserts", stat->disk.stmt.upserts);
-	info_table_end(h); /* statement */
-	info_table_begin(h, "iterator");
-	info_append_int(h, "lookup", stat->disk.iterator.lookup);
+	info_begin_key_table(h, "statement");
+	info_set_key_int(h, "inserts", stat->disk.stmt.inserts);
+	info_set_key_int(h, "replaces", stat->disk.stmt.replaces);
+	info_set_key_int(h, "deletes", stat->disk.stmt.deletes);
+	info_set_key_int(h, "upserts", stat->disk.stmt.upserts);
+	info_end_table(h); /* statement */
+	info_begin_key_table(h, "iterator");
+	info_set_key_int(h, "lookup", stat->disk.iterator.lookup);
 	vy_info_append_stmt_counter(h, "get", &stat->disk.iterator.get);
 	vy_info_append_disk_stmt_counter(h, "read", &stat->disk.iterator.read);
-	info_table_begin(h, "bloom");
-	info_append_int(h, "hit", stat->disk.iterator.bloom_hit);
-	info_append_int(h, "miss", stat->disk.iterator.bloom_miss);
-	info_table_end(h); /* bloom */
-	info_table_end(h); /* iterator */
-	info_table_begin(h, "dump");
-	info_append_int(h, "count", stat->disk.dump.count);
-	info_append_double(h, "time", stat->disk.dump.time);
+	info_begin_key_table(h, "bloom");
+	info_set_key_int(h, "hit", stat->disk.iterator.bloom_hit);
+	info_set_key_int(h, "miss", stat->disk.iterator.bloom_miss);
+	info_end_table(h); /* bloom */
+	info_end_table(h); /* iterator */
+	info_begin_key_table(h, "dump");
+	info_set_key_int(h, "count", stat->disk.dump.count);
+	info_set_key_double(h, "time", stat->disk.dump.time);
 	vy_info_append_stmt_counter(h, "input", &stat->disk.dump.input);
 	vy_info_append_disk_stmt_counter(h, "output", &stat->disk.dump.output);
-	info_table_end(h); /* dump */
-	info_table_begin(h, "compaction");
-	info_append_int(h, "count", stat->disk.compaction.count);
-	info_append_double(h, "time", stat->disk.compaction.time);
+	info_end_table(h); /* dump */
+	info_begin_key_table(h, "compaction");
+	info_set_key_int(h, "count", stat->disk.compaction.count);
+	info_set_key_double(h, "time", stat->disk.compaction.time);
 	vy_info_append_disk_stmt_counter(h, "input", &stat->disk.compaction.input);
 	vy_info_append_disk_stmt_counter(h, "output", &stat->disk.compaction.output);
 	vy_info_append_disk_stmt_counter(h, "queue", &stat->disk.compaction.queue);
-	info_table_end(h); /* compaction */
-	info_append_int(h, "index_size", lsm->page_index_size);
-	info_append_int(h, "bloom_size", lsm->bloom_size);
-	info_table_end(h); /* disk */
+	info_end_table(h); /* compaction */
+	info_set_key_int(h, "index_size", lsm->page_index_size);
+	info_set_key_int(h, "bloom_size", lsm->bloom_size);
+	info_end_table(h); /* disk */
 
-	info_table_begin(h, "cache");
+	info_begin_key_table(h, "cache");
 	vy_info_append_stmt_counter(h, NULL, &cache_stat->count);
-	info_append_int(h, "lookup", cache_stat->lookup);
+	info_set_key_int(h, "lookup", cache_stat->lookup);
 	vy_info_append_stmt_counter(h, "get", &cache_stat->get);
 	vy_info_append_stmt_counter(h, "put", &cache_stat->put);
 	vy_info_append_stmt_counter(h, "invalidate", &cache_stat->invalidate);
 	vy_info_append_stmt_counter(h, "evict", &cache_stat->evict);
-	info_append_int(h, "index_size",
+	info_set_key_int(h, "index_size",
 			vy_cache_tree_mem_used(&lsm->cache.cache_tree));
-	info_table_end(h); /* cache */
+	info_end_table(h); /* cache */
 
-	info_table_begin(h, "txw");
+	info_begin_key_table(h, "txw");
 	vy_info_append_stmt_counter(h, NULL, &stat->txw.count);
-	info_table_begin(h, "iterator");
-	info_append_int(h, "lookup", stat->txw.iterator.lookup);
+	info_begin_key_table(h, "iterator");
+	info_set_key_int(h, "lookup", stat->txw.iterator.lookup);
 	vy_info_append_stmt_counter(h, "get", &stat->txw.iterator.get);
-	info_table_end(h); /* iterator */
-	info_table_end(h); /* txw */
+	info_end_table(h); /* iterator */
+	info_end_table(h); /* txw */
 
-	info_append_int(h, "range_size", vy_lsm_range_size(lsm));
-	info_append_int(h, "range_count", lsm->range_count);
-	info_append_int(h, "run_count", lsm->run_count);
-	info_append_int(h, "run_avg", lsm->run_count / lsm->range_count);
-	info_append_str(h, "run_histogram", TOSTR(histogram_snprint,
+	info_set_key_int(h, "range_size", vy_lsm_range_size(lsm));
+	info_set_key_int(h, "range_count", lsm->range_count);
+	info_set_key_int(h, "run_count", lsm->run_count);
+	info_set_key_int(h, "run_avg", lsm->run_count / lsm->range_count);
+	info_set_key_str(h, "run_histogram", TOSTR(histogram_snprint,
 						  lsm->run_hist));
-	info_append_int(h, "dumps_per_compaction",
+	info_set_key_int(h, "dumps_per_compaction",
 			vy_lsm_dumps_per_compaction(lsm));
 
 	info_end(h);
