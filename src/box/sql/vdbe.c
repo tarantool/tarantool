@@ -2504,11 +2504,21 @@ case OP_OpenTEphemeral: {
 	assert(pOp->p4type == P4_DYNAMIC || pOp->p4type == P4_STATIC);
 	struct sql_space_info *info = pOp->p4.space_info;
 	assert(info != NULL);
-	struct space *space = sql_ephemeral_space_new(info);
-
-	if (space == NULL)
-		goto abort_due_to_error;
-	mem_set_ptr(&aMem[pOp->p1], space);
+	if (info->is_lite) {
+		struct sql_ephemeral_space *space = sql_ephemeral_new(info);
+		struct VdbeCursor *cur = allocateCursor(p, pOp->p2,
+							info->field_count,
+							CURTYPE_EPHEMERAL);
+		cur->uc.eph_space = space;
+		if (space == NULL)
+			goto abort_due_to_error;
+		mem_set_ptr(&aMem[pOp->p1], space);
+	} else {
+		struct space *space = sql_ephemeral_space_new(info);
+		if (space == NULL)
+			goto abort_due_to_error;
+		mem_set_ptr(&aMem[pOp->p1], space);
+	}
 	break;
 }
 
@@ -2873,6 +2883,23 @@ case OP_Found: {        /* jump, in3 */
 	pC->seekOp = pOp->opcode;
 #endif
 	pIn3 = &aMem[pOp->p3];
+	if (pC->eCurType == CURTYPE_EPHEMERAL) {
+		assert(pC->uc.eph_space != 0);
+		r.key_def = pC->uc.eph_space->key_def;
+		r.nField = (u16)pOp->p4.i;
+		r.aMem = pIn3;
+		r.default_rc = 0;
+		int res = sql_ephemeral_find(pC->uc.eph_space, &r);
+		int found = res != -1;
+		if (pOp->opcode == OP_Found) {
+			if (found)
+				goto jump_to_p2;
+		} else if (pOp->opcode == OP_NotFound) {
+			if (!found)
+				goto jump_to_p2;
+		}
+		break;
+	}
 	assert(pC->eCurType==CURTYPE_TARANTOOL);
 	assert(pC->uc.pCursor!=0);
 	if (pOp->p4.i>0) {
@@ -3590,6 +3617,17 @@ case OP_IdxInsert: {
 		if (vdbe_add_new_autoinc_id(p, value) != 0)
 			goto abort_due_to_error;
 	}
+	break;
+}
+
+case OP_IdxInsertEphemeral: {
+	pIn2 = &aMem[pOp->p1];
+	assert(mem_is_bin(pIn2));
+	struct sql_ephemeral_space *space = aMem[pOp->p2].u.p;
+	assert(space != NULL);
+	/* Make sure that memory has been allocated on region. */
+	assert(mem_is_ephemeral(&aMem[pOp->p1]));
+	sql_ephemeral_insert(space, pIn2->z, pIn2->z + pIn2->n);
 	break;
 }
 
