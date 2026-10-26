@@ -96,6 +96,10 @@ with raw API calls.
 
 The tool works via the public GitHub API by default.
 
+By default, the tool takes the PR repository from the `origin` remote.
+When `origin` is not the repository of the PR, pass `--repo <owner>/<repo>`
+to every command of the tool.
+
 ### Comment post
 
 ```Bash
