@@ -107,7 +107,8 @@ ast_select_new(struct region *region)
 }
 
 /**
- * Build single `struct Select` object from `struct ast_select` object.
+ * Build single `struct Select` object from `struct ast_select` object. The WITH
+ * clause is not converted.
  *
  * Return NULL on error.
  */
@@ -116,21 +117,28 @@ select_from_ast_single(struct Parse *parser, struct ast_select *select)
 {
 	if (select->op != TK_SELECT && select->op != TK_ALL)
 		parser->hasCompound = 1;
+	/*
+	 * Convert the clauses in the order they appear in the query, so that
+	 * anonymous bind variables ("?") are numbered in this order.
+	 */
+	struct ExprList *columns = expr_list_from_ast(parser, select->columns);
 	struct SrcList *list = src_list_from_ast(parser, select->sources);
 	struct Expr *where = expr_from_ast(parser, select->where);
-	struct Expr *having = expr_from_ast(parser, select->having);
-	struct Expr *limit = expr_from_ast(parser, select->limit);
-	struct Expr *offset = expr_from_ast(parser, select->offset);
-	struct ExprList *columns = expr_list_from_ast(parser, select->columns);
 	struct ExprList *group_by = expr_list_from_ast(parser,
 						       select->group_by);
+	struct Expr *having = expr_from_ast(parser, select->having);
 	struct ExprList *order_by = expr_list_from_ast(parser,
 						       select->order_by);
+	struct Expr *offset = NULL;
+	if (select->is_offset_first)
+		offset = expr_from_ast(parser, select->offset);
+	struct Expr *limit = expr_from_ast(parser, select->limit);
+	if (!select->is_offset_first)
+		offset = expr_from_ast(parser, select->offset);
 	struct Select *res = sqlSelectNew(parser, columns, list, where,
 					  group_by, having, order_by,
 					  select->flags, limit, offset);
 	res->op = select->op;
-	res->pWith = with_from_ast(parser, select->with);
 	if (parser->is_aborted) {
 		sql_select_delete(res);
 		return NULL;
@@ -144,15 +152,21 @@ select_from_ast(struct Parse *parser, struct ast_select *select)
 	if (select == NULL)
 		return NULL;
 	/*
-	 * Convert the compound parts from left to right, so that anonymous bind
-	 * variables ("?") are numbered in the order they appear in the query.
+	 * The WITH clause is attached to the last compound part, but precedes
+	 * all of them in the query. Convert it first and then the compound
+	 * parts from left to right, so that anonymous bind variables ("?") are
+	 * numbered in the order they appear in the query.
 	 */
+	struct With *with = with_from_ast(parser, select->with);
+	if (parser->is_aborted)
+		return NULL;
 	struct Select *prior = NULL;
 	struct ast_select *part;
 	int count = 1;
 	rlist_foreach_entry(part, &select->link, link) {
 		struct Select *cur = select_from_ast_single(parser, part);
 		if (parser->is_aborted) {
+			sqlWithDelete(with);
 			sql_select_delete(prior);
 			return NULL;
 		}
@@ -165,9 +179,11 @@ select_from_ast(struct Parse *parser, struct ast_select *select)
 	}
 	struct Select *res = select_from_ast_single(parser, select);
 	if (parser->is_aborted) {
+		sqlWithDelete(with);
 		sql_select_delete(prior);
 		return NULL;
 	}
+	res->pWith = with;
 	if (prior != NULL) {
 		res->pPrior = prior;
 		prior->pNext = res;
@@ -596,12 +612,13 @@ expr_in(struct Parse *parser, struct ast_expr *expr)
 static struct Expr *
 expr_getitem(struct Parse *parser, struct ast_expr *expr)
 {
-	struct ExprList *list = expr_list_from_ast(parser, expr->list);
+	/* The operand precedes the keys in the query, so convert it first. */
+	struct Expr *left = expr_from_ast(parser, expr->left);
 	if (parser->is_aborted)
 		return NULL;
-	struct Expr *left = expr_from_ast(parser, expr->left);
+	struct ExprList *list = expr_list_from_ast(parser, expr->list);
 	if (parser->is_aborted) {
-		sql_expr_list_delete(list);
+		sql_expr_delete(left);
 		return NULL;
 	}
 	struct Expr *res = sql_expr_new_anon(expr->op);
