@@ -112,3 +112,48 @@ g.test_3473_primary_key_not_declared_null = function(cg)
         t.assert_equals(tostring(err), exp_err)
     end)
 end
+
+--
+-- gh-13358 CREATE TABLE with PRIMARY KEY matching a non-first UNIQUE
+--
+g.test_13358_primary_key_matching_a_non_first_unique = function(cg)
+    cg.server:exec(function()
+        local sql = "CREATE TABLE t (a INT, b INT, UNIQUE (a), UNIQUE (b), "..
+                    "PRIMARY KEY (b));"
+        local _, err = box.execute(sql)
+        t.assert_equals(err, nil)
+
+        local res = box.space.t.index
+        t.assert_equals(res[0].id, 0)
+        t.assert_equals(res[0].name, "unique_unnamed_t_2")
+        t.assert_equals(res[1].id, 1)
+        t.assert_equals(res[1].name, "unique_unnamed_t_1")
+
+        sql = "CREATE TABLE t2 (a INT UNIQUE, b INT UNIQUE PRIMARY KEY);"
+        _, err = box.execute(sql)
+        t.assert_equals(err, nil)
+
+        res = box.space.t2.index
+        t.assert_equals(res[0].id, 0)
+        t.assert_equals(res[0].name, "unique_unnamed_t2_2")
+        t.assert_equals(res[1].id, 1)
+        t.assert_equals(res[1].name, "unique_unnamed_t2_1")
+
+        sql = "CREATE TABLE t3 (a INT, b INT, c INT, UNIQUE (a), UNIQUE (b), "..
+              "UNIQUE (c), PRIMARY KEY (c));"
+        _, err = box.execute(sql)
+        t.assert_equals(err, nil)
+
+        res = box.space.t3.index
+        t.assert_equals(res[0].id, 0)
+        t.assert_equals(res[0].name, "unique_unnamed_t3_3")
+        t.assert_equals(res[1].id, 1)
+        t.assert_equals(res[1].name, "unique_unnamed_t3_1")
+        t.assert_equals(res[2].id, 2)
+        t.assert_equals(res[2].name, "unique_unnamed_t3_2")
+
+        box.execute([[DROP TABLE t;]])
+        box.execute([[DROP TABLE t2;]])
+        box.execute([[DROP TABLE t3;]])
+    end)
+end
