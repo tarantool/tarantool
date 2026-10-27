@@ -25,7 +25,7 @@ test:plan(1)
 
 test:test("json", function(test)
     local serializer = require('json')
-    test:plan(83)
+    test:plan(84)
 
     test:test("unsigned", common.test_unsigned, serializer)
     test:test("signed", common.test_signed, serializer)
@@ -313,6 +313,8 @@ test:test("json", function(test)
     test:is(err_msg,
             "Expected value but found invalid token on line 1 at character 1 here ' >> a'",
             'mem-leak test for .decode error with options')
+    _, err_msg = pcall(j.encode, {}, {encode_key_order = 1})
+    test:is(err_msg, 'encode_key_order option must be a table')
     --
     -- gh-12726: Check that we used an original key while
     -- iterating, not its serialized form.
