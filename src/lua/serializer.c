@@ -194,7 +194,11 @@ static void
 luaL_serializer_parse_encode_key_order(struct lua_State *L,
 				       struct luaL_serializer *cfg)
 {
-	assert(lua_istable(L, -1) || lua_isnil(L, -1) || luaL_isnull(L, -1));
+	if (!(lua_istable(L, -1) || lua_isnil(L, -1) || luaL_isnull(L, -1))) {
+		luaL_error(L, "encode_key_order option must be a table");
+		unreachable();
+		return;
+	}
 
 	luaL_serializer_free_encode_key_order(cfg);
 
