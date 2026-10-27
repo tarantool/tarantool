@@ -17,6 +17,10 @@ local EXPIRY_WARNING_PERIOD = 30 * 24 * 60 * 60
 -- later than EXPIRY_WARNING_PERIOD before the certificate expires.
 local ALERT_THRESHOLD = CHECK_INTERVAL + EXPIRY_WARNING_PERIOD
 
+-- Whether the truncated SSL parameter names are accepted
+-- alongside the full ones. To remove in Tarantool 4.x.
+local SSL_PARAMS_ALLOW_DOUBLE_NAMES = true
+
 local function scalar(value)
     if type(value) == 'table' then
         value = value[1]
@@ -255,7 +259,11 @@ checker.unregister_discovery = function(name)
 end
 
 checker.register_discovery('iproto', function(config, records, add_certificate)
-    add_certificate(records, config:get('iproto.ssl.ssl_cert'), 'iproto')
+    local cert_file = config:get('iproto.ssl.ssl_cert_file')
+    if SSL_PARAMS_ALLOW_DOUBLE_NAMES and cert_file == nil then
+        cert_file = config:get('iproto.ssl.ssl_cert')
+    end
+    add_certificate(records, cert_file, 'iproto')
 end)
 
 checker.new = new

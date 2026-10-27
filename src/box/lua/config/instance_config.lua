@@ -10,6 +10,10 @@ local network = require('internal.config.utils.network')
 local loaders = require('internal.loaders')
 local expression = require('internal.config.utils.expression')
 
+-- Whether the truncated SSL parameter names are accepted
+-- alongside the full ones. To remove in Tarantool 4.x.
+local SSL_PARAMS_ALLOW_DOUBLE_NAMES = true
+
 local TIMEOUT_INFINITY = 500 * 365 * 86400
 
 -- Available only in Tarantool Enterprise Edition.
@@ -168,10 +172,17 @@ local function enhance_uri_ssl_params(self, iconfig, uri)
     uri.params = table.copy(uri.params)
 
     local ssl = self:get(iconfig, 'iproto.ssl') or {}
-    local ssl_params = {
-        ssl_ca_file = ssl.ca_file,
-        ssl_key_file = ssl.ssl_key,
-        ssl_cert_file = ssl.ssl_cert,
+    local ssl_params = SSL_PARAMS_ALLOW_DOUBLE_NAMES and {
+        ssl_ca_file = ssl.ssl_ca_file or ssl.ca_file,
+        ssl_key_file = ssl.ssl_key_file or ssl.ssl_key,
+        ssl_cert_file = ssl.ssl_cert_file or ssl.ssl_cert,
+        ssl_ciphers = ssl.ssl_ciphers,
+        ssl_password = ssl.ssl_password,
+        ssl_password_file = ssl.ssl_password_file,
+    } or {
+        ssl_ca_file = ssl.ssl_ca_file,
+        ssl_key_file = ssl.ssl_key_file,
+        ssl_cert_file = ssl.ssl_cert_file,
         ssl_ciphers = ssl.ssl_ciphers,
         ssl_password = ssl.ssl_password,
         ssl_password_file = ssl.ssl_password_file,
@@ -919,16 +930,16 @@ return schema.new('instance_config', schema.record({
             default = false,
         }),
         ssl = schema.record({
-            ca_file = schema.scalar({
+            ssl_ca_file = schema.scalar({
                 type = 'string',
             }),
-            ssl_cert = schema.scalar({
+            ssl_cert_file = schema.scalar({
                 type = 'string',
             }),
             ssl_ciphers = schema.scalar({
                 type = 'string',
             }),
-            ssl_key = schema.scalar({
+            ssl_key_file = schema.scalar({
                 type = 'string',
             }),
             ssl_password = sensitive(schema.scalar({
@@ -937,6 +948,16 @@ return schema.new('instance_config', schema.record({
             ssl_password_file = sensitive(schema.scalar({
                 type = 'string',
             })),
+            -- Deprecated truncated names, kept for backward
+            -- compatibility in Tarantool 3.x
+            -- (SSL_PARAMS_ALLOW_DOUBLE_NAMES). They will be
+            -- disabled in Tarantool 4.x; see
+            -- validators['iproto.ssl'].
+            ca_file = schema.scalar({ type = 'string' }),
+            ssl_cert = schema.scalar({ type = 'string' }),
+            ssl_key = schema.scalar({ type = 'string' }),
+        }, {
+            validate = validators['iproto.ssl'],
         }),
     }),
     session = schema.record({
@@ -2288,14 +2309,24 @@ return schema.new('instance_config', schema.record({
         })),
         iproto = enterprise_edition(schema.record({
             ssl = schema.record({
-                ca_file = schema.scalar({ type = 'string' }),
-                ssl_cert = schema.scalar({ type = 'string' }),
-                ssl_key = schema.scalar({ type = 'string' }),
+                ssl_ca_file = schema.scalar({ type = 'string' }),
+                ssl_cert_file = schema.scalar({ type = 'string' }),
+                ssl_key_file = schema.scalar({ type = 'string' }),
                 ssl_ciphers = schema.scalar({ type = 'string' }),
                 ssl_password = sensitive(schema.scalar({ type = 'string' })),
                 ssl_password_file = sensitive(schema.scalar({
                     type = 'string',
                 })),
+                -- Deprecated truncated names, kept for backward
+                -- compatibility in Tarantool 3.x
+                -- (SSL_PARAMS_ALLOW_DOUBLE_NAMES). They will be
+                -- disabled in Tarantool 4.x; see
+                -- validators['failover.iproto.ssl'].
+                ca_file = schema.scalar({ type = 'string' }),
+                ssl_cert = schema.scalar({ type = 'string' }),
+                ssl_key = schema.scalar({ type = 'string' }),
+            }, {
+                validate = validators['failover.iproto.ssl'],
             }),
         })),
     }, {
