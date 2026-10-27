@@ -445,7 +445,7 @@ struct errcode_record {
 	_(ER_INVALID_SORTDATA_FILE, 298,	"Invalid MemTX sort data file", "path", STRING, "details", STRING) \
 	_(ER_NO_SUCH_THREAD, 299,		"Thread does not exist", "thread_id", UINT) \
 	_(ER_UNABLE_TO_PROCESS_IN_THREAD, 300,	"Unable to process request in thread", "request", STRING, "thread_id", UINT) \
-	_(ER_DICT_OVERFLOW, 301,		"Dictionary has no space - too many unique values are used", "max_size", UINT) \
+	/* _(ER_DICT_OVERFLOW, 301, Unused */ \
 	_(ER_NO_SUCH_THREAD_GROUP, 302,		"Thread group does not exist", "thread_group", STRING) \
 	_(ER_XLOG_NOT_FOUND, 303,		"xlog file not found", "vclock", STRING) \
 	_(ER_RECOVERY_POINT_TXN_LAST_ROW, 304,	"Last row of recovery point transaction should not be local") \
