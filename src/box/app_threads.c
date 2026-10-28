@@ -7,11 +7,13 @@
 
 #include <assert.h>
 #include <limits.h>
+#include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "box.h"
 #include "coio_task.h"
 #include "cord_buf.h"
 #include "call.h"
@@ -39,45 +41,32 @@ __thread int app_thread_id = -1;
 /** Array of application threads. */
 static struct cord *app_thread_cords;
 
-static void *
-app_thread_f(void *arg)
+static int
+app_thread_f(va_list ap)
 {
-	app_thread_id = (intptr_t)arg;
+	app_thread_id = (intptr_t)va_arg(ap, void *);
 	assert(app_thread_id >= 1 && app_thread_id <= app_thread_count);
+	fiber_set_system(fiber(), true);
 	coio_enable();
 	event_init();
 	tuple_init();
 	app_thread_lua_init();
 	struct fiber_pool fiber_pool;
 	fiber_pool_create(&fiber_pool, cord_name(cord()), INT_MAX,
-			  FIBER_POOL_IDLE_TIMEOUT);
-	ev_run(loop(), 0);
-	/*
-	 * XXX: We must destroy the fiber pool endpoint and truncate the idle
-	 * fiber list to avoid use-after-free bugs while destroying this cord
-	 * and/or other endpoints, but we can't call fiber_pool_shutdown() here
-	 * because it requires a running event loop so we do it directly.
-	 */
-	cbus_endpoint_destroy(&fiber_pool.endpoint, NULL);
-	while (!rlist_empty(&fiber_pool.idle))
-		rlist_shift(&fiber_pool.idle);
-	/*
-	 * XXX: There may be fibers waiting on a condition variable created
-	 * from Lua code. If we don't wake them up, we'll get an assertion
-	 * failure in fiber_cond_destroy() when we try to destroy this
-	 * condition variable in lua_close(). Waking them up here like this
-	 * looks like a hack. We need to implement something like
-	 * fiber_shutdown() for application threads.
-	 */
-	struct fiber *fiber;
-	rlist_foreach_entry(fiber, &cord()->alive, link)
-		fiber_wakeup(fiber);
+			  box_fiber_pool_idle_timeout);
+	while (!fiber_is_cancelled())
+		fiber_yield();
+	if (fiber_shutdown(box_shutdown_timeout) != 0) {
+		diag_log();
+		panic("cannot gracefully shutdown client fibers");
+	}
+	fiber_pool_shutdown(&fiber_pool);
 	app_thread_lua_free();
 	box_lua_call_runtime_priv_reset();
 	tuple_free();
 	event_free();
 	cord_buf_free();
-	return NULL;
+	return 0;
 }
 
 void
@@ -98,8 +87,8 @@ app_threads_start(int thread_count)
 		char name[16];
 		/* Sic: ids start with 1 because id 0 is reserved for tx. */
 		snprintf(name, sizeof(name), "app%d", i + 1);
-		if (cord_start(cord, name, app_thread_f,
-			       (void *)(intptr_t)(i + 1)) != 0)
+		if (cord_costart(cord, name, app_thread_f,
+				 (void *)(intptr_t)(i + 1)) != 0)
 			panic_syserror("failed to start application thread");
 	}
 }
