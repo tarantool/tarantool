@@ -185,6 +185,14 @@ void
 session_close(struct session *session);
 
 /**
+ * Close all sessions belonging to a user with the given uid.
+ * Called when a user is dropped to prevent privilege leaks when
+ * a new user is recreated with the same uid.
+ */
+void
+session_close_all_by_uid(uint32_t uid);
+
+/**
  * Find a session by id.
  */
 struct session *
