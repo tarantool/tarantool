@@ -1035,8 +1035,17 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 		 */
 		goto end;
 	}
-	if (key_is_full && !eq_match)
+
+	if (it->after_data.key != NULL && is_eq) {
+		memtx_tx_track_gap_equal(txn, space, index_base,
+					 successor_entry, type,
+					 start_data.key, start_data.part_count,
+					 it->key_data.part_count);
+		goto end;
+	} else if (key_is_full && !eq_match) {
 		memtx_tx_track_point(txn, space, index_base, it->key_data.key);
+	}
+
 	if (!key_is_full ||
 	    ((type == ITER_GE || type == ITER_LE) && !equals) ||
 	    (type == ITER_GT || type == ITER_LT))
