@@ -302,12 +302,10 @@ static bool box_feedback_crash_enabled;
 #define BOX_SHUTDOWN_TIMEOUT_DEFAULT 3.0
 #endif
 
-/** Timeout on waiting client related fibers to finish. */
-static double box_shutdown_timeout = BOX_SHUTDOWN_TIMEOUT_DEFAULT;
+double box_shutdown_timeout = BOX_SHUTDOWN_TIMEOUT_DEFAULT;
 TWEAK_DOUBLE(box_shutdown_timeout);
 
-/** Idle timeout for box fiber pool. */
-static double box_fiber_pool_idle_timeout = FIBER_POOL_IDLE_TIMEOUT;
+double box_fiber_pool_idle_timeout = FIBER_POOL_IDLE_TIMEOUT;
 TWEAK_DOUBLE(box_fiber_pool_idle_timeout);
 
 static int

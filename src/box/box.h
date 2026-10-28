@@ -96,6 +96,12 @@ extern struct event *box_on_shutdown_event;
  */
 extern struct event *box_on_recovery_state_event;
 
+/** Timeout on waiting client related fibers to finish. */
+extern double box_shutdown_timeout;
+
+/** Idle timeout for box fiber pool. */
+extern double box_fiber_pool_idle_timeout;
+
 /**
  * Timeout during which the transaction must complete,
  * otherwise it will be rolled back.

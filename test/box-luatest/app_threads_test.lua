@@ -887,3 +887,25 @@ g.test_concurrent_access_denial = function(cg)
     end
     conn:close()
 end
+
+g.before_test('test_net_box_conn_gc_at_exit', function(cg)
+    cg.server2 = server:new({
+        box_cfg = {app_threads = 1},
+        net_box_credentials = {user = 'admin'},
+    })
+    cg.server2:start()
+end)
+
+g.test_net_box_conn_gc_at_exit = function(cg)
+    cg.server2:exec(function(uri)
+        local conn = require('net.box').connect(uri)
+        t.assert(conn:ping())
+        rawset(_G, 'test_conn', conn)
+    end, {cg.server.net_box_uri}, {_thread_id = 1})
+    cg.server2:stop()
+end
+
+g.after_test('test_net_box_conn_gc_at_exit', function(cg)
+    cg.server2:drop()
+    cg.server2 = nil
+end)
