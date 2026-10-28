@@ -133,6 +133,7 @@ lua_source(lua_sources ../third_party/metrics/metrics/version.lua metrics_versio
 lua_stub(checks FILES
     ../third_party/checks/checks.lua
     ../third_party/checks/checks/version.lua)
+lua_stub(luafun FILES ../third_party/luafun/fun.lua)
 file(GLOB_RECURSE METRICS_SOURCE_FILES
     "${PROJECT_SOURCE_DIR}/third_party/metrics/metrics/*.lua"
 )
