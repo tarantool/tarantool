@@ -38,7 +38,7 @@
 local DEFAULT_ORIGIN = ''
 local CONFIG_ORIGIN = 'config'
 local USER_OPTS_FIELD = 8
-local PRIV_OPTS_FIELD = 6
+local PRIV_OPTS_FIELD = 7
 
 -- Return origins for user/role from the given tuple.
 local function user_origins_from_tuple(tuple)
@@ -228,7 +228,8 @@ if #config_entries == 0 then
         'No further actions are expected.'
 end
 
-if #duplicate_entries == 0 and #orphan_entries == 0 then
+if #duplicate_entries == 0 and #orphan_entries == 0 and
+   next(lua_privileges_on_config) == nil then
     return 'Found no users/roles created from Lua. Everything is managed ' ..
         'using the YAML configuration. Fine.'
 end
@@ -253,19 +254,6 @@ o('Found users/roles that are managed using the YAML configuration')
 o('')
 l(config_entries)
 
--- Report Lua-granted privileges on config-managed subjects.
-if next(lua_privileges_on_config) ~= nil then
-    o('')
-    o('Some config-managed users/roles have privileges granted from Lua.')
-    o('These are not managed by the YAML configuration and should be')
-    o('reviewed and migrated if necessary.')
-    for name, privs in pairs(lua_privileges_on_config) do
-        o((''):format())
-        o(('%q has Lua-granted privileges:'):format(name))
-        l(privs)
-    end
-end
-
 if #duplicate_entries > 0 then
     -- Add these functions only if needed.
     box.schema.user.disown = gen_disown_f('user')
@@ -286,6 +274,20 @@ if #orphan_entries > 0 then
     o('are obsoleted). The following commands remove them.')
     o('')
     l(orphan_entries)
+end
+
+-- Report Lua-granted privileges on config-managed subjects (append after
+-- existing output so that backward-compatible output remains unchanged).
+if next(lua_privileges_on_config) ~= nil then
+    o('')
+    o('Some config-managed users/roles have privileges granted from Lua.')
+    o('These are not managed by the YAML configuration and should be')
+    o('reviewed and migrated if necessary.')
+    for name, privs in pairs(lua_privileges_on_config) do
+        o((''):format())
+        o(('%q has Lua-granted privileges:'):format(name))
+        l(privs)
+    end
 end
 
 return output
