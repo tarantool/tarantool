@@ -794,6 +794,19 @@ say_logger_free(void)
 /** {{{ Formatters */
 
 /**
+ * Append a newline to the log message regardless the message length.
+ */
+static int
+say_format_newline(int total, char *buf_start, int len_max)
+{
+	assert(len_max >= 2);
+	int end = MIN(total, len_max - 2);
+	buf_start[end] = '\n';
+	buf_start[end + 1] = '\0';
+	return total + 1;
+}
+
+/**
  * Format the log message in compact form:
  * MESSAGE: ERROR
  *
@@ -810,11 +823,13 @@ say_format_boot(struct log *log, char *buf, int len, int level,
 	(void)line;
 	(void)level;
 	int total = 0;
+	char *buf_start = buf;
+	int len_max = len;
+
 	SNPRINT(total, vsnprintf, buf, len, format, ap);
 	if (error != NULL)
 		SNPRINT(total, snprintf, buf, len, ": %s", error);
-	SNPRINT(total, snprintf, buf, len, "\n");
-	return total;
+	return say_format_newline(total, buf_start, len_max);
 }
 
 /**
@@ -827,6 +842,8 @@ say_format_plain(struct log *log, char *buf, int len, int level,
 		 const char *error, const char *format, va_list ap)
 {
 	int total = 0;
+	char *buf_start = buf;
+	int len_max = len;
 
 	/*
 	 * Every message written to syslog has a header that contains
@@ -870,8 +887,7 @@ say_format_plain(struct log *log, char *buf, int len, int level,
 	if (error != NULL)
 		SNPRINT(total, snprintf, buf, len, ": %s", error);
 
-	SNPRINT(total, snprintf, buf, len, "\n");
-	return total;
+	return say_format_newline(total, buf_start, len_max);
 }
 
 /**
