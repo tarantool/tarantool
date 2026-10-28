@@ -69,6 +69,43 @@ local modules = {
             },
         },
     },
+    {
+        name = 'os',
+        source = 'src/lua/os_stub.lua',
+        fixtures = 'test/app-luatest/emmylua/os',
+        fields = {
+            execute = 'Execute a command by passing it to the shell',
+            rename = 'Rename a file or directory',
+            getenv = 'Get an environment variable',
+            remove = 'Remove a file or directory',
+            date = 'Return a formatted date',
+            exit = 'Exit the program',
+            time = 'Return the number of seconds since the epoch',
+            clock = 'Return the number of CPU seconds since the program start',
+            tmpname = 'Return a name for a temporary file',
+            environ = 'Return a table containing all environment variables',
+            setenv = 'Set an environment variable',
+            setlocale = 'Change the locale',
+            difftime = 'Return the number of seconds between two times',
+        },
+        objects = {
+            {
+                fixture = 'date_table.lua',
+                type_name = 'os.date_table',
+                fields = {
+                    year = 'The year',
+                    month = 'The month',
+                    day = 'The day of the month',
+                    hour = 'The hour',
+                    min = 'The minute',
+                    sec = 'The second',
+                    wday = 'The day of the week',
+                    yday = 'The day of the year',
+                    isdst = 'Whether daylight saving time is in effect',
+                },
+            },
+        },
+    },
 }
 
 local function normalize(value)
