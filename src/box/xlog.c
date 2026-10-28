@@ -729,6 +729,18 @@ xlog_file_is_temporary_default(const char *filename)
 xlog_file_is_temporary_f xlog_file_is_temporary =
 				xlog_file_is_temporary_default;
 
+/** Whether the file is a directory. */
+static bool
+xlog_file_is_dir(const char *filename)
+{
+	struct stat st;
+	if (lstat(filename, &st) != 0) {
+		say_warn("failed to stat file '%s'", filename);
+		return false;
+	}
+	return S_ISDIR(st.st_mode);
+}
+
 void
 xdir_remove_temporary_files(struct xdir *xdir)
 {
@@ -743,7 +755,8 @@ xdir_remove_temporary_files(struct xdir *xdir)
 	while ((dent = readdir(dh)) != NULL) {
 		const char *filename = tt_snprintf(PATH_MAX, "%s/%s",
 						   dirname, dent->d_name);
-		if (xlog_file_is_temporary(filename))
+		if (xlog_file_is_temporary(filename) &&
+		    !xlog_file_is_dir(filename))
 			xlog_remove_file(filename, XLOG_RM_VERBOSE);
 	}
 	closedir(dh);
