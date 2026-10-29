@@ -582,6 +582,17 @@ sio_getaddrinfo(const char *host, const char *service,
 		const struct addrinfo *hints, struct addrinfo **res)
 {
 	int rc = getaddrinfo(host, service, hints, res);
+	ERROR_INJECT(ERRINJ_SIO_GETADDRINFO_ADDRCONFIG, {
+		if ((hints->ai_flags & AI_ADDRCONFIG) != 0) {
+			if (rc == 0) {
+				freeaddrinfo(*res);
+				*res = NULL;
+			}
+			rc = EAI_ADDRFAMILY;
+			errinj(ERRINJ_SIO_GETADDRINFO_ADDRCONFIG,
+			       ERRINJ_BOOL)->bparam = false;
+		}
+	});
 	/* See https://bugs.launchpad.net/tarantool/+bug/1160877. */
 	if ((rc == EAI_BADFLAGS || rc == EAI_ADDRFAMILY) &&
 	    (hints->ai_flags & AI_ADDRCONFIG) != 0) {
