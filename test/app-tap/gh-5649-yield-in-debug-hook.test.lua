@@ -16,10 +16,10 @@ fiber.create(function()
   -- All ok if panic doesn't occure.
   -- Yield before hook is set back.
   debug.sethook(old_hook, mask, count)
-  test:ok(true)
+  test:ok(true, 'no panic when yielding in a debug hook')
 end)
 -- Return to the second fiber.
 fiber.yield()
-test:ok(true)
+test:ok(true, 'main fiber resumed after yield')
 
 os.exit(test:check() and 0 or 1)
