@@ -2872,6 +2872,17 @@ I['sharding.roles'] = format_text([[
 
 I['sharding.roles.*'] = 'Sharding role: router, storage or rebalancer.'
 
+I['sharding.router_thread_group'] = format_text([[
+    Thread group to use for running routers.
+
+    By default, the vshard router module is loaded and configured only on
+    the main thread ("tx"). If this option is set, the vshard router module
+    will instead be loaded and configured on each thread of the specified
+    group. This may be useful for scaling routers within the same Tarantool
+    instance and/or unloading the main thread. The specified thread group
+    must be defined via the `threads.groups` configuration option.
+]])
+
 I['sharding.sched_move_quota'] = format_text([[
     A scheduler's bucket move quota used by the rebalancer.
 

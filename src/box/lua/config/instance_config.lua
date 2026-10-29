@@ -1962,6 +1962,10 @@ return schema.new('instance_config', schema.record({
             default = TIMEOUT_INFINITY,
             validate = validators['sharding.rebalancer_bucket_send_timeout'],
         })),
+        router_thread_group = schema.scalar({
+            type = 'string',
+            default = 'tx',
+        }),
     })),
     audit_log = enterprise_edition(schema.record({
         -- The same as the destination for the logger, audit logger destination
