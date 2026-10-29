@@ -1456,6 +1456,20 @@ setmetatable(this_module.self, {
     end
 })
 
-end -- cord_is_main
+else -- not cord_is_main
+
+this_module.self = setmetatable({}, {
+    __index = function(self, key)
+        if key == 'space' then
+            return {}
+        end
+        return function()
+            box.error(box.error.UNSUPPORTED,
+                      'application thread', 'net.box.self')
+        end
+    end,
+})
+
+end -- not cord_is_main
 
 return this_module
