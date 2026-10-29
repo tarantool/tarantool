@@ -1,3 +1,4 @@
+local threads = require('threads')
 local expression = require('internal.config.utils.expression')
 local health = require('internal.healthcheck')
 local log = require('internal.config.utils.log')
@@ -45,6 +46,26 @@ local function get_vshard_roles(configdata)
     return is_storage, is_router
 end
 
+-- Check if the thread group configured for vshard routers is defined.
+local function check_vshard_router_thread_group(configdata)
+    local router_thread_group = configdata:get('sharding.router_thread_group',
+                                               {use_default = true})
+    if router_thread_group == 'tx' then
+        return
+    end
+    local exists = false
+    local thread_groups = configdata:get('threads.groups') or {}
+    for _, tg in ipairs(thread_groups) do
+        if router_thread_group == tg.name then
+            exists = true
+        end
+    end
+    if not exists then
+        error('sharding.router_thread_group must be defined in ' ..
+              'threads.groups', 0)
+    end
+end
+
 -- Make sure vshard is available and its version is not too old.
 --
 -- The check is performed before box.cfg() and so before a
@@ -61,6 +82,7 @@ end
 -- role.
 local function check_vshard(config)
     local configdata = config._configdata
+    check_vshard_router_thread_group(configdata)
     local is_storage, is_router = get_vshard_roles(configdata)
     if not is_storage and not is_router then
         return
@@ -125,8 +147,20 @@ local function apply(config)
     end
     if is_router then
         log.info('sharding: apply router config')
-        _G.vshard.router.cfg(cfg)
-        register_vshard_router_health_check()
+        local thread_group = configdata:get('sharding.router_thread_group',
+                                            {use_default = true})
+        if thread_group == 'tx' then
+            _G.vshard.router.cfg(cfg)
+            register_vshard_router_health_check()
+        else
+            -- FIXME: enable health check in application threads
+            threads.eval(thread_group, [[
+                local cfg = ...
+                local loaders = require('internal.loaders')
+                _G.vshard = loaders.require_first('vshard', 'vshard-ee')
+                _G.vshard.router.cfg(cfg)
+            ]], {cfg})
+        end
     else
         unregister_vshard_health_checks()
     end

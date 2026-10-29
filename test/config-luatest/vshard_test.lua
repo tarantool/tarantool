@@ -1282,3 +1282,108 @@ g.test_rebalancer_bucket_send_timeout = function(g)
     local res = g.server:eval('return vshard.storage.internal.current_cfg')
     t.assert_equals(res.rebalancer_bucket_send_timeout, 42)
 end
+
+g.test_vshard_router_thread_group_undefined_error_before_box_cfg = function()
+    local dir = treegen.prepare_directory({}, {})
+    local config = [[
+    sharding:
+      router_thread_group: sharding
+
+    groups:
+      group-001:
+        replicasets:
+          replicaset-001:
+            instances:
+              instance-001: {}
+    ]]
+    treegen.write_file(dir, 'config.yaml', config)
+
+    local res = justrun.tarantool(dir, {LUA_PATH = ''},
+        {'--name', 'instance-001', '--config', 'config.yaml'},
+        {nojson = true, stderr = true, setsearchroot = false})
+    t.assert_equals(res.exit_code, 1)
+    t.assert_str_contains(res.stderr,
+        'sharding.router_thread_group must be defined in threads.groups')
+    local snaps = fio.glob(fio.pathjoin(dir, 'var/lib/instance-001/*.snap'))
+    t.assert_equals(snaps, {})
+end
+
+g.test_vshard_router_thread_group = function()
+    skip_if_no_vshard()
+
+    local config = cbuilder:new()
+        :set_global_option('credentials.users.admin.password', 'secret')
+        :set_global_option('credentials.users.storage', {
+            roles = {'sharding'},
+            password = 'storage',
+        })
+        :set_global_option('iproto.advertise.sharding', {
+            login = 'storage',
+        })
+        :use_group('g1')
+
+        :use_replicaset('rs1')
+        :set_replicaset_option('sharding.roles', {'storage'})
+        :set_replicaset_option('replication.failover', 'manual')
+        :set_replicaset_option('leader', 'i1')
+        :add_instance('i1', {})
+
+        :use_replicaset('rs2')
+        :set_replicaset_option('sharding', {
+            roles = {'router'},
+            router_thread_group = 'sharding',
+        })
+        :set_replicaset_option('threads.groups', {
+            {name = 'sharding', size = 2},
+        })
+        :set_replicaset_option('replication.failover', 'manual')
+        :set_replicaset_option('leader', 'i2')
+        :add_instance('i2', {})
+
+        :config()
+
+    local cluster = cluster:new(config, {
+        net_box_credentials = {user = 'admin', password = 'secret'},
+    })
+    cluster:start()
+
+    cluster.i1:exec(function()
+        box.schema.create_space('test', {
+            format = {
+                {'id', 'unsigned'},
+                {'bucket_id', 'unsigned'},
+            },
+        })
+        box.space.test:create_index('id', {
+            if_not_exists = true,
+            parts = {'id'},
+        })
+        box.space.test:create_index('bucket_id', {
+            unique = false,
+            parts = {'bucket_id'},
+        })
+        box.iproto.export('put', function(v)
+            box.space.test:insert({v.id, v.bucket_id})
+        end)
+    end)
+    cluster.i2:exec(function()
+        local vshard = require('vshard')
+        t.assert(vshard.router.bootstrap == nil)
+        t.assert(vshard.router.call == nil)
+    end)
+    cluster.i2:exec(function()
+        local vshard = require('vshard')
+        t.assert(vshard.router.bootstrap ~= nil)
+        vshard.router.bootstrap()
+        t.assert(vshard.router.call ~= nil)
+        vshard.router.call(10, 'write', 'put', {{id = 10, bucket_id = 100}})
+    end, {}, {_thread_id = 1})
+    cluster.i2:exec(function()
+        local vshard = require('vshard')
+        t.assert(vshard.router.call ~= nil)
+        vshard.router.call(20, 'write', 'put', {{id = 20, bucket_id = 200}})
+    end, {}, {_thread_id = 2})
+    cluster.i1:exec(function()
+        t.assert_equals(box.space.test:select(), {{10, 100}, {20, 200}})
+    end)
+end

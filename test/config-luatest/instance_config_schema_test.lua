@@ -1780,6 +1780,7 @@ g.test_sharding = function()
             rebalancer_mode = 'manual',
             sched_ref_quota = 10,
             sched_move_quota = 11,
+            router_thread_group = 'sharding',
         },
     }
     instance_config:validate(iconfig)
@@ -1806,6 +1807,7 @@ g.test_sharding = function()
         rebalancer_max_receiving = 100,
         rebalancer_max_sending = 1,
         rebalancer_mode = 'auto',
+        router_thread_group = 'tx',
         sched_move_quota = 1,
         sched_ref_quota = 300,
         shard_index = "bucket_id",
