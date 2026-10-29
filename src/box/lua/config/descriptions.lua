@@ -3118,6 +3118,20 @@ I['vinyl.write_threads'] = format_text([[
 
 -- }}} vinyl configuration
 
+-- {{{ memcs configuration
+
+I['memcs'] = format_text([[
+    This section defines configuration parameters for the MemCS storage engine.
+]])
+
+I['memcs.dir'] = format_text([[
+    A directory where memcs checkpoints will be stored. This option may contain
+    a relative file path. In this case, it is interpreted as relative
+    to `process.work_dir`.
+]])
+
+-- }}} memcs configuration
+
 -- {{{ quiver configuration
 
 I['quiver'] = format_text([[

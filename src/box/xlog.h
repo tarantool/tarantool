@@ -286,7 +286,7 @@ typedef bool
 extern xlog_file_is_temporary_f xlog_file_is_temporary;
 
 /**
- * Removes all temporary files in the specified directory.
+ * Removes all temporary files in the specified directory, ignoring directories.
  *
  * We call this function at startup to clean up the xlog directory of
  * incomplete files left from the previous run.
