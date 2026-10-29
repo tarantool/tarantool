@@ -572,3 +572,22 @@ sio_getprotobynumber(int proto)
 	return res;
 #endif
 }
+
+#ifndef EAI_ADDRFAMILY
+#define EAI_ADDRFAMILY EAI_BADFLAGS /* EAI_ADDRFAMILY is deprecated on BSD */
+#endif
+
+int
+sio_getaddrinfo(const char *host, const char *service,
+		const struct addrinfo *hints, struct addrinfo **res)
+{
+	int rc = getaddrinfo(host, service, hints, res);
+	/* See https://bugs.launchpad.net/tarantool/+bug/1160877. */
+	if ((rc == EAI_BADFLAGS || rc == EAI_ADDRFAMILY) &&
+	    (hints->ai_flags & AI_ADDRCONFIG) != 0) {
+		struct addrinfo retry = *hints;
+		retry.ai_flags &= ~AI_ADDRCONFIG;
+		rc = getaddrinfo(host, service, &retry, res);
+	}
+	return rc;
+}
