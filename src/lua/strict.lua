@@ -5,11 +5,45 @@
 -- anywhere or assigned to inside a function.
 --
 
-local getinfo, error, rawset, rawget = debug.getinfo, error, rawset, rawget
+---The `strict` module has functions for turning "strict mode" on or off.
+---When strict mode is on, an attempt to use an undeclared global variable
+---will cause an error. A global variable is considered "undeclared" if it
+---has never had a value assigned to it. Often this is an indication of a
+---programming error.
+---
+---By default strict mode is off, unless tarantool was built with the
+---`-DCMAKE_BUILD_TYPE=Debug` option.
+---
+---**Example:**
+---
+---```lua
+---    tarantool> strict = require('strict')
+---    ---
+---    ...
+---    tarantool> strict.on()
+---    ---
+---    ...
+---    tarantool> a = b -- strict mode is on so this will cause an error
+---    ---
+---    - error: ... variable 'b' is not declared
+---    ...
+---    tarantool> strict.off()
+---    ---
+---    ...
+---    tarantool> a = b -- strict mode is off so this will not cause an error
+---    ---
+---    ...
+---```
+---@class strict
+---@field on fun(): nil @Enable strict mode.
+---@field off fun(): nil @Disable strict mode.
+local declared = {}
 
 local mt = {}
 
-mt.__declared = {}
+mt.__declared = declared
+
+local getinfo, error, rawset, rawget = debug.getinfo, error, rawset, rawget
 
 local function what ()
   local d = getinfo(3, "S")
@@ -34,6 +68,18 @@ mt.__index = function (t, n)
   return rawget(t, n)
 end
 
+---Disable strict mode.
+---
+---When strict mode is off, an attempt to use an undeclared global variable
+---will not cause an error.
+---
+---**Example:**
+---
+--- ```lua
+--- strict = require('strict')
+--- strict.off()
+--- ```
+---
 local function off()
     mt.__declared = {}
     local m = getmetatable(_G)
@@ -48,6 +94,18 @@ local function off()
     end
 end
 
+---Enable strict mode.
+---
+---When strict mode is on, an attempt to use an undeclared global variable
+---will cause an error.
+---
+---**Example:**
+---
+--- ```lua
+--- strict = require('strict')
+--- strict.on()
+--- ```
+---
 local function on()
     local m = getmetatable(_G)
     if  m == mt then
@@ -63,6 +121,7 @@ end
 
 on()
 
+---@type strict
 return {
     on = on,
     off = off,
