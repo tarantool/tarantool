@@ -7,6 +7,7 @@
   - [Convenience tools](#convenience-tools)
 - [How to use an image](#how-to-use-an-image)
   - [Start a Tarantool instance](#start-a-tarantool-instance)
+  - [Run Lua scripts and utilities](#run-lua-scripts-and-utilities)
   - [Connect to a running Tarantool instance](#connect-to-a-running-tarantool-instance)
   - [Add application code with a volume mount](#add-application-code-with-a-volume-mount)
   - [Build your own image](#build-your-own-image)
@@ -72,6 +73,35 @@ $ docker run \
 This will start an instance of Tarantool and expose it on port 3301. Note that
 by default there is no password protection, so don't expose this instance to the
 outside world.
+
+### Run Lua scripts and utilities
+
+The image applies automatic server settings only when starting a server:
+bare `tarantool`, `-i` without a script, or server options such as `--config`
+and `--name`. The default app is `default`, the default instance is
+`instance-001`, and a mounted app's `config.yaml` takes precedence over the
+bundled configuration unless `TT_CONFIG` is explicitly set to a nonempty path.
+
+Lua scripts, stdin scripts (`-`), `-e` chunks, bytecode operations (`-b`),
+and arbitrary commands do not receive automatic instance, configuration,
+storage, log, socket, or PID settings. A script action takes precedence over
+server mode, including when combined with `-i` or server options.
+
+For example, to run a mounted Lua script without initializing a database:
+
+```console
+$ docker run --rm -v /path/to/tools:/tools:ro \
+    tarantool/tarantool tarantool /tools/tool.lua
+```
+
+Shell commands and executable scripts with a `#!/usr/bin/env tarantool`
+shebang can also be used as the container command. Bypassing the entrypoint
+or using `docker exec ... tarantool` does not apply automatic server defaults.
+
+Explicit environment settings are preserved in all modes. In particular,
+`TT_INSTANCE_NAME` (or `--name`) can intentionally initialize a database before
+a Lua script, as in native Tarantool. Utility mode does not disable explicit
+configuration. Omit instance settings when running an unconfigured utility.
 
 ### Connect to a running Tarantool instance
 
