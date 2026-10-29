@@ -208,7 +208,7 @@ assert(clock.monotonic() - start_time < time_quota, 'time_quota is violated')
 
 ph_server:signal(popen.signal.SIGINT)
 
-local status = ph_server:wait(nil, popen.signal.SIGINT)
+local status = ph_server:wait()
 test:unlike(status.state, popen.state.ALIVE,
             'SIGINT terminates tarantool in daemon mode')
 
