@@ -48,6 +48,12 @@ Standards-Version: 4.5.1
 Homepage: http://tarantool.org/
 VCS-Browser: https://github.com/tarantool/tarantool
 VCS-Git: git://github.com/tarantool/tarantool.git
+# dpkg-buildpackage calls the build target of debian/rules and then the
+# binary target under fakeroot up to Ubuntu 24.04 and Debian 12. Since
+# Ubuntu 26.04 and Debian 13 it builds without root by default and calls
+# the binary target alone, while debian/rules writes the install list of
+# tarantool-common in the build target. Keep the old way.
+Rules-Requires-Root: binary-targets
 
 Package: tarantool-common
 Architecture: all
