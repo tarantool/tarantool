@@ -63,6 +63,7 @@
 #include "tt_static.h"
 #include "memory.h"
 #include "ssl_error.h"
+#include "reflection.h"
 
 STRS(applier_state, applier_STATE);
 
@@ -2561,6 +2562,85 @@ applier_subscribe(struct applier *applier)
 	unreachable();
 }
 
+/** Information about how to handle an applier error. */
+struct applier_error_info {
+	/** Next state for the applier. */
+	enum applier_state next_state;
+	/** Whether to try reconnecting after this error. */
+	bool try_reconnect;
+	/** Whether to log this error. */
+	bool log_error;
+};
+
+/* Classify an error and return an appropriate action info. */
+static struct applier_error_info
+applier_classify_error(struct error *e)
+{
+	if (type_cast(ClientError, e) != NULL) {
+		switch (box_error_code(e)) {
+		/* Autobootstrap. */
+		case ER_LOADING:
+		/*
+		 * The instance is not anonymous, and is registered, but its ID
+		 * is not delivered to all the nodes in the cluster yet, and
+		 * some nodes may ask to retry connection later, until they
+		 * receive _cluster record of this instance. From some third
+		 * node, for example.
+		 */
+		case ER_TOO_EARLY_SUBSCRIBE:
+		/* Join failure due to synchronous transaction rollback. */
+		case ER_SYNC_QUORUM_TIMEOUT:
+		case ER_SYNC_ROLLBACK:
+		/* Invalid configuration. */
+		case ER_CFG:
+		case ER_ACCESS_DENIED:
+		case ER_NO_SUCH_USER:
+		case ER_CREDS_MISMATCH:
+			return {APPLIER_LOADING, true, true};
+		/* System error from master instance. */
+		case ER_SYSTEM:
+		case ER_SSL:
+		/*
+		 * Real tarantool can't have a nil UUID. This must be a
+		 * cartridge remote control instance. The error is transient,
+		 * since remote control will be replaced by a normal tarantool
+		 * node sooner or later.
+		 */
+		case ER_NIL_UUID:
+			return {APPLIER_DISCONNECTED, true, true};
+		default:
+			return {APPLIER_STOPPED, false, true};
+		}
+	}
+	/*
+	 * Xlog gap error can't be a critical error. Because it is totally
+	 * normal during bootstrap. Consider the case: node1 is a leader,
+	 * it is booted with vclock {1: 3}. Node2 connects and fetches
+	 * snapshot of node1, it also gets vclock {1: 3}. Then node1 writes
+	 * something and its vclock becomes {1: 4}. Now node3 boots from node1,
+	 * and gets the same vclock. Vclocks now look like this:
+	 *
+	 * - node1: {1: 4}, leader, has {1: 3} snap.
+	 * - node2: {1: 3}, booted from node1, has only snap.
+	 * - node3: {1: 4}, booted from node1, has only snap.
+	 *
+	 * If the cluster is a fullmesh, node2 will send subscribe requests
+	 * with vclock {1: 3}. If node3 receives it, it will respond with
+	 * xlog gap error, because it only has a snap with {1: 4}, nothing
+	 * else. In that case node2 should retry connecting to node3, and in
+	 * the meantime try to get newer changes from node1.
+	 */
+	if (type_cast(XlogGapError, e) != NULL)
+		return {APPLIER_LOADING, true, true};
+	/* Network and system errors - disconnect and retry. */
+	if (type_cast(SocketError, e) != NULL ||
+	    type_cast(SystemError, e) != NULL ||
+	    type_cast(SSLError, e) != NULL)
+		return {APPLIER_DISCONNECTED, true, true};
+
+    return {APPLIER_STOPPED, false, true};
+}
+
 static inline void
 applier_disconnect(struct applier *applier, enum applier_state state)
 {
@@ -2598,9 +2678,7 @@ applier_f(va_list ap)
 
 	/* Re-connect loop */
 	while (true) {
-		bool try_reconnect = true;
-		bool log_error = true;
-		applier_state applier_next_state = APPLIER_OFF;
+		struct applier_error_info err_info;
 		FiberGCChecker gc_check;
 		try {
 			/*
@@ -2660,98 +2738,27 @@ applier_f(va_list ap)
 			 */
 			unreachable();
 			return 0;
-		} catch (ClientError *e) {
-			if (e->errcode() == ER_CONNECTION_TO_SELF &&
-			    tt_uuid_is_equal(&applier->uuid, &INSTANCE_UUID)) {
-				/* Connection to itself, stop applier */
-				applier_next_state = APPLIER_OFF;
-				try_reconnect = false;
-				log_error = false;
-			} else if (e->errcode() == ER_LOADING) {
-				/* Autobootstrap */
-				applier_next_state = APPLIER_LOADING;
-			} else if (e->errcode() == ER_TOO_EARLY_SUBSCRIBE) {
-				/*
-				 * The instance is not anonymous, and is
-				 * registered, but its ID is not delivered to
-				 * all the nodes in the cluster yet, and some
-				 * nodes may ask to retry connection later,
-				 * until they receive _cluster record of this
-				 * instance. From some third node, for example.
-				 */
-				applier_next_state = APPLIER_LOADING;
-			} else if (e->errcode() == ER_SYNC_QUORUM_TIMEOUT ||
-				   e->errcode() == ER_SYNC_ROLLBACK) {
-				/*
-				 * Join failure due to synchronous
-				 * transaction rollback.
-				 */
-				applier_next_state = APPLIER_LOADING;
-			} else if (e->errcode() == ER_CFG ||
-				   e->errcode() == ER_ACCESS_DENIED ||
-				   e->errcode() == ER_NO_SUCH_USER ||
-				   e->errcode() == ER_CREDS_MISMATCH) {
-				/* Invalid configuration */
-				applier_next_state = APPLIER_LOADING;
-			} else if (e->errcode() == ER_SYSTEM ||
-				   e->errcode() == ER_SSL) {
-				/* System error from master instance. */
-				applier_next_state = APPLIER_DISCONNECTED;
-			} else if (e->errcode() == ER_NIL_UUID) {
-				/*
-				 * Real tarantool can't have a nil UUID. This
-				 * must be a cartridge remote control instance.
-				 * The error is transient, since remote control
-				 * will be replaced by a normal tarantool node
-				 * sooner or later.
-				 */
-				applier_next_state = APPLIER_DISCONNECTED;
-			} else {
-				/* Unrecoverable errors */
-				applier_next_state = APPLIER_STOPPED;
-				try_reconnect = false;
-			}
-		} catch (XlogGapError *e) {
-			/*
-			 * Xlog gap error can't be a critical error. Because it
-			 * is totally normal during bootstrap. Consider the
-			 * case: node1 is a leader, it is booted with vclock
-			 * {1: 3}. Node2 connects and fetches snapshot of node1,
-			 * it also gets vclock {1: 3}. Then node1 writes
-			 * something and its vclock becomes {1: 4}. Now node3
-			 * boots from node1, and gets the same vclock. Vclocks
-			 * now look like this:
-			 *
-			 * - node1: {1: 4}, leader, has {1: 3} snap.
-			 * - node2: {1: 3}, booted from node1, has only snap.
-			 * - node3: {1: 4}, booted from node1, has only snap.
-			 *
-			 * If the cluster is a fullmesh, node2 will send
-			 * subscribe requests with vclock {1: 3}. If node3
-			 * receives it, it will respond with xlog gap error,
-			 * because it only has a snap with {1: 4}, nothing else.
-			 * In that case node2 should retry connecting to node3,
-			 * and in the meantime try to get newer changes from
-			 * node1.
-			 */
-			applier_next_state = APPLIER_LOADING;
-		} catch (FiberIsCancelled *e) {
-			if (!diag_is_empty(&applier->diag)) {
-				applier_disconnect(applier, APPLIER_STOPPED);
-			} else {
-				applier_set_last_error(applier, e);
-				applier_disconnect(applier, APPLIER_OFF);
-			}
-			break;
-		} catch (SocketError *e) {
-			applier_next_state = APPLIER_DISCONNECTED;
-		} catch (SystemError *e) {
-			applier_next_state = APPLIER_DISCONNECTED;
-		} catch (SSLError *e) {
-			applier_next_state = APPLIER_DISCONNECTED;
 		} catch (Exception *e) {
-			applier_next_state = APPLIER_STOPPED;
-			try_reconnect = false;
+			/* Connection to itself - stop applier permanently */
+			if (type_cast(ClientError, e) != NULL &&
+			    box_error_code(e) == ER_CONNECTION_TO_SELF &&
+			    tt_uuid_is_equal(&applier->uuid, &INSTANCE_UUID)) {
+				applier_disconnect(applier, APPLIER_OFF);
+				break;
+			}
+			/* FiberIsCancelled breaks the reconnect loop */
+			if (type_cast(FiberIsCancelled, e)) {
+				if (!diag_is_empty(&applier->diag)) {
+					applier_disconnect(applier,
+							   APPLIER_STOPPED);
+				} else {
+					applier_set_last_error(applier, e);
+					applier_disconnect(applier,
+							   APPLIER_OFF);
+				}
+				break;
+			}
+			err_info = applier_classify_error(e);
 		}
 		/*
 		 * If the master restarts during the initial join state and
@@ -2771,18 +2778,19 @@ applier_f(va_list ap)
 			say_info("Error occurred during fetching snapshot, "
 				 "but some data has "
 				 "been applied. Stopping applier");
-			applier_next_state = APPLIER_STOPPED;
-			try_reconnect = false;
+			err_info.next_state = APPLIER_STOPPED;
+			err_info.try_reconnect = false;
 		}
 
 		struct error *err = diag_last_error(diag_get());
 		if (err != NULL) {
 			applier_set_last_error(applier, err);
-			if (log_error)
-				applier_log_error(applier, err, try_reconnect);
+			if (err_info.log_error)
+				applier_log_error(applier, err,
+						  err_info.try_reconnect);
 		}
-		applier_disconnect(applier, applier_next_state);
-		if (!try_reconnect)
+		applier_disconnect(applier, err_info.next_state);
+		if (!err_info.try_reconnect)
 			break;
 		/* Put fiber_sleep() out of catch block.
 		 *
