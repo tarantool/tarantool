@@ -252,6 +252,28 @@ session_close(struct session *session)
 }
 
 void
+session_close_all_by_uid(uint32_t uid)
+{
+	struct mh_i64ptr_t *h = session_registry;
+	mh_int_t i;
+	/* Collect sessions to close first, because mh_foreach
+	 * may not be safe when closing modifies the registry. */
+	struct session *to_close[128];
+	int n = 0;
+	mh_foreach(h, i) {
+		struct session *session =
+			(struct session *)mh_i64ptr_node(h, i)->val;
+		if (session->credentials.uid == uid &&
+		    session->vtab != &closed_session_vtab) {
+			if (n < (int)(sizeof(to_close) / sizeof(to_close[0])))
+				to_close[n++] = session;
+		}
+	}
+	for (int k = 0; k < n; k++)
+		session_close(to_close[k]);
+}
+
+void
 session_set_type(struct session *session, enum session_type type)
 {
 	assert(type < session_type_MAX);

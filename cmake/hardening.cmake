@@ -9,6 +9,11 @@ endif()
 option(ENABLE_HARDENING "Enable compiler options that harden against memory corruption attacks" ${ENABLE_HARDENING_DEFAULT})
 if (ENABLE_HARDENING)
     set(HARDENING_FLAGS "-Wformat -Wformat-security -Werror=format-security -fstack-protector-strong -fPIC")
+    # _FORTIFY_SOURCE=2 requires optimization (at least -O) for all files.
+    # It also doesn't work well with ASAN, so skip it when ASAN is enabled.
+    if (NOT ENABLE_ASAN)
+        set(HARDENING_FLAGS "${HARDENING_FLAGS} -D_FORTIFY_SOURCE=2")
+    endif()
     if (NOT TARGET_OS_DARWIN)
         set(HARDENING_LDFLAGS "-pie -z relro -z now")
     endif()
