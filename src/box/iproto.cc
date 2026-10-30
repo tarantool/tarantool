@@ -4602,6 +4602,8 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 		evio_service_detach(binary);
 		break;
 	case IPROTO_CFG_RESTART:
+		if (iproto_thread->is_shutting_down)
+			break;
 		evio_service_detach(binary);
 		evio_service_attach(binary, &tx_binary);
 		break;

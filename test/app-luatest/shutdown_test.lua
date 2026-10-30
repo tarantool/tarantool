@@ -120,6 +120,39 @@ g.test_box_session_new_after_shutdown_started = function(cg)
     end)
 end
 
+local g_listen = t.group('listen')
+
+g_listen.before_each(function(cg)
+    cg.server = server:new()
+    cg.server:start()
+end)
+
+g_listen.after_each(function(cg)
+    if cg.server ~= nil then
+        cg.server:drop()
+    end
+end)
+
+-- Test iproto listen reloading with the same address during the graceful
+-- shutdown.
+--
+-- Aims to hit the moment when the iproto threads have stopped accepting
+-- connections, but the listening socket is not closed yet.
+g_listen.test_iproto_listen_reload = function(cg)
+    cg.server:exec(function()
+        -- A box.ctl.on_shutdown() trigger is invoked after iproto's (internal)
+        -- graceful shutdown trigger, so we hit the exact moment when the latter
+        -- waits for the iproto threads to respond to the shutdown message, and
+        -- it is before the listening socket is closed.
+        box.ctl.on_shutdown(function()
+            box.cfg{listen = box.cfg.listen}
+            require('log').info('iproto listen is reloaded')
+        end)
+    end)
+    cg.server:stop()
+    t.assert(cg.server:grep_log('iproto listen is reloaded'))
+end
+
 local g_snap = t.group('snapshot')
 
 g_snap.before_each(function(cg)
