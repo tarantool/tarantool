@@ -1,0 +1,12 @@
+	*** test_cardinality ***
+	*** test_cardinality: done ***
+	*** test_get_set ***
+Generating test set... ok
+Settings bits... ok
+Checking bits... ok
+Unsetting random bits... ok
+Checking set bits... ok
+Checking all bits... ok
+Unsetting all bits... ok
+Checking all bits... ok
+	*** test_get_set: done ***

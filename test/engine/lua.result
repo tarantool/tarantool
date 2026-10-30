@@ -1,0 +1,228 @@
+test_run = require('test_run')
+---
+...
+inspector = test_run.new()
+---
+...
+engine = inspector:get_cfg('engine')
+---
+...
+--
+-- Lua select_reverse_range
+--
+-- lua select_reverse_range() testing
+-- https://blueprints.launchpad.net/tarantool/+spec/backward-tree-index-iterator
+space = box.schema.space.create('tweedledum', { engine = engine })
+---
+...
+tmp = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'}, unique = true })
+---
+...
+tmp = space:create_index('range', { type = 'tree', parts = {2, 'unsigned', 1, 'unsigned'}, unique = true })
+---
+...
+space:insert{0, 0}
+---
+- [0, 0]
+...
+space:insert{1, 0}
+---
+- [1, 0]
+...
+space:insert{2, 0}
+---
+- [2, 0]
+...
+space:insert{3, 0}
+---
+- [3, 0]
+...
+space:insert{4, 0}
+---
+- [4, 0]
+...
+space:insert{5, 0}
+---
+- [5, 0]
+...
+space:insert{6, 0}
+---
+- [6, 0]
+...
+space:insert{7, 0}
+---
+- [7, 0]
+...
+space:insert{8, 0}
+---
+- [8, 0]
+...
+space:insert{9, 0}
+---
+- [9, 0]
+...
+space.index['range']:select({}, { limit = 10, iterator = 'GE' })
+---
+- - [0, 0]
+  - [1, 0]
+  - [2, 0]
+  - [3, 0]
+  - [4, 0]
+  - [5, 0]
+  - [6, 0]
+  - [7, 0]
+  - [8, 0]
+  - [9, 0]
+...
+space.index['range']:select({}, { limit = 10, iterator = 'LE' })
+---
+- - [9, 0]
+  - [8, 0]
+  - [7, 0]
+  - [6, 0]
+  - [5, 0]
+  - [4, 0]
+  - [3, 0]
+  - [2, 0]
+  - [1, 0]
+  - [0, 0]
+...
+space.index['range']:select({}, { limit = 4, iterator = 'LE' })
+---
+- - [9, 0]
+  - [8, 0]
+  - [7, 0]
+  - [6, 0]
+...
+space:drop()
+---
+...
+--
+-- Tests for box.index iterators
+--
+space = box.schema.space.create('tweedledum', { engine = engine })
+---
+...
+tmp = space:create_index('primary', { type = 'tree', parts = {1, 'string'}, unique = true })
+---
+...
+tmp = space:create_index('i1', { type = 'tree', parts = {2, 'string', 3, 'string'}, unique = true })
+---
+...
+pid = 1
+---
+...
+tid = 999
+---
+...
+inspector:cmd("setopt delimiter ';'")
+---
+- true
+...
+for sid = 1, 2 do
+    for i = 1, 3 do
+        space:insert{'pid_'..pid, 'sid_'..sid, 'tid_'..tid}
+        pid = pid + 1
+        tid = tid - 1
+    end
+end;
+---
+...
+inspector:cmd("setopt delimiter ''");
+---
+- true
+...
+index = space.index['i1']
+---
+...
+t = {}
+---
+...
+for state, v in index:pairs('sid_1', { iterator = 'GE' }) do table.insert(t, v) end
+---
+...
+t
+---
+- - ['pid_3', 'sid_1', 'tid_997']
+  - ['pid_2', 'sid_1', 'tid_998']
+  - ['pid_1', 'sid_1', 'tid_999']
+  - ['pid_6', 'sid_2', 'tid_994']
+  - ['pid_5', 'sid_2', 'tid_995']
+  - ['pid_4', 'sid_2', 'tid_996']
+...
+t = {}
+---
+...
+for state, v in index:pairs('sid_2', { iterator = 'LE' }) do table.insert(t, v) end
+---
+...
+t
+---
+- - ['pid_4', 'sid_2', 'tid_996']
+  - ['pid_5', 'sid_2', 'tid_995']
+  - ['pid_6', 'sid_2', 'tid_994']
+  - ['pid_1', 'sid_1', 'tid_999']
+  - ['pid_2', 'sid_1', 'tid_998']
+  - ['pid_3', 'sid_1', 'tid_997']
+...
+t = {}
+---
+...
+for state, v in index:pairs('sid_1', { iterator = 'EQ' }) do table.insert(t, v) end
+---
+...
+t
+---
+- - ['pid_3', 'sid_1', 'tid_997']
+  - ['pid_2', 'sid_1', 'tid_998']
+  - ['pid_1', 'sid_1', 'tid_999']
+...
+t = {}
+---
+...
+for state, v in index:pairs('sid_1', { iterator = 'REQ' }) do table.insert(t, v) end
+---
+...
+t
+---
+- - ['pid_1', 'sid_1', 'tid_999']
+  - ['pid_2', 'sid_1', 'tid_998']
+  - ['pid_3', 'sid_1', 'tid_997']
+...
+t = {}
+---
+...
+for state, v in index:pairs('sid_2', { iterator = 'EQ' }) do table.insert(t, v) end
+---
+...
+t
+---
+- - ['pid_6', 'sid_2', 'tid_994']
+  - ['pid_5', 'sid_2', 'tid_995']
+  - ['pid_4', 'sid_2', 'tid_996']
+...
+t = {}
+---
+...
+for state, v in index:pairs('sid_2', { iterator = 'REQ' }) do table.insert(t, v) end
+---
+...
+t
+---
+- - ['pid_4', 'sid_2', 'tid_996']
+  - ['pid_5', 'sid_2', 'tid_995']
+  - ['pid_6', 'sid_2', 'tid_994']
+...
+t = {}
+---
+...
+index:pairs('sid_t', { iterator = 'wrong_iterator_type' })
+---
+- error: Unknown iterator type 'wrong_iterator_type'
+...
+index = nil
+---
+...
+space:drop()
+---
+...

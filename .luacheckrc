@@ -1,0 +1,127 @@
+std = "luajit"
+globals = {
+    "box",
+    "misc",
+    "package",
+    "tonumber64",
+    "utf8",
+    "_TARANTOOL",
+}
+ignore = {
+    -- Accessing an undefined field of a global variable <debug>.
+    "143/debug",
+    -- Accessing an undefined field of a global variable <os>.
+    "143/os",
+    -- Accessing an undefined field of a global variable <string>.
+    "143/string",
+    -- Accessing an undefined field of a global variable <table>.
+    "143/table",
+    -- Unused argument <self>.
+    "212/self",
+    -- Redefining a local variable.
+    "411",
+    -- Redefining an argument.
+    "412",
+    -- Shadowing a local variable.
+    "421",
+    -- Shadowing an upvalue.
+    "431",
+    -- Shadowing an upvalue argument.
+    "432",
+    -- Unused variable with `_` prefix.
+    "212/_.*",
+    -- Unused loop variable with `_` prefix.
+    "213/_.*",
+}
+
+include_files = {
+    "**/*.lua",
+}
+
+exclude_files = {
+    "build/**/*.lua",
+    "luatest/**/*.lua",
+    "test-run/**/*.lua",
+    "test/app/*.test.lua",
+    "test/box/*.test.lua",
+    "test/engine/*.test.lua",
+    "test/engine_long/*.test.lua",
+    "test/replication/*.test.lua",
+    "test/metrics-luatest/test/*.lua",
+    "test/metrics-luatest/test/**/*.lua",
+    "test/sql/**/*.lua",
+    "test/swim/*.test.lua",
+    "test/var/**/*.lua",
+    "test/vinyl/*.test.lua",
+    "test/wal_off/*.test.lua",
+    "test/xlog/*.test.lua",
+    "test/static/corpus/luaL_loadbuffer/*.lua",
+    "third_party/**/*.lua",
+    ".rocks/**/*.lua",
+    ".git/**/*.lua",
+}
+
+files["test/sql-tap/**/*.lua"] = {
+    ignore = {
+        -- Line is too long.
+        -- https://github.com/tarantool/tarantool/issues/5181
+        "631"
+    }
+}
+
+files["src/lua/help.lua"] = {
+    -- Globals defined for interactive mode.
+    globals = {"help", "tutorial"},
+}
+files["src/lua/init.lua"] = {
+    -- Miscellaneous global function definition.
+    globals = {"dostring"},
+}
+files["test/box/box.lua"] = {
+    globals = {
+        "cfg_filter",
+        "sorted",
+        "iproto_request",
+    }
+}
+files["test/box-tap/session.test.lua"] = {
+    globals = {
+        "session",
+        "space",
+        "f1",
+        "f2",
+    },
+}
+files["test/box-tap/extended_error.test.lua"] = {
+    globals = {
+        "error_access_denied",
+        "error_new",
+        "error_new_stacked",
+        "error_throw",
+        "error_throw_stacked",
+        "error_throw_access_denied",
+        "forbidden_function",
+    },
+}
+files["test/swim/box.lua"] = {
+    globals = {
+        "listen_port",
+        "listen_uri",
+        "uuid",
+        "uri",
+    }
+}
+files["test/replication/replica_quorum.lua"] = {
+    globals = {
+        "INSTANCE_URI",
+        "nonexistent_uri",
+    },
+}
+
+-- Defined functions is unused in preamble,
+-- but could be used by generated Lua programs.
+files["test/fuzz/luaL_loadbuffer/preamble.lua"] = {
+    ignore = {
+        "211",
+    },
+}

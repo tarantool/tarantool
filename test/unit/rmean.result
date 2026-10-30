@@ -1,0 +1,11 @@
+Stat. 2 names, timer simulation
+	*** test_100rps ***
+Send 100 requests every second for 10 seconds
+Calc rps at third and last second
+EV1: rps 60, total 300	EV2: rps 0, total 0
+EV1: rps 100, total 1000	EV2: rps 0, total 0
+	*** test_100rps: done ***
+	*** test_mean15rps ***
+Send 15 rps on the average, and 3 rps to EV2
+EV1: rps 15, total 1150	EV2: rps 3, total 30
+	*** test_mean15rps: done ***

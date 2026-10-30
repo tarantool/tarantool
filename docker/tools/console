@@ -1,0 +1,5 @@
+#!/bin/sh
+
+RUN_DIR="/var/run/tarantool/sys_env"
+TT_CONSOLE_SOCKET_DEFAULT="${RUN_DIR}/${TT_APP_NAME}/${TT_INSTANCE_NAME}/tarantool.control"
+tt connect "${TT_CONSOLE_SOCKET:-${TT_CONSOLE_SOCKET_DEFAULT}}"

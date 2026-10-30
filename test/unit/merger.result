@@ -1,0 +1,71 @@
+1..4
+	*** test_basic ***
+    1..9
+	*** test_array_source ***
+    ok 1 - array source next() (any format): tuple != NULL
+    ok 2 - array source next() (any format): skip tuple validation
+    ok 3 - array source next() (any format): check tuple size
+    ok 4 - array source next() (any format): check tuple data
+    ok 5 - array source next() (any format): tuple != NULL
+    ok 6 - array source next() (any format): skip tuple validation
+    ok 7 - array source next() (any format): check tuple size
+    ok 8 - array source next() (any format): check tuple data
+    ok 9 - array source is empty (any format)
+	*** test_array_source: done ***
+ok 1 - subtests
+    1..9
+	*** test_array_source ***
+    ok 1 - array source next() (user's format): tuple != NULL
+    ok 2 - array source next() (user's format): validate tuple
+    ok 3 - array source next() (user's format): check tuple size
+    ok 4 - array source next() (user's format): check tuple data
+    ok 5 - array source next() (user's format): tuple != NULL
+    ok 6 - array source next() (user's format): validate tuple
+    ok 7 - array source next() (user's format): check tuple size
+    ok 8 - array source next() (user's format): check tuple data
+    ok 9 - array source is empty (user's format)
+	*** test_array_source: done ***
+ok 2 - subtests
+    1..17
+	*** test_merger ***
+    ok 1 - merger next() (any format): tuple != NULL
+    ok 2 - merger next() (any format): skip tuple validation
+    ok 3 - merger next() (any format): check tuple size
+    ok 4 - merger next() (any format): check tuple data
+    ok 5 - merger next() (any format): tuple != NULL
+    ok 6 - merger next() (any format): skip tuple validation
+    ok 7 - merger next() (any format): check tuple size
+    ok 8 - merger next() (any format): check tuple data
+    ok 9 - merger next() (any format): tuple != NULL
+    ok 10 - merger next() (any format): skip tuple validation
+    ok 11 - merger next() (any format): check tuple size
+    ok 12 - merger next() (any format): check tuple data
+    ok 13 - merger next() (any format): tuple != NULL
+    ok 14 - merger next() (any format): skip tuple validation
+    ok 15 - merger next() (any format): check tuple size
+    ok 16 - merger next() (any format): check tuple data
+    ok 17 - merger is empty (any format)
+	*** test_merger: done ***
+ok 3 - subtests
+    1..17
+	*** test_merger ***
+    ok 1 - merger next() (user's format): tuple != NULL
+    ok 2 - merger next() (user's format): validate tuple
+    ok 3 - merger next() (user's format): check tuple size
+    ok 4 - merger next() (user's format): check tuple data
+    ok 5 - merger next() (user's format): tuple != NULL
+    ok 6 - merger next() (user's format): validate tuple
+    ok 7 - merger next() (user's format): check tuple size
+    ok 8 - merger next() (user's format): check tuple data
+    ok 9 - merger next() (user's format): tuple != NULL
+    ok 10 - merger next() (user's format): validate tuple
+    ok 11 - merger next() (user's format): check tuple size
+    ok 12 - merger next() (user's format): check tuple data
+    ok 13 - merger next() (user's format): tuple != NULL
+    ok 14 - merger next() (user's format): validate tuple
+    ok 15 - merger next() (user's format): check tuple size
+    ok 16 - merger next() (user's format): check tuple data
+    ok 17 - merger is empty (user's format)
+	*** test_merger: done ***
+ok 4 - subtests
+	*** test_basic: done ***

@@ -1,0 +1,34 @@
+	*** test0 ***
+Initialized: 
+STAILQ_INIT: 
+STAILQ_REVERSE: 
+	*** test0: done ***
+	*** test1 ***
+STAILQ_INIT: 1 
+STAILQ_REVERSE: 1 
+	*** test1: done ***
+	*** test2 ***
+STAILQ_INIT: 1 2 
+STAILQ_REVERSE: 2 1 
+	*** test2: done ***
+	*** test3 ***
+STAILQ_INIT: 1 2 3 
+STAILQ_REVERSE: 3 2 1 
+	*** test3: done ***
+	*** test_splice ***
+q1: 
+q2: 
+q1: 
+q2: 
+STAILQ_INIT: 1 2 3 
+q1: 
+q2: 1 2 3 
+q1: 1 2 3 
+q2: 
+q1: 1 
+q2: 2 3 
+q1: 1 3 
+q2: 2 
+q1: 1 3 2 
+q2: 
+	*** test_splice: done ***

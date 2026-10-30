@@ -1,0 +1,69 @@
+[submodule "third_party/luajit"]
+	path = third_party/luajit
+	url = https://github.com/tarantool/luajit.git
+	ignore = dirty
+	branch = tarantool-1.7
+[submodule "third_party/libyaml"]
+	path = third_party/libyaml
+	url = https://github.com/tarantool/libyaml.git
+	ignore = dirty
+[submodule "src/lib/msgpuck"]
+	path = src/lib/msgpuck
+	url = https://github.com/tarantool/msgpuck.git
+	ignore = dirty
+[submodule "third_party/luafun"]
+	path = third_party/luafun
+	url = https://github.com/luafun/luafun.git
+	ignore = dirty
+[submodule "test-run"]
+	path = test-run
+	url = https://github.com/tarantool/test-run.git
+	ignore = dirty
+[submodule "src/lib/small"]
+	path = src/lib/small
+	url = https://github.com/tarantool/small.git
+	ignore = dirty
+[submodule "third_party/zstd"]
+	path = third_party/zstd
+	url = https://github.com/tarantool/zstd.git
+	ignore = dirty
+[submodule "third_party/decNumber"]
+	path = third_party/decNumber
+	url = https://github.com/tarantool/decNumber.git
+[submodule "third_party/curl"]
+	path = third_party/curl
+	url = https://github.com/tarantool/curl.git
+[submodule "third_party/c-ares"]
+	path = third_party/c-ares
+	url = https://github.com/tarantool/c-ares.git
+[submodule "third_party/xxHash"]
+	path = third_party/xxHash
+	url = https://github.com/tarantool/xxHash
+[submodule "third_party/c-dt"]
+	path = third_party/c-dt
+	url = https://github.com/tarantool/c-dt.git
+[submodule "third_party/lua-zlib"]
+	path = third_party/lua-zlib
+	url = https://github.com/tarantool/lua-zlib.git
+[submodule "third_party/luazip"]
+	path = third_party/luazip
+	url = https://github.com/tarantool/luazip.git
+[submodule "third_party/nghttp2"]
+	path = third_party/nghttp2
+	url = https://github.com/tarantool/nghttp2.git
+[submodule "third_party/libunwind"]
+	path = third_party/libunwind
+	url = https://github.com/tarantool/libunwind.git
+	branch = libunwind-1.6.2-tarantool
+[submodule "third_party/tz"]
+	path = third_party/tz
+	url = https://github.com/tarantool/tz.git
+[submodule "third_party/checks"]
+	path = third_party/checks
+	url = https://github.com/tarantool/checks.git
+[submodule "third_party/metrics"]
+	path = third_party/metrics
+	url = https://github.com/tarantool/metrics.git
+[submodule "luatest"]
+	path = luatest
+	url = https://github.com/tarantool/luatest.git

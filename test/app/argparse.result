@@ -1,0 +1,169 @@
+-- internal argparse test
+test_run = require('test_run').new()
+---
+...
+test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua:<line>\"]: '")
+---
+- true
+...
+argparse = require('internal.argparse').parse
+---
+...
+-- test with empty arguments and options
+argparse()
+---
+- []
+...
+-- test with command name (should be excluded)
+argparse({[0] = 'tarantoolctl', 'start', 'instance'})
+---
+- - start
+  - instance
+...
+-- test long option
+argparse({'tarantoolctl', 'start', 'instance', '--start'})
+---
+- 1: tarantoolctl
+  2: start
+  3: instance
+  start: true
+...
+argparse({'tarantoolctl', 'start', 'instance', '--start', '--stop'})
+---
+- 1: tarantoolctl
+  2: start
+  3: instance
+  start: true
+  stop: true
+...
+argparse({'tarantoolctl', 'start', 'instance', '--start', '--stop', '--stop'})
+---
+- 1: tarantoolctl
+  2: start
+  3: instance
+  start: true
+  stop:
+  - true
+  - true
+...
+argparse({'tarantoolctl', 'start', 'instance', '--start', '--stop', '--stop'})
+---
+- 1: tarantoolctl
+  2: start
+  3: instance
+  start: true
+  stop:
+  - true
+  - true
+...
+argparse({'tarantoolctl', 'start', 'instance', '-baobab'})
+---
+- 1: tarantoolctl
+  2: start
+  3: instance
+  b:
+  - true
+  - true
+  - true
+  o: true
+  a:
+  - true
+  - true
+...
+argparse({'tarantoolctl', 'start', 'instance', '-vovov'})
+---
+- 1: tarantoolctl
+  2: start
+  3: instance
+  o:
+  - true
+  - true
+  v:
+  - true
+  - true
+  - true
+...
+argparse({'tarantoolctl', 'start', 'instance', '--start=lalochka'})
+---
+- 1: tarantoolctl
+  2: start
+  3: instance
+  start: lalochka
+...
+argparse({'tarantoolctl', 'start', 'instance', '--start', 'lalochka'})
+---
+- 1: tarantoolctl
+  2: start
+  3: instance
+  start: lalochka
+...
+argparse({'tarantoolctl', 'start', 'instance', '--start', '--', 'lalochka'})
+---
+- error: 'builtin/internal.argparse.lua:<line>"]: bad argument #5: ID not valid'
+...
+argparse({'tarantoolctl', 'start', 'instance', '--start', '-', 'lalochka'})
+---
+- 1: tarantoolctl
+  2: start
+  3: instance
+  4: lalochka
+  start: true
+...
+argparse({'--verh=42'}, {{'verh', 'number'}})
+---
+- verh: 42
+...
+argparse({'--verh=42'}, {{'verh', 'number+'}})
+---
+- verh:
+  - 42
+...
+argparse({'--verh=42'}, {{'verh', 'string'}})
+---
+- verh: '42'
+...
+argparse({'--verh=42'}, {{'verh', 'string+'}})
+---
+- verh:
+  - '42'
+...
+argparse({'--verh=42'}, {{'verh'}})
+---
+- verh: '42'
+...
+argparse({'--verh=42'}, {'verh'})
+---
+- verh: '42'
+...
+argparse({'--verh=42'}, {{'verh', 'boolean'}})
+---
+- error: 'builtin/internal.argparse.lua:<line>"]: Bad value for parameter "verh". No value
+    expected, got "42"'
+...
+argparse({'--verh=42'}, {{'verh', 'boolean+'}})
+---
+- error: 'builtin/internal.argparse.lua:<line>"]: Bad value for parameter "verh". No value
+    expected, got "42"'
+...
+argparse({'--verh=42'}, {'niz'})
+---
+- error: 'builtin/internal.argparse.lua:<line>"]: unknown options: verh'
+...
+argparse({'--super-option'})
+---
+- super-option: true
+...
+argparse({'tarantoolctl', 'start', 'instance', '--start=lalochka', 'option', '-', 'another option'})
+---
+- 1: tarantoolctl
+  2: start
+  3: instance
+  4: option
+  5: '-'
+  6: another option
+  start: lalochka
+...
+test_run:cmd("clear filter")
+---
+- true
+...

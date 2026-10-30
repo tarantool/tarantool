@@ -1,0 +1,2955 @@
+json = require 'json'
+---
+...
+yaml = require 'yaml'
+---
+...
+pickle = require 'pickle'
+---
+...
+socket = require 'socket'
+---
+...
+fiber = require 'fiber'
+---
+...
+msgpack = require 'msgpack'
+---
+...
+log = require 'log'
+---
+...
+errno = require 'errno'
+---
+...
+fio = require 'fio'
+---
+...
+ffi = require('ffi')
+---
+...
+type(socket)
+---
+- table
+...
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+test_run:cmd("push filter '(error: .builtin/.*[.]lua):[0-9]+' to '\\1'")
+---
+- true
+...
+TIMEOUT = 100
+---
+...
+socket('PF_INET', 'SOCK_STREAM', 'tcp121222');
+---
+- null
+...
+s = socket('PF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+type(s)
+---
+- table
+...
+-- Invalid arguments
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+for k in pairs(getmetatable(s).__index) do
+    local r, msg = pcall(s[k])
+    if not msg:match('Usage:') then
+        error("Arguments is not checked for "..k)
+    end
+end;
+---
+...
+s:close();
+---
+- true
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+LISTEN = require('uri').parse(box.cfg.listen)
+---
+...
+LISTEN ~= nil
+---
+- true
+...
+s = socket.tcp_connect(LISTEN.host, LISTEN.service)
+---
+...
+s:nonblock(true)
+---
+- true
+...
+s:nonblock()
+---
+- true
+...
+s:nonblock(false)
+---
+- false
+...
+s:nonblock()
+---
+- false
+...
+s:nonblock(true)
+---
+- true
+...
+s:readable(TIMEOUT)
+---
+- true
+...
+s:wait(TIMEOUT)
+---
+- RW
+...
+socket.iowait(s:fd(), 'RW')
+---
+- RW
+...
+socket.iowait(s:fd(), 3)
+---
+- 3
+...
+socket.iowait(s:fd(), 'R')
+---
+- R
+...
+socket.iowait(s:fd(), 'r')
+---
+- R
+...
+socket.iowait(s:fd(), 1)
+---
+- 1
+...
+socket.iowait(s:fd(), 'W')
+---
+- W
+...
+socket.iowait(s:fd(), 'w')
+---
+- W
+...
+socket.iowait(s:fd(), 2)
+---
+- 2
+...
+socket.iowait(s:fd(), '')
+---
+- error: 'Usage: iowait(fd, 1 | ''r'' | 2 | ''w'' | 3 | ''rw'' [, timeout])'
+...
+socket.iowait(s:fd(), -1)
+---
+- error: 'Usage: iowait(fd, 1 | ''r'' | 2 | ''w'' | 3 | ''rw'' [, timeout])'
+...
+socket.iowait(s:fd(), 'RW')
+---
+- RW
+...
+socket.iowait(s:fd(), 'RW', -100500)
+---
+- RW
+...
+s:readable(0)
+---
+- true
+...
+s:errno() > 0
+---
+- false
+...
+s:error()
+---
+- null
+...
+s:writable(.00000000000001)
+---
+- true
+...
+s:writable(0)
+---
+- true
+...
+s:wait(TIMEOUT)
+---
+- RW
+...
+socket.iowait(nil, nil, -1)
+---
+...
+socket.iowait(nil, nil, 0.0001)
+---
+...
+socket.iowait(-1, nil, 0.0001)
+---
+...
+socket.iowait(nil, 'RW')
+---
+- error: 'Usage: iowait(fd, 1 | ''r'' | 2 | ''w'' | 3 | ''rw'' [, timeout])'
+...
+socket.iowait(0, nil)
+---
+- error: 'Usage: iowait(fd, 1 | ''r'' | 2 | ''w'' | 3 | ''rw'' [, timeout])'
+...
+handshake = ffi.new('char[128]')
+---
+...
+-- test sysread with char *
+s:sysread(handshake, 128)
+---
+- 128
+...
+ffi.string(handshake, 9)
+---
+- Tarantool
+...
+ping = msgpack.encode({ [0] = 64, [1] = 0 })
+---
+...
+ping = msgpack.encode(string.len(ping)) .. ping
+---
+...
+-- test syswrite with char *
+s:syswrite(ffi.cast('const char *', ping), #ping)
+---
+- 6
+...
+s:readable(TIMEOUT)
+---
+- true
+...
+s:wait(TIMEOUT)
+---
+- RW
+...
+pong = s:sysread()
+---
+...
+string.len(pong)
+---
+- 33
+...
+msgpack.decode(pong)
+---
+- 28
+- 6
+...
+function remove_schema_id(t, x) if t[5] then t[5] = 'XXX' end return t, x end
+---
+...
+remove_schema_id(msgpack.decode(pong, 6))
+---
+- {0: 0, 1: 0, 5: 'XXX'}
+- 33
+...
+s:close()
+---
+- true
+...
+s = socket('PF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+---
+- true
+...
+s:error()
+---
+- null
+...
+s:bind('127.0.0.1', 0)
+---
+- true
+...
+s:error()
+---
+- null
+...
+s:listen(128)
+---
+- true
+...
+sevres = {}
+---
+...
+type(require('fiber').create(function() s:readable() do local sc = s:accept() table.insert(sevres, sc) sc:syswrite('ok') sc:close() end end))
+---
+- userdata
+...
+#sevres
+---
+- 0
+...
+sc = socket('PF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+sc:nonblock(false)
+---
+- false
+...
+sc:sysconnect('127.0.0.1', s:name().port)
+---
+- true
+...
+sc:nonblock(true)
+---
+- true
+...
+sc:readable(TIMEOUT)
+---
+- true
+...
+sc:sysread()
+---
+- ok
+...
+string.match(tostring(sc), ', peer') ~= nil
+---
+- true
+...
+#sevres
+---
+- 1
+...
+sevres[1].host
+---
+- null
+...
+s:setsockopt('SOL_SOCKET', 'SO_BROADCAST', false)
+---
+- true
+...
+s:getsockopt('socket', 'SO_TYPE')
+---
+- 1
+...
+s:error()
+---
+- null
+...
+s:setsockopt('SOL_SOCKET', 'SO_DEBUG', false)
+---
+- true
+...
+s:getsockopt('socket', 'SO_DEBUG')
+---
+- 0
+...
+s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
+---
+- error: 'builtin/socket.lua: Socket option SO_ACCEPTCONN is read only'
+...
+s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
+---
+- true
+...
+s:error()
+---
+- null
+...
+s:setsockopt('IPPROTO_TCP', 'TCP_NODELAY', true)
+---
+- true
+...
+s:getsockopt('IPPROTO_TCP', 'TCP_NODELAY') > 0
+---
+- true
+...
+s:setsockopt('SOL_TCP', 'TCP_NODELAY', false)
+---
+- true
+...
+s:getsockopt('SOL_TCP', 'TCP_NODELAY') == 0
+---
+- true
+...
+s:setsockopt('tcp', 'TCP_NODELAY', true)
+---
+- true
+...
+s:getsockopt('tcp', 'TCP_NODELAY') > 0
+---
+- true
+...
+s:setsockopt(6, 'TCP_NODELAY', false)
+---
+- true
+...
+s:getsockopt(6, 'TCP_NODELAY') == 0
+---
+- true
+...
+not s:setsockopt(nil, 'TCP_NODELAY', true) and errno() == errno.EINVAL
+---
+- true
+...
+not s:getsockopt(nil, 'TCP_NODELAY') and errno() == errno.EINVAL
+---
+- true
+...
+s:linger()
+---
+- false
+- 0
+...
+s:linger(true, 1)
+---
+- true
+- 1
+...
+s:linger()
+---
+- true
+- 1
+...
+s:linger(false, 1)
+---
+- false
+- 1
+...
+s:linger()
+---
+- false
+- 1
+...
+s:close()
+---
+- true
+...
+s = socket('PF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+---
+- true
+...
+s:setsockopt('SOL_SOCKET', 'SO_REUSEPORT', true)
+---
+- true
+...
+s:getsockopt('SOL_SOCKET', 'SO_REUSEPORT') > 0
+---
+- true
+...
+s:setsockopt('SOL_SOCKET', 'SO_REUSEPORT', false)
+---
+- true
+...
+s:getsockopt('SOL_SOCKET', 'SO_REUSEPORT') == 0
+---
+- true
+...
+s:bind('127.0.0.1', 0)
+---
+- true
+...
+s:listen(128)
+---
+- true
+...
+sc = socket('PF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+sc:sysconnect('127.0.0.1', s:name().port) or errno() == errno.EINPROGRESS
+---
+- true
+...
+sc:writable(TIMEOUT)
+---
+- true
+...
+sc:write('Hello, world')
+---
+- 12
+...
+sa, addr = s:accept()
+---
+...
+addr2 = sa:name()
+---
+...
+addr2.host == addr.host
+---
+- true
+...
+addr2.family == addr.family
+---
+- true
+...
+sa:nonblock(1)
+---
+- true
+...
+sa:read(8)
+---
+- Hello, w
+...
+sa:read(3)
+---
+- orl
+...
+sc:writable()
+---
+- true
+...
+sc:write(', again')
+---
+- 7
+...
+sa:read(8)
+---
+- d, again
+...
+sa:error()
+---
+- null
+...
+string.len(sa:read(0))
+---
+- 0
+...
+type(sa:read(0))
+---
+- string
+...
+sa:read(1, .01)
+---
+- null
+...
+sc:writable()
+---
+- true
+...
+-- gh-3979 Check for errors when argument is negative.
+sc:read(-1)
+---
+- error: 'builtin/socket.lua: socket:read(): limit can not be negative'
+...
+sc:sysread(-1)
+---
+- error: 'builtin/socket.lua: socket:sysread(): size can not be negative'
+...
+sc:read(-100)
+---
+- error: 'builtin/socket.lua: socket:read(): limit can not be negative'
+...
+sc:sysread(-100)
+---
+- error: 'builtin/socket.lua: socket:sysread(): size can not be negative'
+...
+sc:send('abc')
+---
+- 3
+...
+sa:read(3)
+---
+- abc
+...
+sc:send('Hello')
+---
+- 5
+...
+sa:readable()
+---
+- true
+...
+sa:recv()
+---
+- Hello
+...
+sa:recv()
+---
+- null
+...
+sc:send('Hello')
+---
+- 5
+...
+sc:send(', world')
+---
+- 7
+...
+sc:send("\\nnew line")
+---
+- 10
+...
+sa:read('\\n', TIMEOUT)
+---
+- Hello, world\n
+...
+sa:read({ chunk = 1, delimiter = 'ine'}, 1)
+---
+- n
+...
+sa:read('ine', TIMEOUT)
+---
+- ew line
+...
+sa:read('ine', 0.1)
+---
+- null
+...
+sc:send('Hello, world')
+---
+- 12
+...
+sa:read(',', TIMEOUT)
+---
+- Hello,
+...
+sc:shutdown('W')
+---
+- true
+...
+sa:close()
+---
+- true
+...
+sc:close()
+---
+- true
+...
+s = socket('PF_UNIX', 'SOCK_STREAM', 0)
+---
+...
+s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+---
+- true
+...
+s ~= nil
+---
+- true
+...
+s:nonblock()
+---
+- true
+...
+s:nonblock(true)
+---
+- true
+...
+s:nonblock()
+---
+- true
+...
+path = 'tarantool-test-socket'
+---
+...
+os.remove(path)
+---
+- null
+- 'tarantool-test-socket: No such file or directory'
+- 2
+...
+s:bind('unix/', path)
+---
+- true
+...
+sc ~= nil
+---
+- true
+...
+s:listen(1234)
+---
+- true
+...
+sc = socket('PF_UNIX', 'SOCK_STREAM', 0)
+---
+...
+sc:nonblock(true)
+---
+- true
+...
+sc:sysconnect('unix/', path)
+---
+- true
+...
+sc:error()
+---
+- null
+...
+s:readable()
+---
+- true
+...
+sa = s:accept()
+---
+...
+sa:nonblock(true)
+---
+- true
+...
+sa:send('Hello, world')
+---
+- 12
+...
+sc:recv()
+---
+- Hello, world
+...
+sc:close()
+---
+- true
+...
+sa:close()
+---
+- true
+...
+s:close()
+---
+- true
+...
+_ = os.remove(path)
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+function aexitst(ai, hostnames, port)
+    for i, a in pairs(ai) do
+        for j, host in pairs(hostnames) do
+            if a.host == host and a.port == port then
+                return true
+            end
+        end
+    end
+    return ai
+end;
+---
+...
+aexitst( socket.getaddrinfo('localhost', 'http', {  protocol = 'tcp',
+    type = 'SOCK_STREAM'}), {'127.0.0.1', '::1'}, 80 );
+---
+- true
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+wrong_addr = socket.getaddrinfo('non-existing-domain-name-12211alklkl.com', 'http', {})
+---
+...
+wrong_addr == nil or #wrong_addr == 0
+---
+- true
+...
+sc = socket('PF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+sc ~= nil
+---
+- true
+...
+sc:getsockopt('SOL_SOCKET', 'SO_ERROR')
+---
+- 0
+...
+sc:nonblock(true)
+---
+- true
+...
+sc:sysconnect('127.0.0.1', 3458) or errno() == errno.EINPROGRESS or errno() == errno.ECONNREFUSED
+---
+- true
+...
+string.match(tostring(sc), ', peer') == nil
+---
+- true
+...
+sc:writable()
+---
+- true
+...
+string.match(tostring(sc), ', peer') == nil
+---
+- true
+...
+socket_error = sc:getsockopt('SOL_SOCKET', 'SO_ERROR')
+---
+...
+socket_error == errno.ECONNREFUSED or socket_error == 0
+---
+- true
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+inf = socket.getaddrinfo('127.0.0.1', '80', { type = 'SOCK_DGRAM',
+    flags = { 'AI_NUMERICSERV', 'AI_NUMERICHOST', } });
+---
+...
+-- musl libc https://github.com/tarantool/tarantool/issues/1249
+inf[1].canonname = nil;
+---
+...
+inf;
+---
+- - host: 127.0.0.1
+    family: AF_INET
+    type: SOCK_DGRAM
+    protocol: udp
+    port: 80
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+sc = socket('AF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+json.encode(sc:name())
+---
+- '{"host":"0.0.0.0","family":"AF_INET","type":"SOCK_STREAM","protocol":"tcp","port":0}'
+...
+sc:name()
+---
+- host: 0.0.0.0
+  family: AF_INET
+  type: SOCK_STREAM
+  protocol: tcp
+  port: 0
+...
+sc:nonblock(true)
+---
+- true
+...
+sc:close()
+---
+- true
+...
+s = socket('AF_INET', 'SOCK_DGRAM', 'udp')
+---
+...
+s:bind('127.0.0.1', 0)
+---
+- true
+...
+sc = socket('AF_INET', 'SOCK_DGRAM', 'udp')
+---
+...
+sc:sendto('127.0.0.1', s:name().port, 'Hello, world')
+---
+- 12
+...
+s:readable(TIMEOUT)
+---
+- true
+...
+s:recv()
+---
+- Hello, world
+...
+sc:sendto('127.0.0.1', s:name().port, 'Hello, world, 2')
+---
+- 15
+...
+s:readable(TIMEOUT)
+---
+- true
+...
+d, from = s:recvfrom()
+---
+...
+from.port > 0
+---
+- true
+...
+from.port = 'Random port'
+---
+...
+json.encode{d, from}
+---
+- '["Hello, world, 2",{"host":"127.0.0.1","family":"AF_INET","port":"Random port"}]'
+...
+s:close()
+---
+- true
+...
+sc:close()
+---
+- true
+...
+s = socket('AF_INET', 'SOCK_DGRAM', 'udp')
+---
+...
+s:nonblock(true)
+---
+- true
+...
+s:bind('127.0.0.1')
+---
+- true
+...
+s:name().port > 0
+---
+- true
+...
+sc = socket('AF_INET', 'SOCK_DGRAM', 'udp')
+---
+...
+sc:nonblock(true)
+---
+- true
+...
+sc:sendto('127.0.0.1', s:name().port)
+---
+- true
+...
+sc:sendto('127.0.0.1', s:name().port, 'Hello, World!')
+---
+- 13
+...
+s:readable(TIMEOUT)
+---
+- true
+...
+data, from = s:recvfrom(10)
+---
+...
+data
+---
+- Hello, Wor
+...
+s:sendto(from.host, from.port, 'Hello, hello!')
+---
+- 13
+...
+sc:readable(TIMEOUT)
+---
+- true
+...
+data_r, from_r = sc:recvfrom()
+---
+...
+data_r
+---
+- Hello, hello!
+...
+from_r.host
+---
+- 127.0.0.1
+...
+from_r.port == s:name().port
+---
+- true
+...
+s:close()
+---
+- true
+...
+sc:close()
+---
+- true
+...
+-- tcp_connect
+-- Test timeout. In this test, tcp_connect can return the second
+-- output value from internal.getaddrinfo (usually on Mac OS, but
+-- theoretically it can happen on Linux too). Sometimes
+-- getaddrinfo() is timed out, sometimes connect. On Linux however
+-- getaddrinfo is fast enough to never give timeout error in
+-- the case. So, there are two sources of timeout errors that are
+-- reported differently. This difference has appeared after
+-- gh-4138 patch.
+s, err = socket.tcp_connect('127.0.0.1', 80, 0.00000000001)
+---
+...
+s == nil
+---
+- true
+...
+-- AF_INET
+s = socket('AF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+s:bind('127.0.0.1', 0)
+---
+- true
+...
+port = s:name().port
+---
+...
+s:listen()
+---
+- true
+...
+sc, e = socket.tcp_connect('127.0.0.1', port), errno()
+---
+...
+sc ~= nil
+---
+- true
+...
+e == 0
+---
+- true
+...
+sc:close()
+---
+- true
+...
+s:close()
+---
+- true
+...
+socket.tcp_connect('127.0.0.1', port), errno() == errno.ECONNREFUSED
+---
+- null
+- true
+...
+-- AF_UNIX
+path = 'tarantool-test-socket'
+---
+...
+_ = os.remove(path)
+---
+...
+s = socket('AF_UNIX', 'SOCK_STREAM', 0)
+---
+...
+s:bind('unix/', path)
+---
+- true
+...
+socket.tcp_connect('unix/', path), errno() == errno.ECONNREFUSED
+---
+- null
+- true
+...
+s:listen()
+---
+- true
+...
+sc, e = socket.tcp_connect('unix/', path), errno()
+---
+...
+sc ~= nil
+---
+- true
+...
+e
+---
+- 0
+...
+sc:close()
+---
+- true
+...
+s:close()
+---
+- true
+...
+socket.tcp_connect('unix/', path), errno() == errno.ECONNREFUSED
+---
+- null
+- true
+...
+_ = os.remove(path)
+---
+...
+socket.tcp_connect('unix/', path), errno() == errno.ENOENT
+---
+- null
+- true
+...
+-- invalid fd / tampering
+s = socket('AF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+s:read(9)
+---
+- null
+...
+s:close()
+---
+- true
+...
+s._gc_socket.fd = 512
+---
+- error: '[string "s._gc_socket.fd = 512 "]:1: attempt to write to constant location'
+...
+s._gc_socket = nil
+---
+...
+tostring(s)
+---
+- error: 'builtin/socket.lua: Usage: socket:method(), called with non-socket'
+...
+s = nil
+---
+...
+-- random port
+master = socket('PF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+master:bind('127.0.0.1', 0)
+---
+- true
+...
+port = master:name().port
+---
+...
+master:listen()
+---
+- true
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+function gh361()
+    local s = socket('PF_INET', 'SOCK_STREAM', 'tcp')
+    s:sysconnect('127.0.0.1', port)
+    s:wait()
+    res = s:read(1200)
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+f = fiber.create(gh361)
+---
+...
+fiber.cancel(f)
+---
+...
+while f:status() ~= 'dead' do fiber.sleep(0.001) end
+---
+...
+master:close()
+---
+- true
+...
+f = nil
+---
+...
+path = 'tarantool-test-socket'
+---
+...
+s = socket('PF_UNIX', 'SOCK_STREAM', 0)
+---
+...
+s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+---
+- true
+...
+s:error()
+---
+- null
+...
+s:bind('unix/', path)
+---
+- true
+...
+s:error()
+---
+- null
+...
+s:listen(128)
+---
+- true
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+f = fiber.create(function()
+    for i=1,2 do
+        s:readable()
+        local sc = s:accept()
+        sc:write('ok!')
+        sc:shutdown()
+        sc:close()
+    end
+end);
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+c = socket.tcp_connect('unix/', path)
+---
+...
+c:error()
+---
+- null
+...
+x = c:read('!')
+---
+...
+x, type(x), #x
+---
+- ok!
+- string
+- 3
+...
+x = c:read('!')
+---
+...
+c:error()
+---
+- null
+...
+x, type(x), #x
+---
+- 
+- string
+- 0
+...
+x = c:read('!')
+---
+...
+c:error()
+---
+- null
+...
+x, type(x), #x
+---
+- 
+- string
+- 0
+...
+c:close()
+---
+- true
+...
+c = socket.tcp_connect('unix/', path)
+---
+...
+c:error()
+---
+- null
+...
+x = c:read(3)
+---
+...
+c:error()
+---
+- null
+...
+x, type(x), #x
+---
+- ok!
+- string
+- 3
+...
+x = c:read(1)
+---
+...
+c:error()
+---
+- null
+...
+x, type(x), #x
+---
+- 
+- string
+- 0
+...
+x = c:read(1)
+---
+...
+c:error()
+---
+- null
+...
+x, type(x), #x
+---
+- 
+- string
+- 0
+...
+x = c:sysread(1)
+---
+...
+c:error()
+---
+- null
+...
+x, type(x), #x
+---
+- 
+- string
+- 0
+...
+c:close()
+---
+- true
+...
+s:close()
+---
+- true
+...
+_ = os.remove(path)
+---
+...
+server, addr = socket.tcp_server('unix/', path, function(s) s:write('Hello, world') end)
+---
+...
+type(addr)
+---
+- table
+...
+server ~= nil
+---
+- true
+...
+fiber.sleep(.1)
+---
+...
+client = socket.tcp_connect('unix/', path)
+---
+...
+client ~= nil
+---
+- true
+...
+client:read(123)
+---
+- Hello, world
+...
+server:close()
+---
+- true
+...
+-- unix socket automatically removed
+while fio.stat(path) ~= nil do fiber.sleep(0.001) end
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+server, addr = socket.tcp_server('127.0.0.1', 0, { handler = function(s)
+    s:read(2)
+    s:write('Hello, world')
+end, name = 'testserv'});
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+type(addr)
+---
+- table
+...
+server ~= nil
+---
+- true
+...
+addr2 = server:name()
+---
+...
+addr.host == addr2.host
+---
+- true
+...
+addr.family == addr2.family
+---
+- true
+...
+fiber.sleep(.1)
+---
+...
+client = socket.tcp_connect(addr2.host, addr2.port)
+---
+...
+client ~= nil
+---
+- true
+...
+-- Check that listen and client fibers have appropriate names
+cnt = 0
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+for _, f in pairs(fiber.info()) do
+    if f.name:match('^testserv/') then
+        cnt = cnt + 1
+    end
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+cnt
+---
+- 2
+...
+client:write('hi')
+---
+- 2
+...
+client:read(123)
+---
+- Hello, world
+...
+client:close()
+---
+- true
+...
+server:close()
+---
+- true
+...
+longstring = string.rep("abc", 65535)
+---
+...
+server = socket.tcp_server('unix/', path, function(s) s:write(longstring) end)
+---
+...
+client = socket.tcp_connect('unix/', path)
+---
+...
+client:read(#longstring) == longstring
+---
+- true
+...
+client = socket.tcp_connect('unix/', path)
+---
+...
+client:read(#longstring + 1) == longstring
+---
+- true
+...
+client = socket.tcp_connect('unix/', path)
+---
+...
+client:read(#longstring - 1) == string.sub(longstring, 1, #longstring - 1)
+---
+- true
+...
+longstring = "Hello\r\n\r\nworld\n\n"
+---
+...
+client = socket.tcp_connect('unix/', path)
+---
+...
+client:read{ line = { "\n\n", "\r\n\r\n" } }
+---
+- "Hello\r\n\r\n"
+...
+server:close()
+---
+- true
+...
+-- gh-658: socket:read() incorrectly handles size and delimiter together
+body = "a 10\nb 15\nabc"
+---
+...
+remaining = #body
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+server = socket.tcp_server('unix/', path, function(s)
+    s:write(body)
+    s:read(100500)
+end);
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+client = socket.tcp_connect('unix/', path)
+---
+...
+buf = client:read({ size = remaining, delimiter = "\n"})
+---
+...
+buf == "a 10\n"
+---
+- true
+...
+remaining = remaining - #buf
+---
+...
+buf = client:read({ size = remaining, delimiter = "\n"})
+---
+...
+buf == "b 15\n"
+---
+- true
+...
+remaining = remaining - #buf
+---
+...
+buf = client:read({ size = remaining, delimiter = "\n"})
+---
+...
+buf == "abc"
+---
+- true
+...
+remaining = remaining - #buf
+---
+...
+remaining == 0
+---
+- true
+...
+buf = client:read({ size = remaining, delimiter = "\n"})
+---
+...
+buf == ""
+---
+- true
+...
+buf = client:read({ size = remaining, delimiter = "\n"})
+---
+...
+buf == ""
+---
+- true
+...
+client:close()
+---
+- true
+...
+server:close()
+---
+- true
+...
+_ = os.remove(path)
+---
+...
+-- Test that socket is closed on GC
+s = socket('AF_UNIX', 'SOCK_STREAM', 0)
+---
+...
+s:bind('unix/', path)
+---
+- true
+...
+s:listen()
+---
+- true
+...
+s = nil
+---
+...
+while socket.tcp_connect('unix/', path) do collectgarbage('collect') end
+---
+...
+_ = os.remove(path)
+---
+...
+-- Test serializers with sockets
+s = socket('AF_UNIX', 'SOCK_STREAM', 0)
+---
+...
+-- check __serialize hook
+json.decode(json.encode(s)).fd == s:fd()
+---
+- true
+...
+yaml.decode(yaml.encode(s)).fd == s:fd()
+---
+- true
+...
+s = nil
+---
+...
+-- start AF_UNIX server with dead socket exists
+path = 'tarantool-test-socket'
+---
+...
+s = socket('AF_UNIX', 'SOCK_STREAM', 0)
+---
+...
+s:bind('unix/', path)
+---
+- true
+...
+s:close()
+---
+- true
+...
+s = socket('AF_UNIX', 'SOCK_STREAM', 0)
+---
+...
+{ s:bind('unix/', path), errno() == errno.EADDRINUSE }
+---
+- - false
+  - true
+...
+s:close()
+---
+- true
+...
+s = socket.tcp_server('unix/', path, function() end)
+---
+...
+s ~= nil
+---
+- true
+...
+s:close()
+---
+- true
+...
+fio.stat(path) == nil
+---
+- true
+...
+{ socket.tcp_connect('abrakadabra#123') == nil, errno.strerror() }
+---
+- - true
+  - Input/output error
+...
+-- wrong options for getaddrinfo
+socket.getaddrinfo('host', 'port', { type = 'WRONG' }) == nil and errno() == errno.EINVAL
+---
+- true
+...
+socket.getaddrinfo('host', 'port', { family = 'WRONG' }) == nil and errno() == errno.EINVAL
+---
+- true
+...
+socket.getaddrinfo('host', 'port', { protocol = 'WRONG' }) == nil and errno() == errno.EPROTOTYPE
+---
+- true
+...
+socket.getaddrinfo('host', 'port', { flags = 'WRONG' }) == nil and errno() == errno.EINVAL
+---
+- true
+...
+-- gh-4634: verify socket path length in socket.tcp_server.
+long_port = string.rep('a', 110)
+---
+...
+socket.tcp_server('unix/', long_port, function(s) end) == nil and errno() == errno.ENOBUFS
+---
+- true
+...
+-- gh-574: check that fiber with getaddrinfo can be safely cancelled
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+f = fiber.create(function()
+    while true do
+        local result = socket.getaddrinfo('localhost', '80')
+        fiber.sleep(0)
+    end
+end);
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+f:cancel()
+---
+...
+-- gh-3168: a stopped tcp server removes the unix socket created
+-- and used by a newly started one.
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+err = nil;
+---
+...
+path = 'tarantool-test-socket'
+for i = 1, 10 do
+    local server = socket.tcp_server('unix/', path, function() end)
+    if not server then
+        err = 'tcp_server: ' .. errno.strerror()
+        break
+    end
+    local client = socket.tcp_connect("unix/", path)
+    if not client then
+        err = 'tcp_connect: ' .. errno.strerror()
+        break
+    end
+    client:close()
+    server:close()
+end;
+---
+...
+err == nil or err;
+---
+- true
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+--------------------------------------------------------------------------------
+-- Lua Socket Emulation
+--------------------------------------------------------------------------------
+test_run:cmd("push filter 'fd=([0-9]+)' to 'fd=<FD>'")
+---
+- true
+...
+s = socket.tcp()
+---
+...
+s
+---
+- 'tcp{master}: fd=<FD>'
+...
+s:close()
+---
+- 1
+...
+-- Sic: incompatible with Lua Socket
+s:close()
+---
+- error: 'builtin/socket.lua: attempt to use closed socket'
+...
+s = socket.tcp()
+---
+...
+host, port, family = s:getsockname()
+---
+...
+host == '0.0.0.0', port == '0', family == 'inet'
+---
+- true
+- true
+- true
+...
+status, reason = s:getpeername()
+---
+...
+status == nil, type(reason) == 'string'
+---
+- true
+- true
+...
+s:settimeout(100500)
+---
+- 1
+...
+s:setoption('keepalive', true)
+---
+- 1
+...
+s:setoption('linger', { on = true })
+---
+- 1
+...
+s:setoption('linger', true)
+---
+- 1
+...
+s:setoption('reuseaddr', true)
+---
+- 1
+...
+s:setoption('tcp-nodelay', true)
+---
+- 1
+...
+s:setoption('unknown', true)
+---
+- error: 'builtin/socket.lua: Unknown socket option name: unknown'
+...
+s:bind('127.0.0.1', 0)
+---
+- 1
+...
+s:bind('127.0.0.1', 0) -- error handling
+---
+- null
+- Invalid argument
+...
+s:listen(10)
+---
+- 1
+...
+s -- transformed to tcp{server} socket
+---
+- 'tcp{server}: fd=<FD>'
+...
+host, port, family = s:getsockname()
+---
+...
+host == '127.0.0.1', type(port) == 'string', family == 'inet'
+---
+- true
+- true
+- true
+...
+status, reason = s:getpeername()
+---
+...
+status == nil, type(reason) == 'string'
+---
+- true
+- true
+...
+s:settimeout(0)
+---
+- 1
+...
+status, reason = s:accept()
+---
+...
+status == nil, type(reason) == 'string'
+---
+- true
+- true
+...
+s:settimeout(0.001)
+---
+- 1
+...
+status, reason = s:accept()
+---
+...
+status == nil, type(reason) == 'string'
+---
+- true
+- true
+...
+s:settimeout(100500)
+---
+- 1
+...
+rch, wch = fiber.channel(1), fiber.channel(1)
+---
+...
+sc = socket.connect(host, port)
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+cfiber = fiber.create(function(sc, rch, wch)
+    while true do
+        local outgoing_data = wch:get()
+        if outgoing_data == nil then
+            sc:close()
+            break
+        end
+        sc:send(outgoing_data)
+        local incoming_data = sc:receive("*l")
+        rch:put(incoming_data)
+    end
+end, sc, rch, wch);
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+c = s:accept()
+---
+...
+c
+---
+- 'tcp{client}: fd=<FD>'
+...
+chost, cport, cfamily = c:getsockname()
+---
+...
+chost == '127.0.0.1', type(cport) == 'string', cfamily == 'inet'
+---
+- true
+- true
+- true
+...
+chost, cport, cfamily = c:getpeername()
+---
+...
+chost == '127.0.0.1', type(cport) == 'string', cfamily == 'inet'
+---
+- true
+- true
+- true
+...
+wch:put("Ping\n")
+---
+- true
+...
+c:receive("*l")
+---
+- Ping
+...
+c:send("Pong\n")
+---
+- 5
+...
+rch:get()
+---
+- Pong
+...
+wch:put("HELO lua\nMAIL FROM: <roman@tarantool.org>\n")
+---
+- true
+...
+c:receive("*l")
+---
+- HELO lua
+...
+c:receive("*l")
+---
+- 'MAIL FROM: <roman@tarantool.org>'
+...
+c:send("250 Welcome to Lua Universe\n")
+---
+- 28
+...
+c:send("$$$250 OK\n$$$", 4, 11)
+---
+- 11
+...
+rch:get()
+---
+- 250 Welcome to Lua Universe
+...
+wch:put("RCPT TO: <team@lua.org>\n")
+---
+- true
+...
+c:receive()
+---
+- 'RCPT TO: <team@lua.org>'
+...
+c:send("250")
+---
+- 3
+...
+c:send(" ")
+---
+- 1
+...
+c:send("OK")
+---
+- 2
+...
+c:send("\n")
+---
+- 1
+...
+rch:get()
+---
+- 250 OK
+...
+wch:put("DATA\n")
+---
+- true
+...
+c:receive(4)
+---
+- DATA
+...
+c:receive("*l")
+---
+- 
+...
+rch:get()
+---
+- $250 OK
+...
+wch:put("Fu")
+---
+- true
+...
+c:send("354 Please type your message\n")
+---
+- 29
+...
+wch:put(nil) -- EOF
+---
+- true
+...
+c:receive("*l", "Line: ")
+---
+- null
+- closed
+- 'Line: Fu'
+...
+c:receive()
+---
+- null
+- closed
+- 
+...
+c:receive(10)
+---
+- null
+- closed
+- 
+...
+c:receive("*a")
+---
+- null
+- closed
+- 
+...
+c:close()
+---
+- 1
+...
+-- eof with bytes
+sc = socket.connect(host, port)
+---
+...
+sc
+---
+- 'tcp{client}: fd=<FD>'
+...
+c = s:accept()
+---
+...
+c
+---
+- 'tcp{client}: fd=<FD>'
+...
+_ = fiber.create(function() sc:send("Po") end)
+---
+...
+sc:close()
+---
+- 1
+...
+c:receive(100500, "Message:")
+---
+- null
+- closed
+- Message:Po
+...
+c:close()
+---
+- 1
+...
+-- eof with '*l'
+sc = socket.connect(host, port)
+---
+...
+sc
+---
+- 'tcp{client}: fd=<FD>'
+...
+c = s:accept()
+---
+...
+c
+---
+- 'tcp{client}: fd=<FD>'
+...
+_ = fiber.create(function() sc:send("Pong\nPo") end)
+---
+...
+sc:close()
+---
+- 1
+...
+c:receive("*l", "Message:")
+---
+- Message:Pong
+...
+c:receive("*l", "Message: ")
+---
+- null
+- closed
+- 'Message: Po'
+...
+c:receive("*l", "Message: ")
+---
+- null
+- closed
+- 'Message: '
+...
+c:close()
+---
+- 1
+...
+-- eof with '*a'
+sc = socket.connect(host, port)
+---
+...
+sc
+---
+- 'tcp{client}: fd=<FD>'
+...
+c = s:accept()
+---
+...
+c
+---
+- 'tcp{client}: fd=<FD>'
+...
+_ = fiber.create(function() sc:send("Pong\n") end)
+---
+...
+sc:close()
+---
+- 1
+...
+c:receive("*a", "Message: ")
+---
+- |
+  Message: Pong
+...
+c:receive("*a", "Message: ")
+---
+- null
+- closed
+- 'Message: '
+...
+c:close()
+---
+- 1
+...
+-- shutdown
+sc = socket.connect(host, port)
+---
+...
+sc
+---
+- 'tcp{client}: fd=<FD>'
+...
+c = s:accept()
+---
+...
+c
+---
+- 'tcp{client}: fd=<FD>'
+...
+_ = fiber.create(function() sc:send("Pong\n") end)
+---
+...
+sc:shutdown("send")
+---
+- 1
+...
+c:receive()
+---
+- Pong
+...
+c:shutdown("send")
+---
+- 1
+...
+status, reason = c:shutdown("recv")
+---
+...
+status == nil, type(reason) == 'string'
+---
+- true
+- true
+...
+status, reason = c:shutdown("recv")
+---
+...
+status == nil, type(reason) == 'string'
+---
+- true
+- true
+...
+status, reason = c:shutdown("both")
+---
+...
+status == nil, type(reason) == 'string'
+---
+- true
+- true
+...
+c:close()
+---
+- 1
+...
+sc:close()
+---
+- 1
+...
+s:close()
+---
+- 1
+...
+-- socket.bind / socket.connect
+s = socket.bind('127.0.0.1', 0)
+---
+...
+s
+---
+- 'tcp{server}: fd=<FD>'
+...
+host, port, family = s:getsockname()
+---
+...
+sc = socket.connect(host, port)
+---
+...
+sc
+---
+- 'tcp{client}: fd=<FD>'
+...
+sc:close()
+---
+- 1
+...
+sc = socket.tcp()
+---
+...
+sc:connect(host, port)
+---
+- 1
+...
+sc:close()
+---
+- 1
+...
+s:close()
+---
+- 1
+...
+--------------------------------------------------------------------------------
+-- gh-3619: socket.recvfrom crops UDP packets
+--------------------------------------------------------------------------------
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+function sendto_zero(self, host, port)
+    local fd = self:fd()
+
+    host = tostring(host)
+    port = tostring(port)
+
+    local addrbuf = ffi.new('char[128]') --[[ enough to fit any address ]]
+    local addr = ffi.cast('struct sockaddr *', addrbuf)
+    local addr_len = ffi.new('socklen_t[1]')
+    addr_len[0] = ffi.sizeof(addrbuf)
+
+    self._errno = nil
+    local res = ffi.C.lbox_socket_local_resolve(host, port, addr, addr_len)
+    if res == 0 then
+        res = ffi.C.sendto(fd, nil, 0, 0, addr, addr_len[0])
+    end
+
+    if res < 0 then
+        self._errno = boxerrno()
+        return nil
+    end
+
+    return tonumber(res)
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+receiving_socket = socket('AF_INET', 'SOCK_DGRAM', 'udp')
+---
+...
+receiving_socket:bind('127.0.0.1', 0)
+---
+- true
+...
+receiving_socket_port = receiving_socket:name().port
+---
+...
+sending_socket = socket('AF_INET', 'SOCK_DGRAM', 'udp')
+---
+...
+-- case: recv, no datagram
+received_message = receiving_socket:recv()
+---
+...
+e = receiving_socket:errno()
+---
+...
+received_message == nil -- expected true
+---
+- true
+...
+received_message
+---
+- null
+...
+e == errno.EAGAIN -- expected true
+---
+- true
+...
+-- case: recvfrom, no datagram
+received_message, from = receiving_socket:recvfrom()
+---
+...
+e = receiving_socket:errno()
+---
+...
+received_message == nil -- expected true
+---
+- true
+...
+received_message
+---
+- null
+...
+from == nil -- expected true
+---
+- true
+...
+from
+---
+- null
+...
+e == errno.EAGAIN -- expected true
+---
+- true
+...
+-- case: recv, zero datagram
+sendto_zero(sending_socket, '127.0.0.1', receiving_socket_port)
+---
+- 0
+...
+receiving_socket:readable(TIMEOUT)
+---
+- true
+...
+received_message = receiving_socket:recv()
+---
+...
+e = receiving_socket:errno()
+---
+...
+received_message == '' -- expected true
+---
+- true
+...
+received_message
+---
+- 
+...
+e == 0 -- expected true
+---
+- true
+...
+-- case: recvfrom, zero datagram
+sendto_zero(sending_socket, '127.0.0.1', receiving_socket_port)
+---
+- 0
+...
+receiving_socket:readable(TIMEOUT)
+---
+- true
+...
+received_message, from = receiving_socket:recvfrom()
+---
+...
+e = receiving_socket:errno()
+---
+...
+received_message == '' -- expected true
+---
+- true
+...
+received_message
+---
+- 
+...
+from ~= nil -- expected true
+---
+- true
+...
+from.host == '127.0.0.1' -- expected true
+---
+- true
+...
+e == 0 -- expected true
+---
+- true
+...
+-- case: recv, no datagram, explicit size
+received_message = receiving_socket:recv(512)
+---
+...
+e = receiving_socket:errno()
+---
+...
+received_message == nil -- expected true
+---
+- true
+...
+received_message
+---
+- null
+...
+e == errno.EAGAIN -- expected true
+---
+- true
+...
+-- case: recvfrom, no datagram, explicit size
+received_message, from = receiving_socket:recvfrom(512)
+---
+...
+e = receiving_socket:errno()
+---
+...
+received_message == nil -- expected true
+---
+- true
+...
+received_message
+---
+- null
+...
+from == nil -- expected true
+---
+- true
+...
+from
+---
+- null
+...
+e == errno.EAGAIN -- expected true
+---
+- true
+...
+-- case: recv, zero datagram, explicit size
+sendto_zero(sending_socket, '127.0.0.1', receiving_socket_port)
+---
+- 0
+...
+receiving_socket:readable(TIMEOUT)
+---
+- true
+...
+received_message = receiving_socket:recv(512)
+---
+...
+e = receiving_socket:errno()
+---
+...
+received_message == '' -- expected true
+---
+- true
+...
+received_message
+---
+- 
+...
+e == 0 -- expected true
+---
+- true
+...
+-- case: recvfrom, zero datagram, explicit size
+sendto_zero(sending_socket, '127.0.0.1', receiving_socket_port)
+---
+- 0
+...
+receiving_socket:readable(TIMEOUT)
+---
+- true
+...
+received_message, from = receiving_socket:recvfrom(512)
+---
+...
+e = receiving_socket:errno()
+---
+...
+received_message == '' -- expected true
+---
+- true
+...
+received_message
+---
+- 
+...
+from ~= nil -- expected true
+---
+- true
+...
+from.host == '127.0.0.1' -- expected true
+---
+- true
+...
+e == 0 -- expected true
+---
+- true
+...
+message_len = 1025
+---
+...
+message = string.rep('x', message_len)
+---
+...
+-- case: recv, non-zero length datagram, the buffer size should be evaluated
+sending_socket:sendto('127.0.0.1', receiving_socket_port, message)
+---
+- 1025
+...
+receiving_socket:readable(TIMEOUT)
+---
+- true
+...
+received_message = receiving_socket:recv()
+---
+...
+e = receiving_socket:errno()
+---
+...
+received_message == message -- expected true
+---
+- true
+...
+received_message:len()
+---
+- 1025
+...
+received_message
+---
+- xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+...
+e == 0 -- expected true
+---
+- true
+...
+e
+---
+- 0
+...
+-- case: recvfrom, non-zero length datagram, the buffer size should be
+-- evaluated
+sending_socket:sendto('127.0.0.1', receiving_socket_port, message)
+---
+- 1025
+...
+receiving_socket:readable(TIMEOUT)
+---
+- true
+...
+received_message, from = receiving_socket:recvfrom()
+---
+...
+e = receiving_socket:errno()
+---
+...
+received_message == message -- expected true
+---
+- true
+...
+received_message:len()
+---
+- 1025
+...
+received_message
+---
+- xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+...
+from ~= nil -- expected true
+---
+- true
+...
+from.host == '127.0.0.1' -- expected true
+---
+- true
+...
+e == 0 -- expected true
+---
+- true
+...
+e
+---
+- 0
+...
+-- case: recv truncates a datagram larger then the buffer of an explicit size
+sending_socket:sendto('127.0.0.1', receiving_socket_port, message)
+---
+- 1025
+...
+receiving_socket:readable(TIMEOUT)
+---
+- true
+...
+received_message = receiving_socket:recv(512)
+---
+...
+e = receiving_socket:errno()
+---
+...
+received_message == message:sub(1, 512) -- expected true
+---
+- true
+...
+received_message:len() == 512 -- expected true
+---
+- true
+...
+received_message
+---
+- xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+...
+received_message:len()
+---
+- 512
+...
+e == 0 -- expected true
+---
+- true
+...
+e
+---
+- 0
+...
+-- we set the different message to ensure the tail of the previous datagram was
+-- discarded
+message_len = 1025
+---
+...
+message = string.rep('y', message_len)
+---
+...
+-- case: recvfrom truncates a datagram larger then the buffer of an explicit size
+sending_socket:sendto('127.0.0.1', receiving_socket_port, message)
+---
+- 1025
+...
+receiving_socket:readable(TIMEOUT)
+---
+- true
+...
+received_message, from = receiving_socket:recvfrom(512)
+---
+...
+e = receiving_socket:errno()
+---
+...
+received_message == message:sub(1, 512) -- expected true
+---
+- true
+...
+received_message:len() == 512 -- expected true
+---
+- true
+...
+received_message
+---
+- yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+...
+received_message:len()
+---
+- 512
+...
+from ~= nil -- expected true
+---
+- true
+...
+from.host == '127.0.0.1' -- expected true
+---
+- true
+...
+e == 0 -- expected true
+---
+- true
+...
+e
+---
+- 0
+...
+receiving_socket:close()
+---
+- true
+...
+sending_socket:close()
+---
+- true
+...
+message_len = 513
+---
+...
+message = string.rep('x', message_len)
+---
+...
+listening_socket = socket('AF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+listening_socket:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+---
+- true
+...
+listening_socket:bind('127.0.0.1', 0)
+---
+- true
+...
+listening_socket:listen()
+---
+- true
+...
+listening_socket_port = listening_socket:name().port
+---
+...
+sending_socket = socket('AF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+sending_socket:sysconnect('127.0.0.1', listening_socket_port) or errno() == errno.EINPROGRESS
+---
+- true
+...
+listening_socket:readable(TIMEOUT)
+---
+- true
+...
+receiving_socket = listening_socket:accept()
+---
+...
+sending_socket:write(message)
+---
+- 513
+...
+-- case: recvfrom reads first 512 bytes from the message with tcp
+receiving_socket:readable(TIMEOUT)
+---
+- true
+...
+received_message, from = receiving_socket:recvfrom()
+---
+...
+e = receiving_socket:errno()
+---
+...
+received_message == message:sub(1, 512) -- expected true
+---
+- true
+...
+received_message:len() == 512 -- expected true
+---
+- true
+...
+received_message
+---
+- xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+...
+received_message:len()
+---
+- 512
+...
+from == nil -- expected true
+---
+- true
+...
+from
+---
+- null
+...
+e == 0 -- expected true
+---
+- true
+...
+e
+---
+- 0
+...
+-- case: recvfrom does not discard the message tail with tcp
+received_message, from = receiving_socket:recvfrom()
+---
+...
+e = receiving_socket:errno()
+---
+...
+received_message == message:sub(513, 513) -- expected true
+---
+- true
+...
+received_message:len() == 1 -- expected true
+---
+- true
+...
+received_message
+---
+- x
+...
+received_message:len()
+---
+- 1
+...
+from == nil -- expected true
+---
+- true
+...
+from
+---
+- null
+...
+e == 0 -- expected true
+---
+- true
+...
+e
+---
+- 0
+...
+receiving_socket:close()
+---
+- true
+...
+sending_socket:close()
+---
+- true
+...
+listening_socket:close()
+---
+- true
+...
+--gh-3344 connection should not fail is there is a spurious wakeup for io fiber
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+echo_fiber = nil
+channel = fiber.channel()
+server = socket.tcp_server('127.0.0.1', 0, { handler = function(s)
+    echo_fiber = fiber.self()
+    channel:put(true)
+    while true do
+        local b = s:read(1, 0.1)
+        if b ~= nil then
+            s:write(b)
+        end
+    end
+end, name = 'echoserv'});
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+addr = server:name()
+---
+...
+client = socket.tcp_connect(addr.host, addr.port)
+---
+...
+channel:get()
+---
+- true
+...
+echo_fiber ~= nil
+---
+- true
+...
+client:write('hello')
+---
+- 5
+...
+client:read(5, TIMEOUT) == 'hello'
+---
+- true
+...
+-- send spurious wakeup
+fiber.wakeup(echo_fiber)
+---
+...
+fiber.sleep(0)
+---
+...
+client:write('world')
+---
+- 5
+...
+client:read(5, TIMEOUT) == 'world'
+---
+- true
+...
+-- cancel fiber
+fiber.cancel(echo_fiber)
+---
+...
+client:read(1, TIMEOUT) == ''
+---
+- true
+...
+server:close()
+---
+- true
+...
+test_run:cmd("clear filter")
+---
+- true
+...
+-- case: socket receive inconsistent behavior
+chan = fiber.channel()
+---
+...
+counter = 0
+---
+...
+fn = function(s) counter = 0; while true do s:write((tostring(counter)):rep(chan:get())); counter = counter + 1 end end
+---
+...
+srv = socket.tcp_server('127.0.0.1', 0, fn)
+---
+...
+s = socket.connect('127.0.0.1', srv:name().port)
+---
+...
+chan:put(5)
+---
+- true
+...
+chan:put(5)
+---
+- true
+...
+s:receive(5)
+---
+- '00000'
+...
+chan:put(5)
+---
+- true
+...
+s:settimeout(1)
+---
+- 1
+...
+s:receive('*a')
+---
+- '1111122222'
+...
+s:close()
+---
+- 1
+...
+srv:close()
+---
+- true
+...
+--
+-- gh-4087: fix error while closing socket.tcp_server
+--
+srv = socket.tcp_server('127.0.0.1', 0, function() end)
+---
+...
+srv:close()
+---
+- true
+...
+test_run:wait_log('default', 'stopped', 1024, 0.01)
+---
+- stopped
+...

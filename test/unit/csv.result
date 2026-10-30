@@ -1,0 +1,102 @@
+	*** test1 ***
+|1|
+||
+|1|	|2|	|3|
+|123|
+	*** test1: done ***
+	*** test2 ***
+|123|	|456|	|abcac|	|'multiword field 4'|
+|none|	|none|	|0|
+||	||	||
+||	||	||
+	*** test2: done ***
+	*** test3 ***
+|1|	||	|2|
+	*** test3: done ***
+	*** test4 ***
+|123|	|5|	|92|	|0|	|0|
+|1|	|12  34|	|56|	|quote , |	|66|
+|ok|
+	*** test4: done ***
+	*** test5 ***
+|abc|	|longlonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglong|	|0|
+|123|	|456|	||
+|0|	||	||
+valid: yes
+	*** test5: done ***
+	*** test6 ***
+||
+||
+|abc|
+|c"|	|d|	|de|
+||
+|k|
+|e|
+||
+||
+| |
+valid: NO
+	*** test6: done ***
+	*** big_chunk_separated_test ***
+line_cnt=10000, fieldsizes_cnt=1920000, 1920000
+	*** big_chunk_separated_test: done ***
+	*** random_generated_test ***
+line_cnt=40, fieldsizes_cnt=183
+valid: yes
+	*** random_generated_test: done ***
+	*** common_test ***
+|first|	|last|	|address|	|city|	|zip|
+|John|	|Doe|	|120 any st.|	|Anytown, WW|	|08123|
+	*** common_test: done ***
+	*** common_test ***
+|a|	|b|	|c|
+|1|	|"|	|"|
+|2|	|3|	|4|
+	*** common_test: done ***
+	*** common_test ***
+|a|	|b|
+|1|	|ha "ha" ha|
+|3|	|4|
+	*** common_test: done ***
+	*** common_test ***
+|key|	|val|
+|1|	|{"type": "Point", "coordinates": [102.0, 0.5]}|
+	*** common_test: done ***
+	*** common_test ***
+|a|	|b|	|c|
+|1|	|2|	|3|
+|Once upon 
+a time|	|5|	|6|
+|7|	|8|	|9|
+	*** common_test: done ***
+	*** common_test ***
+|a|	|b|
+|1|	|ha
+"ha"
+ha|
+|3|	|4|
+	*** common_test: done ***
+	*** common_test ***
+|a|	|b|	|c|
+|1|	|2|	|3|
+|4|	|5|	|а нет ли ошибок?|
+	*** common_test: done ***
+	*** common_test ***
+|www|	|aaa|	|tt  |
+	*** common_test: done ***
+	*** iter_test1 ***
+||	|d|	|e|
+|12|	|42|	|3|
+|o|
+	*** iter_test1: done ***
+	*** iter_test2 ***
+|1|
+|23|
+	*** iter_test2: done ***
+	*** iter_test3 ***
+|1|	|2|	|3|
+|4|	|5|	|6|
+	*** iter_test3: done ***
+	*** csv_out ***
+abc<len=3>,"with,comma"<len=12>,""in quotes""<len=13>,1 "" quote<len=10>
+	*** csv_out: done ***

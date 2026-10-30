@@ -1,0 +1,414 @@
+test_run = require('test_run').new()
+---
+...
+fiber = require('fiber')
+---
+...
+--
+-- Check that DDL operations are logged in vylog only after successful
+-- WAL write.
+--
+-- If we logged an index creation in the metadata log before WAL write,
+-- WAL failure would result in leaving the index record in vylog forever.
+-- Since we use LSN to identify indexes in vylog, retrying index creation
+-- would then lead to a duplicate index id in vylog and hence inability
+-- to make a snapshot or recover.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+---
+...
+box.error.injection.set('ERRINJ_WAL_IO', true)
+---
+- ok
+...
+_ = s:create_index('pk')
+---
+- error: Failed to write to disk
+...
+box.error.injection.set('ERRINJ_WAL_IO', false)
+---
+- ok
+...
+_ = s:create_index('pk')
+---
+...
+box.snapshot()
+---
+- ok
+...
+s:drop()
+---
+...
+--
+-- Check that an error to commit a new run to vylog does not
+-- break vinyl permanently.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+---
+...
+_ = s:create_index('pk')
+---
+...
+_ = s:insert{1, 'x'}
+---
+...
+box.error.injection.set('ERRINJ_VY_LOG_FLUSH', true);
+---
+- ok
+...
+box.snapshot()
+---
+- error: Error injection 'vinyl log flush'
+...
+box.error.injection.set('ERRINJ_VY_LOG_FLUSH', false);
+---
+- ok
+...
+_ = s:insert{2, 'y'}
+---
+...
+box.snapshot()
+---
+- ok
+...
+_ = s:insert{3, 'z'}
+---
+...
+test_run:cmd('restart server default')
+s = box.space.test
+---
+...
+s:select()
+---
+- - [1, 'x']
+  - [2, 'y']
+  - [3, 'z']
+...
+s:drop()
+---
+...
+--
+-- Check that an index drop/create record we failed to
+-- write to vylog is flushed along with the next record.
+--
+fiber = require 'fiber'
+---
+...
+s1 = box.schema.space.create('test1', {engine = 'vinyl'})
+---
+...
+s2 = box.schema.space.create('test2', {engine = 'vinyl'})
+---
+...
+_ = s2:create_index('pk')
+---
+...
+_ = s2:insert{1, 'a'}
+---
+...
+box.snapshot()
+---
+- ok
+...
+_ = s2:insert{2, 'b'}
+---
+...
+box.error.injection.set('ERRINJ_WAL_DELAY', true)
+---
+- ok
+...
+-- VY_LOG_PREPARE_LSM written, but VY_LOG_CREATE_LSM missing
+ch = fiber.channel(1)
+---
+...
+_ = fiber.create(function() s1:create_index('pk') ch:put(true) end)
+---
+...
+fiber.sleep(0.001)
+---
+...
+box.error.injection.set('ERRINJ_VY_LOG_FLUSH', true)
+---
+- ok
+...
+box.error.injection.set('ERRINJ_WAL_DELAY', false)
+---
+- ok
+...
+ch:get()
+---
+- true
+...
+_ = s1:insert{3, 'c'}
+---
+...
+-- VY_LOG_DROP_LSM missing
+s2.index.pk:drop()
+---
+...
+-- pending records must not be rolled back on error
+box.snapshot() -- error
+---
+- error: Error injection 'vinyl log flush'
+...
+box.error.injection.set('ERRINJ_VY_LOG_FLUSH', false);
+---
+- ok
+...
+_ = s1:insert{4, 'd'}
+---
+...
+_ = s2:create_index('pk')
+---
+...
+_ = s2:insert{5, 'e'}
+---
+...
+test_run:cmd('restart server default')
+s1 = box.space.test1
+---
+...
+s2 = box.space.test2
+---
+...
+s1:select()
+---
+- - [3, 'c']
+  - [4, 'd']
+...
+s2:select()
+---
+- - [5, 'e']
+...
+s1:drop()
+---
+...
+s2:drop()
+---
+...
+--
+-- Check that if a buffered index drop/create record does not
+-- make it to the vylog before restart, it will be replayed on
+-- recovery.
+--
+fiber = require 'fiber'
+---
+...
+s1 = box.schema.space.create('test1', {engine = 'vinyl'})
+---
+...
+s2 = box.schema.space.create('test2', {engine = 'vinyl'})
+---
+...
+_ = s2:create_index('pk')
+---
+...
+_ = s2:insert{111, 'aaa'}
+---
+...
+box.snapshot()
+---
+- ok
+...
+_ = s2:insert{222, 'bbb'}
+---
+...
+box.error.injection.set('ERRINJ_WAL_DELAY', true)
+---
+- ok
+...
+-- VY_LOG_PREPARE_LSM written, but VY_LOG_CREATE_LSM missing
+ch = fiber.channel(1)
+---
+...
+_ = fiber.create(function() s1:create_index('pk') ch:put(true) end)
+---
+...
+fiber.sleep(0.001)
+---
+...
+box.error.injection.set('ERRINJ_VY_LOG_FLUSH', true)
+---
+- ok
+...
+box.error.injection.set('ERRINJ_WAL_DELAY', false)
+---
+- ok
+...
+ch:get()
+---
+- true
+...
+_ = s1:insert{333, 'ccc'}
+---
+...
+-- VY_LOG_DROP_LSM missing
+s2.index.pk:drop()
+---
+...
+-- VY_LOG_PREPARE_LSM missing
+_ = s2:create_index('pk')
+---
+...
+test_run:cmd('restart server default')
+s1 = box.space.test1
+---
+...
+s2 = box.space.test2
+---
+...
+_ = s1:insert{444, 'ddd'}
+---
+...
+_ = s2:insert{555, 'eee'}
+---
+...
+s1:select()
+---
+- - [333, 'ccc']
+  - [444, 'ddd']
+...
+s2:select()
+---
+- - [555, 'eee']
+...
+box.snapshot()
+---
+- ok
+...
+test_run:cmd('restart server default')
+s1 = box.space.test1
+---
+...
+s2 = box.space.test2
+---
+...
+s1:select()
+---
+- - [333, 'ccc']
+  - [444, 'ddd']
+...
+s2:select()
+---
+- - [555, 'eee']
+...
+s1:drop()
+---
+...
+s2:drop()
+---
+...
+--
+-- Check that an index that was prepared, but not committed,
+-- is recovered properly.
+--
+fiber = require('fiber')
+---
+...
+s = box.schema.space.create('test', {engine = 'vinyl'})
+---
+...
+_ = s:create_index('pk')
+---
+...
+_ = s:insert{1, 1}
+---
+...
+box.error.injection.set('ERRINJ_WAL_DELAY', true)
+---
+- ok
+...
+ch = fiber.channel(1)
+---
+...
+_ = fiber.create(function() s:create_index('sk', {parts = {2, 'unsigned'}}) ch:put(true) end)
+---
+...
+-- wait for ALTER to stall on WAL after preparing the new index
+while s.index.pk:stat().disk.dump.count == 0 do fiber.sleep(0.001) end
+---
+...
+box.error.injection.set('ERRINJ_VY_LOG_FLUSH', true);
+---
+- ok
+...
+box.error.injection.set('ERRINJ_WAL_DELAY', false)
+---
+- ok
+...
+ch:get()
+---
+- true
+...
+test_run:cmd('restart server default')
+s = box.space.test
+---
+...
+s.index.pk:select()
+---
+- - [1, 1]
+...
+s.index.sk:select()
+---
+- - [1, 1]
+...
+s:drop()
+---
+...
+--
+-- gh-4066: recovery error if an instance is restarted while
+-- building an index and there's an index with the same id in
+-- the snapshot.
+--
+fiber = require('fiber')
+---
+...
+s = box.schema.space.create('test', {engine = 'vinyl'})
+---
+...
+_ = s:create_index('pk')
+---
+...
+_ = s:create_index('sk', {parts = {2, 'unsigned'}})
+---
+...
+s.index[1] ~= nil
+---
+- true
+...
+s:replace{1, 2}
+---
+- [1, 2]
+...
+box.snapshot()
+---
+- ok
+...
+s.index.sk:drop()
+---
+...
+-- Log index creation, but never finish building it due to an error injection.
+box.error.injection.set('ERRINJ_VY_READ_PAGE_TIMEOUT', 9000)
+---
+- ok
+...
+_ = fiber.create(function() s:create_index('sk', {parts = {2, 'unsigned'}}) end)
+---
+...
+fiber.sleep(0.01)
+---
+...
+-- Should ignore the incomplete index on recovery.
+-- Use KILL because server will hang on shutdown due to injection.
+-- We don't need graceful shutdown for the test anyway.
+test_run:cmd('restart server default with signal=KILL')
+s = box.space.test
+---
+...
+s.index[1] == nil
+---
+- true
+...
+s:drop()
+---
+...

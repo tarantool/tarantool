@@ -1,0 +1,845 @@
+local fio = require('fio')
+local net = require('net.box')
+
+local t = require('luatest')
+local cbuilder = require('luatest.cbuilder')
+local cluster = require('luatest.cluster')
+local server = require('luatest.server')
+
+local g = t.group()
+
+local BASE_CONFIG = cbuilder:new()
+    :set_global_option('credentials.users.admin.password', 'secret')
+    :config()
+
+local SERVER_OPTS = {
+    net_box_credentials = {user = 'admin', password = 'secret'},
+}
+
+g.test_threads_config_propagation = function()
+    --
+    -- Check that the threads configuration is propagated to box.cfg
+    -- and the threads module.
+    --
+    local config = cbuilder:new(BASE_CONFIG)
+        :add_instance('server', {})
+        :set_instance_option('server', 'threads.groups', {
+            {name = 'test1', size = 1},
+            {name = 'test2', size = 2},
+            {name = 'test3', size = 3},
+        })
+        :config()
+    local cluster = cluster:new(config, SERVER_OPTS)
+    cluster:start()
+    local expected_threads_info = {
+        thread_id = 1,
+        group_name = 'tx',
+        groups = {
+            {name = 'tx', size = 1},
+            {name = 'test1', size = 1},
+            {name = 'test2', size = 2},
+            {name = 'test3', size = 3},
+        },
+    }
+    cluster.server:exec(function(expected_threads_info)
+        t.assert_equals(box.cfg.app_threads, 6)
+        t.assert_equals(require('threads').info(), expected_threads_info)
+    end, {expected_threads_info})
+    --
+    -- Check that the threads configuration is updated only after
+    -- instance restart.
+    --
+    config = cbuilder:new(BASE_CONFIG)
+        :add_instance('server', {})
+        :set_instance_option('server', 'threads.groups', {
+            {name = 'test1', size = 1},
+            {name = 'test2', size = 2},
+            {name = 'test3', size = 3},
+            {name = 'test4', size = 4},
+        })
+        :config()
+    cluster:reload(config)
+    cluster.server:exec(function(expected_threads_info)
+        t.assert_covers(require('config'):info().alerts[1], {
+            message = 'box_cfg.apply: threads configuration ' ..
+                      'will not be set until the instance is restarted',
+        })
+        t.assert_equals(box.cfg.app_threads, 6)
+        t.assert_equals(require('threads').info(), expected_threads_info)
+    end, {expected_threads_info})
+    cluster.server:restart()
+    local expected_threads_info = {
+        thread_id = 1,
+        group_name = 'tx',
+        groups = {
+            {name = 'tx', size = 1},
+            {name = 'test1', size = 1},
+            {name = 'test2', size = 2},
+            {name = 'test3', size = 3},
+            {name = 'test4', size = 4},
+        },
+    }
+    cluster.server:exec(function(expected_threads_info)
+        t.assert_equals(box.cfg.app_threads, 10)
+        t.assert_equals(require('threads').info(), expected_threads_info)
+    end, {expected_threads_info})
+    --
+    -- Check configuration in other threads.
+    --
+    for i = 1, 10 do
+        local group_name, thread_id
+        if i < 2 then
+            group_name = 'test1'
+            thread_id = i
+        elseif i < 4 then
+            group_name = 'test2'
+            thread_id = i - 1
+        elseif i < 7 then
+            group_name = 'test3'
+            thread_id = i - 3
+        else
+            group_name = 'test4'
+            thread_id = i - 6
+        end
+        expected_threads_info.thread_id = thread_id
+        expected_threads_info.group_name = group_name
+        cluster.server:exec(function(expected_threads_info)
+            t.assert_equals(require('threads').info(), expected_threads_info)
+        end, {expected_threads_info}, {_thread_id = i})
+    end
+end
+
+--
+-- Check the threads module when no thread groups are configured.
+--
+local function test_threads_not_configured()
+    local threads = require('threads')
+    t.assert_equals(box.cfg.app_threads, 0)
+    t.assert_equals(threads.info(), {
+        thread_id = 1,
+        group_name = 'tx',
+        groups = {{name = 'tx', size = 1}},
+    })
+    local err = {type = 'ClientError', name = 'NO_SUCH_THREAD_GROUP'}
+    t.assert_error_covers(err, threads.eval, 'app', [[return 123]])
+    t.assert_error_covers(err, threads.call, 'app', 'test_func')
+    local opts = {target = 2}
+    err = {type = 'ClientError', name = 'NO_SUCH_THREAD', thread_id = 2}
+    t.assert_error_covers(err, threads.eval, 'tx', [[return 123]], {}, opts)
+    t.assert_error_covers(err, threads.call, 'tx', 'test_func', {}, opts)
+    t.assert_error_msg_contains("unexpected symbol near '123'",
+                                threads.eval, 'tx', [[123]])
+    err = {type = 'ClientError', name = 'NO_SUCH_FUNCTION', func = 'test'}
+    t.assert_error_covers(err, threads.call, 'tx', 'test')
+    threads.export('test1', function(x, y) return y, x end)
+    threads.export('test2', function() error('foobar') end)
+    threads.export('test3', function()
+        box.error({type = 'Foo', name = 'Bar'})
+    end)
+    t.assert_equals(threads.call('tx', 'test1', {1, 2}), {{2, 1}})
+    t.assert_error_msg_contains('foobar', threads.call, 'tx', 'test2')
+    t.assert_error_covers({type = 'Foo', name = 'Bar'},
+                          threads.call, 'tx', 'test3')
+    t.assert_equals(threads.eval('tx', [[return ...]], {1, 2}), {{1, 2}})
+    t.assert_error_msg_contains('foobar', threads.eval, 'tx',
+                                [[error('foobar')]])
+    t.assert_error_covers({type = 'Foo', name = 'Bar'}, threads.eval, 'tx',
+                          [[box.error({type = 'Foo', name = 'Bar'})]])
+end
+
+g.test_threads_not_configured = function()
+    local config = cbuilder:new(BASE_CONFIG)
+        :add_instance('server', {})
+        :config()
+    local cluster = cluster:new(config, SERVER_OPTS)
+    cluster:start()
+    cluster.server:exec(test_threads_not_configured)
+    config = cbuilder:new(config)
+        :set_instance_option('server', 'threads', {})
+        :config()
+    cluster:reload(config)
+    cluster.server:restart()
+    cluster.server:exec(test_threads_not_configured)
+    config = cbuilder:new(config)
+        :set_instance_option('server', 'threads.groups', {})
+        :config()
+    cluster:reload(config)
+    cluster.server:restart()
+    cluster.server:exec(test_threads_not_configured)
+end
+
+g.test_thread_function_export = function()
+    local config = cbuilder:new(BASE_CONFIG)
+        :add_instance('server', {})
+        :set_instance_option('server', 'threads.groups', {
+            {name = 'test1', size = 3},
+            {name = 'test2', size = 2},
+        })
+        :config()
+    local cluster = cluster:new(config, SERVER_OPTS)
+    cluster:start()
+    --
+    -- Argument checking.
+    --
+    cluster.server:exec(function()
+        local threads = require('threads')
+        t.assert_error_covers({
+            type = 'IllegalParams',
+            message = 'function name should be a string',
+        }, threads.export, 123)
+        t.assert_error_covers({
+            type = 'IllegalParams',
+            message = 'function object should be a function',
+        }, threads.export, 'test_func', 123)
+    end)
+    --
+    -- Duplicate name.
+    --
+    cluster.server:exec(function()
+        local threads = require('threads')
+        threads.export('test_func_1', function() end)
+        threads.export('test_func_2', function() end)
+        t.assert_error_covers({
+            type = 'ClientError',
+            name = 'FUNCTION_EXISTS',
+        }, threads.export, 'test_func_1', function() end)
+    end)
+end
+
+g.test_threads_call = function()
+    local config = cbuilder:new(BASE_CONFIG)
+        :add_instance('server', {})
+        :set_instance_option('server', 'threads.groups', {
+            {name = 'test1', size = 3},
+            {name = 'test2', size = 2},
+        })
+        :config()
+    local cluster = cluster:new(config, SERVER_OPTS)
+    cluster:start()
+    --
+    -- Argument checking.
+    --
+    cluster.server:exec(function()
+        local threads = require('threads')
+        t.assert_error_covers({
+            type = 'IllegalParams',
+            message = 'group name should be a string',
+        }, threads.call, 123)
+        t.assert_error_covers({
+            type = 'IllegalParams',
+            message = 'function name should be a string',
+        }, threads.call, 'test1', 123)
+        t.assert_error_covers({
+            type = 'IllegalParams',
+            message = 'function arguments should be a table',
+        }, threads.call, 'test1', 'test_func', 123)
+        t.assert_error_covers({
+            type = 'IllegalParams',
+            message = 'options should be a table',
+        }, threads.call, 'test1', 'test_func', {123}, 123)
+        t.assert_error_covers({
+            type = 'IllegalParams',
+            message = "unexpected option 'foo'",
+        }, threads.call, 'test1', 'test_func', {123}, {foo = 'bar'})
+        t.assert_error_covers({
+            type = 'IllegalParams',
+            message = "options parameter 'target' should be one of types: " ..
+                      "string, number",
+        }, threads.call, 'test1', 'test_func', {123}, {target = {}})
+        t.assert_error_covers({
+            type = 'IllegalParams',
+            message = "unexpected value for option parameter 'target': " ..
+                      "got 'foo', expected 'any', 'all', or a number",
+        }, threads.call, 'test1', 'test_func', {123}, {target = 'foo'})
+    end)
+    --
+    -- Unknown group.
+    --
+    cluster.server:exec(function()
+        local threads = require('threads')
+        t.assert_error_covers({
+            type = 'ClientError',
+            name = 'NO_SUCH_THREAD_GROUP',
+        }, threads.call, 'test3', 'test_func', {}, {target = 'all'})
+    end)
+    --
+    -- Unknown thread.
+    --
+    cluster.server:exec(function()
+        local threads = require('threads')
+        for _, p in ipairs({{'test1', -1}, {'test2', 0},
+                            {'test1', 4}, {'test2', 3}}) do
+            local group, target = unpack(p)
+            t.assert_error_covers({
+                type = 'ClientError',
+                name = 'NO_SUCH_THREAD',
+                thread_id = target,
+            }, threads.call, group, 'test_func', {}, {target = target})
+        end
+    end)
+    --
+    -- Unknown function.
+    --
+    cluster.server:exec(function()
+        local threads = require('threads')
+        t.assert_error_covers({
+            type = 'ClientError',
+            name = 'NO_SUCH_FUNCTION',
+        }, threads.call, 'test1', 'test_func', {}, {target = 'all'})
+    end)
+    --
+    -- Target handling.
+    --
+    cluster.server:exec(function()
+        local threads = require('threads')
+        local group = 'test1'
+        local func = 'test_func_1'
+        local func_def = [[
+            local threads = require('threads')
+            threads.export('test_func_1', function()
+                return threads.info().thread_id
+            end)
+        ]]
+        threads.eval('test1', func_def)
+        local ret_all = threads.call(group, func, {}, {target = 'all'})
+        t.assert_equals(ret_all, {{1}, {2}, {3}})
+        local ret_any = threads.call(group, func, {}, {target = 'any'})
+        t.assert_equals(#ret_any, 1)
+        t.assert_items_include(ret_all, ret_any)
+        t.assert_equals(threads.call('test1', func, {}, {target = 1}), {{1}})
+        t.assert_equals(threads.call('test1', func, {}, {target = 2}), {{2}})
+        t.assert_equals(threads.call('test1', func, {}, {target = 3}), {{3}})
+        threads.eval('test2', func_def)
+        t.assert_equals(threads.call('test2', func, {}, {target = 1}), {{1}})
+        t.assert_equals(threads.call('test2', func, {}, {target = 2}), {{2}})
+    end)
+    --
+    -- Default arguments.
+    --
+    cluster.server:exec(function()
+        local threads = require('threads')
+        local group = 'test2'
+        local func = 'test_func_2'
+        threads.eval(group, [[
+            local threads = require('threads')
+            threads.export('test_func_2', function(...) return ... end)
+        ]])
+        t.assert_equals(threads.call(group, func), {{}, {}})
+        t.assert_equals(threads.call(group, func, {1, 2, 3}),
+                        {{1, 2, 3}, {1, 2, 3}})
+        t.assert_equals(threads.call(group, func, {1, 2, 3}, {}),
+                        {{1, 2, 3}, {1, 2, 3}})
+        t.assert_equals(threads.call(group, func, {1, 2, 3}, {target = 'all'}),
+                        {{1, 2, 3}, {1, 2, 3}})
+        t.assert_equals(threads.call(group, func, {1, 2, 3}, {target = 'any'}),
+                        {{1, 2, 3}})
+    end)
+    --
+    -- Return value and error handling.
+    --
+    cluster.server:exec(function()
+        local threads = require('threads')
+        local group = 'test1'
+        threads.eval(group, [[
+            local threads = require('threads')
+            threads.export('test_func_3', function()
+                local thread_id = threads.info().thread_id
+                if thread_id == 1 then
+                    return 1, 2, 3
+                elseif thread_id == 3 then
+                    return {1, 2, 3}
+                end
+            end)
+        ]])
+        t.assert_equals(
+            threads.call(group, 'test_func_3', {}, {target = 'all'}),
+            {{1, 2, 3}, {}, {{1, 2, 3}}}
+        )
+        threads.eval(group, [[
+            local threads = require('threads')
+            threads.export('test_func_4', function()
+                local thread_id = threads.info().thread_id
+                if thread_id == 1 then
+                    box.error({type = 'MyErrorType', name = 'MyError1'})
+                elseif thread_id == 2 then
+                    box.error({type = 'MyErrorType', name = 'MyError2'})
+                end
+            end)
+        ]])
+        t.assert_error_covers(
+            {type = 'MyErrorType', name = 'MyError2'},
+            threads.call, group, 'test_func_4', {}, {target = 'all'}
+        )
+    end)
+    --
+    -- Calling tx thread group from tx.
+    --
+    cluster.server:exec(function()
+        local threads = require('threads')
+        local func = 'test_func_5'
+        threads.eval('tx', [[
+            local threads = require('threads')
+            threads.export('test_func_5', threads.info)
+        ]])
+        local expected = {{threads.info()}}
+        t.assert_equals(threads.call('tx', func, {}, {target = 'any'}),
+                                     expected)
+        t.assert_equals(threads.call('tx', func, {}, {target = 'all'}),
+                                     expected)
+    end)
+    --
+    -- Usage in other a non-tx thread.
+    --
+    cluster.server:exec(function()
+        local threads = require('threads')
+        t.assert_covers(threads.info(), {
+            thread_id = 2,
+            group_name = 'test2',
+        })
+        local func = 'test_func_6'
+        local expr = [[
+            local threads = require('threads')
+            threads.export('test_func_6', function()
+                local info = threads.info()
+                return info.group_name, info.thread_id
+            end)
+        ]]
+        threads.eval('tx', expr)
+        threads.eval('test1', expr)
+        threads.eval('test2', expr)
+        t.assert_equals(threads.call('tx', func, {}, {target = 'all'}),
+                        {{'tx', 1}})
+        t.assert_equals(threads.call('test1', func, {}, {target = 'all'}),
+                        {{'test1', 1}, {'test1', 2}, {'test1', 3}})
+        t.assert_equals(threads.call('test2', func, {}, {target = 'all'}),
+                        {{'test2', 1}, {'test2', 2}})
+    end, {}, {_thread_id = 5})
+end
+
+g.test_threads_eval = function()
+    local config = cbuilder:new(BASE_CONFIG)
+        :add_instance('server', {})
+        :set_instance_option('server', 'threads.groups', {
+            {name = 'test1', size = 3},
+            {name = 'test2', size = 2},
+        })
+        :config()
+    local cluster = cluster:new(config, SERVER_OPTS)
+    cluster:start()
+    --
+    -- Argument checking.
+    --
+    cluster.server:exec(function()
+        local threads = require('threads')
+        t.assert_error_covers({
+            type = 'IllegalParams',
+            message = 'group name should be a string',
+        }, threads.eval, 123)
+        t.assert_error_covers({
+            type = 'IllegalParams',
+            message = 'expression should be a string',
+        }, threads.eval, 'test1', 123)
+        t.assert_error_covers({
+            type = 'IllegalParams',
+            message = 'expression arguments should be a table',
+        }, threads.eval, 'test1', 'return ...', 123)
+        t.assert_error_covers({
+            type = 'IllegalParams',
+            message = 'options should be a table',
+        }, threads.eval, 'test1', 'return ...', {123}, 123)
+        t.assert_error_covers({
+            type = 'IllegalParams',
+            message = "unexpected option 'foo'",
+        }, threads.eval, 'test1', 'return ...', {123}, {foo = 'bar'})
+        t.assert_error_covers({
+            type = 'IllegalParams',
+            message = "options parameter 'target' should be one of types: " ..
+                      "string, number",
+        }, threads.eval, 'test1', 'return ...', {123}, {target = {}})
+        t.assert_error_covers({
+            type = 'IllegalParams',
+            message = "unexpected value for option parameter 'target': " ..
+                      "got 'foo', expected 'any', 'all', or a number",
+        }, threads.eval, 'test1', 'return ...', {123}, {target = 'foo'})
+    end)
+    --
+    -- Unknown group.
+    --
+    cluster.server:exec(function()
+        local threads = require('threads')
+        t.assert_error_covers({
+            type = 'ClientError',
+            name = 'NO_SUCH_THREAD_GROUP',
+        }, threads.eval, 'test3', 'return ...', {}, {target = 'all'})
+    end)
+    --
+    -- Unknown thread.
+    --
+    cluster.server:exec(function()
+        local threads = require('threads')
+        for _, p in ipairs({{'test1', -1}, {'test2', 0},
+                            {'test1', 4}, {'test2', 3}}) do
+            local group, target = unpack(p)
+            t.assert_error_covers({
+                type = 'ClientError',
+                name = 'NO_SUCH_THREAD',
+                thread_id = target,
+            }, threads.eval, group, 'return ...', {}, {target = target})
+        end
+    end)
+    --
+    -- Target handling.
+    --
+    cluster.server:exec(function()
+        local threads = require('threads')
+        local group = 'test1'
+        local expr = [[
+            local threads = require('threads')
+            return threads.info().thread_id
+        ]]
+        local ret_all = threads.eval(group, expr, {}, {target = 'all'})
+        t.assert_equals(ret_all, {{1}, {2}, {3}})
+        local ret_any = threads.eval(group, expr, {}, {target = 'any'})
+        t.assert_equals(#ret_any, 1)
+        t.assert_items_include(ret_all, ret_any)
+        t.assert_equals(threads.eval('test1', expr, {}, {target = 1}), {{1}})
+        t.assert_equals(threads.eval('test1', expr, {}, {target = 2}), {{2}})
+        t.assert_equals(threads.eval('test1', expr, {}, {target = 3}), {{3}})
+        t.assert_equals(threads.eval('test2', expr, {}, {target = 1}), {{1}})
+        t.assert_equals(threads.eval('test2', expr, {}, {target = 2}), {{2}})
+    end)
+    --
+    -- Default arguments.
+    --
+    cluster.server:exec(function()
+        local threads = require('threads')
+        local group = 'test2'
+        local expr = [[return ...]]
+        t.assert_equals(threads.eval(group, expr), {{}, {}})
+        t.assert_equals(threads.eval(group, expr, {1, 2, 3}),
+                        {{1, 2, 3}, {1, 2, 3}})
+        t.assert_equals(threads.eval(group, expr, {1, 2, 3}, {}),
+                        {{1, 2, 3}, {1, 2, 3}})
+        t.assert_equals(threads.eval(group, expr, {1, 2, 3}, {target = 'all'}),
+                        {{1, 2, 3}, {1, 2, 3}})
+        t.assert_equals(threads.eval(group, expr, {1, 2, 3}, {target = 'any'}),
+                        {{1, 2, 3}})
+    end)
+    --
+    -- Return value and error handling.
+    --
+    cluster.server:exec(function()
+        local threads = require('threads')
+        local group = 'test1'
+        local expr = [[
+            local threads = require('threads')
+            local thread_id = threads.info().thread_id
+            if thread_id == 1 then
+                return 1, 2, 3
+            elseif thread_id == 3 then
+                return {1, 2, 3}
+            end
+        ]]
+        t.assert_equals(threads.eval(group, expr, {}, {target = 'all'}),
+                        {{1, 2, 3}, {}, {{1, 2, 3}}})
+        expr = [[
+            local threads = require('threads')
+            local thread_id = threads.info().thread_id
+            if thread_id == 1 then
+                box.error({type = 'MyErrorType', name = 'MyError1'})
+            elseif thread_id == 2 then
+                box.error({type = 'MyErrorType', name = 'MyError2'})
+            end
+        ]]
+        t.assert_error_covers({type = 'MyErrorType', name = 'MyError2'},
+                              threads.eval, group, expr, {}, {target = 'all'})
+    end)
+    --
+    -- Calling tx thread group from tx.
+    --
+    cluster.server:exec(function()
+        local threads = require('threads')
+        local expr = [[
+            return require('threads').info()
+        ]]
+        local expected = {{threads.info()}}
+        t.assert_equals(threads.eval('tx', expr, {}, {target = 'any'}),
+                                     expected)
+        t.assert_equals(threads.eval('tx', expr, {}, {target = 'all'}),
+                                     expected)
+    end)
+    --
+    -- Usage in other a non-tx thread.
+    --
+    cluster.server:exec(function()
+        local threads = require('threads')
+        t.assert_covers(threads.info(), {
+            thread_id = 2,
+            group_name = 'test2',
+        })
+        local expr = [[
+            local threads = require('threads')
+            local info = threads.info()
+            return info.group_name, info.thread_id
+        ]]
+        t.assert_equals(threads.eval('tx', expr, {}, {target = 'all'}),
+                        {{'tx', 1}})
+        t.assert_equals(threads.eval('test1', expr, {}, {target = 'all'}),
+                        {{'test1', 1}, {'test1', 2}, {'test1', 3}})
+        t.assert_equals(threads.eval('test2', expr, {}, {target = 'all'}),
+                        {{'test2', 1}, {'test2', 2}})
+    end, {}, {_thread_id = 5})
+end
+
+g.test_threads_priv = function()
+    local config = cbuilder:new(BASE_CONFIG)
+        :set_global_option('credentials.users.guest.privileges', {
+            {
+                permissions = {'execute'},
+                lua_call = {'test_func_1', 'test_func_2'},
+            },
+        })
+        :set_global_option('credentials.users.admin.password', 'secret')
+        :set_global_option('credentials.users.alice.password', 'ALICE')
+        :set_global_option('credentials.users.alice.privileges', {
+            {
+                permissions = {'execute'},
+                lua_call = {'test_func_1'},
+            },
+        })
+        :set_global_option('credentials.users.bob.password', 'BOB')
+        :set_global_option('credentials.users.bob.privileges', {
+            {
+                permissions = {'execute'},
+                lua_call = {'all'},
+            },
+        })
+        :add_instance('server', {})
+        :set_instance_option('server', 'threads.groups', {
+            {name = 'test1', size = 1},
+            {name = 'test2', size = 2},
+            {name = 'test3', size = 3},
+        })
+        :config()
+    local cluster = cluster:new(config, SERVER_OPTS)
+    cluster.server:start()
+    cluster.server:exec(function()
+        local threads = require('threads')
+        for _, group in ipairs(threads.info().groups) do
+            threads.eval(group.name, [[
+                for _, f in ipairs({
+                    'test_func_1', 'test_func_2', 'test_func_3',
+                }) do
+                    box.iproto.export(f, function() return f end)
+                end
+            ]])
+        end
+    end)
+    local conn_guest = net.connect(cluster.server.net_box_uri)
+    local conn_admin = net.connect(cluster.server.net_box_uri,
+                                   {user = 'admin', password = 'secret'})
+    local conn_alice = net.connect(cluster.server.net_box_uri,
+                                   {user = 'alice', password = 'ALICE'})
+    local conn_bob = net.connect(cluster.server.net_box_uri,
+                                 {user = 'bob', password = 'BOB'})
+    local function check_ok(conn, func_name)
+        t.assert_equals(conn:call(func_name), func_name)
+    end
+    local function check_err(conn, func_name)
+        t.assert_error_covers({
+            type = 'AccessDeniedError',
+            access_type = 'Execute',
+            object_type = 'function',
+            object_name = func_name,
+            user = conn.opts and conn.opts.user or 'guest',
+        }, conn.call, conn, func_name)
+    end
+    -- Run the checks a few times so that function call requests land in
+    -- different application threads.
+    for _ = 1, 10 do
+        check_ok(conn_admin, 'test_func_1')
+        check_ok(conn_admin, 'test_func_2')
+        check_ok(conn_admin, 'test_func_3')
+        check_ok(conn_guest, 'test_func_1')
+        check_ok(conn_guest, 'test_func_2')
+        check_err(conn_guest, 'test_func_3')
+        check_ok(conn_alice, 'test_func_1')
+        check_err(conn_alice, 'test_func_2')
+        check_err(conn_alice, 'test_func_3')
+        check_ok(conn_bob, 'test_func_1')
+        check_ok(conn_bob, 'test_func_2')
+        check_ok(conn_bob, 'test_func_3')
+    end
+    -- Reload config and check again.
+    config = cbuilder:new(config)
+        :set_global_option('credentials.users.guest.privileges', {
+            {
+                permissions = {'execute'},
+                lua_call = {'test_func_3'},
+            },
+        })
+        :set_global_option('credentials.users.alice.privileges', {
+            {
+                permissions = {'execute'},
+                lua_call = {'all'},
+            },
+        })
+        :set_global_option('credentials.users.bob.privileges', {
+            {
+                permissions = {'execute'},
+                lua_call = {'test_func_2'},
+            },
+        })
+        :config()
+    cluster:reload(config)
+    for _ = 1, 10 do
+        check_ok(conn_admin, 'test_func_1')
+        check_ok(conn_admin, 'test_func_2')
+        check_ok(conn_admin, 'test_func_3')
+        check_err(conn_guest, 'test_func_1')
+        check_err(conn_guest, 'test_func_2')
+        check_ok(conn_guest, 'test_func_3')
+        check_ok(conn_alice, 'test_func_1')
+        check_ok(conn_alice, 'test_func_2')
+        check_ok(conn_alice, 'test_func_3')
+        check_err(conn_bob, 'test_func_1')
+        check_ok(conn_bob, 'test_func_2')
+        check_err(conn_bob, 'test_func_3')
+    end
+end
+
+g.before_test('test_box_cfg', function(cg)
+    cg.server = server:new()
+    cg.server:start()
+end)
+
+g.test_box_cfg = function(cg)
+    --
+    -- Check that the threads module is initialized with the default thread
+    -- group if box.cfg.app_threads is set from application code.
+    --
+    cg.server:exec(test_threads_not_configured)
+    cg.server:restart({box_cfg = {app_threads = 4}})
+    cg.server:exec(function()
+        local threads = require('threads')
+        t.assert_equals(threads.info(), {
+            thread_id = 1,
+            group_name = 'tx',
+            groups = {
+                {name = 'tx', size = 1},
+                {name = 'app', size = 4},
+            },
+        })
+        threads.eval('app', [[
+            local threads = require('threads')
+            threads.export('test_func', function()
+                local info = threads.info()
+                return info.group_name, info.thread_id
+            end)
+        ]])
+        t.assert_equals(threads.call('app', 'test_func'), {
+            {'app', 1}, {'app', 2}, {'app', 3}, {'app', 4},
+        })
+    end)
+end
+
+g.after_test('test_box_cfg', function(cg)
+    cg.server:drop()
+    cg.server = nil
+end)
+
+g.test_thread_names_in_logs = function()
+    local config = cbuilder:new(BASE_CONFIG)
+        :add_instance('server', {})
+        :set_instance_option('server', 'threads.groups', {
+            {name = 'fuzz', size = 1},
+            {name = 'buzz', size = 2},
+        })
+        :config()
+    local cluster = cluster:new(config, SERVER_OPTS)
+    cluster:start()
+    cluster.server:exec(function()
+        local threads = require('threads')
+        require('log').info('foobar1')
+        threads.eval('fuzz', [[
+            require('log').info('foobar2')
+        ]], {}, {target = 1})
+        threads.eval('buzz', [[
+            require('log').info('foobar3')
+        ]], {}, {target = 2})
+    end)
+    t.assert_str_contains(cluster.server:grep_log('.*foobar1'),
+                          'main/%d+/pool', true)
+    t.assert_str_contains(cluster.server:grep_log('.*foobar2'),
+                          'fuzz1/%d+/pool', true)
+    t.assert_str_contains(cluster.server:grep_log('.*foobar3'),
+                          'buzz2/%d+/pool', true)
+end
+
+g.before_test('test_threads_connection_on_shutdown', function(cg)
+    cg.server = server:new({box_cfg = {app_threads = 1}})
+    cg.server:start()
+end)
+
+g.test_threads_connection_on_shutdown = function(cg)
+    --
+    -- Check that application threads can be called from shutdown triggers.
+    --
+    local path = fio.pathjoin(cg.server.workdir, 'test.txt')
+    cg.server:exec(function(path)
+        local fio = require('fio')
+        local threads = require('threads')
+        box.ctl.on_shutdown(function()
+            local fh = fio.open(path, {'O_CREAT', 'O_WRONLY', 'O_TRUNC'},
+                                tonumber('666', 8))
+            for _ = 1, 10 do
+                local ok, err = pcall(threads.eval, 'app', [[return true]])
+                if ok then
+                    fh:write('OK')
+                else
+                    fh:write(tostring(err))
+                end
+                fh:write('\n')
+            end
+            fh:close()
+        end)
+    end, {path})
+    cg.server:stop()
+    local fh, err = fio.open(path, {'O_RDONLY'})
+    t.assert_is(err, nil)
+    local actual = fh:read(1024)
+    fh:close()
+    local expected = {}
+    for _ = 1, 10 do
+        table.insert(expected, 'OK')
+    end
+    table.insert(expected, '')
+    expected = table.concat(expected, '\n')
+    t.assert_equals(actual, expected)
+end
+
+g.after_test('test_threads_connection_on_shutdown', function(cg)
+    cg.server:drop()
+    cg.server = nil
+end)
+
+g.before_test('test_threads_module_alias', function(cg)
+    cg.server = server:new({
+        box_cfg = {app_threads = 1},
+        net_box_credentials = {user = 'admin'},
+    })
+    cg.server:start()
+end)
+
+g.test_threads_module_alias = function(cg)
+    cg.server:exec(function()
+        t.assert_is(require('experimental.threads'), require('threads'))
+    end)
+    cg.server:exec(function()
+        t.assert_is(require('experimental.threads'), require('threads'))
+    end, {}, {_thread_id = 1})
+end
+
+g.after_test('test_threads_module_alias', function(cg)
+    cg.server:drop()
+end)

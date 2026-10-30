@@ -1,0 +1,120 @@
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+inspector = env.new()
+---
+...
+engine = inspector:get_cfg('engine')
+---
+...
+space = box.schema.space.create('tweedledum', { engine = engine })
+---
+...
+index = space:create_index('primary', { type = 'tree' })
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+function crossjoin(space0, space1, limit)
+  local result = {}
+  for _,v0 in space0:pairs() do
+    for _,v1 in space1:pairs() do
+      if limit <= 0 then
+        return result
+      end
+      local newtuple = v0:totable()
+      for _, v in v1:pairs() do table.insert(newtuple, v) end
+      table.insert(result, newtuple)
+      limit = limit - 1
+    end
+  end
+  return result
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+crossjoin(space, space, 0)
+---
+- []
+...
+crossjoin(space, space, 10000)
+---
+- []
+...
+space:insert{1}
+---
+- [1]
+...
+crossjoin(space, space, 10000)
+---
+- - [1, 1]
+...
+space:insert{2}
+---
+- [2]
+...
+crossjoin(space, space, 10000)
+---
+- - [1, 1]
+  - [1, 2]
+  - [2, 1]
+  - [2, 2]
+...
+space:insert{3, 'hello'}
+---
+- [3, 'hello']
+...
+crossjoin(space, space, 10000)
+---
+- - [1, 1]
+  - [1, 2]
+  - [1, 3, 'hello']
+  - [2, 1]
+  - [2, 2]
+  - [2, 3, 'hello']
+  - [3, 'hello', 1]
+  - [3, 'hello', 2]
+  - [3, 'hello', 3, 'hello']
+...
+space:insert{4, 'world'}
+---
+- [4, 'world']
+...
+space[0]:insert{5, 'hello world'}
+---
+- error: '[string "return space[0]:insert{5, ''hello world''} "]:1: attempt to index
+    a nil value'
+...
+crossjoin(space, space, 10000)
+---
+- - [1, 1]
+  - [1, 2]
+  - [1, 3, 'hello']
+  - [1, 4, 'world']
+  - [2, 1]
+  - [2, 2]
+  - [2, 3, 'hello']
+  - [2, 4, 'world']
+  - [3, 'hello', 1]
+  - [3, 'hello', 2]
+  - [3, 'hello', 3, 'hello']
+  - [3, 'hello', 4, 'world']
+  - [4, 'world', 1]
+  - [4, 'world', 2]
+  - [4, 'world', 3, 'hello']
+  - [4, 'world', 4, 'world']
+...
+space:drop()
+---
+...
+crossjoin = nil
+---
+...

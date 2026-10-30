@@ -1,0 +1,147 @@
+-- key type validations (str, num)
+space = box.schema.space.create('test', { engine = 'vinyl' })
+---
+...
+index = space:create_index('primary', { type = 'tree', parts = {1, 'string'} })
+---
+...
+space:insert{1}
+---
+- error: 'Tuple field 1 type does not match one required by operation: expected string,
+    got unsigned'
+...
+space:replace{1}
+---
+- error: 'Tuple field 1 type does not match one required by operation: expected string,
+    got unsigned'
+...
+space:delete{1}
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected string'
+...
+space:update({1}, {{'=', 1, 101}})
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected string'
+...
+space:upsert({1}, {{'+', 1, 10}})
+---
+- error: 'Tuple field 1 type does not match one required by operation: expected string,
+    got unsigned'
+...
+space:get{1}
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected string'
+...
+index:pairs(1, {iterator = 'GE'})
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected string'
+...
+space:drop()
+---
+...
+-- key type validations (num, str)
+space = box.schema.space.create('test', { engine = 'vinyl' })
+---
+...
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
+---
+...
+space:insert{'A'}
+---
+- error: 'Tuple field 1 type does not match one required by operation: expected unsigned,
+    got string'
+...
+space:replace{'A'}
+---
+- error: 'Tuple field 1 type does not match one required by operation: expected unsigned,
+    got string'
+...
+space:delete{'A'}
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected unsigned'
+...
+space:update({'A'}, {{'=', 1, 101}})
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected unsigned'
+...
+space:upsert({'A'}, {{'+', 1, 10}})
+---
+- error: 'Tuple field 1 type does not match one required by operation: expected unsigned,
+    got string'
+...
+space:get{'A'}
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected unsigned'
+...
+index:pairs('A', {iterator = 'GE'})
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected unsigned'
+...
+space:drop()
+---
+...
+-- ensure all key-parts are passed
+space = box.schema.space.create('test', { engine = 'vinyl' })
+---
+...
+index = space:create_index('primary', { type = 'tree', parts = {1,'unsigned',2,'unsigned'} })
+---
+...
+space:insert{1}
+---
+- error: Tuple field 2 required by space format is missing
+...
+space:replace{1}
+---
+- error: Tuple field 2 required by space format is missing
+...
+space:delete{1}
+---
+- error: Invalid key part count in an exact match (expected 2, got 1)
+...
+space:update(1, {{'=', 1, 101}})
+---
+- error: Invalid key part count in an exact match (expected 2, got 1)
+...
+space:upsert({1}, {{'+', 1, 10}})
+---
+- error: Tuple field 2 required by space format is missing
+...
+space:get{1}
+---
+- error: Invalid key part count in an exact match (expected 2, got 1)
+...
+index:select({1}, {iterator = box.index.GT})
+---
+- []
+...
+space:drop()
+---
+...
+-------------------------------------------------------------------------------
+-- Key part length without limit
+-------------------------------------------------------------------------------
+space = box.schema.space.create('single_part', { engine = 'vinyl' })
+---
+...
+_ = space:create_index('primary', { type = 'tree', parts = {1, 'string'}})
+---
+...
+t1 = space:insert({string.rep('x', 1020)})
+---
+...
+t1 = space:insert({string.rep('x', 10210)})
+---
+...
+t3 = space:insert({string.rep('x', 102200)})
+---
+...
+space:drop()
+---
+...
+space = nil
+---
+...
+pk = nil
+---
+...

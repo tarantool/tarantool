@@ -1,0 +1,7 @@
+import platform
+
+# Disabled on OpenBSD due to fail #XXXX.
+if platform.system() == 'OpenBSD':
+    self.skip = 1
+
+# vim: set ft=python:

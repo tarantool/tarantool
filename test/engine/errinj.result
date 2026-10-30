@@ -1,0 +1,53 @@
+test_run = require('test_run')
+---
+...
+inspector = test_run.new()
+---
+...
+engine = inspector:get_cfg('engine')
+---
+...
+errinj = box.error.injection
+---
+...
+-- truncation rollback should not crash
+s = box.schema.space.create('truncate_rollback', {engine = engine})
+---
+...
+_ = s:create_index('pk')
+---
+...
+_ = s:create_index('sk', {parts = {1, 'int'}})
+---
+...
+for i = 1, 10 do s:replace({i, i}) end
+---
+...
+errinj.set('ERRINJ_WAL_IO', true)
+---
+- ok
+...
+s:truncate()
+---
+- error: Failed to write to disk
+...
+errinj.set('ERRINJ_WAL_IO', false)
+---
+- ok
+...
+s:select()
+---
+- - [1, 1]
+  - [2, 2]
+  - [3, 3]
+  - [4, 4]
+  - [5, 5]
+  - [6, 6]
+  - [7, 7]
+  - [8, 8]
+  - [9, 9]
+  - [10, 10]
+...
+s:drop()
+---
+...

@@ -1,0 +1,1573 @@
+-- box.tuple test
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua...\"]:<line>: '")
+---
+- true
+...
+-- Test box.tuple:slice()
+t=box.tuple.new{'0', '1', '2', '3', '4', '5', '6', '7'}
+---
+...
+t:slice(0)
+---
+- '0'
+- '1'
+- '2'
+- '3'
+- '4'
+- '5'
+- '6'
+- '7'
+...
+t:slice(-1)
+---
+- '7'
+...
+t:slice(1)
+---
+- '1'
+- '2'
+- '3'
+- '4'
+- '5'
+- '6'
+- '7'
+...
+t:slice(-1, -1)
+---
+- error: 'tuple.slice(): start must be less than end'
+...
+t:slice(-1, 1)
+---
+- error: 'tuple.slice(): start must be less than end'
+...
+t:slice(1, -1)
+---
+- '1'
+- '2'
+- '3'
+- '4'
+- '5'
+- '6'
+...
+t:slice(1, 3)
+---
+- '1'
+- '2'
+...
+t:slice(7)
+---
+- '7'
+...
+t:slice(8)
+---
+- error: 'tuple.slice(): start >= field count'
+...
+t:slice(9)
+---
+- error: 'tuple.slice(): start >= field count'
+...
+t:slice(100500)
+---
+- error: 'tuple.slice(): start >= field count'
+...
+t:slice(9, -1)
+---
+- error: 'tuple.slice(): start >= field count'
+...
+t:slice(6, -1)
+---
+- '6'
+...
+t:slice(4, 4)
+---
+- error: 'tuple.slice(): start must be less than end'
+...
+t:slice(6, 4)
+---
+- error: 'tuple.slice(): start must be less than end'
+...
+t:slice(0, 0)
+---
+- error: 'tuple.slice(): end > field count'
+...
+t:slice(9, 10)
+---
+- error: 'tuple.slice(): start >= field count'
+...
+t:slice(-7)
+---
+- '1'
+- '2'
+- '3'
+- '4'
+- '5'
+- '6'
+- '7'
+...
+t:slice(-8)
+---
+- '0'
+- '1'
+- '2'
+- '3'
+- '4'
+- '5'
+- '6'
+- '7'
+...
+t:slice(-9)
+---
+- error: 'tuple.slice(): start >= field count'
+...
+t:slice(-100500)
+---
+- error: 'tuple.slice(): start >= field count'
+...
+t:slice(500, 700)
+---
+- error: 'tuple.slice(): start >= field count'
+...
+--  box.tuple.new test
+box.tuple.new()
+---
+- []
+...
+box.tuple.new(1)
+---
+- [1]
+...
+box.tuple.new('string')
+---
+- ['string']
+...
+box.tuple.new(tonumber64('18446744073709551615'))
+---
+- [18446744073709551615]
+...
+box.tuple.new{tonumber64('18446744073709551615'), 'string', 1}
+---
+- [18446744073709551615, 'string', 1]
+...
+--  A test case for Bug#1131108 'incorrect conversion from boolean lua value to tarantool tuple'
+function bug1075677() local range = {} table.insert(range, 1>0) return range end
+---
+...
+box.tuple.new(bug1075677())
+---
+- [true]
+...
+bug1075677=nil
+---
+...
+-- boolean values in a tuple
+box.tuple.new(false)
+---
+- [false]
+...
+box.tuple.new({false})
+---
+- [false]
+...
+-- tuple:bsize()
+t = box.tuple.new('abc')
+---
+...
+t
+---
+- ['abc']
+...
+t:bsize()
+---
+- 5
+...
+--
+-- Test cases for #106 box.tuple.new fails on multiple items
+--
+box.tuple.new()
+---
+- []
+...
+box.tuple.new{}
+---
+- []
+...
+box.tuple.new(1)
+---
+- [1]
+...
+box.tuple.new{1}
+---
+- [1]
+...
+box.tuple.new{1, 2, 3, 4, 5}
+---
+- [1, 2, 3, 4, 5]
+...
+box.tuple.new{{'a', 'b'}, {'c', 'd'}, {'e', 'f'}}
+---
+- [['a', 'b'], ['c', 'd'], ['e', 'f']]
+...
+box.tuple.new{{1, 2}, 'x', 'y', 'z', {c = 3, d = 4}, {e = 5, f = 6}}
+---
+- [[1, 2], 'x', 'y', 'z', {'c': 3, 'd': 4}, {'e': 5, 'f': 6}]
+...
+box.tuple.new{'x', 'y', 'z', {1, 2}, {c = 3, d = 4}, {e = 5, f = 6}}
+---
+- ['x', 'y', 'z', [1, 2], {'c': 3, 'd': 4}, {'e': 5, 'f': 6}]
+...
+t=box.tuple.new{'a','b','c'}
+---
+...
+t:totable()
+---
+- ['a', 'b', 'c']
+...
+t:unpack()
+---
+- a
+- b
+- c
+...
+t:totable(1)
+---
+- ['a', 'b', 'c']
+...
+t:unpack(1)
+---
+- a
+- b
+- c
+...
+t:totable(2)
+---
+- ['b', 'c']
+...
+t:unpack(2)
+---
+- b
+- c
+...
+t:totable(1, 3)
+---
+- ['a', 'b', 'c']
+...
+t:unpack(1, 3)
+---
+- a
+- b
+- c
+...
+t:totable(2, 3)
+---
+- ['b', 'c']
+...
+t:unpack(2, 3)
+---
+- b
+- c
+...
+t:totable(2, 4)
+---
+- ['b', 'c']
+...
+t:unpack(2, 4)
+---
+- b
+- c
+...
+t:totable(nil, 2)
+---
+- ['a', 'b']
+...
+t:unpack(nil, 2)
+---
+- a
+- b
+...
+t:totable(2, 1)
+---
+- []
+...
+t:unpack(2, 1)
+---
+...
+t:totable(0)
+---
+- error: 'builtin/box/tuple.lua..."]:<line>: tuple.totable: invalid second argument'
+...
+t:totable(1, 0)
+---
+- error: 'builtin/box/tuple.lua..."]:<line>: tuple.totable: invalid third argument'
+...
+--
+-- Check that tuple:totable correctly sets serializer hints
+--
+box.tuple.new{1, 2, 3}:totable()
+---
+- [1, 2, 3]
+...
+getmetatable(box.tuple.new{1, 2, 3}:totable()).__serialize
+---
+- seq
+...
+--  A test case for the key as an tuple
+space = box.schema.space.create('tweedledum')
+---
+...
+index = space:create_index('primary')
+---
+...
+space:truncate()
+---
+...
+t=space:insert{0, 777, '0', '1', '2', '3'}
+---
+...
+t
+---
+- [0, 777, '0', '1', '2', '3']
+...
+space:replace(t)
+---
+- [0, 777, '0', '1', '2', '3']
+...
+space:replace{777, { 'a', 'b', 'c', {'d', 'e', t}}}
+---
+- [777, ['a', 'b', 'c', ['d', 'e', [0, 777, '0', '1', '2', '3']]]]
+...
+--  A test case for tuple:totable() method
+t=space:get{777}:totable()
+---
+...
+t[2], t[3], t[4], t[5]
+---
+- ['a', 'b', 'c', ['d', 'e', [0, 777, '0', '1', '2', '3']]]
+- null
+- null
+- null
+...
+space:truncate()
+---
+...
+--  A test case for Bug#1119389 '(lbox_tuple_index) crashes on 'nil' argument'
+t=space:insert{0, 8989}
+---
+...
+t[nil]
+---
+- null
+...
+--------------------------------------------------------------------------------
+-- test tuple:next
+--------------------------------------------------------------------------------
+t = box.tuple.new({'a', 'b', 'c'})
+---
+...
+state, val = t:next()
+---
+...
+state, val
+---
+- 1
+- a
+...
+state, val = t:next(state)
+---
+...
+state, val
+---
+- 2
+- b
+...
+state, val = t:next(state)
+---
+...
+state, val
+---
+- 3
+- c
+...
+state, val = t:next(state)
+---
+...
+state, val
+---
+- null
+- null
+...
+t:next(nil)
+---
+- 1
+- a
+...
+t:next(0)
+---
+- 1
+- a
+...
+t:next(1)
+---
+- 2
+- b
+...
+t:next(2)
+---
+- 3
+- c
+...
+t:next(3)
+---
+- null
+...
+t:next(4)
+---
+- null
+...
+t:next(-1)
+---
+- null
+...
+t:next("fdsaf")
+---
+- error: 'builtin/box/tuple.lua..."]:<line>: bad argument #2 to ''box_tuple_field'' (cannot
+    convert ''string'' to ''unsigned int'')'
+...
+box.tuple.new({'x', 'y', 'z'}):next()
+---
+- 1
+- x
+...
+t=space:insert{1953719668}
+---
+...
+t:next(1684234849)
+---
+- null
+...
+t:next(1)
+---
+- null
+...
+t:next(nil)
+---
+- 1
+- 1953719668
+...
+t:next(t:next())
+---
+- null
+...
+--------------------------------------------------------------------------------
+-- test tuple:pairs
+--------------------------------------------------------------------------------
+ta = {} for k, v in t:pairs() do table.insert(ta, v) end
+---
+...
+ta
+---
+- - 1953719668
+...
+t=space:replace{1953719668, 'another field'}
+---
+...
+ta = {} for k, v in t:pairs() do table.insert(ta, v) end
+---
+...
+ta
+---
+- - 1953719668
+  - another field
+...
+t=space:replace{1953719668, 'another field', 'one more'}
+---
+...
+ta = {} for k, v in t:pairs() do table.insert(ta, v) end
+---
+...
+ta
+---
+- - 1953719668
+  - another field
+  - one more
+...
+t=box.tuple.new({'a', 'b', 'c', 'd'})
+---
+...
+ta = {} for it,field in t:pairs() do table.insert(ta, field); end
+---
+...
+ta
+---
+- - a
+  - b
+  - c
+  - d
+...
+t = box.tuple.new({'a', 'b', 'c'})
+---
+...
+gen, init, state = t:pairs()
+---
+...
+gen, init, state
+---
+- gen: <tuple iterator>
+  param: &0 ['a', 'b', 'c']
+- *0
+- null
+...
+state, val = gen(init, state)
+---
+...
+state, val
+---
+- 1
+- a
+...
+state, val = gen(init, state)
+---
+...
+state, val
+---
+- 2
+- b
+...
+state, val = gen(init, state)
+---
+...
+state, val
+---
+- 3
+- c
+...
+state, val = gen(init, state)
+---
+...
+state, val
+---
+- null
+- null
+...
+r = {}
+---
+...
+for _state, val in t:pairs() do table.insert(r, val) end
+---
+...
+r
+---
+- - a
+  - b
+  - c
+...
+r = {}
+---
+...
+for _state, val in t:pairs() do table.insert(r, val) end
+---
+...
+r
+---
+- - a
+  - b
+  - c
+...
+r = {}
+---
+...
+for _state, val in t:pairs(1) do table.insert(r, val) end
+---
+...
+r
+---
+- - b
+  - c
+...
+r = {}
+---
+...
+for _state, val in t:pairs(3) do table.insert(r, val) end
+---
+...
+r
+---
+- []
+...
+r = {}
+---
+...
+for _state, val in t:pairs(10) do table.insert(r, val) end
+---
+- error: 'builtin/box/tuple.lua..."]:<line>: error: invalid key to ''next'''
+...
+r
+---
+- []
+...
+r = {}
+---
+...
+for _state, val in t:pairs(nil) do table.insert(r, val) end
+---
+...
+r
+---
+- - a
+  - b
+  - c
+...
+t:pairs(nil)
+---
+- gen: <tuple iterator>
+  param: &0 ['a', 'b', 'c']
+- *0
+- null
+...
+t:pairs("fdsaf")
+---
+- state: fdsaf
+  gen: <tuple iterator>
+  param: &0 ['a', 'b', 'c']
+- *0
+- fdsaf
+...
+--------------------------------------------------------------------------------
+-- test tuple:find
+--------------------------------------------------------------------------------
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+t = box.tuple.new({'a','b','c','a', -1, 0, 1, 2, true, 9223372036854775807ULL,
+    -9223372036854775807LL});
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+t:find('a')
+---
+- 1
+...
+t:find(1, 'a')
+---
+- 4
+...
+t:find('c')
+---
+- 3
+...
+t:find('xxxxx')
+---
+- null
+...
+t:find(1, 'xxxxx')
+---
+- null
+...
+t:findall('a')
+---
+- - 1
+  - 4
+...
+t:findall(1, 'a')
+---
+- - 4
+...
+t:findall('xxxxx')
+---
+- []
+...
+t:findall(1, 'xxxxx')
+---
+- []
+...
+t:find(100, 'a')
+---
+- error: 'builtin/box/tuple.lua..."]:<line>: error: invalid key to ''next'''
+...
+t:findall(100, 'a')
+---
+- error: 'builtin/box/tuple.lua..."]:<line>: error: invalid key to ''next'''
+...
+t:find(100, 'xxxxx')
+---
+- error: 'builtin/box/tuple.lua..."]:<line>: error: invalid key to ''next'''
+...
+t:findall(100, 'xxxxx')
+---
+- error: 'builtin/box/tuple.lua..."]:<line>: error: invalid key to ''next'''
+...
+---
+-- Lua type coercion
+---
+t:find(2)
+---
+- 8
+...
+t:findall(2)
+---
+- - 8
+...
+t:find(2ULL)
+---
+- 8
+...
+t:findall(2ULL)
+---
+- - 8
+...
+t:find(2LL)
+---
+- 8
+...
+t:findall(2LL)
+---
+- - 8
+...
+t:find(2)
+---
+- 8
+...
+t:findall(2)
+---
+- - 8
+...
+t:find(-1)
+---
+- 5
+...
+t:findall(-1)
+---
+- - 5
+...
+t:find(-1LL)
+---
+- 5
+...
+t:findall(-1LL)
+---
+- - 5
+...
+t:find(true)
+---
+- 9
+...
+t:findall(true)
+---
+- - 9
+...
+t:find(9223372036854775807LL)
+---
+- 10
+...
+t:findall(9223372036854775807LL)
+---
+- - 10
+...
+t:find(9223372036854775807ULL)
+---
+- 10
+...
+t:findall(9223372036854775807ULL)
+---
+- - 10
+...
+t:find(-9223372036854775807LL)
+---
+- 11
+...
+t:findall(-9223372036854775807LL)
+---
+- - 11
+...
+--------------------------------------------------------------------------------
+-- test tuple:update
+--------------------------------------------------------------------------------
+-- see box/update.test.lua for more test cases
+t = box.tuple.new({'a', 'b', 'c', 'd', 'e'})
+---
+...
+t:update()
+---
+- error: 'builtin/box/tuple.lua..."]:<line>: Usage: tuple:update({ { op, field, arg}+ })'
+...
+t:update(10)
+---
+- error: 'builtin/box/tuple.lua..."]:<line>: Usage: tuple:update({ { op, field, arg}+ })'
+...
+t:update({})
+---
+- ['a', 'b', 'c', 'd', 'e']
+...
+t:update({{ '!', -1, 'f'}})
+---
+- ['a', 'b', 'c', 'd', 'e', 'f']
+...
+t:update({{ '#', 4, 1}})
+---
+- ['a', 'b', 'c', 'e']
+...
+t
+---
+- ['a', 'b', 'c', 'd', 'e']
+...
+t = nil
+---
+...
+-- gh-2454 Regression in msgpack
+t = box.tuple.new(require('yaml').decode("[17711728, {1000: 'xxx'}]"))
+---
+...
+t:update({{'=', 2, t[2]}})
+---
+- [17711728, {1000: 'xxx'}]
+...
+t
+---
+- [17711728, {1000: 'xxx'}]
+...
+t = nil
+---
+...
+--
+-- gh-4041: Invalid field on empty tuple update.
+--
+t = box.tuple.new{}
+---
+...
+t:update({{'=', 1, 1}})
+---
+- [1]
+...
+t:upsert({{'=', 1, 1}})
+---
+- [1]
+...
+t:update({{'+', 1, 1}})
+---
+- error: Field 1 was not found in the tuple
+...
+t = nil
+---
+...
+--------------------------------------------------------------------------------
+-- test msgpack.encode + tuple
+--------------------------------------------------------------------------------
+msgpack = require('msgpack')
+---
+...
+encode_load_metatables = msgpack.cfg.encode_load_metatables
+---
+...
+-- disable __serialize hook to test internal on_encode hook
+msgpack.cfg{encode_load_metatables = false}
+---
+...
+msgpackffi = require('msgpackffi')
+---
+...
+t = box.tuple.new({'a', 'b', 'c'})
+---
+...
+msgpack.decode(msgpackffi.encode(t))
+---
+- ['a', 'b', 'c']
+- 8
+...
+msgpack.decode(msgpack.encode(t))
+---
+- ['a', 'b', 'c']
+- 8
+...
+msgpack.decode(msgpackffi.encode({1, {'x', 'y', t, 'z'}, 2, 3}))
+---
+- [1, ['x', 'y', ['a', 'b', 'c'], 'z'], 2, 3]
+- 19
+...
+msgpack.decode(msgpack.encode({1, {'x', 'y', t, 'z'}, 2, 3}))
+---
+- [1, ['x', 'y', ['a', 'b', 'c'], 'z'], 2, 3]
+- 19
+...
+-- restore configuration
+msgpack.cfg{encode_load_metatables = encode_load_metatables}
+---
+...
+-- gh-738: Serializer hints are unclear
+t = box.tuple.new({1, 2, {}})
+---
+...
+map = t[3]
+---
+...
+getmetatable(map) ~= nil
+---
+- true
+...
+map
+---
+- []
+...
+map['test'] = 48
+---
+...
+map
+---
+- test: 48
+...
+getmetatable(map) == nil
+---
+- true
+...
+-- gh-1189: tuple is not checked as first argument
+t = box.tuple.new({1, 2, {}})
+---
+...
+t.bsize()
+---
+- error: 'builtin/box/tuple.lua..."]:<line>: Usage: tuple:bsize()'
+...
+t.find(9223372036854775807LL)
+---
+- error: 'builtin/box/tuple.lua..."]:<line>: Usage: tuple:find([offset, ]val)'
+...
+t.findall(9223372036854775807LL)
+---
+- error: 'builtin/box/tuple.lua..."]:<line>: Usage: tuple:findall([offset, ]val)'
+...
+t.update()
+---
+- error: 'builtin/box/tuple.lua..."]:<line>: Usage: tuple:update({ { op, field, arg}+ })'
+...
+t.upsert()
+---
+- error: 'builtin/box/tuple.lua..."]:<line>: Usage: tuple:upsert({ { op, field, arg}+ })'
+...
+t = nil
+---
+...
+space:drop()
+---
+...
+-- gh-1266: luaL_convertfield crashes on ffi.typeof()
+ffi = require('ffi')
+---
+...
+ffi.typeof('struct tuple')
+---
+- ctype<struct tuple>
+...
+-- gh-1345: lbox_tuple_new() didn't check result of box_tuple_new() for NULL
+-- try to allocate 100Mb tuple and checked that server won't crash
+box.tuple.new(string.rep('x', 100 * 1024 * 1024)) ~= nil
+---
+- true
+...
+collectgarbage('collect') -- collect huge string
+---
+- 0
+...
+-- testing tostring
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+null = nil
+t = box.tuple.new{{1, -2, 1.2, -1.2}, 'x', 'y', 'z', null, true, false,
+    {bin = "\x08\x5c\xc2\x80\x12\x2f",
+    big_num = tonumber64('18446744073709551615'),
+    map = {key = "value"},
+    double=1.0000000001,
+    utf8="Кудыкины горы"}};
+---
+...
+tostring(t);
+---
+- '[[1, -2, 1.2, -1.2], ''x'', ''y'', ''z'', null, true, false, {''big_num'': 18446744073709551615,
+  ''double'': 1.0000000001, ''utf8'': ''Кудыкины горы'', ''bin'': "\b\\\u0080\x12/",
+  ''map'': {''key'': ''value''}}]'
+...
+t;
+---
+- [[1, -2, 1.2, -1.2], 'x', 'y', 'z', null, true, false, {'big_num': 18446744073709551615,
+    'double': 1.0000000001, 'utf8': 'Кудыкины горы', 'bin': "\b\\\u0080\x12/", 'map': {
+      'key': 'value'}}]
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+--
+-- gh-1014: tuple field names and tuple methods aliases.
+--
+t = box.tuple.new({1, 2, 3})
+---
+...
+box.tuple.next == t.next
+---
+- true
+...
+box.tuple.ipairs == t.ipairs
+---
+- true
+...
+box.tuple.pairs == t.pairs
+---
+- true
+...
+box.tuple.slice == t.slice
+---
+- true
+...
+box.tuple.transform == t.transform
+---
+- true
+...
+box.tuple.find == t.find
+---
+- true
+...
+box.tuple.findall == t.findall
+---
+- true
+...
+box.tuple.unpack == t.unpack
+---
+- true
+...
+box.tuple.totable == t.totable
+---
+- true
+...
+box.tuple.update == t.update
+---
+- true
+...
+box.tuple.upsert == t.upsert
+---
+- true
+...
+box.tuple.bsize == t.bsize
+---
+- true
+...
+--
+-- gh-3282: space:frommap().
+--
+format = {}
+---
+...
+format[1] = {name = 'aaa', type = 'unsigned'}
+---
+...
+format[2] = {name = 'bbb', type = 'unsigned', is_nullable = true}
+---
+...
+format[3] = {name = 'ccc', type = 'unsigned', is_nullable = true}
+---
+...
+format[4] = {name = 'ddd', type = 'unsigned', is_nullable = true}
+---
+...
+s = box.schema.create_space('test', {format = format})
+---
+...
+s:frommap({ddd = 1, aaa = 2, ccc = 3, bbb = 4})
+---
+- [2, 4, 3, 1]
+...
+s:frommap({ddd = 1, aaa = 2, bbb = 3})
+---
+- [2, 3, null, 1]
+...
+s:frommap({ddd = 1, aaa = 2, ccc = 3, eee = 4})
+---
+- null
+- Unknown field 'eee'
+...
+s:frommap()
+---
+- error: 'Usage: space:frommap(map, opts)'
+...
+s:frommap({})
+---
+- null
+- Tuple field 1 (aaa) required by space format is missing
+...
+s:frommap({ddd = 'fail', aaa = 2, ccc = 3, bbb = 4}, {table=true})
+---
+- null
+- 'Tuple field 4 (ddd) type does not match one required by operation: expected unsigned,
+  got string'
+...
+s:frommap({ddd = 1, aaa = 2, ccc = 3, bbb = 4}, {table = true})
+---
+- - 2
+  - 4
+  - 3
+  - 1
+...
+s:frommap({ddd = 1, aaa = 2, ccc = 3, bbb = 4}, {table = false})
+---
+- [2, 4, 3, 1]
+...
+s:frommap({ddd = 1, aaa = 2, ccc = 3, bbb = box.NULL})
+---
+- [2, null, 3, 1]
+...
+s:frommap({ddd = 1, aaa = 2, ccc = 3, bbb = 4}, {dummy = true})
+---
+- [2, 4, 3, 1]
+...
+_ = s:create_index('primary', {parts = {'aaa'}})
+---
+...
+tuple = s:frommap({ddd = 1, aaa = 2, ccc = 3, bbb = 4})
+---
+...
+s:replace(tuple)
+---
+- [2, 4, 3, 1]
+...
+s:drop()
+---
+...
+_, err = s:frommap({ddd = 1, aaa = 2, ccc = 3, bbb = 4})
+---
+...
+assert(err ~= nil)
+---
+- true
+...
+--
+-- gh-3902: tuple is collected while it's still in use.
+--
+t1 = box.tuple.new(1)
+---
+...
+t1 = t1:update{{'+', 1, 1}}
+---
+...
+collectgarbage()
+---
+- 0
+...
+t2 = box.tuple.new(2)
+---
+...
+t1 = t1:update{{'+', 1, 1}}
+---
+...
+test_run:cmd("clear filter")
+---
+- true
+...
+--
+-- gh-3882: Inappropriate storage optimization for sparse arrays
+--          in box.tuple.new.
+--
+t = {}
+---
+...
+t[1] = 1
+---
+...
+t[2] = 2
+---
+...
+t[11] = 11
+---
+...
+box.tuple.new(t)
+---
+- [1, 2, null, null, null, null, null, null, null, null, 11]
+...
+s2 = box.schema.space.create('test')
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+s2:format({{name="a", type="str"}, {name="b", type="str", is_nullable=true},
+           {name="c", type="str", is_nullable=true},
+           {name="d", type="str", is_nullable=true},
+           {name="e", type="str", is_nullable=true},
+           {name="f", type="str", is_nullable=true},
+           {name="g", type="str", is_nullable=true},
+           {name="h", type="str", is_nullable=true},
+           {name="i", type="str", is_nullable=true},
+           {name="j", type="str", is_nullable=true},
+           {name="k", type="str", is_nullable=true}});
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+s2:frommap({a="1", k="11"})
+---
+- ['1', null, null, null, null, null, null, null, null, null, '11']
+...
+--
+-- gh-4045: space:frommap():tomap() conversion fail
+--
+s2:frommap({a="1", k="11"}):tomap({names_only = true})
+---
+- i: null
+  f: null
+  c: null
+  g: null
+  b: null
+  j: null
+  k: '11'
+  d: null
+  h: null
+  a: '1'
+  e: null
+...
+s2:drop()
+---
+...
+-- test decimals in tuple
+dec = require('decimal')
+---
+...
+a = dec.new('1')
+---
+...
+b = dec.new('1e10')
+---
+...
+c = dec.new('1e-10')
+---
+...
+d = box.tuple.new{5, a, 6, b, 7, c, "string"}
+---
+...
+d
+---
+- [5, 1, 6, 1E+10, 7, 1E-10, 'string']
+...
+state, val = d:next()
+---
+...
+state
+---
+- 1
+...
+val
+---
+- 5
+...
+state, val = d:next(state)
+---
+...
+state
+---
+- 2
+...
+val
+---
+- 1
+...
+state, val = d:next(state)
+---
+...
+state, val
+---
+- 3
+- 6
+...
+d:slice(1)
+---
+- 1
+- 6
+- 1E+10
+- 7
+- 1E-10
+- string
+...
+d:slice(-1)
+---
+- string
+...
+d:slice(-2)
+---
+- 1E-10
+- string
+...
+msgpack.decode(msgpackffi.encode(d))
+---
+- [5, 1, 6, 1E+10, 7, 1E-10, 'string']
+- 24
+...
+d:bsize()
+---
+- 23
+...
+d:update{{'!', 3, dec.new('1234.5678')}}
+---
+- [5, 1, 1234.5678, 6, 1E+10, 7, 1E-10, 'string']
+...
+d:update{{'=', -1, dec.new('0.12345678910111213')}}
+---
+- [5, 1, 6, 1E+10, 7, 1E-10, 0.12345678910111213]
+...
+--
+-- gh-4413: tuple:update arithmetic for decimals
+--
+ffi = require('ffi')
+---
+...
+d = box.tuple.new(dec.new('1'))
+---
+...
+d:update{{'+', 1, dec.new('0.5')}}
+---
+- [1.5]
+...
+d:update{{'-', 1, dec.new('0.5')}}
+---
+- [0.5]
+...
+d:update{{'+', 1, 1.36}}
+---
+- [2.36]
+...
+d:update{{'+', 1, ffi.new('uint64_t', 1712)}}
+---
+- [1713]
+...
+d:update{{'-', 1, ffi.new('float', 635)}}
+---
+- [-634]
+...
+-- test erroneous values
+-- nan
+d:update{{'+', 1, 0/0}}
+---
+- error: 'Argument type in operation ''+'' on field 1 does not match field type: expected
+    a number convertible to decimal'
+...
+-- inf
+d:update{{'-', 1, 1/0}}
+---
+- error: 'Argument type in operation ''-'' on field 1 does not match field type: expected
+    a number convertible to decimal'
+...
+-- decimal overflow
+d = box.tuple.new(dec.new('9e37'))
+---
+...
+d
+---
+- [9E+37]
+...
+d:update{{'+', 1, dec.new('1e37')}}
+---
+- [1.0E+38]
+...
+d:update{{'-', 1, dec.new('1e37')}}
+---
+- [8E+37]
+...
+--
+-- gh-4434: tuple should use global msgpack serializer.
+--
+max_depth = msgpack.cfg.encode_max_depth
+---
+...
+deep_as_nil = msgpack.cfg.encode_deep_as_nil
+---
+...
+decode_max_depth = msgpack.cfg.decode_max_depth
+---
+...
+msgpack.cfg({encode_deep_as_nil = true})
+---
+...
+t = nil
+---
+...
+for i = 1, max_depth + 5 do t = {t} end
+---
+...
+tuple = box.tuple.new(t):totable()
+---
+...
+level = 0
+---
+...
+while tuple ~= nil do level = level + 1 tuple = tuple[1] end
+---
+...
+level == max_depth or {level, max_depth}
+---
+- true
+...
+msgpack.cfg({encode_max_depth = max_depth + 5})
+---
+...
+msgpack.cfg({decode_max_depth = max_depth + 5})
+---
+...
+tuple = box.tuple.new(t):totable()
+---
+...
+level = 0
+---
+...
+while tuple ~= nil do level = level + 1 tuple = tuple[1] end
+---
+...
+-- Level should be bigger now, because the default msgpack
+-- serializer allows deeper tables.
+level == max_depth + 5 or {level, max_depth}
+---
+- true
+...
+-- gh-4684: some box.tuple.* methods were private and could be
+-- used by customers to shoot in their own legs. Some of them
+-- were moved to a more secret place. box.tuple.is() was moved to
+-- the public API, legally.
+box.tuple.is()
+---
+- false
+...
+box.tuple.is(nil)
+---
+- false
+...
+box.tuple.is(box.NULL)
+---
+- false
+...
+box.tuple.is({})
+---
+- false
+...
+box.tuple.is(ffi.new('char[1]'))
+---
+- false
+...
+box.tuple.is(1)
+---
+- false
+...
+box.tuple.is('1')
+---
+- false
+...
+box.tuple.is(box.tuple.new())
+---
+- true
+...
+box.tuple.is(box.tuple.new({1}))
+---
+- true
+...
+--
+-- gh-4268 UUID in tuple
+--
+uuid = require("uuid")
+---
+...
+-- Fixed randomly generated uuids to avoid problems with test
+-- output comparison.
+a = uuid.fromstr("c8f0fa1f-da29-438c-a040-393f1126ad39")
+---
+...
+b = uuid.fromstr("83eb4959-3de6-49fb-8890-6fb4423dd186")
+---
+...
+t = box.tuple.new{a, 2, b, "string"}
+---
+...
+state, val = t:next()
+---
+...
+state
+---
+- 1
+...
+val == a
+---
+- true
+...
+state, val = t:next(state)
+---
+...
+state
+---
+- 2
+...
+val
+---
+- 2
+...
+state, val = t:next(state)
+---
+...
+state
+---
+- 3
+...
+val == b
+---
+- true
+...
+t:slice(1)
+---
+- 2
+- 83eb4959-3de6-49fb-8890-6fb4423dd186
+- string
+...
+t:slice(-1)
+---
+- string
+...
+t:slice(-2)
+---
+- 83eb4959-3de6-49fb-8890-6fb4423dd186
+- string
+...
+msgpack.decode(msgpack.encode(t))
+---
+- [c8f0fa1f-da29-438c-a040-393f1126ad39, 2, 83eb4959-3de6-49fb-8890-6fb4423dd186,
+  'string']
+- 46
+...
+msgpackffi.decode(msgpackffi.encode(t))
+---
+- [c8f0fa1f-da29-438c-a040-393f1126ad39, 2, 83eb4959-3de6-49fb-8890-6fb4423dd186,
+  'string']
+- 46
+...
+t:bsize()
+---
+- 45
+...
+msgpack.cfg({encode_max_depth = max_depth})
+---
+...
+msgpack.cfg({encode_deep_as_nil = deep_as_nil})
+---
+...
+msgpack.cfg({decode_max_depth = decode_max_depth})
+---
+...

@@ -1,0 +1,68 @@
+How to update libcoro
+=====================
+
+cvs up
+
+How to update libev
+===================
+
+Remove Tarantool patches (see csv diff -U8).
+cvs up
+Add patches back.
+
+How to update luajit
+====================
+
+Run from project root dir:
+git submodule update --reference v2.0.1-fixed -- third_party/luajit
+
+How to update libobjc2
+======================
+
+How initial import was done:
+
+svn co http://svn.gna.org/svn/gnustep/libs/libobjc2/trunk/ ./libobjc
+
+find . -name '.svn' | xargs rm -rf
+rm Makefile.clang
+rm GNUMakefile
+
+How to update it:
+
+- delete GNUmakefile
+- delete CMakeLists.txt
+- merge our Makefile with the Makefile in
+the source tarball
+- preserve the zero-warnings patch 43771c84f7f5bf04e426dde30a31303d4699f00d
+
+How to update libeio
+====================
+Note: we have two important changes to the stock libeio:
+- it's possible to change the libeio thread stack size
+  with EIO_STACKSIZE constant. In particular, EIO_STACKSIZE
+  set to 0 means the default stack size.
+  A larger stack size is necessary to make getaddrinfo()
+  work.
+
+- replace config.h with tarantool/config.h in eio.c
+
+Otherwise: cvs up
+
+How to update rb.h
+======================
+Get the header from
+git://canonware.com/jemalloc.git
+apply rb.patch patch
+=======
+
+How to update murmur hash
+=========================
+
+wget http://smhasher.googlecode.com/svn/trunk/PMurHash.c -O PMurHash.c
+wget http://smhasher.googlecode.com/svn/trunk/PMurHash.h -O PMurHash.h
+
+How to update arrow/abi.h
+=========================
+
+Get the header from
+git@github.com:apache/arrow.git cpp/src/arrow/c/abi.h

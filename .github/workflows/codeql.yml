@@ -1,0 +1,86 @@
+name: CodeQL
+
+on:
+  pull_request:
+    branches: [ "master" ]
+  workflow_dispatch:
+    branches: [ "master" ]
+
+jobs:
+  analyze:
+    # Run inside tarantool/tarantool on workflow dispatch or pull request
+    # if the 'notest' label is not set.
+    if: github.repository == 'tarantool/tarantool' &&
+        ( github.event_name != 'pull_request' ||
+          ( github.event_name == 'pull_request' &&
+            !contains(github.event.pull_request.labels.*.name, 'notest') ) )
+
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'cpp' ]
+
+    runs-on: ubuntu-20.04-self-hosted
+
+    timeout-minutes: 60
+
+    container:
+      image: docker.io/tarantool/testing:ubuntu-focal
+      # Mount /dev to the container to be able to mount a disk image inside it
+      # for successful run of the .github/actions/environment action.
+      volumes:
+        - /dev:/dev
+      # Add extra privileges to the container for successful run
+      # of the .github/actions/environment action.
+      options: '--privileged'
+
+    steps:
+    - name: Prepare checkout
+      uses: tarantool/actions/prepare-checkout@master
+
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+
+    - name: Setup env
+      uses: ./.github/actions/environment
+
+    - name: Install deps
+      uses: ./.github/actions/install-deps-debian
+
+    - name: Build
+      run: make -f .test.mk build
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:${{matrix.language}}"
+
+    - name: Cleanup CodeQL files
+      # Once the cache has filled the disk, the jobs that would clean it are
+      # exactly the ones that fail before reaching this step.
+      if: always()
+      # Setting the shell to bash makes the runner call it with pipefail.
+      shell: bash
+      run: |
+        # runner.tool_cache is expanded on the host, and the path it yields
+        # does not exist in the job container, where the cache is
+        # bind-mounted elsewhere. RUNNER_TOOL_CACHE is the path the
+        # container sees.
+        set -u
+        cache="${RUNNER_TOOL_CACHE}/CodeQL"
+        [ -d "${cache}" ] || exit 0
+        cd "${cache}"
+        ls -1t | tail -n +2 | xargs -r rm -rf --

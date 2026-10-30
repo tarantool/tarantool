@@ -1,0 +1,1289 @@
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+engine = test_run:get_cfg('engine')
+---
+...
+-- one part indices
+-- int type
+space0 = box.schema.space.create('space0', { engine = engine })
+---
+...
+index0 = space0:create_index('primary', { type = 'tree', parts = {1, 'INTEGER'} })
+---
+...
+space0:insert({1, "AAAA"})
+---
+- [1, 'AAAA']
+...
+space0:insert({2, "AAAA"})
+---
+- [2, 'AAAA']
+...
+space0:insert({3, "AAAA"})
+---
+- [3, 'AAAA']
+...
+space0:insert({4, "AAAA"})
+---
+- [4, 'AAAA']
+...
+index0:select()
+---
+- - [1, 'AAAA']
+  - [2, 'AAAA']
+  - [3, 'AAAA']
+  - [4, 'AAAA']
+...
+index0:max(2)
+---
+- [2, 'AAAA']
+...
+index0:min(2)
+---
+- [2, 'AAAA']
+...
+index0:count(2)
+---
+- 1
+...
+index0:max()
+---
+- [4, 'AAAA']
+...
+index0:min()
+---
+- [1, 'AAAA']
+...
+index0:count()
+---
+- 4
+...
+space0:insert({20, "AAAA"})
+---
+- [20, 'AAAA']
+...
+space0:insert({30, "AAAA"})
+---
+- [30, 'AAAA']
+...
+space0:insert({40, "AAAA"})
+---
+- [40, 'AAAA']
+...
+index0:select()
+---
+- - [1, 'AAAA']
+  - [2, 'AAAA']
+  - [3, 'AAAA']
+  - [4, 'AAAA']
+  - [20, 'AAAA']
+  - [30, 'AAAA']
+  - [40, 'AAAA']
+...
+index0:max(15)
+---
+...
+index0:min(15)
+---
+...
+index0:count(15)
+---
+- 0
+...
+index0:max()
+---
+- [40, 'AAAA']
+...
+index0:min()
+---
+- [1, 'AAAA']
+...
+index0:count()
+---
+- 7
+...
+space0:insert({-2, "AAAA"})
+---
+- [-2, 'AAAA']
+...
+space0:insert({-3, "AAAA"})
+---
+- [-3, 'AAAA']
+...
+space0:insert({-4, "AAAA"})
+---
+- [-4, 'AAAA']
+...
+index0:select()
+---
+- - [-4, 'AAAA']
+  - [-3, 'AAAA']
+  - [-2, 'AAAA']
+  - [1, 'AAAA']
+  - [2, 'AAAA']
+  - [3, 'AAAA']
+  - [4, 'AAAA']
+  - [20, 'AAAA']
+  - [30, 'AAAA']
+  - [40, 'AAAA']
+...
+index0:max(0)
+---
+...
+index0:min(0)
+---
+...
+index0:count(0)
+---
+- 0
+...
+index0:max()
+---
+- [40, 'AAAA']
+...
+index0:min()
+---
+- [-4, 'AAAA']
+...
+index0:count()
+---
+- 10
+...
+space0:drop()
+---
+...
+-- number type
+space1 = box.schema.space.create('space1', { engine = engine })
+---
+...
+index1 = space1:create_index('primary', { type = 'tree', parts = {1, 'number'} })
+---
+...
+space1:insert({1, "AAAA"})
+---
+- [1, 'AAAA']
+...
+space1:insert({2, "AAAA"})
+---
+- [2, 'AAAA']
+...
+space1:insert({3, "AAAA"})
+---
+- [3, 'AAAA']
+...
+space1:insert({4, "AAAA"})
+---
+- [4, 'AAAA']
+...
+index1:select()
+---
+- - [1, 'AAAA']
+  - [2, 'AAAA']
+  - [3, 'AAAA']
+  - [4, 'AAAA']
+...
+index1:max(2)
+---
+- [2, 'AAAA']
+...
+index1:min(2)
+---
+- [2, 'AAAA']
+...
+index1:count(2)
+---
+- 1
+...
+index1:max()
+---
+- [4, 'AAAA']
+...
+index1:min()
+---
+- [1, 'AAAA']
+...
+index1:count()
+---
+- 4
+...
+space1:insert({20, "AAAA"})
+---
+- [20, 'AAAA']
+...
+space1:insert({30, "AAAA"})
+---
+- [30, 'AAAA']
+...
+space1:insert({40, "AAAA"})
+---
+- [40, 'AAAA']
+...
+index1:select()
+---
+- - [1, 'AAAA']
+  - [2, 'AAAA']
+  - [3, 'AAAA']
+  - [4, 'AAAA']
+  - [20, 'AAAA']
+  - [30, 'AAAA']
+  - [40, 'AAAA']
+...
+index1:max(15)
+---
+...
+index1:min(15)
+---
+...
+index1:count(15)
+---
+- 0
+...
+index1:max()
+---
+- [40, 'AAAA']
+...
+index1:min()
+---
+- [1, 'AAAA']
+...
+index1:count()
+---
+- 7
+...
+space1:insert({-2, "AAAA"})
+---
+- [-2, 'AAAA']
+...
+space1:insert({-3, "AAAA"})
+---
+- [-3, 'AAAA']
+...
+space1:insert({-4, "AAAA"})
+---
+- [-4, 'AAAA']
+...
+index1:select()
+---
+- - [-4, 'AAAA']
+  - [-3, 'AAAA']
+  - [-2, 'AAAA']
+  - [1, 'AAAA']
+  - [2, 'AAAA']
+  - [3, 'AAAA']
+  - [4, 'AAAA']
+  - [20, 'AAAA']
+  - [30, 'AAAA']
+  - [40, 'AAAA']
+...
+index1:max(0)
+---
+...
+index1:min(0)
+---
+...
+index1:count(0)
+---
+- 0
+...
+index1:max()
+---
+- [40, 'AAAA']
+...
+index1:min()
+---
+- [-4, 'AAAA']
+...
+index1:count()
+---
+- 10
+...
+space1:insert({1.5, "AAAA"})
+---
+- [1.5, 'AAAA']
+...
+space1:insert({2.5, "AAAA"})
+---
+- [2.5, 'AAAA']
+...
+space1:insert({3.5, "AAAA"})
+---
+- [3.5, 'AAAA']
+...
+space1:insert({4.5, "AAAA"})
+---
+- [4.5, 'AAAA']
+...
+index1:select()
+---
+- - [-4, 'AAAA']
+  - [-3, 'AAAA']
+  - [-2, 'AAAA']
+  - [1, 'AAAA']
+  - [1.5, 'AAAA']
+  - [2, 'AAAA']
+  - [2.5, 'AAAA']
+  - [3, 'AAAA']
+  - [3.5, 'AAAA']
+  - [4, 'AAAA']
+  - [4.5, 'AAAA']
+  - [20, 'AAAA']
+  - [30, 'AAAA']
+  - [40, 'AAAA']
+...
+index1:max(1)
+---
+- [1, 'AAAA']
+...
+index1:min(1)
+---
+- [1, 'AAAA']
+...
+index1:count(1)
+---
+- 1
+...
+index1:max()
+---
+- [40, 'AAAA']
+...
+index1:min()
+---
+- [-4, 'AAAA']
+...
+index1:count()
+---
+- 14
+...
+space1:drop()
+---
+...
+-- str type
+space2 = box.schema.space.create('space2', { engine = engine })
+---
+...
+index2 = space2:create_index('primary', { type = 'tree', parts = {1, 'string'} })
+---
+...
+space2:insert({'1', "AAAA"})
+---
+- ['1', 'AAAA']
+...
+space2:insert({'2', "AAAA"})
+---
+- ['2', 'AAAA']
+...
+space2:insert({'3', "AAAA"})
+---
+- ['3', 'AAAA']
+...
+space2:insert({'4', "AAAA"})
+---
+- ['4', 'AAAA']
+...
+index2:select()
+---
+- - ['1', 'AAAA']
+  - ['2', 'AAAA']
+  - ['3', 'AAAA']
+  - ['4', 'AAAA']
+...
+index2:max('2')
+---
+- ['2', 'AAAA']
+...
+index2:min('2')
+---
+- ['2', 'AAAA']
+...
+index2:count('2')
+---
+- 1
+...
+index2:max()
+---
+- ['4', 'AAAA']
+...
+index2:min()
+---
+- ['1', 'AAAA']
+...
+index2:count()
+---
+- 4
+...
+space2:insert({'20', "AAAA"})
+---
+- ['20', 'AAAA']
+...
+space2:insert({'30', "AAAA"})
+---
+- ['30', 'AAAA']
+...
+space2:insert({'40', "AAAA"})
+---
+- ['40', 'AAAA']
+...
+index2:select()
+---
+- - ['1', 'AAAA']
+  - ['2', 'AAAA']
+  - ['20', 'AAAA']
+  - ['3', 'AAAA']
+  - ['30', 'AAAA']
+  - ['4', 'AAAA']
+  - ['40', 'AAAA']
+...
+index2:max('15')
+---
+...
+index2:min('15')
+---
+...
+index2:count('15')
+---
+- 0
+...
+index2:max()
+---
+- ['40', 'AAAA']
+...
+index2:min()
+---
+- ['1', 'AAAA']
+...
+index2:count()
+---
+- 7
+...
+space2:insert({'-2', "AAAA"})
+---
+- ['-2', 'AAAA']
+...
+space2:insert({'-3', "AAAA"})
+---
+- ['-3', 'AAAA']
+...
+space2:insert({'-4', "AAAA"})
+---
+- ['-4', 'AAAA']
+...
+index2:select()
+---
+- - ['-2', 'AAAA']
+  - ['-3', 'AAAA']
+  - ['-4', 'AAAA']
+  - ['1', 'AAAA']
+  - ['2', 'AAAA']
+  - ['20', 'AAAA']
+  - ['3', 'AAAA']
+  - ['30', 'AAAA']
+  - ['4', 'AAAA']
+  - ['40', 'AAAA']
+...
+index2:max('0')
+---
+...
+index2:min('0')
+---
+...
+index2:count('0')
+---
+- 0
+...
+index2:max()
+---
+- ['40', 'AAAA']
+...
+index2:min()
+---
+- ['-2', 'AAAA']
+...
+index2:count()
+---
+- 10
+...
+space2:drop()
+---
+...
+-- num type
+space3 = box.schema.space.create('space3', { engine = engine })
+---
+...
+index3 = space3:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
+---
+...
+space3:insert({1, "AAAA"})
+---
+- [1, 'AAAA']
+...
+space3:insert({2, "AAAA"})
+---
+- [2, 'AAAA']
+...
+space3:insert({3, "AAAA"})
+---
+- [3, 'AAAA']
+...
+space3:insert({4, "AAAA"})
+---
+- [4, 'AAAA']
+...
+index3:select()
+---
+- - [1, 'AAAA']
+  - [2, 'AAAA']
+  - [3, 'AAAA']
+  - [4, 'AAAA']
+...
+index3:max(2)
+---
+- [2, 'AAAA']
+...
+index3:min(2)
+---
+- [2, 'AAAA']
+...
+index3:count(2)
+---
+- 1
+...
+index3:max()
+---
+- [4, 'AAAA']
+...
+index3:min()
+---
+- [1, 'AAAA']
+...
+index3:count()
+---
+- 4
+...
+space3:insert({20, "AAAA"})
+---
+- [20, 'AAAA']
+...
+space3:insert({30, "AAAA"})
+---
+- [30, 'AAAA']
+...
+space3:insert({40, "AAAA"})
+---
+- [40, 'AAAA']
+...
+index3:select()
+---
+- - [1, 'AAAA']
+  - [2, 'AAAA']
+  - [3, 'AAAA']
+  - [4, 'AAAA']
+  - [20, 'AAAA']
+  - [30, 'AAAA']
+  - [40, 'AAAA']
+...
+index3:max(15)
+---
+...
+index3:min(15)
+---
+...
+index3:count(15)
+---
+- 0
+...
+index3:max()
+---
+- [40, 'AAAA']
+...
+index3:min()
+---
+- [1, 'AAAA']
+...
+index3:count()
+---
+- 7
+...
+space3:drop()
+---
+...
+-- scalar type
+space4 = box.schema.space.create('space4', { engine = engine })
+---
+...
+index4 = space4:create_index('primary', { type = 'tree', parts = {1, 'scalar'} })
+---
+...
+space4:insert({1, "AAAA"})
+---
+- [1, 'AAAA']
+...
+space4:insert({2, "AAAA"})
+---
+- [2, 'AAAA']
+...
+space4:insert({3, "AAAA"})
+---
+- [3, 'AAAA']
+...
+space4:insert({4, "AAAA"})
+---
+- [4, 'AAAA']
+...
+index4:select()
+---
+- - [1, 'AAAA']
+  - [2, 'AAAA']
+  - [3, 'AAAA']
+  - [4, 'AAAA']
+...
+index4:max(2)
+---
+- [2, 'AAAA']
+...
+index4:min(2)
+---
+- [2, 'AAAA']
+...
+index4:count(2)
+---
+- 1
+...
+index4:max()
+---
+- [4, 'AAAA']
+...
+index4:min()
+---
+- [1, 'AAAA']
+...
+index4:count()
+---
+- 4
+...
+space4:insert({20, "AAAA"})
+---
+- [20, 'AAAA']
+...
+space4:insert({30, "AAAA"})
+---
+- [30, 'AAAA']
+...
+space4:insert({40, "AAAA"})
+---
+- [40, 'AAAA']
+...
+index4:select()
+---
+- - [1, 'AAAA']
+  - [2, 'AAAA']
+  - [3, 'AAAA']
+  - [4, 'AAAA']
+  - [20, 'AAAA']
+  - [30, 'AAAA']
+  - [40, 'AAAA']
+...
+index4:max(15)
+---
+...
+index4:min(15)
+---
+...
+index4:count(15)
+---
+- 0
+...
+index4:max()
+---
+- [40, 'AAAA']
+...
+index4:min()
+---
+- [1, 'AAAA']
+...
+index4:count()
+---
+- 7
+...
+space4:insert({'1', "AAAA"})
+---
+- ['1', 'AAAA']
+...
+space4:insert({'2', "AAAA"})
+---
+- ['2', 'AAAA']
+...
+space4:insert({'3', "AAAA"})
+---
+- ['3', 'AAAA']
+...
+space4:insert({'4', "AAAA"})
+---
+- ['4', 'AAAA']
+...
+index4:select()
+---
+- - [1, 'AAAA']
+  - [2, 'AAAA']
+  - [3, 'AAAA']
+  - [4, 'AAAA']
+  - [20, 'AAAA']
+  - [30, 'AAAA']
+  - [40, 'AAAA']
+  - ['1', 'AAAA']
+  - ['2', 'AAAA']
+  - ['3', 'AAAA']
+  - ['4', 'AAAA']
+...
+index4:max('2')
+---
+- ['2', 'AAAA']
+...
+index4:min('2')
+---
+- ['2', 'AAAA']
+...
+index4:count('2')
+---
+- 1
+...
+index4:max()
+---
+- ['4', 'AAAA']
+...
+index4:min()
+---
+- [1, 'AAAA']
+...
+index4:count()
+---
+- 11
+...
+space4:insert({'20', "AAAA"})
+---
+- ['20', 'AAAA']
+...
+space4:insert({'30', "AAAA"})
+---
+- ['30', 'AAAA']
+...
+space4:insert({'40', "AAAA"})
+---
+- ['40', 'AAAA']
+...
+index4:select()
+---
+- - [1, 'AAAA']
+  - [2, 'AAAA']
+  - [3, 'AAAA']
+  - [4, 'AAAA']
+  - [20, 'AAAA']
+  - [30, 'AAAA']
+  - [40, 'AAAA']
+  - ['1', 'AAAA']
+  - ['2', 'AAAA']
+  - ['20', 'AAAA']
+  - ['3', 'AAAA']
+  - ['30', 'AAAA']
+  - ['4', 'AAAA']
+  - ['40', 'AAAA']
+...
+index4:max('15')
+---
+...
+index4:min('15')
+---
+...
+index4:count('15')
+---
+- 0
+...
+index4:max()
+---
+- ['40', 'AAAA']
+...
+index4:min()
+---
+- [1, 'AAAA']
+...
+index4:count()
+---
+- 14
+...
+space4:insert({'-2', "AAAA"})
+---
+- ['-2', 'AAAA']
+...
+space4:insert({'-3', "AAAA"})
+---
+- ['-3', 'AAAA']
+...
+space4:insert({'-4', "AAAA"})
+---
+- ['-4', 'AAAA']
+...
+index4:select()
+---
+- - [1, 'AAAA']
+  - [2, 'AAAA']
+  - [3, 'AAAA']
+  - [4, 'AAAA']
+  - [20, 'AAAA']
+  - [30, 'AAAA']
+  - [40, 'AAAA']
+  - ['-2', 'AAAA']
+  - ['-3', 'AAAA']
+  - ['-4', 'AAAA']
+  - ['1', 'AAAA']
+  - ['2', 'AAAA']
+  - ['20', 'AAAA']
+  - ['3', 'AAAA']
+  - ['30', 'AAAA']
+  - ['4', 'AAAA']
+  - ['40', 'AAAA']
+...
+index4:max('0')
+---
+...
+index4:min('0')
+---
+...
+index4:count('0')
+---
+- 0
+...
+index4:max()
+---
+- ['40', 'AAAA']
+...
+index4:min()
+---
+- [1, 'AAAA']
+...
+index4:count()
+---
+- 17
+...
+space4:insert({-2, "AAAA"})
+---
+- [-2, 'AAAA']
+...
+space4:insert({-3, "AAAA"})
+---
+- [-3, 'AAAA']
+...
+space4:insert({-4, "AAAA"})
+---
+- [-4, 'AAAA']
+...
+index4:select()
+---
+- - [-4, 'AAAA']
+  - [-3, 'AAAA']
+  - [-2, 'AAAA']
+  - [1, 'AAAA']
+  - [2, 'AAAA']
+  - [3, 'AAAA']
+  - [4, 'AAAA']
+  - [20, 'AAAA']
+  - [30, 'AAAA']
+  - [40, 'AAAA']
+  - ['-2', 'AAAA']
+  - ['-3', 'AAAA']
+  - ['-4', 'AAAA']
+  - ['1', 'AAAA']
+  - ['2', 'AAAA']
+  - ['20', 'AAAA']
+  - ['3', 'AAAA']
+  - ['30', 'AAAA']
+  - ['4', 'AAAA']
+  - ['40', 'AAAA']
+...
+index4:max(0)
+---
+...
+index4:min(0)
+---
+...
+index4:count(0)
+---
+- 0
+...
+index4:max()
+---
+- ['40', 'AAAA']
+...
+index4:min()
+---
+- [-4, 'AAAA']
+...
+index4:count()
+---
+- 20
+...
+space4:drop()
+---
+...
+-- multi filed indices
+-- scalar int
+space5 = box.schema.space.create('space5', { engine = engine })
+---
+...
+index5 = space5:create_index('primary', { type = 'tree', parts = {1, 'scalar', 2, 'INTEGER'} })
+---
+...
+space5:insert({1, 1})
+---
+- [1, 1]
+...
+space5:insert({1, 2})
+---
+- [1, 2]
+...
+space5:insert({1, 3})
+---
+- [1, 3]
+...
+space5:insert({1, -4})
+---
+- [1, -4]
+...
+index5:select()
+---
+- - [1, -4]
+  - [1, 1]
+  - [1, 2]
+  - [1, 3]
+...
+index5:max({1})
+---
+- [1, 3]
+...
+index5:min({1})
+---
+- [1, -4]
+...
+index5:count({1})
+---
+- 4
+...
+index5:max({1, 0})
+---
+...
+index5:min({1, 1})
+---
+- [1, 1]
+...
+index5:count({1})
+---
+- 4
+...
+index5:max()
+---
+- [1, 3]
+...
+index5:min()
+---
+- [1, -4]
+...
+index5:count()
+---
+- 4
+...
+space5:insert({2, 1})
+---
+- [2, 1]
+...
+space5:insert({2, 2})
+---
+- [2, 2]
+...
+space5:insert({2, 3})
+---
+- [2, 3]
+...
+space5:insert({2, -4})
+---
+- [2, -4]
+...
+index5:select()
+---
+- - [1, -4]
+  - [1, 1]
+  - [1, 2]
+  - [1, 3]
+  - [2, -4]
+  - [2, 1]
+  - [2, 2]
+  - [2, 3]
+...
+index5:max({2})
+---
+- [2, 3]
+...
+index5:min({2})
+---
+- [2, -4]
+...
+index5:count({2})
+---
+- 4
+...
+index5:max({2, 0})
+---
+...
+index5:min({2, 1})
+---
+- [2, 1]
+...
+index5:count({2})
+---
+- 4
+...
+index5:max()
+---
+- [2, 3]
+...
+index5:min()
+---
+- [1, -4]
+...
+index5:count()
+---
+- 8
+...
+space5:drop()
+---
+...
+-- scalar str
+space6 = box.schema.space.create('space6', { engine = engine })
+---
+...
+index6 = space6:create_index('primary', { type = 'tree', parts = {1, 'scalar', 2, 'string'} })
+---
+...
+space6:insert({1, '1'})
+---
+- [1, '1']
+...
+space6:insert({1, '2'})
+---
+- [1, '2']
+...
+space6:insert({1, '3'})
+---
+- [1, '3']
+...
+space6:insert({1, '-4'})
+---
+- [1, '-4']
+...
+index6:select()
+---
+- - [1, '-4']
+  - [1, '1']
+  - [1, '2']
+  - [1, '3']
+...
+index6:max({1})
+---
+- [1, '3']
+...
+index6:min({1})
+---
+- [1, '-4']
+...
+index6:count({1})
+---
+- 4
+...
+index6:max({1, '0'})
+---
+...
+index6:min({1, '1'})
+---
+- [1, '1']
+...
+index6:count({1})
+---
+- 4
+...
+index6:max()
+---
+- [1, '3']
+...
+index6:min()
+---
+- [1, '-4']
+...
+index6:count()
+---
+- 4
+...
+space6:insert({2, '1'})
+---
+- [2, '1']
+...
+space6:insert({2, '2'})
+---
+- [2, '2']
+...
+space6:insert({2, '3'})
+---
+- [2, '3']
+...
+space6:insert({2, '-4'})
+---
+- [2, '-4']
+...
+index6:select()
+---
+- - [1, '-4']
+  - [1, '1']
+  - [1, '2']
+  - [1, '3']
+  - [2, '-4']
+  - [2, '1']
+  - [2, '2']
+  - [2, '3']
+...
+index6:max({2})
+---
+- [2, '3']
+...
+index6:min({2})
+---
+- [2, '-4']
+...
+index6:count({2})
+---
+- 4
+...
+index6:max({2, '0'})
+---
+...
+index6:min({2, '1'})
+---
+- [2, '1']
+...
+index6:count({2})
+---
+- 4
+...
+index6:max()
+---
+- [2, '3']
+...
+index6:min()
+---
+- [1, '-4']
+...
+index6:count()
+---
+- 8
+...
+space6:drop()
+---
+...
+-- min max count after many inserts
+string = require('string')
+---
+...
+space7 = box.schema.space.create('space7', { engine = engine })
+---
+...
+index7 = space7:create_index('primary', { type = 'tree', parts = {1, 'scalar'} })
+---
+...
+long_string = string.rep('A', 650)
+---
+...
+for i = 1, 1000 do space7:insert({i, long_string}) end
+---
+...
+index7:max({100})
+---
+- [100, 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA']
+...
+index7:max({700})
+---
+- [700, 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA']
+...
+index7:min({100})
+---
+- [100, 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA']
+...
+index7:min({700})
+---
+- [700, 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA']
+...
+index7:count({2})
+---
+- 1
+...
+index7:max()
+---
+- [1000, 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA']
+...
+index7:min()
+---
+- [1, 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA']
+...
+index7:count()
+---
+- 1000
+...
+space7:drop()
+---
+...
+space8 = box.schema.space.create('space8', { engine = engine })
+---
+...
+index8 = space8:create_index('primary', { type = 'tree', parts = {1, 'scalar', 2, 'INTEGER'} })
+---
+...
+for i = 1, 1000 do space8:insert({i % 10, i, long_string}) end
+---
+...
+index8:max({1, 100})
+---
+...
+index8:max({2, 700})
+---
+...
+index8:max({3})
+---
+- [3, 993, 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA']
+...
+index8:min({1, 10})
+---
+...
+index8:min({1, 700})
+---
+...
+index8:min({3})
+---
+- [3, 3, 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA']
+...
+index8:count({2})
+---
+- 100
+...
+index8:max()
+---
+- [9, 999, 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA']
+...
+index8:min()
+---
+- [0, 10, 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA']
+...
+index8:count()
+---
+- 1000
+...
+space8:drop()
+---
+...

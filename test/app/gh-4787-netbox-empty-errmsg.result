@@ -1,0 +1,61 @@
+-- test-run result file version 2
+netbox = require('net.box')
+ | ---
+ | ...
+fiber = require('fiber')
+ | ---
+ | ...
+--
+-- gh-4787: netbox reported empty error message while executing
+-- remote call.
+--
+box.schema.user.create('test', { password = 'test' })
+ | ---
+ | ...
+box.schema.user.grant('test', 'super')
+ | ---
+ | ...
+function echo(...) return ... end
+ | ---
+ | ...
+
+-- Check that a request in 'auth' state returns a correct error.
+function req_during_auth()                                                      \
+    local c = netbox.connect(box.cfg.listen, {                                  \
+        user = 'test', password = 'test', wait_connected = false                \
+    })                                                                          \
+    while c.state ~= 'auth' do fiber.yield() end                                \
+    local ok, err = pcall(c.call, c, 'echo', {}, {is_async = true})             \
+    c:close()                                                                   \
+    return ok, err                                                              \
+end
+ | ---
+ | ...
+
+req_during_auth()
+ | ---
+ | - false
+ | - Connection is not established, state is "auth"
+ | ...
+
+-- Check the same for 'initial' state.
+ok, err = nil
+ | ---
+ | ...
+do                                                                              \
+    c = netbox.connect(box.cfg.listen, {wait_connected = false})                \
+    ok, err = pcall(c.call, c, 'echo', {}, {is_async = true})                   \
+end
+ | ---
+ | ...
+ok, err
+ | ---
+ | - false
+ | - Connection is not established, state is "initial"
+ | ...
+c:close()
+ | ---
+ | ...
+box.schema.user.drop('test')
+ | ---
+ | ...

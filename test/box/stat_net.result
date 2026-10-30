@@ -1,0 +1,195 @@
+-- clear statistics
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+test_run:cmd('restart server default')
+box.stat.net.SENT -- zero
+---
+- total: 0
+  rps: 0
+...
+box.stat.net.RECEIVED -- zero
+---
+- total: 0
+  rps: 0
+...
+box.stat.net.CONNECTIONS -- zero
+---
+- current: 0
+  rps: 0
+  total: 0
+...
+box.stat.net.REQUESTS -- zero
+---
+- current: 0
+  rps: 0
+  total: 0
+...
+space = box.schema.space.create('tweedledum')
+---
+...
+box.schema.user.grant('guest', 'read', 'space', 'tweedledum')
+---
+...
+index = space:create_index('primary', { type = 'hash' })
+---
+...
+ch = require('fiber').channel(1)
+---
+...
+function tweedledee() ch:get() end
+---
+...
+box.schema.func.create('tweedledee')
+---
+...
+box.schema.user.grant('guest', 'execute', 'function', 'tweedledee')
+---
+...
+remote = require 'net.box'
+---
+...
+LISTEN = require('uri').parse(box.cfg.listen)
+---
+...
+cn = remote.connect(LISTEN.host, LISTEN.service)
+---
+...
+cn1 = remote.connect(LISTEN.host, LISTEN.service)
+---
+...
+cn2 = remote.connect(LISTEN.host, LISTEN.service)
+---
+...
+cn3 = remote.connect(LISTEN.host, LISTEN.service)
+---
+...
+cn.space.tweedledum:select() --small request
+---
+- []
+...
+box.stat.net.SENT.total > 0
+---
+- true
+...
+box.stat.net.RECEIVED.total > 0
+---
+- true
+...
+box.stat.net.CONNECTIONS.total
+---
+- 4
+...
+box.stat.net.REQUESTS.total > 0
+---
+- true
+...
+box.stat.net.CONNECTIONS.current
+---
+- 4
+...
+box.stat.net.REQUESTS.current
+---
+- 0
+...
+WAIT_COND_TIMEOUT = 10
+---
+...
+cn1:close()
+---
+...
+cn2:close()
+---
+...
+test_run:wait_cond(function() return box.stat.net.CONNECTIONS.current == 2 end, WAIT_COND_TIMEOUT)
+---
+- true
+...
+cn3:close()
+---
+...
+test_run:wait_cond(function() return box.stat.net.CONNECTIONS.current == 1 end, WAIT_COND_TIMEOUT)
+---
+- true
+...
+requests_total_saved = box.stat.net.REQUESTS.total
+---
+...
+future1 = cn:call('tweedledee', {}, {is_async = true})
+---
+...
+test_run:wait_cond(function() return box.stat.net.REQUESTS.current == 1 end, WAIT_COND_TIMEOUT)
+---
+- true
+...
+future2 = cn:call('tweedledee', {}, {is_async = true})
+---
+...
+test_run:wait_cond(function() return box.stat.net.REQUESTS.current == 2 end, WAIT_COND_TIMEOUT)
+---
+- true
+...
+ch:put(true)
+---
+- true
+...
+ch:put(true)
+---
+- true
+...
+future1:wait_result()
+---
+- []
+...
+future2:wait_result()
+---
+- []
+...
+test_run:wait_cond(function() return box.stat.net.REQUESTS.current == 0 end, WAIT_COND_TIMEOUT)
+---
+- true
+...
+box.stat.net.REQUESTS.total - requests_total_saved == 2
+---
+- true
+...
+-- reset
+box.stat.reset()
+---
+...
+box.stat.net.SENT.total
+---
+- 0
+...
+box.stat.net.RECEIVED.total
+---
+- 0
+...
+box.stat.net.CONNECTIONS.total
+---
+- 0
+...
+box.stat.net.REQUESTS.total
+---
+- 0
+...
+box.stat.net.CONNECTIONS.current
+---
+- 1
+...
+box.stat.net.REQUESTS.current
+---
+- 0
+...
+box.schema.func.drop('tweedledee')
+---
+...
+space:drop() -- tweedledum
+---
+...
+cn:close()
+---
+...

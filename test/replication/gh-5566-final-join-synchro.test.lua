@@ -1,0 +1,34 @@
+test_run = require('test_run').new()
+
+--
+-- gh-5566 replica tolerates synchronous transactions in final join stream.
+--
+_ = box.schema.space.create('sync', {is_sync=true})
+_ = box.space.sync:create_index('pk')
+box.ctl.promote()
+
+box.schema.user.grant('guest', 'replication')
+box.schema.user.grant('guest', 'write', 'space', 'sync')
+
+-- Part 1. Make sure a joining instance tolerates synchronous rows in final join
+-- stream.
+trig = function()\
+    box.space.sync:replace{1}\
+end
+-- The trigger will generate synchronous rows each time a replica joins.
+_ = box.space._cluster:on_replace(trig)
+
+orig_synchro_quorum = box.cfg.replication_synchro_quorum
+orig_synchro_timeout = box.cfg.replication_synchro_timeout
+box.cfg{replication_synchro_quorum=1, replication_synchro_timeout=60}
+
+test_run:cmd('create server replica with rpl_master=default,\
+                                         script="replication/replica.lua"')
+test_run:cmd('start server replica')
+
+test_run:switch('replica')
+test_run:wait_upstream(1, {status='follow'})
+
+test_run:switch('default')
+test_run:cmd('stop server replica')
+test_run:cmd('delete server replica')

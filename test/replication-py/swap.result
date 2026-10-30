@@ -1,0 +1,5084 @@
+box.schema.user.create('test', { password = 'pass123456'})
+---
+...
+box.schema.user.grant('test', 'read,write,execute', 'universe')
+---
+...
+while box.info.id == 0 do require('fiber').sleep(0.01) end
+---
+...
+while box.space['_priv']:len() < 1 do require('fiber').sleep(0.01) end
+---
+...
+s = box.schema.space.create('memtx', { engine = 'memtx'})
+---
+...
+index = s:create_index('primary', {type = 'tree'})
+---
+...
+s = box.schema.space.create('vinyl', { engine = 'vinyl'})
+---
+...
+index = s:create_index('primary', {type = 'tree'})
+---
+...
+test 0 iteration
+box.space.memtx:insert{0, "tuple 0"}
+-
+- [0, 'tuple 0']
+box.space.memtx:insert{1, "tuple 1"}
+-
+- [1, 'tuple 1']
+box.space.memtx:insert{2, "tuple 2"}
+-
+- [2, 'tuple 2']
+box.space.memtx:insert{3, "tuple 3"}
+-
+- [3, 'tuple 3']
+box.space.memtx:insert{4, "tuple 4"}
+-
+- [4, 'tuple 4']
+box.space.vinyl:insert{0, "tuple 0"}
+-
+- [0, 'tuple 0']
+box.space.vinyl:insert{1, "tuple 1"}
+-
+- [1, 'tuple 1']
+box.space.vinyl:insert{2, "tuple 2"}
+-
+- [2, 'tuple 2']
+box.space.vinyl:insert{3, "tuple 3"}
+-
+- [3, 'tuple 3']
+box.space.vinyl:insert{4, "tuple 4"}
+-
+- [4, 'tuple 4']
+box.space.memtx:select{0}
+-
+- [0, 'tuple 0']
+box.space.memtx:select{1}
+-
+- [1, 'tuple 1']
+box.space.memtx:select{2}
+-
+- [2, 'tuple 2']
+box.space.memtx:select{3}
+-
+- [3, 'tuple 3']
+box.space.memtx:select{4}
+-
+- [4, 'tuple 4']
+box.space.vinyl:select{0}
+-
+- [0, 'tuple 0']
+box.space.vinyl:select{1}
+-
+- [1, 'tuple 1']
+box.space.vinyl:select{2}
+-
+- [2, 'tuple 2']
+box.space.vinyl:select{3}
+-
+- [3, 'tuple 3']
+box.space.vinyl:select{4}
+-
+- [4, 'tuple 4']
+box.space.memtx:insert{5, "tuple 5"}
+-
+- [5, 'tuple 5']
+box.space.memtx:insert{6, "tuple 6"}
+-
+- [6, 'tuple 6']
+box.space.memtx:insert{7, "tuple 7"}
+-
+- [7, 'tuple 7']
+box.space.memtx:insert{8, "tuple 8"}
+-
+- [8, 'tuple 8']
+box.space.memtx:insert{9, "tuple 9"}
+-
+- [9, 'tuple 9']
+box.space.vinyl:insert{5, "tuple 5"}
+-
+- [5, 'tuple 5']
+box.space.vinyl:insert{6, "tuple 6"}
+-
+- [6, 'tuple 6']
+box.space.vinyl:insert{7, "tuple 7"}
+-
+- [7, 'tuple 7']
+box.space.vinyl:insert{8, "tuple 8"}
+-
+- [8, 'tuple 8']
+box.space.vinyl:insert{9, "tuple 9"}
+-
+- [9, 'tuple 9']
+box.space.memtx:select{5}
+-
+- [5, 'tuple 5']
+box.space.memtx:select{6}
+-
+- [6, 'tuple 6']
+box.space.memtx:select{7}
+-
+- [7, 'tuple 7']
+box.space.memtx:select{8}
+-
+- [8, 'tuple 8']
+box.space.memtx:select{9}
+-
+- [9, 'tuple 9']
+box.space.vinyl:select{5}
+-
+- [5, 'tuple 5']
+box.space.vinyl:select{6}
+-
+- [6, 'tuple 6']
+box.space.vinyl:select{7}
+-
+- [7, 'tuple 7']
+box.space.vinyl:select{8}
+-
+- [8, 'tuple 8']
+box.space.vinyl:select{9}
+-
+- [9, 'tuple 9']
+swap servers
+switch replica to master
+box.cfg{replication=''}
+---
+...
+switch master to replica
+box.space.memtx:insert{10, "tuple 10"}
+-
+- [10, 'tuple 10']
+box.space.memtx:insert{11, "tuple 11"}
+-
+- [11, 'tuple 11']
+box.space.memtx:insert{12, "tuple 12"}
+-
+- [12, 'tuple 12']
+box.space.memtx:insert{13, "tuple 13"}
+-
+- [13, 'tuple 13']
+box.space.memtx:insert{14, "tuple 14"}
+-
+- [14, 'tuple 14']
+box.space.vinyl:insert{10, "tuple 10"}
+-
+- [10, 'tuple 10']
+box.space.vinyl:insert{11, "tuple 11"}
+-
+- [11, 'tuple 11']
+box.space.vinyl:insert{12, "tuple 12"}
+-
+- [12, 'tuple 12']
+box.space.vinyl:insert{13, "tuple 13"}
+-
+- [13, 'tuple 13']
+box.space.vinyl:insert{14, "tuple 14"}
+-
+- [14, 'tuple 14']
+box.space.memtx:select{10}
+-
+- [10, 'tuple 10']
+box.space.memtx:select{11}
+-
+- [11, 'tuple 11']
+box.space.memtx:select{12}
+-
+- [12, 'tuple 12']
+box.space.memtx:select{13}
+-
+- [13, 'tuple 13']
+box.space.memtx:select{14}
+-
+- [14, 'tuple 14']
+box.space.vinyl:select{10}
+-
+- [10, 'tuple 10']
+box.space.vinyl:select{11}
+-
+- [11, 'tuple 11']
+box.space.vinyl:select{12}
+-
+- [12, 'tuple 12']
+box.space.vinyl:select{13}
+-
+- [13, 'tuple 13']
+box.space.vinyl:select{14}
+-
+- [14, 'tuple 14']
+box.space.memtx:insert{15, "tuple 15"}
+-
+- [15, 'tuple 15']
+box.space.memtx:insert{16, "tuple 16"}
+-
+- [16, 'tuple 16']
+box.space.memtx:insert{17, "tuple 17"}
+-
+- [17, 'tuple 17']
+box.space.memtx:insert{18, "tuple 18"}
+-
+- [18, 'tuple 18']
+box.space.memtx:insert{19, "tuple 19"}
+-
+- [19, 'tuple 19']
+box.space.vinyl:insert{15, "tuple 15"}
+-
+- [15, 'tuple 15']
+box.space.vinyl:insert{16, "tuple 16"}
+-
+- [16, 'tuple 16']
+box.space.vinyl:insert{17, "tuple 17"}
+-
+- [17, 'tuple 17']
+box.space.vinyl:insert{18, "tuple 18"}
+-
+- [18, 'tuple 18']
+box.space.vinyl:insert{19, "tuple 19"}
+-
+- [19, 'tuple 19']
+box.space.memtx:select{15}
+-
+- [15, 'tuple 15']
+box.space.memtx:select{16}
+-
+- [16, 'tuple 16']
+box.space.memtx:select{17}
+-
+- [17, 'tuple 17']
+box.space.memtx:select{18}
+-
+- [18, 'tuple 18']
+box.space.memtx:select{19}
+-
+- [19, 'tuple 19']
+box.space.vinyl:select{15}
+-
+- [15, 'tuple 15']
+box.space.vinyl:select{16}
+-
+- [16, 'tuple 16']
+box.space.vinyl:select{17}
+-
+- [17, 'tuple 17']
+box.space.vinyl:select{18}
+-
+- [18, 'tuple 18']
+box.space.vinyl:select{19}
+-
+- [19, 'tuple 19']
+rollback servers configuration
+switch master to master
+box.cfg{replication=''}
+---
+...
+switch replica to replica
+test 1 iteration
+box.space.memtx:insert{20, "tuple 20"}
+-
+- [20, 'tuple 20']
+box.space.memtx:insert{21, "tuple 21"}
+-
+- [21, 'tuple 21']
+box.space.memtx:insert{22, "tuple 22"}
+-
+- [22, 'tuple 22']
+box.space.memtx:insert{23, "tuple 23"}
+-
+- [23, 'tuple 23']
+box.space.memtx:insert{24, "tuple 24"}
+-
+- [24, 'tuple 24']
+box.space.vinyl:insert{20, "tuple 20"}
+-
+- [20, 'tuple 20']
+box.space.vinyl:insert{21, "tuple 21"}
+-
+- [21, 'tuple 21']
+box.space.vinyl:insert{22, "tuple 22"}
+-
+- [22, 'tuple 22']
+box.space.vinyl:insert{23, "tuple 23"}
+-
+- [23, 'tuple 23']
+box.space.vinyl:insert{24, "tuple 24"}
+-
+- [24, 'tuple 24']
+box.space.memtx:select{20}
+-
+- [20, 'tuple 20']
+box.space.memtx:select{21}
+-
+- [21, 'tuple 21']
+box.space.memtx:select{22}
+-
+- [22, 'tuple 22']
+box.space.memtx:select{23}
+-
+- [23, 'tuple 23']
+box.space.memtx:select{24}
+-
+- [24, 'tuple 24']
+box.space.vinyl:select{20}
+-
+- [20, 'tuple 20']
+box.space.vinyl:select{21}
+-
+- [21, 'tuple 21']
+box.space.vinyl:select{22}
+-
+- [22, 'tuple 22']
+box.space.vinyl:select{23}
+-
+- [23, 'tuple 23']
+box.space.vinyl:select{24}
+-
+- [24, 'tuple 24']
+box.space.memtx:insert{25, "tuple 25"}
+-
+- [25, 'tuple 25']
+box.space.memtx:insert{26, "tuple 26"}
+-
+- [26, 'tuple 26']
+box.space.memtx:insert{27, "tuple 27"}
+-
+- [27, 'tuple 27']
+box.space.memtx:insert{28, "tuple 28"}
+-
+- [28, 'tuple 28']
+box.space.memtx:insert{29, "tuple 29"}
+-
+- [29, 'tuple 29']
+box.space.vinyl:insert{25, "tuple 25"}
+-
+- [25, 'tuple 25']
+box.space.vinyl:insert{26, "tuple 26"}
+-
+- [26, 'tuple 26']
+box.space.vinyl:insert{27, "tuple 27"}
+-
+- [27, 'tuple 27']
+box.space.vinyl:insert{28, "tuple 28"}
+-
+- [28, 'tuple 28']
+box.space.vinyl:insert{29, "tuple 29"}
+-
+- [29, 'tuple 29']
+box.space.memtx:select{25}
+-
+- [25, 'tuple 25']
+box.space.memtx:select{26}
+-
+- [26, 'tuple 26']
+box.space.memtx:select{27}
+-
+- [27, 'tuple 27']
+box.space.memtx:select{28}
+-
+- [28, 'tuple 28']
+box.space.memtx:select{29}
+-
+- [29, 'tuple 29']
+box.space.vinyl:select{25}
+-
+- [25, 'tuple 25']
+box.space.vinyl:select{26}
+-
+- [26, 'tuple 26']
+box.space.vinyl:select{27}
+-
+- [27, 'tuple 27']
+box.space.vinyl:select{28}
+-
+- [28, 'tuple 28']
+box.space.vinyl:select{29}
+-
+- [29, 'tuple 29']
+swap servers
+switch replica to master
+box.cfg{replication=''}
+---
+...
+switch master to replica
+box.space.memtx:insert{30, "tuple 30"}
+-
+- [30, 'tuple 30']
+box.space.memtx:insert{31, "tuple 31"}
+-
+- [31, 'tuple 31']
+box.space.memtx:insert{32, "tuple 32"}
+-
+- [32, 'tuple 32']
+box.space.memtx:insert{33, "tuple 33"}
+-
+- [33, 'tuple 33']
+box.space.memtx:insert{34, "tuple 34"}
+-
+- [34, 'tuple 34']
+box.space.vinyl:insert{30, "tuple 30"}
+-
+- [30, 'tuple 30']
+box.space.vinyl:insert{31, "tuple 31"}
+-
+- [31, 'tuple 31']
+box.space.vinyl:insert{32, "tuple 32"}
+-
+- [32, 'tuple 32']
+box.space.vinyl:insert{33, "tuple 33"}
+-
+- [33, 'tuple 33']
+box.space.vinyl:insert{34, "tuple 34"}
+-
+- [34, 'tuple 34']
+box.space.memtx:select{30}
+-
+- [30, 'tuple 30']
+box.space.memtx:select{31}
+-
+- [31, 'tuple 31']
+box.space.memtx:select{32}
+-
+- [32, 'tuple 32']
+box.space.memtx:select{33}
+-
+- [33, 'tuple 33']
+box.space.memtx:select{34}
+-
+- [34, 'tuple 34']
+box.space.vinyl:select{30}
+-
+- [30, 'tuple 30']
+box.space.vinyl:select{31}
+-
+- [31, 'tuple 31']
+box.space.vinyl:select{32}
+-
+- [32, 'tuple 32']
+box.space.vinyl:select{33}
+-
+- [33, 'tuple 33']
+box.space.vinyl:select{34}
+-
+- [34, 'tuple 34']
+box.space.memtx:insert{35, "tuple 35"}
+-
+- [35, 'tuple 35']
+box.space.memtx:insert{36, "tuple 36"}
+-
+- [36, 'tuple 36']
+box.space.memtx:insert{37, "tuple 37"}
+-
+- [37, 'tuple 37']
+box.space.memtx:insert{38, "tuple 38"}
+-
+- [38, 'tuple 38']
+box.space.memtx:insert{39, "tuple 39"}
+-
+- [39, 'tuple 39']
+box.space.vinyl:insert{35, "tuple 35"}
+-
+- [35, 'tuple 35']
+box.space.vinyl:insert{36, "tuple 36"}
+-
+- [36, 'tuple 36']
+box.space.vinyl:insert{37, "tuple 37"}
+-
+- [37, 'tuple 37']
+box.space.vinyl:insert{38, "tuple 38"}
+-
+- [38, 'tuple 38']
+box.space.vinyl:insert{39, "tuple 39"}
+-
+- [39, 'tuple 39']
+box.space.memtx:select{35}
+-
+- [35, 'tuple 35']
+box.space.memtx:select{36}
+-
+- [36, 'tuple 36']
+box.space.memtx:select{37}
+-
+- [37, 'tuple 37']
+box.space.memtx:select{38}
+-
+- [38, 'tuple 38']
+box.space.memtx:select{39}
+-
+- [39, 'tuple 39']
+box.space.vinyl:select{35}
+-
+- [35, 'tuple 35']
+box.space.vinyl:select{36}
+-
+- [36, 'tuple 36']
+box.space.vinyl:select{37}
+-
+- [37, 'tuple 37']
+box.space.vinyl:select{38}
+-
+- [38, 'tuple 38']
+box.space.vinyl:select{39}
+-
+- [39, 'tuple 39']
+rollback servers configuration
+switch master to master
+box.cfg{replication=''}
+---
+...
+switch replica to replica
+test 2 iteration
+box.space.memtx:insert{40, "tuple 40"}
+-
+- [40, 'tuple 40']
+box.space.memtx:insert{41, "tuple 41"}
+-
+- [41, 'tuple 41']
+box.space.memtx:insert{42, "tuple 42"}
+-
+- [42, 'tuple 42']
+box.space.memtx:insert{43, "tuple 43"}
+-
+- [43, 'tuple 43']
+box.space.memtx:insert{44, "tuple 44"}
+-
+- [44, 'tuple 44']
+box.space.vinyl:insert{40, "tuple 40"}
+-
+- [40, 'tuple 40']
+box.space.vinyl:insert{41, "tuple 41"}
+-
+- [41, 'tuple 41']
+box.space.vinyl:insert{42, "tuple 42"}
+-
+- [42, 'tuple 42']
+box.space.vinyl:insert{43, "tuple 43"}
+-
+- [43, 'tuple 43']
+box.space.vinyl:insert{44, "tuple 44"}
+-
+- [44, 'tuple 44']
+box.space.memtx:select{40}
+-
+- [40, 'tuple 40']
+box.space.memtx:select{41}
+-
+- [41, 'tuple 41']
+box.space.memtx:select{42}
+-
+- [42, 'tuple 42']
+box.space.memtx:select{43}
+-
+- [43, 'tuple 43']
+box.space.memtx:select{44}
+-
+- [44, 'tuple 44']
+box.space.vinyl:select{40}
+-
+- [40, 'tuple 40']
+box.space.vinyl:select{41}
+-
+- [41, 'tuple 41']
+box.space.vinyl:select{42}
+-
+- [42, 'tuple 42']
+box.space.vinyl:select{43}
+-
+- [43, 'tuple 43']
+box.space.vinyl:select{44}
+-
+- [44, 'tuple 44']
+box.space.memtx:insert{45, "tuple 45"}
+-
+- [45, 'tuple 45']
+box.space.memtx:insert{46, "tuple 46"}
+-
+- [46, 'tuple 46']
+box.space.memtx:insert{47, "tuple 47"}
+-
+- [47, 'tuple 47']
+box.space.memtx:insert{48, "tuple 48"}
+-
+- [48, 'tuple 48']
+box.space.memtx:insert{49, "tuple 49"}
+-
+- [49, 'tuple 49']
+box.space.vinyl:insert{45, "tuple 45"}
+-
+- [45, 'tuple 45']
+box.space.vinyl:insert{46, "tuple 46"}
+-
+- [46, 'tuple 46']
+box.space.vinyl:insert{47, "tuple 47"}
+-
+- [47, 'tuple 47']
+box.space.vinyl:insert{48, "tuple 48"}
+-
+- [48, 'tuple 48']
+box.space.vinyl:insert{49, "tuple 49"}
+-
+- [49, 'tuple 49']
+box.space.memtx:select{45}
+-
+- [45, 'tuple 45']
+box.space.memtx:select{46}
+-
+- [46, 'tuple 46']
+box.space.memtx:select{47}
+-
+- [47, 'tuple 47']
+box.space.memtx:select{48}
+-
+- [48, 'tuple 48']
+box.space.memtx:select{49}
+-
+- [49, 'tuple 49']
+box.space.vinyl:select{45}
+-
+- [45, 'tuple 45']
+box.space.vinyl:select{46}
+-
+- [46, 'tuple 46']
+box.space.vinyl:select{47}
+-
+- [47, 'tuple 47']
+box.space.vinyl:select{48}
+-
+- [48, 'tuple 48']
+box.space.vinyl:select{49}
+-
+- [49, 'tuple 49']
+swap servers
+switch replica to master
+box.cfg{replication=''}
+---
+...
+switch master to replica
+box.space.memtx:insert{50, "tuple 50"}
+-
+- [50, 'tuple 50']
+box.space.memtx:insert{51, "tuple 51"}
+-
+- [51, 'tuple 51']
+box.space.memtx:insert{52, "tuple 52"}
+-
+- [52, 'tuple 52']
+box.space.memtx:insert{53, "tuple 53"}
+-
+- [53, 'tuple 53']
+box.space.memtx:insert{54, "tuple 54"}
+-
+- [54, 'tuple 54']
+box.space.vinyl:insert{50, "tuple 50"}
+-
+- [50, 'tuple 50']
+box.space.vinyl:insert{51, "tuple 51"}
+-
+- [51, 'tuple 51']
+box.space.vinyl:insert{52, "tuple 52"}
+-
+- [52, 'tuple 52']
+box.space.vinyl:insert{53, "tuple 53"}
+-
+- [53, 'tuple 53']
+box.space.vinyl:insert{54, "tuple 54"}
+-
+- [54, 'tuple 54']
+box.space.memtx:select{50}
+-
+- [50, 'tuple 50']
+box.space.memtx:select{51}
+-
+- [51, 'tuple 51']
+box.space.memtx:select{52}
+-
+- [52, 'tuple 52']
+box.space.memtx:select{53}
+-
+- [53, 'tuple 53']
+box.space.memtx:select{54}
+-
+- [54, 'tuple 54']
+box.space.vinyl:select{50}
+-
+- [50, 'tuple 50']
+box.space.vinyl:select{51}
+-
+- [51, 'tuple 51']
+box.space.vinyl:select{52}
+-
+- [52, 'tuple 52']
+box.space.vinyl:select{53}
+-
+- [53, 'tuple 53']
+box.space.vinyl:select{54}
+-
+- [54, 'tuple 54']
+box.space.memtx:insert{55, "tuple 55"}
+-
+- [55, 'tuple 55']
+box.space.memtx:insert{56, "tuple 56"}
+-
+- [56, 'tuple 56']
+box.space.memtx:insert{57, "tuple 57"}
+-
+- [57, 'tuple 57']
+box.space.memtx:insert{58, "tuple 58"}
+-
+- [58, 'tuple 58']
+box.space.memtx:insert{59, "tuple 59"}
+-
+- [59, 'tuple 59']
+box.space.vinyl:insert{55, "tuple 55"}
+-
+- [55, 'tuple 55']
+box.space.vinyl:insert{56, "tuple 56"}
+-
+- [56, 'tuple 56']
+box.space.vinyl:insert{57, "tuple 57"}
+-
+- [57, 'tuple 57']
+box.space.vinyl:insert{58, "tuple 58"}
+-
+- [58, 'tuple 58']
+box.space.vinyl:insert{59, "tuple 59"}
+-
+- [59, 'tuple 59']
+box.space.memtx:select{55}
+-
+- [55, 'tuple 55']
+box.space.memtx:select{56}
+-
+- [56, 'tuple 56']
+box.space.memtx:select{57}
+-
+- [57, 'tuple 57']
+box.space.memtx:select{58}
+-
+- [58, 'tuple 58']
+box.space.memtx:select{59}
+-
+- [59, 'tuple 59']
+box.space.vinyl:select{55}
+-
+- [55, 'tuple 55']
+box.space.vinyl:select{56}
+-
+- [56, 'tuple 56']
+box.space.vinyl:select{57}
+-
+- [57, 'tuple 57']
+box.space.vinyl:select{58}
+-
+- [58, 'tuple 58']
+box.space.vinyl:select{59}
+-
+- [59, 'tuple 59']
+rollback servers configuration
+switch master to master
+box.cfg{replication=''}
+---
+...
+switch replica to replica
+test 3 iteration
+box.space.memtx:insert{60, "tuple 60"}
+-
+- [60, 'tuple 60']
+box.space.memtx:insert{61, "tuple 61"}
+-
+- [61, 'tuple 61']
+box.space.memtx:insert{62, "tuple 62"}
+-
+- [62, 'tuple 62']
+box.space.memtx:insert{63, "tuple 63"}
+-
+- [63, 'tuple 63']
+box.space.memtx:insert{64, "tuple 64"}
+-
+- [64, 'tuple 64']
+box.space.vinyl:insert{60, "tuple 60"}
+-
+- [60, 'tuple 60']
+box.space.vinyl:insert{61, "tuple 61"}
+-
+- [61, 'tuple 61']
+box.space.vinyl:insert{62, "tuple 62"}
+-
+- [62, 'tuple 62']
+box.space.vinyl:insert{63, "tuple 63"}
+-
+- [63, 'tuple 63']
+box.space.vinyl:insert{64, "tuple 64"}
+-
+- [64, 'tuple 64']
+box.space.memtx:select{60}
+-
+- [60, 'tuple 60']
+box.space.memtx:select{61}
+-
+- [61, 'tuple 61']
+box.space.memtx:select{62}
+-
+- [62, 'tuple 62']
+box.space.memtx:select{63}
+-
+- [63, 'tuple 63']
+box.space.memtx:select{64}
+-
+- [64, 'tuple 64']
+box.space.vinyl:select{60}
+-
+- [60, 'tuple 60']
+box.space.vinyl:select{61}
+-
+- [61, 'tuple 61']
+box.space.vinyl:select{62}
+-
+- [62, 'tuple 62']
+box.space.vinyl:select{63}
+-
+- [63, 'tuple 63']
+box.space.vinyl:select{64}
+-
+- [64, 'tuple 64']
+box.space.memtx:insert{65, "tuple 65"}
+-
+- [65, 'tuple 65']
+box.space.memtx:insert{66, "tuple 66"}
+-
+- [66, 'tuple 66']
+box.space.memtx:insert{67, "tuple 67"}
+-
+- [67, 'tuple 67']
+box.space.memtx:insert{68, "tuple 68"}
+-
+- [68, 'tuple 68']
+box.space.memtx:insert{69, "tuple 69"}
+-
+- [69, 'tuple 69']
+box.space.vinyl:insert{65, "tuple 65"}
+-
+- [65, 'tuple 65']
+box.space.vinyl:insert{66, "tuple 66"}
+-
+- [66, 'tuple 66']
+box.space.vinyl:insert{67, "tuple 67"}
+-
+- [67, 'tuple 67']
+box.space.vinyl:insert{68, "tuple 68"}
+-
+- [68, 'tuple 68']
+box.space.vinyl:insert{69, "tuple 69"}
+-
+- [69, 'tuple 69']
+box.space.memtx:select{65}
+-
+- [65, 'tuple 65']
+box.space.memtx:select{66}
+-
+- [66, 'tuple 66']
+box.space.memtx:select{67}
+-
+- [67, 'tuple 67']
+box.space.memtx:select{68}
+-
+- [68, 'tuple 68']
+box.space.memtx:select{69}
+-
+- [69, 'tuple 69']
+box.space.vinyl:select{65}
+-
+- [65, 'tuple 65']
+box.space.vinyl:select{66}
+-
+- [66, 'tuple 66']
+box.space.vinyl:select{67}
+-
+- [67, 'tuple 67']
+box.space.vinyl:select{68}
+-
+- [68, 'tuple 68']
+box.space.vinyl:select{69}
+-
+- [69, 'tuple 69']
+swap servers
+switch replica to master
+box.cfg{replication=''}
+---
+...
+switch master to replica
+box.space.memtx:insert{70, "tuple 70"}
+-
+- [70, 'tuple 70']
+box.space.memtx:insert{71, "tuple 71"}
+-
+- [71, 'tuple 71']
+box.space.memtx:insert{72, "tuple 72"}
+-
+- [72, 'tuple 72']
+box.space.memtx:insert{73, "tuple 73"}
+-
+- [73, 'tuple 73']
+box.space.memtx:insert{74, "tuple 74"}
+-
+- [74, 'tuple 74']
+box.space.vinyl:insert{70, "tuple 70"}
+-
+- [70, 'tuple 70']
+box.space.vinyl:insert{71, "tuple 71"}
+-
+- [71, 'tuple 71']
+box.space.vinyl:insert{72, "tuple 72"}
+-
+- [72, 'tuple 72']
+box.space.vinyl:insert{73, "tuple 73"}
+-
+- [73, 'tuple 73']
+box.space.vinyl:insert{74, "tuple 74"}
+-
+- [74, 'tuple 74']
+box.space.memtx:select{70}
+-
+- [70, 'tuple 70']
+box.space.memtx:select{71}
+-
+- [71, 'tuple 71']
+box.space.memtx:select{72}
+-
+- [72, 'tuple 72']
+box.space.memtx:select{73}
+-
+- [73, 'tuple 73']
+box.space.memtx:select{74}
+-
+- [74, 'tuple 74']
+box.space.vinyl:select{70}
+-
+- [70, 'tuple 70']
+box.space.vinyl:select{71}
+-
+- [71, 'tuple 71']
+box.space.vinyl:select{72}
+-
+- [72, 'tuple 72']
+box.space.vinyl:select{73}
+-
+- [73, 'tuple 73']
+box.space.vinyl:select{74}
+-
+- [74, 'tuple 74']
+box.space.memtx:insert{75, "tuple 75"}
+-
+- [75, 'tuple 75']
+box.space.memtx:insert{76, "tuple 76"}
+-
+- [76, 'tuple 76']
+box.space.memtx:insert{77, "tuple 77"}
+-
+- [77, 'tuple 77']
+box.space.memtx:insert{78, "tuple 78"}
+-
+- [78, 'tuple 78']
+box.space.memtx:insert{79, "tuple 79"}
+-
+- [79, 'tuple 79']
+box.space.vinyl:insert{75, "tuple 75"}
+-
+- [75, 'tuple 75']
+box.space.vinyl:insert{76, "tuple 76"}
+-
+- [76, 'tuple 76']
+box.space.vinyl:insert{77, "tuple 77"}
+-
+- [77, 'tuple 77']
+box.space.vinyl:insert{78, "tuple 78"}
+-
+- [78, 'tuple 78']
+box.space.vinyl:insert{79, "tuple 79"}
+-
+- [79, 'tuple 79']
+box.space.memtx:select{75}
+-
+- [75, 'tuple 75']
+box.space.memtx:select{76}
+-
+- [76, 'tuple 76']
+box.space.memtx:select{77}
+-
+- [77, 'tuple 77']
+box.space.memtx:select{78}
+-
+- [78, 'tuple 78']
+box.space.memtx:select{79}
+-
+- [79, 'tuple 79']
+box.space.vinyl:select{75}
+-
+- [75, 'tuple 75']
+box.space.vinyl:select{76}
+-
+- [76, 'tuple 76']
+box.space.vinyl:select{77}
+-
+- [77, 'tuple 77']
+box.space.vinyl:select{78}
+-
+- [78, 'tuple 78']
+box.space.vinyl:select{79}
+-
+- [79, 'tuple 79']
+rollback servers configuration
+switch master to master
+box.cfg{replication=''}
+---
+...
+switch replica to replica
+test 4 iteration
+box.space.memtx:insert{80, "tuple 80"}
+-
+- [80, 'tuple 80']
+box.space.memtx:insert{81, "tuple 81"}
+-
+- [81, 'tuple 81']
+box.space.memtx:insert{82, "tuple 82"}
+-
+- [82, 'tuple 82']
+box.space.memtx:insert{83, "tuple 83"}
+-
+- [83, 'tuple 83']
+box.space.memtx:insert{84, "tuple 84"}
+-
+- [84, 'tuple 84']
+box.space.vinyl:insert{80, "tuple 80"}
+-
+- [80, 'tuple 80']
+box.space.vinyl:insert{81, "tuple 81"}
+-
+- [81, 'tuple 81']
+box.space.vinyl:insert{82, "tuple 82"}
+-
+- [82, 'tuple 82']
+box.space.vinyl:insert{83, "tuple 83"}
+-
+- [83, 'tuple 83']
+box.space.vinyl:insert{84, "tuple 84"}
+-
+- [84, 'tuple 84']
+box.space.memtx:select{80}
+-
+- [80, 'tuple 80']
+box.space.memtx:select{81}
+-
+- [81, 'tuple 81']
+box.space.memtx:select{82}
+-
+- [82, 'tuple 82']
+box.space.memtx:select{83}
+-
+- [83, 'tuple 83']
+box.space.memtx:select{84}
+-
+- [84, 'tuple 84']
+box.space.vinyl:select{80}
+-
+- [80, 'tuple 80']
+box.space.vinyl:select{81}
+-
+- [81, 'tuple 81']
+box.space.vinyl:select{82}
+-
+- [82, 'tuple 82']
+box.space.vinyl:select{83}
+-
+- [83, 'tuple 83']
+box.space.vinyl:select{84}
+-
+- [84, 'tuple 84']
+box.space.memtx:insert{85, "tuple 85"}
+-
+- [85, 'tuple 85']
+box.space.memtx:insert{86, "tuple 86"}
+-
+- [86, 'tuple 86']
+box.space.memtx:insert{87, "tuple 87"}
+-
+- [87, 'tuple 87']
+box.space.memtx:insert{88, "tuple 88"}
+-
+- [88, 'tuple 88']
+box.space.memtx:insert{89, "tuple 89"}
+-
+- [89, 'tuple 89']
+box.space.vinyl:insert{85, "tuple 85"}
+-
+- [85, 'tuple 85']
+box.space.vinyl:insert{86, "tuple 86"}
+-
+- [86, 'tuple 86']
+box.space.vinyl:insert{87, "tuple 87"}
+-
+- [87, 'tuple 87']
+box.space.vinyl:insert{88, "tuple 88"}
+-
+- [88, 'tuple 88']
+box.space.vinyl:insert{89, "tuple 89"}
+-
+- [89, 'tuple 89']
+box.space.memtx:select{85}
+-
+- [85, 'tuple 85']
+box.space.memtx:select{86}
+-
+- [86, 'tuple 86']
+box.space.memtx:select{87}
+-
+- [87, 'tuple 87']
+box.space.memtx:select{88}
+-
+- [88, 'tuple 88']
+box.space.memtx:select{89}
+-
+- [89, 'tuple 89']
+box.space.vinyl:select{85}
+-
+- [85, 'tuple 85']
+box.space.vinyl:select{86}
+-
+- [86, 'tuple 86']
+box.space.vinyl:select{87}
+-
+- [87, 'tuple 87']
+box.space.vinyl:select{88}
+-
+- [88, 'tuple 88']
+box.space.vinyl:select{89}
+-
+- [89, 'tuple 89']
+swap servers
+switch replica to master
+box.cfg{replication=''}
+---
+...
+switch master to replica
+box.space.memtx:insert{90, "tuple 90"}
+-
+- [90, 'tuple 90']
+box.space.memtx:insert{91, "tuple 91"}
+-
+- [91, 'tuple 91']
+box.space.memtx:insert{92, "tuple 92"}
+-
+- [92, 'tuple 92']
+box.space.memtx:insert{93, "tuple 93"}
+-
+- [93, 'tuple 93']
+box.space.memtx:insert{94, "tuple 94"}
+-
+- [94, 'tuple 94']
+box.space.vinyl:insert{90, "tuple 90"}
+-
+- [90, 'tuple 90']
+box.space.vinyl:insert{91, "tuple 91"}
+-
+- [91, 'tuple 91']
+box.space.vinyl:insert{92, "tuple 92"}
+-
+- [92, 'tuple 92']
+box.space.vinyl:insert{93, "tuple 93"}
+-
+- [93, 'tuple 93']
+box.space.vinyl:insert{94, "tuple 94"}
+-
+- [94, 'tuple 94']
+box.space.memtx:select{90}
+-
+- [90, 'tuple 90']
+box.space.memtx:select{91}
+-
+- [91, 'tuple 91']
+box.space.memtx:select{92}
+-
+- [92, 'tuple 92']
+box.space.memtx:select{93}
+-
+- [93, 'tuple 93']
+box.space.memtx:select{94}
+-
+- [94, 'tuple 94']
+box.space.vinyl:select{90}
+-
+- [90, 'tuple 90']
+box.space.vinyl:select{91}
+-
+- [91, 'tuple 91']
+box.space.vinyl:select{92}
+-
+- [92, 'tuple 92']
+box.space.vinyl:select{93}
+-
+- [93, 'tuple 93']
+box.space.vinyl:select{94}
+-
+- [94, 'tuple 94']
+box.space.memtx:insert{95, "tuple 95"}
+-
+- [95, 'tuple 95']
+box.space.memtx:insert{96, "tuple 96"}
+-
+- [96, 'tuple 96']
+box.space.memtx:insert{97, "tuple 97"}
+-
+- [97, 'tuple 97']
+box.space.memtx:insert{98, "tuple 98"}
+-
+- [98, 'tuple 98']
+box.space.memtx:insert{99, "tuple 99"}
+-
+- [99, 'tuple 99']
+box.space.vinyl:insert{95, "tuple 95"}
+-
+- [95, 'tuple 95']
+box.space.vinyl:insert{96, "tuple 96"}
+-
+- [96, 'tuple 96']
+box.space.vinyl:insert{97, "tuple 97"}
+-
+- [97, 'tuple 97']
+box.space.vinyl:insert{98, "tuple 98"}
+-
+- [98, 'tuple 98']
+box.space.vinyl:insert{99, "tuple 99"}
+-
+- [99, 'tuple 99']
+box.space.memtx:select{95}
+-
+- [95, 'tuple 95']
+box.space.memtx:select{96}
+-
+- [96, 'tuple 96']
+box.space.memtx:select{97}
+-
+- [97, 'tuple 97']
+box.space.memtx:select{98}
+-
+- [98, 'tuple 98']
+box.space.memtx:select{99}
+-
+- [99, 'tuple 99']
+box.space.vinyl:select{95}
+-
+- [95, 'tuple 95']
+box.space.vinyl:select{96}
+-
+- [96, 'tuple 96']
+box.space.vinyl:select{97}
+-
+- [97, 'tuple 97']
+box.space.vinyl:select{98}
+-
+- [98, 'tuple 98']
+box.space.vinyl:select{99}
+-
+- [99, 'tuple 99']
+rollback servers configuration
+switch master to master
+box.cfg{replication=''}
+---
+...
+switch replica to replica
+test 5 iteration
+box.space.memtx:insert{100, "tuple 100"}
+-
+- [100, 'tuple 100']
+box.space.memtx:insert{101, "tuple 101"}
+-
+- [101, 'tuple 101']
+box.space.memtx:insert{102, "tuple 102"}
+-
+- [102, 'tuple 102']
+box.space.memtx:insert{103, "tuple 103"}
+-
+- [103, 'tuple 103']
+box.space.memtx:insert{104, "tuple 104"}
+-
+- [104, 'tuple 104']
+box.space.vinyl:insert{100, "tuple 100"}
+-
+- [100, 'tuple 100']
+box.space.vinyl:insert{101, "tuple 101"}
+-
+- [101, 'tuple 101']
+box.space.vinyl:insert{102, "tuple 102"}
+-
+- [102, 'tuple 102']
+box.space.vinyl:insert{103, "tuple 103"}
+-
+- [103, 'tuple 103']
+box.space.vinyl:insert{104, "tuple 104"}
+-
+- [104, 'tuple 104']
+box.space.memtx:select{100}
+-
+- [100, 'tuple 100']
+box.space.memtx:select{101}
+-
+- [101, 'tuple 101']
+box.space.memtx:select{102}
+-
+- [102, 'tuple 102']
+box.space.memtx:select{103}
+-
+- [103, 'tuple 103']
+box.space.memtx:select{104}
+-
+- [104, 'tuple 104']
+box.space.vinyl:select{100}
+-
+- [100, 'tuple 100']
+box.space.vinyl:select{101}
+-
+- [101, 'tuple 101']
+box.space.vinyl:select{102}
+-
+- [102, 'tuple 102']
+box.space.vinyl:select{103}
+-
+- [103, 'tuple 103']
+box.space.vinyl:select{104}
+-
+- [104, 'tuple 104']
+box.space.memtx:insert{105, "tuple 105"}
+-
+- [105, 'tuple 105']
+box.space.memtx:insert{106, "tuple 106"}
+-
+- [106, 'tuple 106']
+box.space.memtx:insert{107, "tuple 107"}
+-
+- [107, 'tuple 107']
+box.space.memtx:insert{108, "tuple 108"}
+-
+- [108, 'tuple 108']
+box.space.memtx:insert{109, "tuple 109"}
+-
+- [109, 'tuple 109']
+box.space.vinyl:insert{105, "tuple 105"}
+-
+- [105, 'tuple 105']
+box.space.vinyl:insert{106, "tuple 106"}
+-
+- [106, 'tuple 106']
+box.space.vinyl:insert{107, "tuple 107"}
+-
+- [107, 'tuple 107']
+box.space.vinyl:insert{108, "tuple 108"}
+-
+- [108, 'tuple 108']
+box.space.vinyl:insert{109, "tuple 109"}
+-
+- [109, 'tuple 109']
+box.space.memtx:select{105}
+-
+- [105, 'tuple 105']
+box.space.memtx:select{106}
+-
+- [106, 'tuple 106']
+box.space.memtx:select{107}
+-
+- [107, 'tuple 107']
+box.space.memtx:select{108}
+-
+- [108, 'tuple 108']
+box.space.memtx:select{109}
+-
+- [109, 'tuple 109']
+box.space.vinyl:select{105}
+-
+- [105, 'tuple 105']
+box.space.vinyl:select{106}
+-
+- [106, 'tuple 106']
+box.space.vinyl:select{107}
+-
+- [107, 'tuple 107']
+box.space.vinyl:select{108}
+-
+- [108, 'tuple 108']
+box.space.vinyl:select{109}
+-
+- [109, 'tuple 109']
+swap servers
+switch replica to master
+box.cfg{replication=''}
+---
+...
+switch master to replica
+box.space.memtx:insert{110, "tuple 110"}
+-
+- [110, 'tuple 110']
+box.space.memtx:insert{111, "tuple 111"}
+-
+- [111, 'tuple 111']
+box.space.memtx:insert{112, "tuple 112"}
+-
+- [112, 'tuple 112']
+box.space.memtx:insert{113, "tuple 113"}
+-
+- [113, 'tuple 113']
+box.space.memtx:insert{114, "tuple 114"}
+-
+- [114, 'tuple 114']
+box.space.vinyl:insert{110, "tuple 110"}
+-
+- [110, 'tuple 110']
+box.space.vinyl:insert{111, "tuple 111"}
+-
+- [111, 'tuple 111']
+box.space.vinyl:insert{112, "tuple 112"}
+-
+- [112, 'tuple 112']
+box.space.vinyl:insert{113, "tuple 113"}
+-
+- [113, 'tuple 113']
+box.space.vinyl:insert{114, "tuple 114"}
+-
+- [114, 'tuple 114']
+box.space.memtx:select{110}
+-
+- [110, 'tuple 110']
+box.space.memtx:select{111}
+-
+- [111, 'tuple 111']
+box.space.memtx:select{112}
+-
+- [112, 'tuple 112']
+box.space.memtx:select{113}
+-
+- [113, 'tuple 113']
+box.space.memtx:select{114}
+-
+- [114, 'tuple 114']
+box.space.vinyl:select{110}
+-
+- [110, 'tuple 110']
+box.space.vinyl:select{111}
+-
+- [111, 'tuple 111']
+box.space.vinyl:select{112}
+-
+- [112, 'tuple 112']
+box.space.vinyl:select{113}
+-
+- [113, 'tuple 113']
+box.space.vinyl:select{114}
+-
+- [114, 'tuple 114']
+box.space.memtx:insert{115, "tuple 115"}
+-
+- [115, 'tuple 115']
+box.space.memtx:insert{116, "tuple 116"}
+-
+- [116, 'tuple 116']
+box.space.memtx:insert{117, "tuple 117"}
+-
+- [117, 'tuple 117']
+box.space.memtx:insert{118, "tuple 118"}
+-
+- [118, 'tuple 118']
+box.space.memtx:insert{119, "tuple 119"}
+-
+- [119, 'tuple 119']
+box.space.vinyl:insert{115, "tuple 115"}
+-
+- [115, 'tuple 115']
+box.space.vinyl:insert{116, "tuple 116"}
+-
+- [116, 'tuple 116']
+box.space.vinyl:insert{117, "tuple 117"}
+-
+- [117, 'tuple 117']
+box.space.vinyl:insert{118, "tuple 118"}
+-
+- [118, 'tuple 118']
+box.space.vinyl:insert{119, "tuple 119"}
+-
+- [119, 'tuple 119']
+box.space.memtx:select{115}
+-
+- [115, 'tuple 115']
+box.space.memtx:select{116}
+-
+- [116, 'tuple 116']
+box.space.memtx:select{117}
+-
+- [117, 'tuple 117']
+box.space.memtx:select{118}
+-
+- [118, 'tuple 118']
+box.space.memtx:select{119}
+-
+- [119, 'tuple 119']
+box.space.vinyl:select{115}
+-
+- [115, 'tuple 115']
+box.space.vinyl:select{116}
+-
+- [116, 'tuple 116']
+box.space.vinyl:select{117}
+-
+- [117, 'tuple 117']
+box.space.vinyl:select{118}
+-
+- [118, 'tuple 118']
+box.space.vinyl:select{119}
+-
+- [119, 'tuple 119']
+rollback servers configuration
+switch master to master
+box.cfg{replication=''}
+---
+...
+switch replica to replica
+test 6 iteration
+box.space.memtx:insert{120, "tuple 120"}
+-
+- [120, 'tuple 120']
+box.space.memtx:insert{121, "tuple 121"}
+-
+- [121, 'tuple 121']
+box.space.memtx:insert{122, "tuple 122"}
+-
+- [122, 'tuple 122']
+box.space.memtx:insert{123, "tuple 123"}
+-
+- [123, 'tuple 123']
+box.space.memtx:insert{124, "tuple 124"}
+-
+- [124, 'tuple 124']
+box.space.vinyl:insert{120, "tuple 120"}
+-
+- [120, 'tuple 120']
+box.space.vinyl:insert{121, "tuple 121"}
+-
+- [121, 'tuple 121']
+box.space.vinyl:insert{122, "tuple 122"}
+-
+- [122, 'tuple 122']
+box.space.vinyl:insert{123, "tuple 123"}
+-
+- [123, 'tuple 123']
+box.space.vinyl:insert{124, "tuple 124"}
+-
+- [124, 'tuple 124']
+box.space.memtx:select{120}
+-
+- [120, 'tuple 120']
+box.space.memtx:select{121}
+-
+- [121, 'tuple 121']
+box.space.memtx:select{122}
+-
+- [122, 'tuple 122']
+box.space.memtx:select{123}
+-
+- [123, 'tuple 123']
+box.space.memtx:select{124}
+-
+- [124, 'tuple 124']
+box.space.vinyl:select{120}
+-
+- [120, 'tuple 120']
+box.space.vinyl:select{121}
+-
+- [121, 'tuple 121']
+box.space.vinyl:select{122}
+-
+- [122, 'tuple 122']
+box.space.vinyl:select{123}
+-
+- [123, 'tuple 123']
+box.space.vinyl:select{124}
+-
+- [124, 'tuple 124']
+box.space.memtx:insert{125, "tuple 125"}
+-
+- [125, 'tuple 125']
+box.space.memtx:insert{126, "tuple 126"}
+-
+- [126, 'tuple 126']
+box.space.memtx:insert{127, "tuple 127"}
+-
+- [127, 'tuple 127']
+box.space.memtx:insert{128, "tuple 128"}
+-
+- [128, 'tuple 128']
+box.space.memtx:insert{129, "tuple 129"}
+-
+- [129, 'tuple 129']
+box.space.vinyl:insert{125, "tuple 125"}
+-
+- [125, 'tuple 125']
+box.space.vinyl:insert{126, "tuple 126"}
+-
+- [126, 'tuple 126']
+box.space.vinyl:insert{127, "tuple 127"}
+-
+- [127, 'tuple 127']
+box.space.vinyl:insert{128, "tuple 128"}
+-
+- [128, 'tuple 128']
+box.space.vinyl:insert{129, "tuple 129"}
+-
+- [129, 'tuple 129']
+box.space.memtx:select{125}
+-
+- [125, 'tuple 125']
+box.space.memtx:select{126}
+-
+- [126, 'tuple 126']
+box.space.memtx:select{127}
+-
+- [127, 'tuple 127']
+box.space.memtx:select{128}
+-
+- [128, 'tuple 128']
+box.space.memtx:select{129}
+-
+- [129, 'tuple 129']
+box.space.vinyl:select{125}
+-
+- [125, 'tuple 125']
+box.space.vinyl:select{126}
+-
+- [126, 'tuple 126']
+box.space.vinyl:select{127}
+-
+- [127, 'tuple 127']
+box.space.vinyl:select{128}
+-
+- [128, 'tuple 128']
+box.space.vinyl:select{129}
+-
+- [129, 'tuple 129']
+swap servers
+switch replica to master
+box.cfg{replication=''}
+---
+...
+switch master to replica
+box.space.memtx:insert{130, "tuple 130"}
+-
+- [130, 'tuple 130']
+box.space.memtx:insert{131, "tuple 131"}
+-
+- [131, 'tuple 131']
+box.space.memtx:insert{132, "tuple 132"}
+-
+- [132, 'tuple 132']
+box.space.memtx:insert{133, "tuple 133"}
+-
+- [133, 'tuple 133']
+box.space.memtx:insert{134, "tuple 134"}
+-
+- [134, 'tuple 134']
+box.space.vinyl:insert{130, "tuple 130"}
+-
+- [130, 'tuple 130']
+box.space.vinyl:insert{131, "tuple 131"}
+-
+- [131, 'tuple 131']
+box.space.vinyl:insert{132, "tuple 132"}
+-
+- [132, 'tuple 132']
+box.space.vinyl:insert{133, "tuple 133"}
+-
+- [133, 'tuple 133']
+box.space.vinyl:insert{134, "tuple 134"}
+-
+- [134, 'tuple 134']
+box.space.memtx:select{130}
+-
+- [130, 'tuple 130']
+box.space.memtx:select{131}
+-
+- [131, 'tuple 131']
+box.space.memtx:select{132}
+-
+- [132, 'tuple 132']
+box.space.memtx:select{133}
+-
+- [133, 'tuple 133']
+box.space.memtx:select{134}
+-
+- [134, 'tuple 134']
+box.space.vinyl:select{130}
+-
+- [130, 'tuple 130']
+box.space.vinyl:select{131}
+-
+- [131, 'tuple 131']
+box.space.vinyl:select{132}
+-
+- [132, 'tuple 132']
+box.space.vinyl:select{133}
+-
+- [133, 'tuple 133']
+box.space.vinyl:select{134}
+-
+- [134, 'tuple 134']
+box.space.memtx:insert{135, "tuple 135"}
+-
+- [135, 'tuple 135']
+box.space.memtx:insert{136, "tuple 136"}
+-
+- [136, 'tuple 136']
+box.space.memtx:insert{137, "tuple 137"}
+-
+- [137, 'tuple 137']
+box.space.memtx:insert{138, "tuple 138"}
+-
+- [138, 'tuple 138']
+box.space.memtx:insert{139, "tuple 139"}
+-
+- [139, 'tuple 139']
+box.space.vinyl:insert{135, "tuple 135"}
+-
+- [135, 'tuple 135']
+box.space.vinyl:insert{136, "tuple 136"}
+-
+- [136, 'tuple 136']
+box.space.vinyl:insert{137, "tuple 137"}
+-
+- [137, 'tuple 137']
+box.space.vinyl:insert{138, "tuple 138"}
+-
+- [138, 'tuple 138']
+box.space.vinyl:insert{139, "tuple 139"}
+-
+- [139, 'tuple 139']
+box.space.memtx:select{135}
+-
+- [135, 'tuple 135']
+box.space.memtx:select{136}
+-
+- [136, 'tuple 136']
+box.space.memtx:select{137}
+-
+- [137, 'tuple 137']
+box.space.memtx:select{138}
+-
+- [138, 'tuple 138']
+box.space.memtx:select{139}
+-
+- [139, 'tuple 139']
+box.space.vinyl:select{135}
+-
+- [135, 'tuple 135']
+box.space.vinyl:select{136}
+-
+- [136, 'tuple 136']
+box.space.vinyl:select{137}
+-
+- [137, 'tuple 137']
+box.space.vinyl:select{138}
+-
+- [138, 'tuple 138']
+box.space.vinyl:select{139}
+-
+- [139, 'tuple 139']
+rollback servers configuration
+switch master to master
+box.cfg{replication=''}
+---
+...
+switch replica to replica
+test 7 iteration
+box.space.memtx:insert{140, "tuple 140"}
+-
+- [140, 'tuple 140']
+box.space.memtx:insert{141, "tuple 141"}
+-
+- [141, 'tuple 141']
+box.space.memtx:insert{142, "tuple 142"}
+-
+- [142, 'tuple 142']
+box.space.memtx:insert{143, "tuple 143"}
+-
+- [143, 'tuple 143']
+box.space.memtx:insert{144, "tuple 144"}
+-
+- [144, 'tuple 144']
+box.space.vinyl:insert{140, "tuple 140"}
+-
+- [140, 'tuple 140']
+box.space.vinyl:insert{141, "tuple 141"}
+-
+- [141, 'tuple 141']
+box.space.vinyl:insert{142, "tuple 142"}
+-
+- [142, 'tuple 142']
+box.space.vinyl:insert{143, "tuple 143"}
+-
+- [143, 'tuple 143']
+box.space.vinyl:insert{144, "tuple 144"}
+-
+- [144, 'tuple 144']
+box.space.memtx:select{140}
+-
+- [140, 'tuple 140']
+box.space.memtx:select{141}
+-
+- [141, 'tuple 141']
+box.space.memtx:select{142}
+-
+- [142, 'tuple 142']
+box.space.memtx:select{143}
+-
+- [143, 'tuple 143']
+box.space.memtx:select{144}
+-
+- [144, 'tuple 144']
+box.space.vinyl:select{140}
+-
+- [140, 'tuple 140']
+box.space.vinyl:select{141}
+-
+- [141, 'tuple 141']
+box.space.vinyl:select{142}
+-
+- [142, 'tuple 142']
+box.space.vinyl:select{143}
+-
+- [143, 'tuple 143']
+box.space.vinyl:select{144}
+-
+- [144, 'tuple 144']
+box.space.memtx:insert{145, "tuple 145"}
+-
+- [145, 'tuple 145']
+box.space.memtx:insert{146, "tuple 146"}
+-
+- [146, 'tuple 146']
+box.space.memtx:insert{147, "tuple 147"}
+-
+- [147, 'tuple 147']
+box.space.memtx:insert{148, "tuple 148"}
+-
+- [148, 'tuple 148']
+box.space.memtx:insert{149, "tuple 149"}
+-
+- [149, 'tuple 149']
+box.space.vinyl:insert{145, "tuple 145"}
+-
+- [145, 'tuple 145']
+box.space.vinyl:insert{146, "tuple 146"}
+-
+- [146, 'tuple 146']
+box.space.vinyl:insert{147, "tuple 147"}
+-
+- [147, 'tuple 147']
+box.space.vinyl:insert{148, "tuple 148"}
+-
+- [148, 'tuple 148']
+box.space.vinyl:insert{149, "tuple 149"}
+-
+- [149, 'tuple 149']
+box.space.memtx:select{145}
+-
+- [145, 'tuple 145']
+box.space.memtx:select{146}
+-
+- [146, 'tuple 146']
+box.space.memtx:select{147}
+-
+- [147, 'tuple 147']
+box.space.memtx:select{148}
+-
+- [148, 'tuple 148']
+box.space.memtx:select{149}
+-
+- [149, 'tuple 149']
+box.space.vinyl:select{145}
+-
+- [145, 'tuple 145']
+box.space.vinyl:select{146}
+-
+- [146, 'tuple 146']
+box.space.vinyl:select{147}
+-
+- [147, 'tuple 147']
+box.space.vinyl:select{148}
+-
+- [148, 'tuple 148']
+box.space.vinyl:select{149}
+-
+- [149, 'tuple 149']
+swap servers
+switch replica to master
+box.cfg{replication=''}
+---
+...
+switch master to replica
+box.space.memtx:insert{150, "tuple 150"}
+-
+- [150, 'tuple 150']
+box.space.memtx:insert{151, "tuple 151"}
+-
+- [151, 'tuple 151']
+box.space.memtx:insert{152, "tuple 152"}
+-
+- [152, 'tuple 152']
+box.space.memtx:insert{153, "tuple 153"}
+-
+- [153, 'tuple 153']
+box.space.memtx:insert{154, "tuple 154"}
+-
+- [154, 'tuple 154']
+box.space.vinyl:insert{150, "tuple 150"}
+-
+- [150, 'tuple 150']
+box.space.vinyl:insert{151, "tuple 151"}
+-
+- [151, 'tuple 151']
+box.space.vinyl:insert{152, "tuple 152"}
+-
+- [152, 'tuple 152']
+box.space.vinyl:insert{153, "tuple 153"}
+-
+- [153, 'tuple 153']
+box.space.vinyl:insert{154, "tuple 154"}
+-
+- [154, 'tuple 154']
+box.space.memtx:select{150}
+-
+- [150, 'tuple 150']
+box.space.memtx:select{151}
+-
+- [151, 'tuple 151']
+box.space.memtx:select{152}
+-
+- [152, 'tuple 152']
+box.space.memtx:select{153}
+-
+- [153, 'tuple 153']
+box.space.memtx:select{154}
+-
+- [154, 'tuple 154']
+box.space.vinyl:select{150}
+-
+- [150, 'tuple 150']
+box.space.vinyl:select{151}
+-
+- [151, 'tuple 151']
+box.space.vinyl:select{152}
+-
+- [152, 'tuple 152']
+box.space.vinyl:select{153}
+-
+- [153, 'tuple 153']
+box.space.vinyl:select{154}
+-
+- [154, 'tuple 154']
+box.space.memtx:insert{155, "tuple 155"}
+-
+- [155, 'tuple 155']
+box.space.memtx:insert{156, "tuple 156"}
+-
+- [156, 'tuple 156']
+box.space.memtx:insert{157, "tuple 157"}
+-
+- [157, 'tuple 157']
+box.space.memtx:insert{158, "tuple 158"}
+-
+- [158, 'tuple 158']
+box.space.memtx:insert{159, "tuple 159"}
+-
+- [159, 'tuple 159']
+box.space.vinyl:insert{155, "tuple 155"}
+-
+- [155, 'tuple 155']
+box.space.vinyl:insert{156, "tuple 156"}
+-
+- [156, 'tuple 156']
+box.space.vinyl:insert{157, "tuple 157"}
+-
+- [157, 'tuple 157']
+box.space.vinyl:insert{158, "tuple 158"}
+-
+- [158, 'tuple 158']
+box.space.vinyl:insert{159, "tuple 159"}
+-
+- [159, 'tuple 159']
+box.space.memtx:select{155}
+-
+- [155, 'tuple 155']
+box.space.memtx:select{156}
+-
+- [156, 'tuple 156']
+box.space.memtx:select{157}
+-
+- [157, 'tuple 157']
+box.space.memtx:select{158}
+-
+- [158, 'tuple 158']
+box.space.memtx:select{159}
+-
+- [159, 'tuple 159']
+box.space.vinyl:select{155}
+-
+- [155, 'tuple 155']
+box.space.vinyl:select{156}
+-
+- [156, 'tuple 156']
+box.space.vinyl:select{157}
+-
+- [157, 'tuple 157']
+box.space.vinyl:select{158}
+-
+- [158, 'tuple 158']
+box.space.vinyl:select{159}
+-
+- [159, 'tuple 159']
+rollback servers configuration
+switch master to master
+box.cfg{replication=''}
+---
+...
+switch replica to replica
+test 8 iteration
+box.space.memtx:insert{160, "tuple 160"}
+-
+- [160, 'tuple 160']
+box.space.memtx:insert{161, "tuple 161"}
+-
+- [161, 'tuple 161']
+box.space.memtx:insert{162, "tuple 162"}
+-
+- [162, 'tuple 162']
+box.space.memtx:insert{163, "tuple 163"}
+-
+- [163, 'tuple 163']
+box.space.memtx:insert{164, "tuple 164"}
+-
+- [164, 'tuple 164']
+box.space.vinyl:insert{160, "tuple 160"}
+-
+- [160, 'tuple 160']
+box.space.vinyl:insert{161, "tuple 161"}
+-
+- [161, 'tuple 161']
+box.space.vinyl:insert{162, "tuple 162"}
+-
+- [162, 'tuple 162']
+box.space.vinyl:insert{163, "tuple 163"}
+-
+- [163, 'tuple 163']
+box.space.vinyl:insert{164, "tuple 164"}
+-
+- [164, 'tuple 164']
+box.space.memtx:select{160}
+-
+- [160, 'tuple 160']
+box.space.memtx:select{161}
+-
+- [161, 'tuple 161']
+box.space.memtx:select{162}
+-
+- [162, 'tuple 162']
+box.space.memtx:select{163}
+-
+- [163, 'tuple 163']
+box.space.memtx:select{164}
+-
+- [164, 'tuple 164']
+box.space.vinyl:select{160}
+-
+- [160, 'tuple 160']
+box.space.vinyl:select{161}
+-
+- [161, 'tuple 161']
+box.space.vinyl:select{162}
+-
+- [162, 'tuple 162']
+box.space.vinyl:select{163}
+-
+- [163, 'tuple 163']
+box.space.vinyl:select{164}
+-
+- [164, 'tuple 164']
+box.space.memtx:insert{165, "tuple 165"}
+-
+- [165, 'tuple 165']
+box.space.memtx:insert{166, "tuple 166"}
+-
+- [166, 'tuple 166']
+box.space.memtx:insert{167, "tuple 167"}
+-
+- [167, 'tuple 167']
+box.space.memtx:insert{168, "tuple 168"}
+-
+- [168, 'tuple 168']
+box.space.memtx:insert{169, "tuple 169"}
+-
+- [169, 'tuple 169']
+box.space.vinyl:insert{165, "tuple 165"}
+-
+- [165, 'tuple 165']
+box.space.vinyl:insert{166, "tuple 166"}
+-
+- [166, 'tuple 166']
+box.space.vinyl:insert{167, "tuple 167"}
+-
+- [167, 'tuple 167']
+box.space.vinyl:insert{168, "tuple 168"}
+-
+- [168, 'tuple 168']
+box.space.vinyl:insert{169, "tuple 169"}
+-
+- [169, 'tuple 169']
+box.space.memtx:select{165}
+-
+- [165, 'tuple 165']
+box.space.memtx:select{166}
+-
+- [166, 'tuple 166']
+box.space.memtx:select{167}
+-
+- [167, 'tuple 167']
+box.space.memtx:select{168}
+-
+- [168, 'tuple 168']
+box.space.memtx:select{169}
+-
+- [169, 'tuple 169']
+box.space.vinyl:select{165}
+-
+- [165, 'tuple 165']
+box.space.vinyl:select{166}
+-
+- [166, 'tuple 166']
+box.space.vinyl:select{167}
+-
+- [167, 'tuple 167']
+box.space.vinyl:select{168}
+-
+- [168, 'tuple 168']
+box.space.vinyl:select{169}
+-
+- [169, 'tuple 169']
+swap servers
+switch replica to master
+box.cfg{replication=''}
+---
+...
+switch master to replica
+box.space.memtx:insert{170, "tuple 170"}
+-
+- [170, 'tuple 170']
+box.space.memtx:insert{171, "tuple 171"}
+-
+- [171, 'tuple 171']
+box.space.memtx:insert{172, "tuple 172"}
+-
+- [172, 'tuple 172']
+box.space.memtx:insert{173, "tuple 173"}
+-
+- [173, 'tuple 173']
+box.space.memtx:insert{174, "tuple 174"}
+-
+- [174, 'tuple 174']
+box.space.vinyl:insert{170, "tuple 170"}
+-
+- [170, 'tuple 170']
+box.space.vinyl:insert{171, "tuple 171"}
+-
+- [171, 'tuple 171']
+box.space.vinyl:insert{172, "tuple 172"}
+-
+- [172, 'tuple 172']
+box.space.vinyl:insert{173, "tuple 173"}
+-
+- [173, 'tuple 173']
+box.space.vinyl:insert{174, "tuple 174"}
+-
+- [174, 'tuple 174']
+box.space.memtx:select{170}
+-
+- [170, 'tuple 170']
+box.space.memtx:select{171}
+-
+- [171, 'tuple 171']
+box.space.memtx:select{172}
+-
+- [172, 'tuple 172']
+box.space.memtx:select{173}
+-
+- [173, 'tuple 173']
+box.space.memtx:select{174}
+-
+- [174, 'tuple 174']
+box.space.vinyl:select{170}
+-
+- [170, 'tuple 170']
+box.space.vinyl:select{171}
+-
+- [171, 'tuple 171']
+box.space.vinyl:select{172}
+-
+- [172, 'tuple 172']
+box.space.vinyl:select{173}
+-
+- [173, 'tuple 173']
+box.space.vinyl:select{174}
+-
+- [174, 'tuple 174']
+box.space.memtx:insert{175, "tuple 175"}
+-
+- [175, 'tuple 175']
+box.space.memtx:insert{176, "tuple 176"}
+-
+- [176, 'tuple 176']
+box.space.memtx:insert{177, "tuple 177"}
+-
+- [177, 'tuple 177']
+box.space.memtx:insert{178, "tuple 178"}
+-
+- [178, 'tuple 178']
+box.space.memtx:insert{179, "tuple 179"}
+-
+- [179, 'tuple 179']
+box.space.vinyl:insert{175, "tuple 175"}
+-
+- [175, 'tuple 175']
+box.space.vinyl:insert{176, "tuple 176"}
+-
+- [176, 'tuple 176']
+box.space.vinyl:insert{177, "tuple 177"}
+-
+- [177, 'tuple 177']
+box.space.vinyl:insert{178, "tuple 178"}
+-
+- [178, 'tuple 178']
+box.space.vinyl:insert{179, "tuple 179"}
+-
+- [179, 'tuple 179']
+box.space.memtx:select{175}
+-
+- [175, 'tuple 175']
+box.space.memtx:select{176}
+-
+- [176, 'tuple 176']
+box.space.memtx:select{177}
+-
+- [177, 'tuple 177']
+box.space.memtx:select{178}
+-
+- [178, 'tuple 178']
+box.space.memtx:select{179}
+-
+- [179, 'tuple 179']
+box.space.vinyl:select{175}
+-
+- [175, 'tuple 175']
+box.space.vinyl:select{176}
+-
+- [176, 'tuple 176']
+box.space.vinyl:select{177}
+-
+- [177, 'tuple 177']
+box.space.vinyl:select{178}
+-
+- [178, 'tuple 178']
+box.space.vinyl:select{179}
+-
+- [179, 'tuple 179']
+rollback servers configuration
+switch master to master
+box.cfg{replication=''}
+---
+...
+switch replica to replica
+test 9 iteration
+box.space.memtx:insert{180, "tuple 180"}
+-
+- [180, 'tuple 180']
+box.space.memtx:insert{181, "tuple 181"}
+-
+- [181, 'tuple 181']
+box.space.memtx:insert{182, "tuple 182"}
+-
+- [182, 'tuple 182']
+box.space.memtx:insert{183, "tuple 183"}
+-
+- [183, 'tuple 183']
+box.space.memtx:insert{184, "tuple 184"}
+-
+- [184, 'tuple 184']
+box.space.vinyl:insert{180, "tuple 180"}
+-
+- [180, 'tuple 180']
+box.space.vinyl:insert{181, "tuple 181"}
+-
+- [181, 'tuple 181']
+box.space.vinyl:insert{182, "tuple 182"}
+-
+- [182, 'tuple 182']
+box.space.vinyl:insert{183, "tuple 183"}
+-
+- [183, 'tuple 183']
+box.space.vinyl:insert{184, "tuple 184"}
+-
+- [184, 'tuple 184']
+box.space.memtx:select{180}
+-
+- [180, 'tuple 180']
+box.space.memtx:select{181}
+-
+- [181, 'tuple 181']
+box.space.memtx:select{182}
+-
+- [182, 'tuple 182']
+box.space.memtx:select{183}
+-
+- [183, 'tuple 183']
+box.space.memtx:select{184}
+-
+- [184, 'tuple 184']
+box.space.vinyl:select{180}
+-
+- [180, 'tuple 180']
+box.space.vinyl:select{181}
+-
+- [181, 'tuple 181']
+box.space.vinyl:select{182}
+-
+- [182, 'tuple 182']
+box.space.vinyl:select{183}
+-
+- [183, 'tuple 183']
+box.space.vinyl:select{184}
+-
+- [184, 'tuple 184']
+box.space.memtx:insert{185, "tuple 185"}
+-
+- [185, 'tuple 185']
+box.space.memtx:insert{186, "tuple 186"}
+-
+- [186, 'tuple 186']
+box.space.memtx:insert{187, "tuple 187"}
+-
+- [187, 'tuple 187']
+box.space.memtx:insert{188, "tuple 188"}
+-
+- [188, 'tuple 188']
+box.space.memtx:insert{189, "tuple 189"}
+-
+- [189, 'tuple 189']
+box.space.vinyl:insert{185, "tuple 185"}
+-
+- [185, 'tuple 185']
+box.space.vinyl:insert{186, "tuple 186"}
+-
+- [186, 'tuple 186']
+box.space.vinyl:insert{187, "tuple 187"}
+-
+- [187, 'tuple 187']
+box.space.vinyl:insert{188, "tuple 188"}
+-
+- [188, 'tuple 188']
+box.space.vinyl:insert{189, "tuple 189"}
+-
+- [189, 'tuple 189']
+box.space.memtx:select{185}
+-
+- [185, 'tuple 185']
+box.space.memtx:select{186}
+-
+- [186, 'tuple 186']
+box.space.memtx:select{187}
+-
+- [187, 'tuple 187']
+box.space.memtx:select{188}
+-
+- [188, 'tuple 188']
+box.space.memtx:select{189}
+-
+- [189, 'tuple 189']
+box.space.vinyl:select{185}
+-
+- [185, 'tuple 185']
+box.space.vinyl:select{186}
+-
+- [186, 'tuple 186']
+box.space.vinyl:select{187}
+-
+- [187, 'tuple 187']
+box.space.vinyl:select{188}
+-
+- [188, 'tuple 188']
+box.space.vinyl:select{189}
+-
+- [189, 'tuple 189']
+swap servers
+switch replica to master
+box.cfg{replication=''}
+---
+...
+switch master to replica
+box.space.memtx:insert{190, "tuple 190"}
+-
+- [190, 'tuple 190']
+box.space.memtx:insert{191, "tuple 191"}
+-
+- [191, 'tuple 191']
+box.space.memtx:insert{192, "tuple 192"}
+-
+- [192, 'tuple 192']
+box.space.memtx:insert{193, "tuple 193"}
+-
+- [193, 'tuple 193']
+box.space.memtx:insert{194, "tuple 194"}
+-
+- [194, 'tuple 194']
+box.space.vinyl:insert{190, "tuple 190"}
+-
+- [190, 'tuple 190']
+box.space.vinyl:insert{191, "tuple 191"}
+-
+- [191, 'tuple 191']
+box.space.vinyl:insert{192, "tuple 192"}
+-
+- [192, 'tuple 192']
+box.space.vinyl:insert{193, "tuple 193"}
+-
+- [193, 'tuple 193']
+box.space.vinyl:insert{194, "tuple 194"}
+-
+- [194, 'tuple 194']
+box.space.memtx:select{190}
+-
+- [190, 'tuple 190']
+box.space.memtx:select{191}
+-
+- [191, 'tuple 191']
+box.space.memtx:select{192}
+-
+- [192, 'tuple 192']
+box.space.memtx:select{193}
+-
+- [193, 'tuple 193']
+box.space.memtx:select{194}
+-
+- [194, 'tuple 194']
+box.space.vinyl:select{190}
+-
+- [190, 'tuple 190']
+box.space.vinyl:select{191}
+-
+- [191, 'tuple 191']
+box.space.vinyl:select{192}
+-
+- [192, 'tuple 192']
+box.space.vinyl:select{193}
+-
+- [193, 'tuple 193']
+box.space.vinyl:select{194}
+-
+- [194, 'tuple 194']
+box.space.memtx:insert{195, "tuple 195"}
+-
+- [195, 'tuple 195']
+box.space.memtx:insert{196, "tuple 196"}
+-
+- [196, 'tuple 196']
+box.space.memtx:insert{197, "tuple 197"}
+-
+- [197, 'tuple 197']
+box.space.memtx:insert{198, "tuple 198"}
+-
+- [198, 'tuple 198']
+box.space.memtx:insert{199, "tuple 199"}
+-
+- [199, 'tuple 199']
+box.space.vinyl:insert{195, "tuple 195"}
+-
+- [195, 'tuple 195']
+box.space.vinyl:insert{196, "tuple 196"}
+-
+- [196, 'tuple 196']
+box.space.vinyl:insert{197, "tuple 197"}
+-
+- [197, 'tuple 197']
+box.space.vinyl:insert{198, "tuple 198"}
+-
+- [198, 'tuple 198']
+box.space.vinyl:insert{199, "tuple 199"}
+-
+- [199, 'tuple 199']
+box.space.memtx:select{195}
+-
+- [195, 'tuple 195']
+box.space.memtx:select{196}
+-
+- [196, 'tuple 196']
+box.space.memtx:select{197}
+-
+- [197, 'tuple 197']
+box.space.memtx:select{198}
+-
+- [198, 'tuple 198']
+box.space.memtx:select{199}
+-
+- [199, 'tuple 199']
+box.space.vinyl:select{195}
+-
+- [195, 'tuple 195']
+box.space.vinyl:select{196}
+-
+- [196, 'tuple 196']
+box.space.vinyl:select{197}
+-
+- [197, 'tuple 197']
+box.space.vinyl:select{198}
+-
+- [198, 'tuple 198']
+box.space.vinyl:select{199}
+-
+- [199, 'tuple 199']
+rollback servers configuration
+switch master to master
+box.cfg{replication=''}
+---
+...
+switch replica to replica
+test 10 iteration
+box.space.memtx:insert{200, "tuple 200"}
+-
+- [200, 'tuple 200']
+box.space.memtx:insert{201, "tuple 201"}
+-
+- [201, 'tuple 201']
+box.space.memtx:insert{202, "tuple 202"}
+-
+- [202, 'tuple 202']
+box.space.memtx:insert{203, "tuple 203"}
+-
+- [203, 'tuple 203']
+box.space.memtx:insert{204, "tuple 204"}
+-
+- [204, 'tuple 204']
+box.space.vinyl:insert{200, "tuple 200"}
+-
+- [200, 'tuple 200']
+box.space.vinyl:insert{201, "tuple 201"}
+-
+- [201, 'tuple 201']
+box.space.vinyl:insert{202, "tuple 202"}
+-
+- [202, 'tuple 202']
+box.space.vinyl:insert{203, "tuple 203"}
+-
+- [203, 'tuple 203']
+box.space.vinyl:insert{204, "tuple 204"}
+-
+- [204, 'tuple 204']
+box.space.memtx:select{200}
+-
+- [200, 'tuple 200']
+box.space.memtx:select{201}
+-
+- [201, 'tuple 201']
+box.space.memtx:select{202}
+-
+- [202, 'tuple 202']
+box.space.memtx:select{203}
+-
+- [203, 'tuple 203']
+box.space.memtx:select{204}
+-
+- [204, 'tuple 204']
+box.space.vinyl:select{200}
+-
+- [200, 'tuple 200']
+box.space.vinyl:select{201}
+-
+- [201, 'tuple 201']
+box.space.vinyl:select{202}
+-
+- [202, 'tuple 202']
+box.space.vinyl:select{203}
+-
+- [203, 'tuple 203']
+box.space.vinyl:select{204}
+-
+- [204, 'tuple 204']
+box.space.memtx:insert{205, "tuple 205"}
+-
+- [205, 'tuple 205']
+box.space.memtx:insert{206, "tuple 206"}
+-
+- [206, 'tuple 206']
+box.space.memtx:insert{207, "tuple 207"}
+-
+- [207, 'tuple 207']
+box.space.memtx:insert{208, "tuple 208"}
+-
+- [208, 'tuple 208']
+box.space.memtx:insert{209, "tuple 209"}
+-
+- [209, 'tuple 209']
+box.space.vinyl:insert{205, "tuple 205"}
+-
+- [205, 'tuple 205']
+box.space.vinyl:insert{206, "tuple 206"}
+-
+- [206, 'tuple 206']
+box.space.vinyl:insert{207, "tuple 207"}
+-
+- [207, 'tuple 207']
+box.space.vinyl:insert{208, "tuple 208"}
+-
+- [208, 'tuple 208']
+box.space.vinyl:insert{209, "tuple 209"}
+-
+- [209, 'tuple 209']
+box.space.memtx:select{205}
+-
+- [205, 'tuple 205']
+box.space.memtx:select{206}
+-
+- [206, 'tuple 206']
+box.space.memtx:select{207}
+-
+- [207, 'tuple 207']
+box.space.memtx:select{208}
+-
+- [208, 'tuple 208']
+box.space.memtx:select{209}
+-
+- [209, 'tuple 209']
+box.space.vinyl:select{205}
+-
+- [205, 'tuple 205']
+box.space.vinyl:select{206}
+-
+- [206, 'tuple 206']
+box.space.vinyl:select{207}
+-
+- [207, 'tuple 207']
+box.space.vinyl:select{208}
+-
+- [208, 'tuple 208']
+box.space.vinyl:select{209}
+-
+- [209, 'tuple 209']
+swap servers
+switch replica to master
+box.cfg{replication=''}
+---
+...
+switch master to replica
+box.space.memtx:insert{210, "tuple 210"}
+-
+- [210, 'tuple 210']
+box.space.memtx:insert{211, "tuple 211"}
+-
+- [211, 'tuple 211']
+box.space.memtx:insert{212, "tuple 212"}
+-
+- [212, 'tuple 212']
+box.space.memtx:insert{213, "tuple 213"}
+-
+- [213, 'tuple 213']
+box.space.memtx:insert{214, "tuple 214"}
+-
+- [214, 'tuple 214']
+box.space.vinyl:insert{210, "tuple 210"}
+-
+- [210, 'tuple 210']
+box.space.vinyl:insert{211, "tuple 211"}
+-
+- [211, 'tuple 211']
+box.space.vinyl:insert{212, "tuple 212"}
+-
+- [212, 'tuple 212']
+box.space.vinyl:insert{213, "tuple 213"}
+-
+- [213, 'tuple 213']
+box.space.vinyl:insert{214, "tuple 214"}
+-
+- [214, 'tuple 214']
+box.space.memtx:select{210}
+-
+- [210, 'tuple 210']
+box.space.memtx:select{211}
+-
+- [211, 'tuple 211']
+box.space.memtx:select{212}
+-
+- [212, 'tuple 212']
+box.space.memtx:select{213}
+-
+- [213, 'tuple 213']
+box.space.memtx:select{214}
+-
+- [214, 'tuple 214']
+box.space.vinyl:select{210}
+-
+- [210, 'tuple 210']
+box.space.vinyl:select{211}
+-
+- [211, 'tuple 211']
+box.space.vinyl:select{212}
+-
+- [212, 'tuple 212']
+box.space.vinyl:select{213}
+-
+- [213, 'tuple 213']
+box.space.vinyl:select{214}
+-
+- [214, 'tuple 214']
+box.space.memtx:insert{215, "tuple 215"}
+-
+- [215, 'tuple 215']
+box.space.memtx:insert{216, "tuple 216"}
+-
+- [216, 'tuple 216']
+box.space.memtx:insert{217, "tuple 217"}
+-
+- [217, 'tuple 217']
+box.space.memtx:insert{218, "tuple 218"}
+-
+- [218, 'tuple 218']
+box.space.memtx:insert{219, "tuple 219"}
+-
+- [219, 'tuple 219']
+box.space.vinyl:insert{215, "tuple 215"}
+-
+- [215, 'tuple 215']
+box.space.vinyl:insert{216, "tuple 216"}
+-
+- [216, 'tuple 216']
+box.space.vinyl:insert{217, "tuple 217"}
+-
+- [217, 'tuple 217']
+box.space.vinyl:insert{218, "tuple 218"}
+-
+- [218, 'tuple 218']
+box.space.vinyl:insert{219, "tuple 219"}
+-
+- [219, 'tuple 219']
+box.space.memtx:select{215}
+-
+- [215, 'tuple 215']
+box.space.memtx:select{216}
+-
+- [216, 'tuple 216']
+box.space.memtx:select{217}
+-
+- [217, 'tuple 217']
+box.space.memtx:select{218}
+-
+- [218, 'tuple 218']
+box.space.memtx:select{219}
+-
+- [219, 'tuple 219']
+box.space.vinyl:select{215}
+-
+- [215, 'tuple 215']
+box.space.vinyl:select{216}
+-
+- [216, 'tuple 216']
+box.space.vinyl:select{217}
+-
+- [217, 'tuple 217']
+box.space.vinyl:select{218}
+-
+- [218, 'tuple 218']
+box.space.vinyl:select{219}
+-
+- [219, 'tuple 219']
+rollback servers configuration
+switch master to master
+box.cfg{replication=''}
+---
+...
+switch replica to replica
+test 11 iteration
+box.space.memtx:insert{220, "tuple 220"}
+-
+- [220, 'tuple 220']
+box.space.memtx:insert{221, "tuple 221"}
+-
+- [221, 'tuple 221']
+box.space.memtx:insert{222, "tuple 222"}
+-
+- [222, 'tuple 222']
+box.space.memtx:insert{223, "tuple 223"}
+-
+- [223, 'tuple 223']
+box.space.memtx:insert{224, "tuple 224"}
+-
+- [224, 'tuple 224']
+box.space.vinyl:insert{220, "tuple 220"}
+-
+- [220, 'tuple 220']
+box.space.vinyl:insert{221, "tuple 221"}
+-
+- [221, 'tuple 221']
+box.space.vinyl:insert{222, "tuple 222"}
+-
+- [222, 'tuple 222']
+box.space.vinyl:insert{223, "tuple 223"}
+-
+- [223, 'tuple 223']
+box.space.vinyl:insert{224, "tuple 224"}
+-
+- [224, 'tuple 224']
+box.space.memtx:select{220}
+-
+- [220, 'tuple 220']
+box.space.memtx:select{221}
+-
+- [221, 'tuple 221']
+box.space.memtx:select{222}
+-
+- [222, 'tuple 222']
+box.space.memtx:select{223}
+-
+- [223, 'tuple 223']
+box.space.memtx:select{224}
+-
+- [224, 'tuple 224']
+box.space.vinyl:select{220}
+-
+- [220, 'tuple 220']
+box.space.vinyl:select{221}
+-
+- [221, 'tuple 221']
+box.space.vinyl:select{222}
+-
+- [222, 'tuple 222']
+box.space.vinyl:select{223}
+-
+- [223, 'tuple 223']
+box.space.vinyl:select{224}
+-
+- [224, 'tuple 224']
+box.space.memtx:insert{225, "tuple 225"}
+-
+- [225, 'tuple 225']
+box.space.memtx:insert{226, "tuple 226"}
+-
+- [226, 'tuple 226']
+box.space.memtx:insert{227, "tuple 227"}
+-
+- [227, 'tuple 227']
+box.space.memtx:insert{228, "tuple 228"}
+-
+- [228, 'tuple 228']
+box.space.memtx:insert{229, "tuple 229"}
+-
+- [229, 'tuple 229']
+box.space.vinyl:insert{225, "tuple 225"}
+-
+- [225, 'tuple 225']
+box.space.vinyl:insert{226, "tuple 226"}
+-
+- [226, 'tuple 226']
+box.space.vinyl:insert{227, "tuple 227"}
+-
+- [227, 'tuple 227']
+box.space.vinyl:insert{228, "tuple 228"}
+-
+- [228, 'tuple 228']
+box.space.vinyl:insert{229, "tuple 229"}
+-
+- [229, 'tuple 229']
+box.space.memtx:select{225}
+-
+- [225, 'tuple 225']
+box.space.memtx:select{226}
+-
+- [226, 'tuple 226']
+box.space.memtx:select{227}
+-
+- [227, 'tuple 227']
+box.space.memtx:select{228}
+-
+- [228, 'tuple 228']
+box.space.memtx:select{229}
+-
+- [229, 'tuple 229']
+box.space.vinyl:select{225}
+-
+- [225, 'tuple 225']
+box.space.vinyl:select{226}
+-
+- [226, 'tuple 226']
+box.space.vinyl:select{227}
+-
+- [227, 'tuple 227']
+box.space.vinyl:select{228}
+-
+- [228, 'tuple 228']
+box.space.vinyl:select{229}
+-
+- [229, 'tuple 229']
+swap servers
+switch replica to master
+box.cfg{replication=''}
+---
+...
+switch master to replica
+box.space.memtx:insert{230, "tuple 230"}
+-
+- [230, 'tuple 230']
+box.space.memtx:insert{231, "tuple 231"}
+-
+- [231, 'tuple 231']
+box.space.memtx:insert{232, "tuple 232"}
+-
+- [232, 'tuple 232']
+box.space.memtx:insert{233, "tuple 233"}
+-
+- [233, 'tuple 233']
+box.space.memtx:insert{234, "tuple 234"}
+-
+- [234, 'tuple 234']
+box.space.vinyl:insert{230, "tuple 230"}
+-
+- [230, 'tuple 230']
+box.space.vinyl:insert{231, "tuple 231"}
+-
+- [231, 'tuple 231']
+box.space.vinyl:insert{232, "tuple 232"}
+-
+- [232, 'tuple 232']
+box.space.vinyl:insert{233, "tuple 233"}
+-
+- [233, 'tuple 233']
+box.space.vinyl:insert{234, "tuple 234"}
+-
+- [234, 'tuple 234']
+box.space.memtx:select{230}
+-
+- [230, 'tuple 230']
+box.space.memtx:select{231}
+-
+- [231, 'tuple 231']
+box.space.memtx:select{232}
+-
+- [232, 'tuple 232']
+box.space.memtx:select{233}
+-
+- [233, 'tuple 233']
+box.space.memtx:select{234}
+-
+- [234, 'tuple 234']
+box.space.vinyl:select{230}
+-
+- [230, 'tuple 230']
+box.space.vinyl:select{231}
+-
+- [231, 'tuple 231']
+box.space.vinyl:select{232}
+-
+- [232, 'tuple 232']
+box.space.vinyl:select{233}
+-
+- [233, 'tuple 233']
+box.space.vinyl:select{234}
+-
+- [234, 'tuple 234']
+box.space.memtx:insert{235, "tuple 235"}
+-
+- [235, 'tuple 235']
+box.space.memtx:insert{236, "tuple 236"}
+-
+- [236, 'tuple 236']
+box.space.memtx:insert{237, "tuple 237"}
+-
+- [237, 'tuple 237']
+box.space.memtx:insert{238, "tuple 238"}
+-
+- [238, 'tuple 238']
+box.space.memtx:insert{239, "tuple 239"}
+-
+- [239, 'tuple 239']
+box.space.vinyl:insert{235, "tuple 235"}
+-
+- [235, 'tuple 235']
+box.space.vinyl:insert{236, "tuple 236"}
+-
+- [236, 'tuple 236']
+box.space.vinyl:insert{237, "tuple 237"}
+-
+- [237, 'tuple 237']
+box.space.vinyl:insert{238, "tuple 238"}
+-
+- [238, 'tuple 238']
+box.space.vinyl:insert{239, "tuple 239"}
+-
+- [239, 'tuple 239']
+box.space.memtx:select{235}
+-
+- [235, 'tuple 235']
+box.space.memtx:select{236}
+-
+- [236, 'tuple 236']
+box.space.memtx:select{237}
+-
+- [237, 'tuple 237']
+box.space.memtx:select{238}
+-
+- [238, 'tuple 238']
+box.space.memtx:select{239}
+-
+- [239, 'tuple 239']
+box.space.vinyl:select{235}
+-
+- [235, 'tuple 235']
+box.space.vinyl:select{236}
+-
+- [236, 'tuple 236']
+box.space.vinyl:select{237}
+-
+- [237, 'tuple 237']
+box.space.vinyl:select{238}
+-
+- [238, 'tuple 238']
+box.space.vinyl:select{239}
+-
+- [239, 'tuple 239']
+rollback servers configuration
+switch master to master
+box.cfg{replication=''}
+---
+...
+switch replica to replica
+test 12 iteration
+box.space.memtx:insert{240, "tuple 240"}
+-
+- [240, 'tuple 240']
+box.space.memtx:insert{241, "tuple 241"}
+-
+- [241, 'tuple 241']
+box.space.memtx:insert{242, "tuple 242"}
+-
+- [242, 'tuple 242']
+box.space.memtx:insert{243, "tuple 243"}
+-
+- [243, 'tuple 243']
+box.space.memtx:insert{244, "tuple 244"}
+-
+- [244, 'tuple 244']
+box.space.vinyl:insert{240, "tuple 240"}
+-
+- [240, 'tuple 240']
+box.space.vinyl:insert{241, "tuple 241"}
+-
+- [241, 'tuple 241']
+box.space.vinyl:insert{242, "tuple 242"}
+-
+- [242, 'tuple 242']
+box.space.vinyl:insert{243, "tuple 243"}
+-
+- [243, 'tuple 243']
+box.space.vinyl:insert{244, "tuple 244"}
+-
+- [244, 'tuple 244']
+box.space.memtx:select{240}
+-
+- [240, 'tuple 240']
+box.space.memtx:select{241}
+-
+- [241, 'tuple 241']
+box.space.memtx:select{242}
+-
+- [242, 'tuple 242']
+box.space.memtx:select{243}
+-
+- [243, 'tuple 243']
+box.space.memtx:select{244}
+-
+- [244, 'tuple 244']
+box.space.vinyl:select{240}
+-
+- [240, 'tuple 240']
+box.space.vinyl:select{241}
+-
+- [241, 'tuple 241']
+box.space.vinyl:select{242}
+-
+- [242, 'tuple 242']
+box.space.vinyl:select{243}
+-
+- [243, 'tuple 243']
+box.space.vinyl:select{244}
+-
+- [244, 'tuple 244']
+box.space.memtx:insert{245, "tuple 245"}
+-
+- [245, 'tuple 245']
+box.space.memtx:insert{246, "tuple 246"}
+-
+- [246, 'tuple 246']
+box.space.memtx:insert{247, "tuple 247"}
+-
+- [247, 'tuple 247']
+box.space.memtx:insert{248, "tuple 248"}
+-
+- [248, 'tuple 248']
+box.space.memtx:insert{249, "tuple 249"}
+-
+- [249, 'tuple 249']
+box.space.vinyl:insert{245, "tuple 245"}
+-
+- [245, 'tuple 245']
+box.space.vinyl:insert{246, "tuple 246"}
+-
+- [246, 'tuple 246']
+box.space.vinyl:insert{247, "tuple 247"}
+-
+- [247, 'tuple 247']
+box.space.vinyl:insert{248, "tuple 248"}
+-
+- [248, 'tuple 248']
+box.space.vinyl:insert{249, "tuple 249"}
+-
+- [249, 'tuple 249']
+box.space.memtx:select{245}
+-
+- [245, 'tuple 245']
+box.space.memtx:select{246}
+-
+- [246, 'tuple 246']
+box.space.memtx:select{247}
+-
+- [247, 'tuple 247']
+box.space.memtx:select{248}
+-
+- [248, 'tuple 248']
+box.space.memtx:select{249}
+-
+- [249, 'tuple 249']
+box.space.vinyl:select{245}
+-
+- [245, 'tuple 245']
+box.space.vinyl:select{246}
+-
+- [246, 'tuple 246']
+box.space.vinyl:select{247}
+-
+- [247, 'tuple 247']
+box.space.vinyl:select{248}
+-
+- [248, 'tuple 248']
+box.space.vinyl:select{249}
+-
+- [249, 'tuple 249']
+swap servers
+switch replica to master
+box.cfg{replication=''}
+---
+...
+switch master to replica
+box.space.memtx:insert{250, "tuple 250"}
+-
+- [250, 'tuple 250']
+box.space.memtx:insert{251, "tuple 251"}
+-
+- [251, 'tuple 251']
+box.space.memtx:insert{252, "tuple 252"}
+-
+- [252, 'tuple 252']
+box.space.memtx:insert{253, "tuple 253"}
+-
+- [253, 'tuple 253']
+box.space.memtx:insert{254, "tuple 254"}
+-
+- [254, 'tuple 254']
+box.space.vinyl:insert{250, "tuple 250"}
+-
+- [250, 'tuple 250']
+box.space.vinyl:insert{251, "tuple 251"}
+-
+- [251, 'tuple 251']
+box.space.vinyl:insert{252, "tuple 252"}
+-
+- [252, 'tuple 252']
+box.space.vinyl:insert{253, "tuple 253"}
+-
+- [253, 'tuple 253']
+box.space.vinyl:insert{254, "tuple 254"}
+-
+- [254, 'tuple 254']
+box.space.memtx:select{250}
+-
+- [250, 'tuple 250']
+box.space.memtx:select{251}
+-
+- [251, 'tuple 251']
+box.space.memtx:select{252}
+-
+- [252, 'tuple 252']
+box.space.memtx:select{253}
+-
+- [253, 'tuple 253']
+box.space.memtx:select{254}
+-
+- [254, 'tuple 254']
+box.space.vinyl:select{250}
+-
+- [250, 'tuple 250']
+box.space.vinyl:select{251}
+-
+- [251, 'tuple 251']
+box.space.vinyl:select{252}
+-
+- [252, 'tuple 252']
+box.space.vinyl:select{253}
+-
+- [253, 'tuple 253']
+box.space.vinyl:select{254}
+-
+- [254, 'tuple 254']
+box.space.memtx:insert{255, "tuple 255"}
+-
+- [255, 'tuple 255']
+box.space.memtx:insert{256, "tuple 256"}
+-
+- [256, 'tuple 256']
+box.space.memtx:insert{257, "tuple 257"}
+-
+- [257, 'tuple 257']
+box.space.memtx:insert{258, "tuple 258"}
+-
+- [258, 'tuple 258']
+box.space.memtx:insert{259, "tuple 259"}
+-
+- [259, 'tuple 259']
+box.space.vinyl:insert{255, "tuple 255"}
+-
+- [255, 'tuple 255']
+box.space.vinyl:insert{256, "tuple 256"}
+-
+- [256, 'tuple 256']
+box.space.vinyl:insert{257, "tuple 257"}
+-
+- [257, 'tuple 257']
+box.space.vinyl:insert{258, "tuple 258"}
+-
+- [258, 'tuple 258']
+box.space.vinyl:insert{259, "tuple 259"}
+-
+- [259, 'tuple 259']
+box.space.memtx:select{255}
+-
+- [255, 'tuple 255']
+box.space.memtx:select{256}
+-
+- [256, 'tuple 256']
+box.space.memtx:select{257}
+-
+- [257, 'tuple 257']
+box.space.memtx:select{258}
+-
+- [258, 'tuple 258']
+box.space.memtx:select{259}
+-
+- [259, 'tuple 259']
+box.space.vinyl:select{255}
+-
+- [255, 'tuple 255']
+box.space.vinyl:select{256}
+-
+- [256, 'tuple 256']
+box.space.vinyl:select{257}
+-
+- [257, 'tuple 257']
+box.space.vinyl:select{258}
+-
+- [258, 'tuple 258']
+box.space.vinyl:select{259}
+-
+- [259, 'tuple 259']
+rollback servers configuration
+switch master to master
+box.cfg{replication=''}
+---
+...
+switch replica to replica
+test 13 iteration
+box.space.memtx:insert{260, "tuple 260"}
+-
+- [260, 'tuple 260']
+box.space.memtx:insert{261, "tuple 261"}
+-
+- [261, 'tuple 261']
+box.space.memtx:insert{262, "tuple 262"}
+-
+- [262, 'tuple 262']
+box.space.memtx:insert{263, "tuple 263"}
+-
+- [263, 'tuple 263']
+box.space.memtx:insert{264, "tuple 264"}
+-
+- [264, 'tuple 264']
+box.space.vinyl:insert{260, "tuple 260"}
+-
+- [260, 'tuple 260']
+box.space.vinyl:insert{261, "tuple 261"}
+-
+- [261, 'tuple 261']
+box.space.vinyl:insert{262, "tuple 262"}
+-
+- [262, 'tuple 262']
+box.space.vinyl:insert{263, "tuple 263"}
+-
+- [263, 'tuple 263']
+box.space.vinyl:insert{264, "tuple 264"}
+-
+- [264, 'tuple 264']
+box.space.memtx:select{260}
+-
+- [260, 'tuple 260']
+box.space.memtx:select{261}
+-
+- [261, 'tuple 261']
+box.space.memtx:select{262}
+-
+- [262, 'tuple 262']
+box.space.memtx:select{263}
+-
+- [263, 'tuple 263']
+box.space.memtx:select{264}
+-
+- [264, 'tuple 264']
+box.space.vinyl:select{260}
+-
+- [260, 'tuple 260']
+box.space.vinyl:select{261}
+-
+- [261, 'tuple 261']
+box.space.vinyl:select{262}
+-
+- [262, 'tuple 262']
+box.space.vinyl:select{263}
+-
+- [263, 'tuple 263']
+box.space.vinyl:select{264}
+-
+- [264, 'tuple 264']
+box.space.memtx:insert{265, "tuple 265"}
+-
+- [265, 'tuple 265']
+box.space.memtx:insert{266, "tuple 266"}
+-
+- [266, 'tuple 266']
+box.space.memtx:insert{267, "tuple 267"}
+-
+- [267, 'tuple 267']
+box.space.memtx:insert{268, "tuple 268"}
+-
+- [268, 'tuple 268']
+box.space.memtx:insert{269, "tuple 269"}
+-
+- [269, 'tuple 269']
+box.space.vinyl:insert{265, "tuple 265"}
+-
+- [265, 'tuple 265']
+box.space.vinyl:insert{266, "tuple 266"}
+-
+- [266, 'tuple 266']
+box.space.vinyl:insert{267, "tuple 267"}
+-
+- [267, 'tuple 267']
+box.space.vinyl:insert{268, "tuple 268"}
+-
+- [268, 'tuple 268']
+box.space.vinyl:insert{269, "tuple 269"}
+-
+- [269, 'tuple 269']
+box.space.memtx:select{265}
+-
+- [265, 'tuple 265']
+box.space.memtx:select{266}
+-
+- [266, 'tuple 266']
+box.space.memtx:select{267}
+-
+- [267, 'tuple 267']
+box.space.memtx:select{268}
+-
+- [268, 'tuple 268']
+box.space.memtx:select{269}
+-
+- [269, 'tuple 269']
+box.space.vinyl:select{265}
+-
+- [265, 'tuple 265']
+box.space.vinyl:select{266}
+-
+- [266, 'tuple 266']
+box.space.vinyl:select{267}
+-
+- [267, 'tuple 267']
+box.space.vinyl:select{268}
+-
+- [268, 'tuple 268']
+box.space.vinyl:select{269}
+-
+- [269, 'tuple 269']
+swap servers
+switch replica to master
+box.cfg{replication=''}
+---
+...
+switch master to replica
+box.space.memtx:insert{270, "tuple 270"}
+-
+- [270, 'tuple 270']
+box.space.memtx:insert{271, "tuple 271"}
+-
+- [271, 'tuple 271']
+box.space.memtx:insert{272, "tuple 272"}
+-
+- [272, 'tuple 272']
+box.space.memtx:insert{273, "tuple 273"}
+-
+- [273, 'tuple 273']
+box.space.memtx:insert{274, "tuple 274"}
+-
+- [274, 'tuple 274']
+box.space.vinyl:insert{270, "tuple 270"}
+-
+- [270, 'tuple 270']
+box.space.vinyl:insert{271, "tuple 271"}
+-
+- [271, 'tuple 271']
+box.space.vinyl:insert{272, "tuple 272"}
+-
+- [272, 'tuple 272']
+box.space.vinyl:insert{273, "tuple 273"}
+-
+- [273, 'tuple 273']
+box.space.vinyl:insert{274, "tuple 274"}
+-
+- [274, 'tuple 274']
+box.space.memtx:select{270}
+-
+- [270, 'tuple 270']
+box.space.memtx:select{271}
+-
+- [271, 'tuple 271']
+box.space.memtx:select{272}
+-
+- [272, 'tuple 272']
+box.space.memtx:select{273}
+-
+- [273, 'tuple 273']
+box.space.memtx:select{274}
+-
+- [274, 'tuple 274']
+box.space.vinyl:select{270}
+-
+- [270, 'tuple 270']
+box.space.vinyl:select{271}
+-
+- [271, 'tuple 271']
+box.space.vinyl:select{272}
+-
+- [272, 'tuple 272']
+box.space.vinyl:select{273}
+-
+- [273, 'tuple 273']
+box.space.vinyl:select{274}
+-
+- [274, 'tuple 274']
+box.space.memtx:insert{275, "tuple 275"}
+-
+- [275, 'tuple 275']
+box.space.memtx:insert{276, "tuple 276"}
+-
+- [276, 'tuple 276']
+box.space.memtx:insert{277, "tuple 277"}
+-
+- [277, 'tuple 277']
+box.space.memtx:insert{278, "tuple 278"}
+-
+- [278, 'tuple 278']
+box.space.memtx:insert{279, "tuple 279"}
+-
+- [279, 'tuple 279']
+box.space.vinyl:insert{275, "tuple 275"}
+-
+- [275, 'tuple 275']
+box.space.vinyl:insert{276, "tuple 276"}
+-
+- [276, 'tuple 276']
+box.space.vinyl:insert{277, "tuple 277"}
+-
+- [277, 'tuple 277']
+box.space.vinyl:insert{278, "tuple 278"}
+-
+- [278, 'tuple 278']
+box.space.vinyl:insert{279, "tuple 279"}
+-
+- [279, 'tuple 279']
+box.space.memtx:select{275}
+-
+- [275, 'tuple 275']
+box.space.memtx:select{276}
+-
+- [276, 'tuple 276']
+box.space.memtx:select{277}
+-
+- [277, 'tuple 277']
+box.space.memtx:select{278}
+-
+- [278, 'tuple 278']
+box.space.memtx:select{279}
+-
+- [279, 'tuple 279']
+box.space.vinyl:select{275}
+-
+- [275, 'tuple 275']
+box.space.vinyl:select{276}
+-
+- [276, 'tuple 276']
+box.space.vinyl:select{277}
+-
+- [277, 'tuple 277']
+box.space.vinyl:select{278}
+-
+- [278, 'tuple 278']
+box.space.vinyl:select{279}
+-
+- [279, 'tuple 279']
+rollback servers configuration
+switch master to master
+box.cfg{replication=''}
+---
+...
+switch replica to replica
+test 14 iteration
+box.space.memtx:insert{280, "tuple 280"}
+-
+- [280, 'tuple 280']
+box.space.memtx:insert{281, "tuple 281"}
+-
+- [281, 'tuple 281']
+box.space.memtx:insert{282, "tuple 282"}
+-
+- [282, 'tuple 282']
+box.space.memtx:insert{283, "tuple 283"}
+-
+- [283, 'tuple 283']
+box.space.memtx:insert{284, "tuple 284"}
+-
+- [284, 'tuple 284']
+box.space.vinyl:insert{280, "tuple 280"}
+-
+- [280, 'tuple 280']
+box.space.vinyl:insert{281, "tuple 281"}
+-
+- [281, 'tuple 281']
+box.space.vinyl:insert{282, "tuple 282"}
+-
+- [282, 'tuple 282']
+box.space.vinyl:insert{283, "tuple 283"}
+-
+- [283, 'tuple 283']
+box.space.vinyl:insert{284, "tuple 284"}
+-
+- [284, 'tuple 284']
+box.space.memtx:select{280}
+-
+- [280, 'tuple 280']
+box.space.memtx:select{281}
+-
+- [281, 'tuple 281']
+box.space.memtx:select{282}
+-
+- [282, 'tuple 282']
+box.space.memtx:select{283}
+-
+- [283, 'tuple 283']
+box.space.memtx:select{284}
+-
+- [284, 'tuple 284']
+box.space.vinyl:select{280}
+-
+- [280, 'tuple 280']
+box.space.vinyl:select{281}
+-
+- [281, 'tuple 281']
+box.space.vinyl:select{282}
+-
+- [282, 'tuple 282']
+box.space.vinyl:select{283}
+-
+- [283, 'tuple 283']
+box.space.vinyl:select{284}
+-
+- [284, 'tuple 284']
+box.space.memtx:insert{285, "tuple 285"}
+-
+- [285, 'tuple 285']
+box.space.memtx:insert{286, "tuple 286"}
+-
+- [286, 'tuple 286']
+box.space.memtx:insert{287, "tuple 287"}
+-
+- [287, 'tuple 287']
+box.space.memtx:insert{288, "tuple 288"}
+-
+- [288, 'tuple 288']
+box.space.memtx:insert{289, "tuple 289"}
+-
+- [289, 'tuple 289']
+box.space.vinyl:insert{285, "tuple 285"}
+-
+- [285, 'tuple 285']
+box.space.vinyl:insert{286, "tuple 286"}
+-
+- [286, 'tuple 286']
+box.space.vinyl:insert{287, "tuple 287"}
+-
+- [287, 'tuple 287']
+box.space.vinyl:insert{288, "tuple 288"}
+-
+- [288, 'tuple 288']
+box.space.vinyl:insert{289, "tuple 289"}
+-
+- [289, 'tuple 289']
+box.space.memtx:select{285}
+-
+- [285, 'tuple 285']
+box.space.memtx:select{286}
+-
+- [286, 'tuple 286']
+box.space.memtx:select{287}
+-
+- [287, 'tuple 287']
+box.space.memtx:select{288}
+-
+- [288, 'tuple 288']
+box.space.memtx:select{289}
+-
+- [289, 'tuple 289']
+box.space.vinyl:select{285}
+-
+- [285, 'tuple 285']
+box.space.vinyl:select{286}
+-
+- [286, 'tuple 286']
+box.space.vinyl:select{287}
+-
+- [287, 'tuple 287']
+box.space.vinyl:select{288}
+-
+- [288, 'tuple 288']
+box.space.vinyl:select{289}
+-
+- [289, 'tuple 289']
+swap servers
+switch replica to master
+box.cfg{replication=''}
+---
+...
+switch master to replica
+box.space.memtx:insert{290, "tuple 290"}
+-
+- [290, 'tuple 290']
+box.space.memtx:insert{291, "tuple 291"}
+-
+- [291, 'tuple 291']
+box.space.memtx:insert{292, "tuple 292"}
+-
+- [292, 'tuple 292']
+box.space.memtx:insert{293, "tuple 293"}
+-
+- [293, 'tuple 293']
+box.space.memtx:insert{294, "tuple 294"}
+-
+- [294, 'tuple 294']
+box.space.vinyl:insert{290, "tuple 290"}
+-
+- [290, 'tuple 290']
+box.space.vinyl:insert{291, "tuple 291"}
+-
+- [291, 'tuple 291']
+box.space.vinyl:insert{292, "tuple 292"}
+-
+- [292, 'tuple 292']
+box.space.vinyl:insert{293, "tuple 293"}
+-
+- [293, 'tuple 293']
+box.space.vinyl:insert{294, "tuple 294"}
+-
+- [294, 'tuple 294']
+box.space.memtx:select{290}
+-
+- [290, 'tuple 290']
+box.space.memtx:select{291}
+-
+- [291, 'tuple 291']
+box.space.memtx:select{292}
+-
+- [292, 'tuple 292']
+box.space.memtx:select{293}
+-
+- [293, 'tuple 293']
+box.space.memtx:select{294}
+-
+- [294, 'tuple 294']
+box.space.vinyl:select{290}
+-
+- [290, 'tuple 290']
+box.space.vinyl:select{291}
+-
+- [291, 'tuple 291']
+box.space.vinyl:select{292}
+-
+- [292, 'tuple 292']
+box.space.vinyl:select{293}
+-
+- [293, 'tuple 293']
+box.space.vinyl:select{294}
+-
+- [294, 'tuple 294']
+box.space.memtx:insert{295, "tuple 295"}
+-
+- [295, 'tuple 295']
+box.space.memtx:insert{296, "tuple 296"}
+-
+- [296, 'tuple 296']
+box.space.memtx:insert{297, "tuple 297"}
+-
+- [297, 'tuple 297']
+box.space.memtx:insert{298, "tuple 298"}
+-
+- [298, 'tuple 298']
+box.space.memtx:insert{299, "tuple 299"}
+-
+- [299, 'tuple 299']
+box.space.vinyl:insert{295, "tuple 295"}
+-
+- [295, 'tuple 295']
+box.space.vinyl:insert{296, "tuple 296"}
+-
+- [296, 'tuple 296']
+box.space.vinyl:insert{297, "tuple 297"}
+-
+- [297, 'tuple 297']
+box.space.vinyl:insert{298, "tuple 298"}
+-
+- [298, 'tuple 298']
+box.space.vinyl:insert{299, "tuple 299"}
+-
+- [299, 'tuple 299']
+box.space.memtx:select{295}
+-
+- [295, 'tuple 295']
+box.space.memtx:select{296}
+-
+- [296, 'tuple 296']
+box.space.memtx:select{297}
+-
+- [297, 'tuple 297']
+box.space.memtx:select{298}
+-
+- [298, 'tuple 298']
+box.space.memtx:select{299}
+-
+- [299, 'tuple 299']
+box.space.vinyl:select{295}
+-
+- [295, 'tuple 295']
+box.space.vinyl:select{296}
+-
+- [296, 'tuple 296']
+box.space.vinyl:select{297}
+-
+- [297, 'tuple 297']
+box.space.vinyl:select{298}
+-
+- [298, 'tuple 298']
+box.space.vinyl:select{299}
+-
+- [299, 'tuple 299']
+rollback servers configuration
+switch master to master
+box.cfg{replication=''}
+---
+...
+switch replica to replica
+test 15 iteration
+box.space.memtx:insert{300, "tuple 300"}
+-
+- [300, 'tuple 300']
+box.space.memtx:insert{301, "tuple 301"}
+-
+- [301, 'tuple 301']
+box.space.memtx:insert{302, "tuple 302"}
+-
+- [302, 'tuple 302']
+box.space.memtx:insert{303, "tuple 303"}
+-
+- [303, 'tuple 303']
+box.space.memtx:insert{304, "tuple 304"}
+-
+- [304, 'tuple 304']
+box.space.vinyl:insert{300, "tuple 300"}
+-
+- [300, 'tuple 300']
+box.space.vinyl:insert{301, "tuple 301"}
+-
+- [301, 'tuple 301']
+box.space.vinyl:insert{302, "tuple 302"}
+-
+- [302, 'tuple 302']
+box.space.vinyl:insert{303, "tuple 303"}
+-
+- [303, 'tuple 303']
+box.space.vinyl:insert{304, "tuple 304"}
+-
+- [304, 'tuple 304']
+box.space.memtx:select{300}
+-
+- [300, 'tuple 300']
+box.space.memtx:select{301}
+-
+- [301, 'tuple 301']
+box.space.memtx:select{302}
+-
+- [302, 'tuple 302']
+box.space.memtx:select{303}
+-
+- [303, 'tuple 303']
+box.space.memtx:select{304}
+-
+- [304, 'tuple 304']
+box.space.vinyl:select{300}
+-
+- [300, 'tuple 300']
+box.space.vinyl:select{301}
+-
+- [301, 'tuple 301']
+box.space.vinyl:select{302}
+-
+- [302, 'tuple 302']
+box.space.vinyl:select{303}
+-
+- [303, 'tuple 303']
+box.space.vinyl:select{304}
+-
+- [304, 'tuple 304']
+box.space.memtx:insert{305, "tuple 305"}
+-
+- [305, 'tuple 305']
+box.space.memtx:insert{306, "tuple 306"}
+-
+- [306, 'tuple 306']
+box.space.memtx:insert{307, "tuple 307"}
+-
+- [307, 'tuple 307']
+box.space.memtx:insert{308, "tuple 308"}
+-
+- [308, 'tuple 308']
+box.space.memtx:insert{309, "tuple 309"}
+-
+- [309, 'tuple 309']
+box.space.vinyl:insert{305, "tuple 305"}
+-
+- [305, 'tuple 305']
+box.space.vinyl:insert{306, "tuple 306"}
+-
+- [306, 'tuple 306']
+box.space.vinyl:insert{307, "tuple 307"}
+-
+- [307, 'tuple 307']
+box.space.vinyl:insert{308, "tuple 308"}
+-
+- [308, 'tuple 308']
+box.space.vinyl:insert{309, "tuple 309"}
+-
+- [309, 'tuple 309']
+box.space.memtx:select{305}
+-
+- [305, 'tuple 305']
+box.space.memtx:select{306}
+-
+- [306, 'tuple 306']
+box.space.memtx:select{307}
+-
+- [307, 'tuple 307']
+box.space.memtx:select{308}
+-
+- [308, 'tuple 308']
+box.space.memtx:select{309}
+-
+- [309, 'tuple 309']
+box.space.vinyl:select{305}
+-
+- [305, 'tuple 305']
+box.space.vinyl:select{306}
+-
+- [306, 'tuple 306']
+box.space.vinyl:select{307}
+-
+- [307, 'tuple 307']
+box.space.vinyl:select{308}
+-
+- [308, 'tuple 308']
+box.space.vinyl:select{309}
+-
+- [309, 'tuple 309']
+swap servers
+switch replica to master
+box.cfg{replication=''}
+---
+...
+switch master to replica
+box.space.memtx:insert{310, "tuple 310"}
+-
+- [310, 'tuple 310']
+box.space.memtx:insert{311, "tuple 311"}
+-
+- [311, 'tuple 311']
+box.space.memtx:insert{312, "tuple 312"}
+-
+- [312, 'tuple 312']
+box.space.memtx:insert{313, "tuple 313"}
+-
+- [313, 'tuple 313']
+box.space.memtx:insert{314, "tuple 314"}
+-
+- [314, 'tuple 314']
+box.space.vinyl:insert{310, "tuple 310"}
+-
+- [310, 'tuple 310']
+box.space.vinyl:insert{311, "tuple 311"}
+-
+- [311, 'tuple 311']
+box.space.vinyl:insert{312, "tuple 312"}
+-
+- [312, 'tuple 312']
+box.space.vinyl:insert{313, "tuple 313"}
+-
+- [313, 'tuple 313']
+box.space.vinyl:insert{314, "tuple 314"}
+-
+- [314, 'tuple 314']
+box.space.memtx:select{310}
+-
+- [310, 'tuple 310']
+box.space.memtx:select{311}
+-
+- [311, 'tuple 311']
+box.space.memtx:select{312}
+-
+- [312, 'tuple 312']
+box.space.memtx:select{313}
+-
+- [313, 'tuple 313']
+box.space.memtx:select{314}
+-
+- [314, 'tuple 314']
+box.space.vinyl:select{310}
+-
+- [310, 'tuple 310']
+box.space.vinyl:select{311}
+-
+- [311, 'tuple 311']
+box.space.vinyl:select{312}
+-
+- [312, 'tuple 312']
+box.space.vinyl:select{313}
+-
+- [313, 'tuple 313']
+box.space.vinyl:select{314}
+-
+- [314, 'tuple 314']
+box.space.memtx:insert{315, "tuple 315"}
+-
+- [315, 'tuple 315']
+box.space.memtx:insert{316, "tuple 316"}
+-
+- [316, 'tuple 316']
+box.space.memtx:insert{317, "tuple 317"}
+-
+- [317, 'tuple 317']
+box.space.memtx:insert{318, "tuple 318"}
+-
+- [318, 'tuple 318']
+box.space.memtx:insert{319, "tuple 319"}
+-
+- [319, 'tuple 319']
+box.space.vinyl:insert{315, "tuple 315"}
+-
+- [315, 'tuple 315']
+box.space.vinyl:insert{316, "tuple 316"}
+-
+- [316, 'tuple 316']
+box.space.vinyl:insert{317, "tuple 317"}
+-
+- [317, 'tuple 317']
+box.space.vinyl:insert{318, "tuple 318"}
+-
+- [318, 'tuple 318']
+box.space.vinyl:insert{319, "tuple 319"}
+-
+- [319, 'tuple 319']
+box.space.memtx:select{315}
+-
+- [315, 'tuple 315']
+box.space.memtx:select{316}
+-
+- [316, 'tuple 316']
+box.space.memtx:select{317}
+-
+- [317, 'tuple 317']
+box.space.memtx:select{318}
+-
+- [318, 'tuple 318']
+box.space.memtx:select{319}
+-
+- [319, 'tuple 319']
+box.space.vinyl:select{315}
+-
+- [315, 'tuple 315']
+box.space.vinyl:select{316}
+-
+- [316, 'tuple 316']
+box.space.vinyl:select{317}
+-
+- [317, 'tuple 317']
+box.space.vinyl:select{318}
+-
+- [318, 'tuple 318']
+box.space.vinyl:select{319}
+-
+- [319, 'tuple 319']
+rollback servers configuration
+switch master to master
+box.cfg{replication=''}
+---
+...
+switch replica to replica
+test 16 iteration
+box.space.memtx:insert{320, "tuple 320"}
+-
+- [320, 'tuple 320']
+box.space.memtx:insert{321, "tuple 321"}
+-
+- [321, 'tuple 321']
+box.space.memtx:insert{322, "tuple 322"}
+-
+- [322, 'tuple 322']
+box.space.memtx:insert{323, "tuple 323"}
+-
+- [323, 'tuple 323']
+box.space.memtx:insert{324, "tuple 324"}
+-
+- [324, 'tuple 324']
+box.space.vinyl:insert{320, "tuple 320"}
+-
+- [320, 'tuple 320']
+box.space.vinyl:insert{321, "tuple 321"}
+-
+- [321, 'tuple 321']
+box.space.vinyl:insert{322, "tuple 322"}
+-
+- [322, 'tuple 322']
+box.space.vinyl:insert{323, "tuple 323"}
+-
+- [323, 'tuple 323']
+box.space.vinyl:insert{324, "tuple 324"}
+-
+- [324, 'tuple 324']
+box.space.memtx:select{320}
+-
+- [320, 'tuple 320']
+box.space.memtx:select{321}
+-
+- [321, 'tuple 321']
+box.space.memtx:select{322}
+-
+- [322, 'tuple 322']
+box.space.memtx:select{323}
+-
+- [323, 'tuple 323']
+box.space.memtx:select{324}
+-
+- [324, 'tuple 324']
+box.space.vinyl:select{320}
+-
+- [320, 'tuple 320']
+box.space.vinyl:select{321}
+-
+- [321, 'tuple 321']
+box.space.vinyl:select{322}
+-
+- [322, 'tuple 322']
+box.space.vinyl:select{323}
+-
+- [323, 'tuple 323']
+box.space.vinyl:select{324}
+-
+- [324, 'tuple 324']
+box.space.memtx:insert{325, "tuple 325"}
+-
+- [325, 'tuple 325']
+box.space.memtx:insert{326, "tuple 326"}
+-
+- [326, 'tuple 326']
+box.space.memtx:insert{327, "tuple 327"}
+-
+- [327, 'tuple 327']
+box.space.memtx:insert{328, "tuple 328"}
+-
+- [328, 'tuple 328']
+box.space.memtx:insert{329, "tuple 329"}
+-
+- [329, 'tuple 329']
+box.space.vinyl:insert{325, "tuple 325"}
+-
+- [325, 'tuple 325']
+box.space.vinyl:insert{326, "tuple 326"}
+-
+- [326, 'tuple 326']
+box.space.vinyl:insert{327, "tuple 327"}
+-
+- [327, 'tuple 327']
+box.space.vinyl:insert{328, "tuple 328"}
+-
+- [328, 'tuple 328']
+box.space.vinyl:insert{329, "tuple 329"}
+-
+- [329, 'tuple 329']
+box.space.memtx:select{325}
+-
+- [325, 'tuple 325']
+box.space.memtx:select{326}
+-
+- [326, 'tuple 326']
+box.space.memtx:select{327}
+-
+- [327, 'tuple 327']
+box.space.memtx:select{328}
+-
+- [328, 'tuple 328']
+box.space.memtx:select{329}
+-
+- [329, 'tuple 329']
+box.space.vinyl:select{325}
+-
+- [325, 'tuple 325']
+box.space.vinyl:select{326}
+-
+- [326, 'tuple 326']
+box.space.vinyl:select{327}
+-
+- [327, 'tuple 327']
+box.space.vinyl:select{328}
+-
+- [328, 'tuple 328']
+box.space.vinyl:select{329}
+-
+- [329, 'tuple 329']
+swap servers
+switch replica to master
+box.cfg{replication=''}
+---
+...
+switch master to replica
+box.space.memtx:insert{330, "tuple 330"}
+-
+- [330, 'tuple 330']
+box.space.memtx:insert{331, "tuple 331"}
+-
+- [331, 'tuple 331']
+box.space.memtx:insert{332, "tuple 332"}
+-
+- [332, 'tuple 332']
+box.space.memtx:insert{333, "tuple 333"}
+-
+- [333, 'tuple 333']
+box.space.memtx:insert{334, "tuple 334"}
+-
+- [334, 'tuple 334']
+box.space.vinyl:insert{330, "tuple 330"}
+-
+- [330, 'tuple 330']
+box.space.vinyl:insert{331, "tuple 331"}
+-
+- [331, 'tuple 331']
+box.space.vinyl:insert{332, "tuple 332"}
+-
+- [332, 'tuple 332']
+box.space.vinyl:insert{333, "tuple 333"}
+-
+- [333, 'tuple 333']
+box.space.vinyl:insert{334, "tuple 334"}
+-
+- [334, 'tuple 334']
+box.space.memtx:select{330}
+-
+- [330, 'tuple 330']
+box.space.memtx:select{331}
+-
+- [331, 'tuple 331']
+box.space.memtx:select{332}
+-
+- [332, 'tuple 332']
+box.space.memtx:select{333}
+-
+- [333, 'tuple 333']
+box.space.memtx:select{334}
+-
+- [334, 'tuple 334']
+box.space.vinyl:select{330}
+-
+- [330, 'tuple 330']
+box.space.vinyl:select{331}
+-
+- [331, 'tuple 331']
+box.space.vinyl:select{332}
+-
+- [332, 'tuple 332']
+box.space.vinyl:select{333}
+-
+- [333, 'tuple 333']
+box.space.vinyl:select{334}
+-
+- [334, 'tuple 334']
+box.space.memtx:insert{335, "tuple 335"}
+-
+- [335, 'tuple 335']
+box.space.memtx:insert{336, "tuple 336"}
+-
+- [336, 'tuple 336']
+box.space.memtx:insert{337, "tuple 337"}
+-
+- [337, 'tuple 337']
+box.space.memtx:insert{338, "tuple 338"}
+-
+- [338, 'tuple 338']
+box.space.memtx:insert{339, "tuple 339"}
+-
+- [339, 'tuple 339']
+box.space.vinyl:insert{335, "tuple 335"}
+-
+- [335, 'tuple 335']
+box.space.vinyl:insert{336, "tuple 336"}
+-
+- [336, 'tuple 336']
+box.space.vinyl:insert{337, "tuple 337"}
+-
+- [337, 'tuple 337']
+box.space.vinyl:insert{338, "tuple 338"}
+-
+- [338, 'tuple 338']
+box.space.vinyl:insert{339, "tuple 339"}
+-
+- [339, 'tuple 339']
+box.space.memtx:select{335}
+-
+- [335, 'tuple 335']
+box.space.memtx:select{336}
+-
+- [336, 'tuple 336']
+box.space.memtx:select{337}
+-
+- [337, 'tuple 337']
+box.space.memtx:select{338}
+-
+- [338, 'tuple 338']
+box.space.memtx:select{339}
+-
+- [339, 'tuple 339']
+box.space.vinyl:select{335}
+-
+- [335, 'tuple 335']
+box.space.vinyl:select{336}
+-
+- [336, 'tuple 336']
+box.space.vinyl:select{337}
+-
+- [337, 'tuple 337']
+box.space.vinyl:select{338}
+-
+- [338, 'tuple 338']
+box.space.vinyl:select{339}
+-
+- [339, 'tuple 339']
+rollback servers configuration
+switch master to master
+box.cfg{replication=''}
+---
+...
+switch replica to replica
+test 17 iteration
+box.space.memtx:insert{340, "tuple 340"}
+-
+- [340, 'tuple 340']
+box.space.memtx:insert{341, "tuple 341"}
+-
+- [341, 'tuple 341']
+box.space.memtx:insert{342, "tuple 342"}
+-
+- [342, 'tuple 342']
+box.space.memtx:insert{343, "tuple 343"}
+-
+- [343, 'tuple 343']
+box.space.memtx:insert{344, "tuple 344"}
+-
+- [344, 'tuple 344']
+box.space.vinyl:insert{340, "tuple 340"}
+-
+- [340, 'tuple 340']
+box.space.vinyl:insert{341, "tuple 341"}
+-
+- [341, 'tuple 341']
+box.space.vinyl:insert{342, "tuple 342"}
+-
+- [342, 'tuple 342']
+box.space.vinyl:insert{343, "tuple 343"}
+-
+- [343, 'tuple 343']
+box.space.vinyl:insert{344, "tuple 344"}
+-
+- [344, 'tuple 344']
+box.space.memtx:select{340}
+-
+- [340, 'tuple 340']
+box.space.memtx:select{341}
+-
+- [341, 'tuple 341']
+box.space.memtx:select{342}
+-
+- [342, 'tuple 342']
+box.space.memtx:select{343}
+-
+- [343, 'tuple 343']
+box.space.memtx:select{344}
+-
+- [344, 'tuple 344']
+box.space.vinyl:select{340}
+-
+- [340, 'tuple 340']
+box.space.vinyl:select{341}
+-
+- [341, 'tuple 341']
+box.space.vinyl:select{342}
+-
+- [342, 'tuple 342']
+box.space.vinyl:select{343}
+-
+- [343, 'tuple 343']
+box.space.vinyl:select{344}
+-
+- [344, 'tuple 344']
+box.space.memtx:insert{345, "tuple 345"}
+-
+- [345, 'tuple 345']
+box.space.memtx:insert{346, "tuple 346"}
+-
+- [346, 'tuple 346']
+box.space.memtx:insert{347, "tuple 347"}
+-
+- [347, 'tuple 347']
+box.space.memtx:insert{348, "tuple 348"}
+-
+- [348, 'tuple 348']
+box.space.memtx:insert{349, "tuple 349"}
+-
+- [349, 'tuple 349']
+box.space.vinyl:insert{345, "tuple 345"}
+-
+- [345, 'tuple 345']
+box.space.vinyl:insert{346, "tuple 346"}
+-
+- [346, 'tuple 346']
+box.space.vinyl:insert{347, "tuple 347"}
+-
+- [347, 'tuple 347']
+box.space.vinyl:insert{348, "tuple 348"}
+-
+- [348, 'tuple 348']
+box.space.vinyl:insert{349, "tuple 349"}
+-
+- [349, 'tuple 349']
+box.space.memtx:select{345}
+-
+- [345, 'tuple 345']
+box.space.memtx:select{346}
+-
+- [346, 'tuple 346']
+box.space.memtx:select{347}
+-
+- [347, 'tuple 347']
+box.space.memtx:select{348}
+-
+- [348, 'tuple 348']
+box.space.memtx:select{349}
+-
+- [349, 'tuple 349']
+box.space.vinyl:select{345}
+-
+- [345, 'tuple 345']
+box.space.vinyl:select{346}
+-
+- [346, 'tuple 346']
+box.space.vinyl:select{347}
+-
+- [347, 'tuple 347']
+box.space.vinyl:select{348}
+-
+- [348, 'tuple 348']
+box.space.vinyl:select{349}
+-
+- [349, 'tuple 349']
+swap servers
+switch replica to master
+box.cfg{replication=''}
+---
+...
+switch master to replica
+box.space.memtx:insert{350, "tuple 350"}
+-
+- [350, 'tuple 350']
+box.space.memtx:insert{351, "tuple 351"}
+-
+- [351, 'tuple 351']
+box.space.memtx:insert{352, "tuple 352"}
+-
+- [352, 'tuple 352']
+box.space.memtx:insert{353, "tuple 353"}
+-
+- [353, 'tuple 353']
+box.space.memtx:insert{354, "tuple 354"}
+-
+- [354, 'tuple 354']
+box.space.vinyl:insert{350, "tuple 350"}
+-
+- [350, 'tuple 350']
+box.space.vinyl:insert{351, "tuple 351"}
+-
+- [351, 'tuple 351']
+box.space.vinyl:insert{352, "tuple 352"}
+-
+- [352, 'tuple 352']
+box.space.vinyl:insert{353, "tuple 353"}
+-
+- [353, 'tuple 353']
+box.space.vinyl:insert{354, "tuple 354"}
+-
+- [354, 'tuple 354']
+box.space.memtx:select{350}
+-
+- [350, 'tuple 350']
+box.space.memtx:select{351}
+-
+- [351, 'tuple 351']
+box.space.memtx:select{352}
+-
+- [352, 'tuple 352']
+box.space.memtx:select{353}
+-
+- [353, 'tuple 353']
+box.space.memtx:select{354}
+-
+- [354, 'tuple 354']
+box.space.vinyl:select{350}
+-
+- [350, 'tuple 350']
+box.space.vinyl:select{351}
+-
+- [351, 'tuple 351']
+box.space.vinyl:select{352}
+-
+- [352, 'tuple 352']
+box.space.vinyl:select{353}
+-
+- [353, 'tuple 353']
+box.space.vinyl:select{354}
+-
+- [354, 'tuple 354']
+box.space.memtx:insert{355, "tuple 355"}
+-
+- [355, 'tuple 355']
+box.space.memtx:insert{356, "tuple 356"}
+-
+- [356, 'tuple 356']
+box.space.memtx:insert{357, "tuple 357"}
+-
+- [357, 'tuple 357']
+box.space.memtx:insert{358, "tuple 358"}
+-
+- [358, 'tuple 358']
+box.space.memtx:insert{359, "tuple 359"}
+-
+- [359, 'tuple 359']
+box.space.vinyl:insert{355, "tuple 355"}
+-
+- [355, 'tuple 355']
+box.space.vinyl:insert{356, "tuple 356"}
+-
+- [356, 'tuple 356']
+box.space.vinyl:insert{357, "tuple 357"}
+-
+- [357, 'tuple 357']
+box.space.vinyl:insert{358, "tuple 358"}
+-
+- [358, 'tuple 358']
+box.space.vinyl:insert{359, "tuple 359"}
+-
+- [359, 'tuple 359']
+box.space.memtx:select{355}
+-
+- [355, 'tuple 355']
+box.space.memtx:select{356}
+-
+- [356, 'tuple 356']
+box.space.memtx:select{357}
+-
+- [357, 'tuple 357']
+box.space.memtx:select{358}
+-
+- [358, 'tuple 358']
+box.space.memtx:select{359}
+-
+- [359, 'tuple 359']
+box.space.vinyl:select{355}
+-
+- [355, 'tuple 355']
+box.space.vinyl:select{356}
+-
+- [356, 'tuple 356']
+box.space.vinyl:select{357}
+-
+- [357, 'tuple 357']
+box.space.vinyl:select{358}
+-
+- [358, 'tuple 358']
+box.space.vinyl:select{359}
+-
+- [359, 'tuple 359']
+rollback servers configuration
+switch master to master
+box.cfg{replication=''}
+---
+...
+switch replica to replica
+test 18 iteration
+box.space.memtx:insert{360, "tuple 360"}
+-
+- [360, 'tuple 360']
+box.space.memtx:insert{361, "tuple 361"}
+-
+- [361, 'tuple 361']
+box.space.memtx:insert{362, "tuple 362"}
+-
+- [362, 'tuple 362']
+box.space.memtx:insert{363, "tuple 363"}
+-
+- [363, 'tuple 363']
+box.space.memtx:insert{364, "tuple 364"}
+-
+- [364, 'tuple 364']
+box.space.vinyl:insert{360, "tuple 360"}
+-
+- [360, 'tuple 360']
+box.space.vinyl:insert{361, "tuple 361"}
+-
+- [361, 'tuple 361']
+box.space.vinyl:insert{362, "tuple 362"}
+-
+- [362, 'tuple 362']
+box.space.vinyl:insert{363, "tuple 363"}
+-
+- [363, 'tuple 363']
+box.space.vinyl:insert{364, "tuple 364"}
+-
+- [364, 'tuple 364']
+box.space.memtx:select{360}
+-
+- [360, 'tuple 360']
+box.space.memtx:select{361}
+-
+- [361, 'tuple 361']
+box.space.memtx:select{362}
+-
+- [362, 'tuple 362']
+box.space.memtx:select{363}
+-
+- [363, 'tuple 363']
+box.space.memtx:select{364}
+-
+- [364, 'tuple 364']
+box.space.vinyl:select{360}
+-
+- [360, 'tuple 360']
+box.space.vinyl:select{361}
+-
+- [361, 'tuple 361']
+box.space.vinyl:select{362}
+-
+- [362, 'tuple 362']
+box.space.vinyl:select{363}
+-
+- [363, 'tuple 363']
+box.space.vinyl:select{364}
+-
+- [364, 'tuple 364']
+box.space.memtx:insert{365, "tuple 365"}
+-
+- [365, 'tuple 365']
+box.space.memtx:insert{366, "tuple 366"}
+-
+- [366, 'tuple 366']
+box.space.memtx:insert{367, "tuple 367"}
+-
+- [367, 'tuple 367']
+box.space.memtx:insert{368, "tuple 368"}
+-
+- [368, 'tuple 368']
+box.space.memtx:insert{369, "tuple 369"}
+-
+- [369, 'tuple 369']
+box.space.vinyl:insert{365, "tuple 365"}
+-
+- [365, 'tuple 365']
+box.space.vinyl:insert{366, "tuple 366"}
+-
+- [366, 'tuple 366']
+box.space.vinyl:insert{367, "tuple 367"}
+-
+- [367, 'tuple 367']
+box.space.vinyl:insert{368, "tuple 368"}
+-
+- [368, 'tuple 368']
+box.space.vinyl:insert{369, "tuple 369"}
+-
+- [369, 'tuple 369']
+box.space.memtx:select{365}
+-
+- [365, 'tuple 365']
+box.space.memtx:select{366}
+-
+- [366, 'tuple 366']
+box.space.memtx:select{367}
+-
+- [367, 'tuple 367']
+box.space.memtx:select{368}
+-
+- [368, 'tuple 368']
+box.space.memtx:select{369}
+-
+- [369, 'tuple 369']
+box.space.vinyl:select{365}
+-
+- [365, 'tuple 365']
+box.space.vinyl:select{366}
+-
+- [366, 'tuple 366']
+box.space.vinyl:select{367}
+-
+- [367, 'tuple 367']
+box.space.vinyl:select{368}
+-
+- [368, 'tuple 368']
+box.space.vinyl:select{369}
+-
+- [369, 'tuple 369']
+swap servers
+switch replica to master
+box.cfg{replication=''}
+---
+...
+switch master to replica
+box.space.memtx:insert{370, "tuple 370"}
+-
+- [370, 'tuple 370']
+box.space.memtx:insert{371, "tuple 371"}
+-
+- [371, 'tuple 371']
+box.space.memtx:insert{372, "tuple 372"}
+-
+- [372, 'tuple 372']
+box.space.memtx:insert{373, "tuple 373"}
+-
+- [373, 'tuple 373']
+box.space.memtx:insert{374, "tuple 374"}
+-
+- [374, 'tuple 374']
+box.space.vinyl:insert{370, "tuple 370"}
+-
+- [370, 'tuple 370']
+box.space.vinyl:insert{371, "tuple 371"}
+-
+- [371, 'tuple 371']
+box.space.vinyl:insert{372, "tuple 372"}
+-
+- [372, 'tuple 372']
+box.space.vinyl:insert{373, "tuple 373"}
+-
+- [373, 'tuple 373']
+box.space.vinyl:insert{374, "tuple 374"}
+-
+- [374, 'tuple 374']
+box.space.memtx:select{370}
+-
+- [370, 'tuple 370']
+box.space.memtx:select{371}
+-
+- [371, 'tuple 371']
+box.space.memtx:select{372}
+-
+- [372, 'tuple 372']
+box.space.memtx:select{373}
+-
+- [373, 'tuple 373']
+box.space.memtx:select{374}
+-
+- [374, 'tuple 374']
+box.space.vinyl:select{370}
+-
+- [370, 'tuple 370']
+box.space.vinyl:select{371}
+-
+- [371, 'tuple 371']
+box.space.vinyl:select{372}
+-
+- [372, 'tuple 372']
+box.space.vinyl:select{373}
+-
+- [373, 'tuple 373']
+box.space.vinyl:select{374}
+-
+- [374, 'tuple 374']
+box.space.memtx:insert{375, "tuple 375"}
+-
+- [375, 'tuple 375']
+box.space.memtx:insert{376, "tuple 376"}
+-
+- [376, 'tuple 376']
+box.space.memtx:insert{377, "tuple 377"}
+-
+- [377, 'tuple 377']
+box.space.memtx:insert{378, "tuple 378"}
+-
+- [378, 'tuple 378']
+box.space.memtx:insert{379, "tuple 379"}
+-
+- [379, 'tuple 379']
+box.space.vinyl:insert{375, "tuple 375"}
+-
+- [375, 'tuple 375']
+box.space.vinyl:insert{376, "tuple 376"}
+-
+- [376, 'tuple 376']
+box.space.vinyl:insert{377, "tuple 377"}
+-
+- [377, 'tuple 377']
+box.space.vinyl:insert{378, "tuple 378"}
+-
+- [378, 'tuple 378']
+box.space.vinyl:insert{379, "tuple 379"}
+-
+- [379, 'tuple 379']
+box.space.memtx:select{375}
+-
+- [375, 'tuple 375']
+box.space.memtx:select{376}
+-
+- [376, 'tuple 376']
+box.space.memtx:select{377}
+-
+- [377, 'tuple 377']
+box.space.memtx:select{378}
+-
+- [378, 'tuple 378']
+box.space.memtx:select{379}
+-
+- [379, 'tuple 379']
+box.space.vinyl:select{375}
+-
+- [375, 'tuple 375']
+box.space.vinyl:select{376}
+-
+- [376, 'tuple 376']
+box.space.vinyl:select{377}
+-
+- [377, 'tuple 377']
+box.space.vinyl:select{378}
+-
+- [378, 'tuple 378']
+box.space.vinyl:select{379}
+-
+- [379, 'tuple 379']
+rollback servers configuration
+switch master to master
+box.cfg{replication=''}
+---
+...
+switch replica to replica
+test 19 iteration
+box.space.memtx:insert{380, "tuple 380"}
+-
+- [380, 'tuple 380']
+box.space.memtx:insert{381, "tuple 381"}
+-
+- [381, 'tuple 381']
+box.space.memtx:insert{382, "tuple 382"}
+-
+- [382, 'tuple 382']
+box.space.memtx:insert{383, "tuple 383"}
+-
+- [383, 'tuple 383']
+box.space.memtx:insert{384, "tuple 384"}
+-
+- [384, 'tuple 384']
+box.space.vinyl:insert{380, "tuple 380"}
+-
+- [380, 'tuple 380']
+box.space.vinyl:insert{381, "tuple 381"}
+-
+- [381, 'tuple 381']
+box.space.vinyl:insert{382, "tuple 382"}
+-
+- [382, 'tuple 382']
+box.space.vinyl:insert{383, "tuple 383"}
+-
+- [383, 'tuple 383']
+box.space.vinyl:insert{384, "tuple 384"}
+-
+- [384, 'tuple 384']
+box.space.memtx:select{380}
+-
+- [380, 'tuple 380']
+box.space.memtx:select{381}
+-
+- [381, 'tuple 381']
+box.space.memtx:select{382}
+-
+- [382, 'tuple 382']
+box.space.memtx:select{383}
+-
+- [383, 'tuple 383']
+box.space.memtx:select{384}
+-
+- [384, 'tuple 384']
+box.space.vinyl:select{380}
+-
+- [380, 'tuple 380']
+box.space.vinyl:select{381}
+-
+- [381, 'tuple 381']
+box.space.vinyl:select{382}
+-
+- [382, 'tuple 382']
+box.space.vinyl:select{383}
+-
+- [383, 'tuple 383']
+box.space.vinyl:select{384}
+-
+- [384, 'tuple 384']
+box.space.memtx:insert{385, "tuple 385"}
+-
+- [385, 'tuple 385']
+box.space.memtx:insert{386, "tuple 386"}
+-
+- [386, 'tuple 386']
+box.space.memtx:insert{387, "tuple 387"}
+-
+- [387, 'tuple 387']
+box.space.memtx:insert{388, "tuple 388"}
+-
+- [388, 'tuple 388']
+box.space.memtx:insert{389, "tuple 389"}
+-
+- [389, 'tuple 389']
+box.space.vinyl:insert{385, "tuple 385"}
+-
+- [385, 'tuple 385']
+box.space.vinyl:insert{386, "tuple 386"}
+-
+- [386, 'tuple 386']
+box.space.vinyl:insert{387, "tuple 387"}
+-
+- [387, 'tuple 387']
+box.space.vinyl:insert{388, "tuple 388"}
+-
+- [388, 'tuple 388']
+box.space.vinyl:insert{389, "tuple 389"}
+-
+- [389, 'tuple 389']
+box.space.memtx:select{385}
+-
+- [385, 'tuple 385']
+box.space.memtx:select{386}
+-
+- [386, 'tuple 386']
+box.space.memtx:select{387}
+-
+- [387, 'tuple 387']
+box.space.memtx:select{388}
+-
+- [388, 'tuple 388']
+box.space.memtx:select{389}
+-
+- [389, 'tuple 389']
+box.space.vinyl:select{385}
+-
+- [385, 'tuple 385']
+box.space.vinyl:select{386}
+-
+- [386, 'tuple 386']
+box.space.vinyl:select{387}
+-
+- [387, 'tuple 387']
+box.space.vinyl:select{388}
+-
+- [388, 'tuple 388']
+box.space.vinyl:select{389}
+-
+- [389, 'tuple 389']
+swap servers
+switch replica to master
+box.cfg{replication=''}
+---
+...
+switch master to replica
+box.space.memtx:insert{390, "tuple 390"}
+-
+- [390, 'tuple 390']
+box.space.memtx:insert{391, "tuple 391"}
+-
+- [391, 'tuple 391']
+box.space.memtx:insert{392, "tuple 392"}
+-
+- [392, 'tuple 392']
+box.space.memtx:insert{393, "tuple 393"}
+-
+- [393, 'tuple 393']
+box.space.memtx:insert{394, "tuple 394"}
+-
+- [394, 'tuple 394']
+box.space.vinyl:insert{390, "tuple 390"}
+-
+- [390, 'tuple 390']
+box.space.vinyl:insert{391, "tuple 391"}
+-
+- [391, 'tuple 391']
+box.space.vinyl:insert{392, "tuple 392"}
+-
+- [392, 'tuple 392']
+box.space.vinyl:insert{393, "tuple 393"}
+-
+- [393, 'tuple 393']
+box.space.vinyl:insert{394, "tuple 394"}
+-
+- [394, 'tuple 394']
+box.space.memtx:select{390}
+-
+- [390, 'tuple 390']
+box.space.memtx:select{391}
+-
+- [391, 'tuple 391']
+box.space.memtx:select{392}
+-
+- [392, 'tuple 392']
+box.space.memtx:select{393}
+-
+- [393, 'tuple 393']
+box.space.memtx:select{394}
+-
+- [394, 'tuple 394']
+box.space.vinyl:select{390}
+-
+- [390, 'tuple 390']
+box.space.vinyl:select{391}
+-
+- [391, 'tuple 391']
+box.space.vinyl:select{392}
+-
+- [392, 'tuple 392']
+box.space.vinyl:select{393}
+-
+- [393, 'tuple 393']
+box.space.vinyl:select{394}
+-
+- [394, 'tuple 394']
+box.space.memtx:insert{395, "tuple 395"}
+-
+- [395, 'tuple 395']
+box.space.memtx:insert{396, "tuple 396"}
+-
+- [396, 'tuple 396']
+box.space.memtx:insert{397, "tuple 397"}
+-
+- [397, 'tuple 397']
+box.space.memtx:insert{398, "tuple 398"}
+-
+- [398, 'tuple 398']
+box.space.memtx:insert{399, "tuple 399"}
+-
+- [399, 'tuple 399']
+box.space.vinyl:insert{395, "tuple 395"}
+-
+- [395, 'tuple 395']
+box.space.vinyl:insert{396, "tuple 396"}
+-
+- [396, 'tuple 396']
+box.space.vinyl:insert{397, "tuple 397"}
+-
+- [397, 'tuple 397']
+box.space.vinyl:insert{398, "tuple 398"}
+-
+- [398, 'tuple 398']
+box.space.vinyl:insert{399, "tuple 399"}
+-
+- [399, 'tuple 399']
+box.space.memtx:select{395}
+-
+- [395, 'tuple 395']
+box.space.memtx:select{396}
+-
+- [396, 'tuple 396']
+box.space.memtx:select{397}
+-
+- [397, 'tuple 397']
+box.space.memtx:select{398}
+-
+- [398, 'tuple 398']
+box.space.memtx:select{399}
+-
+- [399, 'tuple 399']
+box.space.vinyl:select{395}
+-
+- [395, 'tuple 395']
+box.space.vinyl:select{396}
+-
+- [396, 'tuple 396']
+box.space.vinyl:select{397}
+-
+- [397, 'tuple 397']
+box.space.vinyl:select{398}
+-
+- [398, 'tuple 398']
+box.space.vinyl:select{399}
+-
+- [399, 'tuple 399']
+rollback servers configuration
+switch master to master
+box.cfg{replication=''}
+---
+...
+switch replica to replica

@@ -1,0 +1,252 @@
+{
+   <some crap from dash>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   ...
+   obj:/bin/dash
+   ...
+}
+{
+   <luajit assembly>
+   Memcheck:Cond
+   fun:str_fastcmp
+   fun:lj_str_new
+   ...
+}
+{
+   <OpenSSL one-time allocations>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:*alloc
+   fun:CRYPTO_*alloc
+   ...
+   fun:ERR_load_crypto_strings
+   ...
+   fun:main
+}
+{
+   <OpenSSL one-time allocations>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:*alloc
+   fun:CRYPTO_*alloc
+   ...
+   fun:OpenSSL_add_all_*
+   ...
+   fun:main
+}
+{
+   <OpenSSL one-time allocations>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:*alloc
+   fun:CRYPTO_*alloc
+   ...
+   fun:EVP_add_digest
+   ...
+   fun:main
+}
+{
+   <OpenSSL one-time allocations - Lua FFI bindings>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:CRYPTO_malloc
+   ...
+   fun:OBJ_NAME_add
+   ...
+   fun:main
+}
+{
+   <OpenSSL via FFI>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:CRYPTO_malloc
+   fun:lh_insert
+   obj:/lib/x86_64-linux-gnu/libcrypto.so.1.0.0
+   obj:/lib/x86_64-linux-gnu/libcrypto.so.1.0.0
+   ...
+}
+{
+   <fiber hash of the main cord>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:calloc
+   fun:mh_i32ptr_new
+   fun:cord_create
+   fun:fiber_init
+   fun:main
+}
+{
+   <title.c>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   ...
+   fun:title_init
+   fun:main
+}
+{
+   <say.c>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:strdup
+   fun:say_init
+   fun:main
+}
+{
+   <libreadline one-time allocation>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:*alloc
+   ...
+   fun:rl_initialize
+   ...
+}
+{
+   <libreadline I don't know what>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:*alloc
+   ...
+   fun:rl_redisplay
+   ...
+}
+{
+   <libev global array of all fds>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:*alloc
+   ...
+   fun:array_realloc
+   ...
+   fun:ev_*
+   ...
+}
+{
+   <libev default loop>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:*alloc
+   ...
+   fun:ev_default_loop
+   ...
+}
+{
+   <One-time allocations in box initialization>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:*alloc
+   ...
+   fun:box_load_cfg
+   fun:load_cfg
+   ...
+}
+{
+   <readline, again>
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   fun:xmalloc
+   fun:readline_internal_teardown
+   fun:rl_callback_read_char
+   fun:lbox_console_readline
+   fun:lj_BC_FUNCC
+   fun:lua_pcall
+   fun:lbox_call
+   fun:run_script_f
+   fun:_ZL16fiber_cxx_invokePFiP13__va_list_tagES0_
+   fun:fiber_loop
+   fun:coro_init
+}
+{
+   <readline history>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:realloc
+   fun:xrealloc
+   fun:add_history
+   fun:read_history_range
+   fun:main
+}
+{
+   <Existing threads>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:*alloc
+   ...
+   fun:cord_create
+   fun:cord_thread_func
+   fun:start_thread
+   fun:clone
+}
+{
+   <Existing spaces in the space cache>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:_Z9space_newP9space_defP5rlist
+   ...
+   fun:trigger_run
+   ...
+}
+{
+   <System spaces>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:_Z12sc_space_newP9space_defP7key_defP7trigger
+   ...
+}
+{
+   <Rolling average>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:rmean_new
+   fun:_ZL10net_cord_fP13__va_list_tag
+   fun:_ZL16fiber_cxx_invokePFiP13__va_list_tagES0_
+   fun:fiber_loop
+   fun:coro_init
+}
+{
+   <lua-json>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:strbuf_init
+   fun:json_create_tokens
+   fun:luaopen_json
+   fun:tarantool_lua_init
+   fun:main
+}
+{
+   <fiber hash>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:mh_i32ptr_put
+   fun:register_fid
+   ...
+}
+{
+   <dlopen>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:calloc
+   fun:_dlerror_run
+   fun:dlsym
+   fun:clib_getsym
+   fun:lj_clib_index
+   fun:ffi_clib_index
+   fun:lj_cf_ffi_clib___index
+   fun:lj_BC_FUNCC
+   fun:lua_call
+   fun:tarantool_lua_init
+   fun:main
+}

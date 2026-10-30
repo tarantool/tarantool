@@ -1,0 +1,140 @@
+name: lint
+
+on:
+  push:
+    branches:
+      - 'master'
+      - 'release/**'
+      - '**full-ci**'
+    tags:
+      - '**'
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # Update of a developer branch cancels the previously scheduled workflow
+  # run for this branch. However, the 'master' branch, release branch, and
+  # tag workflow runs are never canceled.
+  #
+  # We use a trick here: define the concurrency group as 'workflow run ID' +
+  # 'workflow run attempt' because it is a unique combination for any run.
+  # So it effectively discards grouping.
+  #
+  # Important: we cannot use `github.sha` as a unique identifier because
+  # pushing a tag may cancel a run that works on a branch push event.
+  group: ${{ (
+    github.ref == 'refs/heads/master' ||
+    startsWith(github.ref, 'refs/heads/release/') ||
+    startsWith(github.ref, 'refs/tags/')) &&
+    format('{0}-{1}', github.run_id, github.run_attempt) ||
+    format('{0}-{1}', github.workflow, github.ref) }}
+  cancel-in-progress: true
+
+jobs:
+  luacheck:
+    # Run on push to the 'master' and release branches of tarantool/tarantool
+    # or on pull request if the 'notest' label is not set.
+    if: github.repository == 'tarantool/tarantool' &&
+        ( github.event_name != 'pull_request' ||
+          ( github.event_name == 'pull_request' &&
+            !contains(github.event.pull_request.labels.*.name, 'notest') ) )
+
+    runs-on: ubuntu-20.04-self-hosted
+
+    timeout-minutes: 60
+
+    container:
+      image: docker.io/tarantool/testing:ubuntu-focal
+
+    steps:
+      - name: Prepare checkout
+        uses: tarantool/actions/prepare-checkout@master
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      # https://cmake.org/cmake/help/latest/manual/cmake-presets.7.html#schema
+      # A machine-readable JSON schema for the CMakePresets.json format.
+      - run: curl -O https://cmake.org/cmake/help/v3.26/_downloads/3e2d73bff478d88a7de0de736ba5e361/schema.json
+      - run: pip3 install jsonschema==4.23.0
+      - name: Check JSON schema of the CMakePresets.json
+        run: jsonschema -i CMakePresets.json schema.json
+      - name: Install deps
+        uses: ./.github/actions/install-deps-debian
+      - name: test
+        run: make -f .test.mk luacheck
+
+  emmylua_check:
+    # Run on push to the 'master' and release branches of tarantool/tarantool
+    # or on pull request if the 'notest' label is not set.
+    if: github.repository == 'tarantool/tarantool' &&
+        ( github.event_name != 'pull_request' ||
+          ( github.event_name == 'pull_request' &&
+            !contains(github.event.pull_request.labels.*.name, 'notest') ) )
+
+    runs-on: ubuntu-26.04
+
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - uses: ./.github/actions/setup-emmylua-analyzer
+      - name: Run emmylua_check
+        run: emmylua_check --warnings-as-errors --config .emmyrc.json .
+
+  release-notes:
+    # Run on push to the 'master' and release branches of tarantool/tarantool
+    # or on pull request if the 'notest' label is not set.
+    if: github.repository == 'tarantool/tarantool' &&
+        ( github.event_name != 'pull_request' ||
+          ( github.event_name == 'pull_request' &&
+            !contains(github.event.pull_request.labels.*.name, 'notest') ) )
+
+    runs-on: ubuntu-20.04-self-hosted
+
+    timeout-minutes: 60
+
+    container:
+      image: docker.io/tarantool/testing:ubuntu-focal
+
+    steps:
+      - name: Prepare checkout
+        uses: tarantool/actions/prepare-checkout@master
+      # We don't need neither deep fetch, nor submodules here.
+      - uses: actions/checkout@v4
+      # Don't use actions/setup-python to don't bother with proper
+      # setup of our self-hosted machines, see [1].
+      #
+      # Any python version is okay for the script, even Python 2.
+      #
+      # [1]: https://github.com/actions/setup-python#using-setup-python-with-a-self-hosted-runner
+      - run: ./tools/gen-release-notes
+
+  checkpatch:
+    # Run only if the workflow was triggered by a pull request for
+    # tarantool/tarantool that doesn't have the 'notest' label.
+    if: github.repository == 'tarantool/tarantool' &&
+        ( github.event_name == 'pull_request' &&
+          !contains(github.event.pull_request.labels.*.name, 'notest') )
+
+    runs-on: ubuntu-20.04-self-hosted
+
+    timeout-minutes: 60
+
+    container:
+      image: docker.io/tarantool/testing:ubuntu-jammy
+
+    steps:
+      - name: Prepare checkout
+        uses: tarantool/actions/prepare-checkout@master
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: test
+        uses: tarantool/checkpatch/.github/actions/checkpatch@master
+        with:
+          revision-range: HEAD~${{ github.event.pull_request.commits }}..HEAD

@@ -1,0 +1,41 @@
+-- test-run result file version 2
+json = require('json')
+ | ---
+ | ...
+msgpack = require('msgpack')
+ | ---
+ | ...
+yaml = require('yaml')
+ | ---
+ | ...
+
+e = box.error.new(box.error.ILLEGAL_PARAMS, 'test')
+ | ---
+ | ...
+v = {123, e, 'abc'}
+ | ---
+ | ...
+box.tuple.new(v)
+ | ---
+ | - [123, 'test', 'abc']
+ | ...
+t = msgpack.decode(msgpack.encode(v))
+ | ---
+ | ...
+t
+ | ---
+ | - [123, 'test', 'abc']
+ | ...
+json.encode(v)
+ | ---
+ | - '[123,"test","abc"]'
+ | ...
+yaml.encode(v)
+ | ---
+ | - |
+ |   ---
+ |   - 123
+ |   - test
+ |   - abc
+ |   ...
+ | ...

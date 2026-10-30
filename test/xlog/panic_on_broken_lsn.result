@@ -1,0 +1,90 @@
+-- Issue 3105: Test logging of request with broken lsn before panicking
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+test_run:cleanup_cluster()
+---
+...
+fio = require('fio')
+---
+...
+-- Testing case of panic on recovery
+test_run:cmd('create server panic with script="xlog/panic.lua"')
+---
+- true
+...
+test_run:cmd('start server panic')
+---
+- true
+...
+test_run:switch('panic')
+---
+- true
+...
+box.space._schema:replace{"t0", "v0"}
+---
+- ['t0', 'v0']
+...
+lsn = box.info.vclock[1]
+---
+...
+box.error.injection.set("ERRINJ_WAL_BREAK_LSN", lsn + 1)
+---
+- ok
+...
+box.space._schema:replace{"t0", "v1"}
+---
+- ['t0', 'v1']
+...
+box.error.injection.set("ERRINJ_WAL_BREAK_LSN", -1)
+---
+- ok
+...
+test_run:switch('default')
+---
+- true
+...
+test_run:cmd('stop server panic')
+---
+- true
+...
+dirname = fio.pathjoin(fio.cwd(), "panic")
+---
+...
+xlogs = fio.glob(dirname .. "/*.xlog")
+---
+...
+fio.unlink(xlogs[#xlogs])
+---
+- true
+...
+test_run:cmd('start server panic with crash_expected=True')
+---
+- false
+...
+-- Check that log contains the mention of broken LSN and the request printout
+filename = fio.pathjoin(fio.cwd(), 'panic.log')
+---
+...
+str = string.format("LSN for 1 is used twice or COMMIT order is broken: confirmed: 1, new: 1, req: .*")
+---
+...
+found = test_run:grep_log(nil, str, 256, {filename = filename})
+---
+...
+(found:gsub('^.*, req: ', ''):gsub('lsn: %d+', 'lsn: <lsn>'))
+---
+- '{type: ''REPLACE'', replica_id: 1, lsn: <lsn>, space_id: 272, index_id: 0, tuple:
+  ["t0", "v1"]}'
+...
+test_run:cmd('cleanup server panic')
+---
+- true
+...
+test_run:cmd('delete server panic')
+---
+- true
+...

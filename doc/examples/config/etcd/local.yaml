@@ -1,0 +1,12 @@
+config:
+  etcd:
+    prefix: /foo
+    endpoints:
+    - http://localhost:2379
+
+iproto:
+  listen:
+    - uri: 'unix/:./{{ instance_name }}.iproto'
+  advertise:
+    peer:
+      login: replicator

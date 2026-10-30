@@ -1,0 +1,90 @@
+	*** manual_test ***
+ -- default ru_RU -- 
+123
+45 GREATER 
+Б GREATER 
+бб GREATER 
+е GREATER 
+ё GREATER 
+Ё GREATER 
+ЕЕЕЕ GREATER 
+и GREATER 
+И GREATER 
+ -- --||-- + upper first -- 
+123
+45 GREATER 
+Б GREATER 
+бб GREATER 
+е GREATER 
+Ё GREATER 
+ё GREATER 
+ЕЕЕЕ GREATER 
+И GREATER 
+и GREATER 
+ -- --||-- + lower first -- 
+123
+45 GREATER 
+Б GREATER 
+бб GREATER 
+е GREATER 
+ё GREATER 
+Ё GREATER 
+ЕЕЕЕ GREATER 
+и GREATER 
+И GREATER 
+ -- --||-- + secondary strength + numeric -- 
+45
+123 GREATER 
+Б GREATER 
+бб GREATER 
+е GREATER 
+ё GREATER 
+Ё EQUAL
+ЕЕЕЕ GREATER 
+и GREATER 
+И EQUAL
+ -- --||-- + case level -- 
+45
+123 GREATER 
+Б GREATER 
+бб GREATER 
+е GREATER 
+ё GREATER 
+Ё GREATER 
+ЕЕЕЕ GREATER 
+и GREATER 
+И GREATER 
+ -- en_EN -- 
+aa
+bb GREATER 
+cc GREATER 
+ch GREATER 
+dd GREATER 
+gg GREATER 
+hh GREATER 
+ii GREATER 
+ -- cs_CZ -- 
+aa
+bb GREATER 
+cc GREATER 
+dd GREATER 
+gg GREATER 
+hh GREATER 
+ch GREATER 
+ii GREATER 
+	*** manual_test: done ***
+	*** hash_test ***
+Case sensitive
+OK
+OK
+OK
+Case insensitive
+OK
+OK
+OK
+	*** hash_test: done ***
+	*** cache_test ***
+1..2
+ok 1 - collations with the same definition are not duplicated
+ok 2 - collations with different definitions are different objects
+	*** cache_test: done ***

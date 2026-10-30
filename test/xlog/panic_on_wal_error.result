@@ -1,0 +1,169 @@
+-- preparatory stuff
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+test_run:cmd("restart server default with cleanup=True")
+box.schema.user.grant('guest', 'replication')
+---
+...
+_ = box.schema.space.create('test')
+---
+...
+_ = box.space.test:create_index('pk')
+---
+...
+--
+-- reopen xlog
+--
+test_run:cmd("restart server default")
+box.space.test ~= nil
+---
+- true
+...
+-- insert some stuff
+-- 
+box.space.test:auto_increment{'before snapshot'}
+---
+- [1, 'before snapshot']
+...
+--
+-- this snapshot will go to the replica
+--
+box.snapshot()
+---
+- ok
+...
+-- 
+-- create a replica, let it catch up somewhat
+--
+test_run:cmd("create server replica with rpl_master=default, script='xlog/replica.lua'")
+---
+- true
+...
+test_run:cmd("start server replica")
+---
+- true
+...
+test_run:cmd("switch replica")
+---
+- true
+...
+box.space.test:select{}
+---
+- - [1, 'before snapshot']
+...
+-- 
+-- stop replica, restart the master, insert more stuff
+-- which will make it into an xlog only
+--
+test_run:cmd("switch default")
+---
+- true
+...
+test_run:cmd("stop server replica")
+---
+- true
+...
+test_run:cmd("restart server default")
+box.space.test:auto_increment{'after snapshot'}
+---
+- [2, 'after snapshot']
+...
+box.space.test:auto_increment{'after snapshot - one more row'}
+---
+- [3, 'after snapshot - one more row']
+...
+--
+-- save snapshot and remove xlogs
+-- 
+box.snapshot()
+---
+- ok
+...
+fio = require('fio')
+---
+...
+glob = fio.pathjoin(box.cfg.wal_dir, '*.xlog')
+---
+...
+files = fio.glob(glob)
+---
+...
+for _, file in pairs(files) do fio.unlink(file) end
+---
+...
+--
+-- make sure the server has some xlogs, otherwise the
+-- replica doesn't discover the gap in the logs
+--
+box.space.test:auto_increment{'after snapshot and restart'}
+---
+- [4, 'after snapshot and restart']
+...
+box.space.test:auto_increment{'after snapshot and restart - one more row'}
+---
+- [5, 'after snapshot and restart - one more row']
+...
+--  
+--  check that panic is true
+--
+box.cfg{force_recovery=false}
+---
+...
+box.cfg.force_recovery
+---
+- false
+...
+-- 
+-- try to start the replica, ha-ha
+-- (replication should fail, some rows are missing)
+--
+test_run:cmd("start server replica with wait=False, crash_expected=True")
+---
+- true
+...
+test_run:cmd("switch replica")
+---
+- true
+...
+-- Need to wait for box.info.replication[1] defined, otherwise test-run fails to
+-- wait for the upstream status sometimes.
+test_run:wait_cond(function()                                                   \
+    return box.info ~= nil and box.info.replication[1] ~= nil                   \
+end)
+---
+- true
+...
+test_run:wait_upstream(1, {message_re = 'Missing %.xlog file', status = 'loading'})
+---
+- true
+...
+box.space.test:select{}
+---
+- - [1, 'before snapshot']
+...
+--
+--
+test_run:cmd("switch default")
+---
+- true
+...
+test_run:cmd("stop server replica")
+---
+- true
+...
+test_run:cmd("cleanup server replica")
+---
+- true
+...
+--
+-- cleanup
+box.space.test:drop()
+---
+...
+box.schema.user.revoke('guest', 'replication')
+---
+...

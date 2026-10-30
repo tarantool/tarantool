@@ -1,0 +1,17 @@
+find_path(LIBEIO_INCLUDE_DIR NAMES eio.h)
+find_library(LIBEIO_LIBRARIES NAMES eio)
+
+if(LIBEIO_INCLUDE_DIR AND LIBEIO_LIBRARIES)
+    set(LIBEIO_FOUND ON)
+endif(LIBEIO_INCLUDE_DIR AND LIBEIO_LIBRARIES)
+
+if(LIBEIO_FOUND)
+    if (NOT LIBEIO_FIND_QUIETLY)
+        message(STATUS "Found libeio includes: ${LIBEIO_INCLUDE_DIR}/eio.h")
+        message(STATUS "Found libeio library: ${LIBEIO_LIBRARIES}")
+    endif (NOT LIBEIO_FIND_QUIETLY)
+else(LIBEIO_FOUND)
+    if (LIBEIO_FIND_REQUIRED)
+        message(FATAL_ERROR "Could not find libeio development files")
+    endif (LIBEIO_FIND_REQUIRED)
+endif (LIBEIO_FOUND)

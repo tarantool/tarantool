@@ -1,0 +1,134 @@
+box.schema.user.grant('guest', 'replication')
+---
+...
+-------------------------------------------------------------
+gh-484: JOIN doesn't save data to snapshot with TREE index
+-------------------------------------------------------------
+space = box.schema.space.create('test', {id =  42})
+---
+...
+index = space:create_index('primary', { type = 'tree'})
+---
+...
+for k = 1, 9 do space:insert{k, k*k} end
+---
+...
+box.space.test:select()
+---
+- - [1, 1]
+  - [2, 4]
+  - [3, 9]
+  - [4, 16]
+  - [5, 25]
+  - [6, 36]
+  - [7, 49]
+  - [8, 64]
+  - [9, 81]
+...
+box.space.test:select()
+---
+- - [1, 1]
+  - [2, 4]
+  - [3, 9]
+  - [4, 16]
+  - [5, 25]
+  - [6, 36]
+  - [7, 49]
+  - [8, 64]
+  - [9, 81]
+...
+-------------------------------------------------------------
+replica test 2 (must be ok)
+-------------------------------------------------------------
+for k = 10, 19 do box.space[42]:insert{k, k*k*k} end
+---
+...
+for k = 20, 29 do box.space[42]:upsert({k}, {}) end
+---
+...
+space = box.space.test
+---
+...
+space:get{1}
+---
+- [1, 1]
+...
+space:get{2}
+---
+- [2, 4]
+...
+space:get{3}
+---
+- [3, 9]
+...
+space:get{4}
+---
+- [4, 16]
+...
+space:get{5}
+---
+- [5, 25]
+...
+space:get{6}
+---
+- [6, 36]
+...
+space:get{7}
+---
+- [7, 49]
+...
+space:get{8}
+---
+- [8, 64]
+...
+space:get{9}
+---
+- [9, 81]
+...
+space:get{10}
+---
+- [10, 1000]
+...
+space:get{11}
+---
+- [11, 1331]
+...
+space:get{12}
+---
+- [12, 1728]
+...
+space:get{13}
+---
+- [13, 2197]
+...
+space:get{14}
+---
+- [14, 2744]
+...
+space:get{15}
+---
+- [15, 3375]
+...
+space:get{16}
+---
+- [16, 4096]
+...
+space:get{17}
+---
+- [17, 4913]
+...
+space:get{18}
+---
+- [18, 5832]
+...
+space:get{19}
+---
+- [19, 6859]
+...
+-------------------------------------------------------------
+reconnect on JOIN/SUBSCRIBE
+-------------------------------------------------------------
+waiting reconnect on JOIN...
+ok
+waiting reconnect on SUBSCRIBE...
+ok

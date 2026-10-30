@@ -1,0 +1,138 @@
+-- test-run result file version 2
+-- gh-4928. Test that transactions mixing local and global
+-- space operations are replicated correctly.
+env = require('test_run')
+ | ---
+ | ...
+test_run = env.new()
+ | ---
+ | ...
+bit = require('bit')
+ | ---
+ | ...
+
+-- Init.
+box.schema.user.grant('guest', 'replication')
+ | ---
+ | ...
+_ = box.schema.space.create('glob')
+ | ---
+ | ...
+_ = box.schema.space.create('loc', {is_local=true})
+ | ---
+ | ...
+_ = box.space.glob:create_index('pk')
+ | ---
+ | ...
+_ = box.space.loc:create_index('pk')
+ | ---
+ | ...
+
+function gen_mixed_tx(i)\
+    box.begin()\
+    if bit.band(i, 1) ~= 0 then\
+        box.space.glob:insert{10 * i + 1}\
+    else\
+        box.space.loc:insert{10 * i + 1}\
+    end\
+    if bit.band(i, 2) ~= 0 then\
+        box.space.glob:insert{10 * i + 2}\
+    else\
+        box.space.loc:insert{10 * i + 2}\
+    end\
+    if bit.band(i, 4) ~= 0 then\
+        box.space.glob:insert{10 * i + 3}\
+    else\
+        box.space.loc:insert{10 * i + 3}\
+    end\
+    box.commit()\
+end
+ | ---
+ | ...
+
+test_run:cmd("create server replica with rpl_master=default,\
+             script='replication/replica.lua'")
+ | ---
+ | - true
+ | ...
+test_run:cmd('start server replica')
+ | ---
+ | - true
+ | ...
+test_run:wait_downstream(2, {status='follow'})
+ | ---
+ | - true
+ | ...
+
+for i = 0, 7 do gen_mixed_tx(i) end
+ | ---
+ | ...
+
+box.info.replication[2].status
+ | ---
+ | - null
+ | ...
+
+vclock = box.info.vclock
+ | ---
+ | ...
+vclock[0] = nil
+ | ---
+ | ...
+test_run:wait_vclock("replica", vclock)
+ | ---
+ | ...
+
+test_run:cmd('switch replica')
+ | ---
+ | - true
+ | ...
+
+box.info.status
+ | ---
+ | - running
+ | ...
+test_run:wait_upstream(1, {status = 'follow'})
+ | ---
+ | - true
+ | ...
+
+box.space.glob:select{}
+ | ---
+ | - - [11]
+ |   - [22]
+ |   - [31]
+ |   - [32]
+ |   - [43]
+ |   - [51]
+ |   - [53]
+ |   - [62]
+ |   - [63]
+ |   - [71]
+ |   - [72]
+ |   - [73]
+ | ...
+
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+
+-- Cleanup.
+test_run:cmd('stop server replica')
+ | ---
+ | - true
+ | ...
+test_run:cmd('delete server replica')
+ | ---
+ | - true
+ | ...
+box.schema.user.revoke('guest', 'replication')
+ | ---
+ | ...
+box.space.loc:drop()
+ | ---
+ | ...
+box.space.glob:drop()
+ | ---
+ | ...

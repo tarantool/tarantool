@@ -1,0 +1,1595 @@
+fiber = require('fiber')
+---
+...
+swim = require('swim')
+---
+...
+uri_lib = require('uri')
+---
+...
+test_run = require('test_run').new()
+---
+...
+test_run:cmd("push filter '\\.lua.*:[0-9]+: ' to '.lua:<line>: '")
+---
+- true
+...
+test_run:cmd("push filter '127.0.0.1:[0-9]+$' to '127.0.0.1:<port>'")
+---
+- true
+...
+msgpack = require('msgpack')
+---
+...
+ffi = require('ffi')
+---
+...
+--
+-- gh-3234: SWIM gossip protocol.
+--
+-- Invalid cfg parameters.
+swim.new(1)
+---
+- error: 'builtin/swim.lua:<line>: swim:cfg: expected table configuration'
+...
+swim.new({uri = true})
+---
+- error: 'builtin/swim.lua:<line>: swim:cfg: expected string URI or port number'
+...
+swim.new({heartbeat_rate = 'rate'})
+---
+- error: 'builtin/swim.lua:<line>: swim:cfg: expected number heartbeat_rate'
+...
+swim.new({ack_timeout = 'timeout'})
+---
+- error: 'builtin/swim.lua:<line>: swim:cfg: expected number ack_timeout'
+...
+swim.new({gc_mode = 'not a mode'})
+---
+- error: 'builtin/swim.lua:<line>: swim:cfg: unknown gc_mode'
+...
+swim.new({gc_mode = 0})
+---
+- error: 'builtin/swim.lua:<line>: swim:cfg: unknown gc_mode'
+...
+swim.new({uuid = 123})
+---
+- error: 'builtin/swim.lua:<line>: swim:cfg: expected string UUID or struct tt_uuid'
+...
+swim.new({uuid = '1234'})
+---
+- error: 'builtin/swim.lua:<line>: swim:cfg: invalid UUID'
+...
+-- Valid parameters, but invalid configuration.
+swim.new({})
+---
+- null
+- 'swim.cfg: UUID and URI are mandatory in a first config'
+...
+swim.new({uuid = uuid(1)})
+---
+- null
+- 'swim.cfg: UUID and URI are mandatory in a first config'
+...
+swim.new({uri = uri()})
+---
+- null
+- 'swim.cfg: UUID and URI are mandatory in a first config'
+...
+-- Check manual deletion.
+s = swim.new({uuid = uuid(1), uri = uri()})
+---
+...
+s:delete()
+---
+...
+s:cfg({})
+---
+- error: 'builtin/swim.lua:<line>: the swim instance is deleted'
+...
+s = nil
+---
+...
+_ = collectgarbage('collect')
+---
+...
+s = swim.new({uuid = uuid(1), uri = uri()})
+---
+...
+s:quit()
+---
+...
+s:is_configured()
+---
+- error: '[string "return s:is_configured() "]:1: the swim instance is deleted'
+...
+s = nil
+---
+...
+_ = collectgarbage('collect')
+---
+...
+s = swim.new({uuid = uuid(1), uri = uri()})
+---
+...
+s:is_configured()
+---
+- true
+...
+s:size()
+---
+- 1
+...
+s.cfg
+---
+- uuid: 00000000-0000-1000-8000-000000000001
+  uri: 127.0.0.1:<port>
+...
+s.cfg.gc_mode = 'off'
+---
+- error: '[string "s.cfg.gc_mode = ''off'' "]:1: please, use swim:cfg{key = value}
+    instead of swim.cfg.key = value'
+...
+s:cfg{gc_mode = 'off'}
+---
+- true
+...
+s.cfg
+---
+- gc_mode: off
+  uuid: 00000000-0000-1000-8000-000000000001
+  uri: 127.0.0.1:<port>
+...
+s.cfg.gc_mode
+---
+- off
+...
+s.cfg.uuid
+---
+- 00000000-0000-1000-8000-000000000001
+...
+s.cfg()
+---
+- error: 'builtin/swim.lua:<line>: swim:cfg: first argument is not a SWIM instance'
+...
+s:cfg({wrong_opt = 100})
+---
+- error: 'swim:cfg: unknown option wrong_opt'
+...
+s:delete()
+---
+...
+-- Reconfigure.
+s = swim.new()
+---
+...
+s:is_configured()
+---
+- false
+...
+-- Check that not configured instance does not provide most of
+-- methods.
+s.quit == nil
+---
+- true
+...
+s:cfg({uuid = uuid(1), uri = uri()})
+---
+- true
+...
+s.quit ~= nil
+---
+- true
+...
+s:is_configured()
+---
+- true
+...
+s:size()
+---
+- 1
+...
+s = nil
+---
+...
+_ = collectgarbage('collect')
+---
+...
+-- Invalid usage.
+s = swim.new()
+---
+...
+s.delete()
+---
+- error: 'builtin/swim.lua:<line>: swim:delete: first argument is not a SWIM instance'
+...
+s.is_configured()
+---
+- error: 'builtin/swim.lua:<line>: swim:is_configured: first argument is not a SWIM instance'
+...
+s.cfg()
+---
+- error: 'builtin/swim.lua:<line>: swim:cfg: first argument is not a SWIM instance'
+...
+s:delete()
+---
+...
+--
+-- Basic member table manipulations.
+--
+s1 = swim.new({uuid = uuid(1), uri = uri(), heartbeat_rate = 0.01, generation = 0})
+---
+...
+s2 = swim.new({uuid = uuid(2), uri = listen_uri, heartbeat_rate = 0.01, generation = 0})
+---
+...
+listen_uri = s2:self():uri()
+---
+...
+listen_port = uri_lib.parse(listen_uri).service
+---
+...
+s1.broadcast()
+---
+- error: 'builtin/swim.lua:<line>: swim:broadcast: first argument is not a SWIM instance'
+...
+s1:broadcast('wrong port')
+---
+- error: 'swim:broadcast: expected number port'
+...
+-- Note, broadcast takes a port, not a URI.
+s1:broadcast('127.0.0.1:3333')
+---
+- error: 'swim:broadcast: expected number port'
+...
+-- Ok to broadcast on default port.
+s1:broadcast()
+---
+- true
+...
+s1:broadcast(listen_port)
+---
+- true
+...
+while s2:size() ~= 2 or s1:size() ~= 2 do fiber.sleep(0.01) s1:broadcast(listen_port) end
+---
+...
+s2:delete()
+---
+...
+s1.remove_member()
+---
+- error: 'builtin/swim.lua:<line>: swim:remove_member: first argument is not a SWIM instance'
+...
+s1:remove_member(100)
+---
+- error: 'builtin/swim.lua:<line>: swim:remove_member: expected string UUID or struct
+    tt_uuid'
+...
+s1:remove_member('1234')
+---
+- error: 'builtin/swim.lua:<line>: swim:remove_member: invalid UUID'
+...
+s1:remove_member(uuid(2)) size = s1:size()
+---
+...
+size
+---
+- 1
+...
+s1.add_member()
+---
+- error: 'builtin/swim.lua:<line>: swim:add_member: first argument is not a SWIM instance'
+...
+s1:add_member(100)
+---
+- error: 'swim:add_member: expected table member definition'
+...
+s1:add_member({uri = true})
+---
+- error: 'builtin/swim.lua:<line>: swim:add_member: expected string URI or port number'
+...
+s1:add_member({uri = listen_uri})
+---
+- null
+- 'swim.add_member: URI and UUID are mandatory'
+...
+s1:add_member({uuid = uuid(2)})
+---
+- null
+- 'swim.add_member: URI and UUID are mandatory'
+...
+s1:remove_member(uuid(2)) s1:add_member({uri = listen_uri, uuid = uuid(2)})
+---
+...
+s1:add_member({uri = listen_uri, uuid = uuid(2)})
+---
+- null
+- 'swim.add_member: a member with such UUID already exists'
+...
+s1:size()
+---
+- 2
+...
+s1:cfg({uuid = uuid(3)}) old_self = s1:member_by_uuid(uuid(1))
+---
+...
+s1:self():uuid()
+---
+- 00000000-0000-1000-8000-000000000003
+...
+old_self
+---
+- uri: 127.0.0.1:<port>
+  status: left
+  incarnation: cdata {generation = 0ULL, version = 1ULL}
+  uuid: 00000000-0000-1000-8000-000000000001
+  payload_size: 0
+...
+-- Can't remove self.
+s1:remove_member(uuid(3))
+---
+- null
+- 'swim.remove_member: can not remove self'
+...
+-- Not existing.
+s1:remove_member(uuid(4))
+---
+- true
+...
+-- Old self.
+s1:remove_member(uuid(1))
+---
+- true
+...
+s1:delete()
+---
+...
+s1 = swim.new({uuid = uuid(1), uri = uri()})
+---
+...
+s2 = swim.new({uuid = uuid(2), uri = uri()})
+---
+...
+s1.probe_member()
+---
+- error: 'builtin/swim.lua:<line>: swim:probe_member: first argument is not a SWIM instance'
+...
+s1:probe_member()
+---
+- null
+- 'swim.probe_member: URI is mandatory'
+...
+s1:probe_member(true)
+---
+- error: 'builtin/swim.lua:<line>: swim:probe_member: expected string URI or port number'
+...
+-- Not existing URI is ok - nothing happens.
+s1:probe_member('127.0.0.1:1')
+---
+- true
+...
+fiber.yield()
+---
+...
+s1:size()
+---
+- 1
+...
+s1:probe_member(s2:self():uri())
+---
+- true
+...
+while s1:size() ~= 2 do fiber.sleep(0.01) end
+---
+...
+s2:size()
+---
+- 2
+...
+s1:delete()
+---
+...
+s2:delete()
+---
+...
+--
+-- Member API.
+--
+s1 = swim.new({uuid = uuid(1), uri = uri(), generation = 0})
+---
+...
+s = s1:self()
+---
+...
+s
+---
+- uri: 127.0.0.1:<port>
+  status: alive
+  incarnation: cdata {generation = 0ULL, version = 1ULL}
+  uuid: 00000000-0000-1000-8000-000000000001
+  payload_size: 0
+...
+s:status()
+---
+- alive
+...
+s:uuid()
+---
+- 00000000-0000-1000-8000-000000000001
+...
+s:uuid() == s:uuid()
+---
+- true
+...
+s:uri()
+---
+- 127.0.0.1:<port>
+...
+s:incarnation()
+---
+- cdata {generation = 0ULL, version = 1ULL}
+...
+s:payload_cdata()
+---
+- 'cdata<const char *>: NULL'
+- 0
+...
+s:payload_str()
+---
+- null
+...
+s:payload()
+---
+- null
+...
+s:is_dropped()
+---
+- false
+...
+s.unknown_index
+---
+- null
+...
+s.status()
+---
+- error: 'builtin/swim.lua:<line>: member:status(): first argument is not a SWIM member'
+...
+s.uuid()
+---
+- error: 'builtin/swim.lua:<line>: member:uuid(): first argument is not a SWIM member'
+...
+s.uri()
+---
+- error: 'builtin/swim.lua:<line>: member:uri(): first argument is not a SWIM member'
+...
+s.incarnation()
+---
+- error: 'builtin/swim.lua:<line>: member:incarnation(): first argument is not a SWIM
+    member'
+...
+s.payload_cdata()
+---
+- error: 'builtin/swim.lua:<line>: member:payload_cdata(): first argument is not a SWIM
+    member'
+...
+s.payload_str()
+---
+- error: 'builtin/swim.lua:<line>: member:payload_str(): first argument is not a SWIM
+    member'
+...
+s.payload()
+---
+- error: 'builtin/swim.lua:<line>: member:payload(): first argument is not a SWIM member'
+...
+s.is_dropped()
+---
+- error: 'builtin/swim.lua:<line>: member:is_dropped(): first argument is not a SWIM
+    member'
+...
+s1:member_by_uuid(uuid(1)) ~= nil
+---
+- true
+...
+s1:member_by_uuid(50)
+---
+- error: 'builtin/swim.lua:<line>: swim:member_by_uuid: expected string UUID or struct
+    tt_uuid'
+...
+-- gh-5951: could crash with no arguments or NULL.
+s1:member_by_uuid()
+---
+- null
+...
+s1:member_by_uuid(box.NULL)
+---
+- null
+...
+s1:member_by_uuid(uuid(2))
+---
+- null
+...
+-- UUID can be cdata.
+s1:member_by_uuid(s:uuid())
+---
+- uri: 127.0.0.1:<port>
+  status: alive
+  incarnation: cdata {generation = 0ULL, version = 1ULL}
+  uuid: 00000000-0000-1000-8000-000000000001
+  payload_size: 0
+...
+s1:quit()
+---
+...
+s:status()
+---
+- left
+...
+s:is_dropped()
+---
+- true
+...
+--
+-- Payload.
+--
+s = swim.new({uuid = uuid(1), uri = uri()})
+---
+...
+s.set_payload()
+---
+- error: 'builtin/swim.lua:<line>: swim:set_payload: first argument is not a SWIM instance'
+...
+s.set_payload_raw()
+---
+- error: 'builtin/swim.lua:<line>: swim:set_payload_raw: first argument is not a SWIM
+    instance'
+...
+self = s:self()
+---
+...
+s:set_payload()
+---
+- true
+...
+self:payload()
+---
+- null
+...
+s:set_payload({a = 100})
+---
+- true
+...
+self:payload()
+---
+- {'a': 100}
+...
+s:set_payload(100)
+---
+- true
+...
+self:payload()
+---
+- 100
+...
+s:set_payload(false)
+---
+- true
+...
+self:payload()
+---
+- false
+...
+p = self:payload_str()
+---
+...
+p
+---
+- "\xC2"
+...
+(msgpack.decode(p))
+---
+- false
+...
+p, size = self:payload_cdata()
+---
+...
+type(p)
+---
+- cdata
+...
+size
+---
+- 1
+...
+(msgpack.decode(p, size))
+---
+- false
+...
+s:set_payload(string.rep('a', 1500))
+---
+- null
+- Payload should be <= 1200 and >= 0
+...
+self:payload()
+---
+- false
+...
+s:set_payload()
+---
+- true
+...
+self:payload()
+---
+- null
+...
+s:set_payload(100)
+---
+- true
+...
+self:payload()
+---
+- 100
+...
+s:set_payload_raw()
+---
+- true
+...
+self:payload()
+---
+- null
+...
+-- Raw payload setting can be used when MessagePack is not needed,
+-- or already encoded.
+s:set_payload_raw(nil, '123')
+---
+- error: 'builtin/swim.lua:<line>: swim:set_payload_raw: expected number payload size'
+...
+s:set_payload_raw('123', -1)
+---
+- null
+- Payload should be <= 1200 and >= 0
+...
+size = 10
+---
+...
+cdata = ffi.new('int[?]', size)
+---
+...
+for i = 0, size - 1 do cdata[i] = i end
+---
+...
+bsize = ffi.sizeof('int') * size
+---
+...
+s:set_payload_raw(cdata)
+---
+- error: 'builtin/swim.lua:<line>: swim:set_payload_raw: size is mandatory for cdata
+    payload'
+...
+s:set_payload_raw('str', 4)
+---
+- error: 'builtin/swim.lua:<line>: swim:set_payload_raw: explicit payload size > string
+    length'
+...
+s:set_payload_raw(true)
+---
+- error: 'builtin/swim.lua:<line>: swim:set_payload_raw: payload should be either string
+    or cdata'
+...
+s:set_payload_raw(cdata, bsize)
+---
+- true
+...
+self:payload_str():len() == bsize
+---
+- true
+...
+self_cdata, self_bsize = self:payload_cdata()
+---
+...
+self_bsize == bsize
+---
+- true
+...
+self_cdata = ffi.cast('int *', self_cdata)
+---
+...
+for i = 0, size - 1 do assert(self_cdata[i] == cdata[i]) end
+---
+...
+s:set_payload_raw('raw str')
+---
+- true
+...
+self:payload_str()
+---
+- raw str
+...
+s:set_payload_raw('raw str', 3)
+---
+- true
+...
+self:payload_str()
+---
+- raw
+...
+s:delete()
+---
+...
+self:is_dropped()
+---
+- true
+...
+--
+-- Check payload dissemination.
+--
+s1 = swim.new({uuid = uuid(1), uri = uri(), heartbeat_rate = 0.01, generation = 0})
+---
+...
+s2 = swim.new({uuid = uuid(2), uri = uri(), heartbeat_rate = 0.01, generation = 0})
+---
+...
+s1:add_member({uuid = uuid(2), uri = s2:self():uri()})
+---
+- true
+...
+while s2:size() ~= 2 do fiber.sleep(0.01) end
+---
+...
+s1_view = s2:member_by_uuid(uuid(1))
+---
+...
+s1_view:payload()
+---
+- null
+...
+s1_view:incarnation()
+---
+- cdata {generation = 0ULL, version = 1ULL}
+...
+s1:set_payload('payload')
+---
+- true
+...
+while s1_view:payload() ~= 'payload' do fiber.sleep(0.01) end
+---
+...
+s1_view:incarnation()
+---
+- cdata {generation = 0ULL, version = 2ULL}
+...
+s1:set_payload('payload2')
+---
+- true
+...
+while s1_view:payload() ~= 'payload2' do fiber.sleep(0.01) end
+---
+...
+s1_view:incarnation()
+---
+- cdata {generation = 0ULL, version = 3ULL}
+...
+s1:delete()
+---
+...
+s2:delete()
+---
+...
+--
+-- Iterators.
+--
+function iterate() local t = {} for k, v in s:pairs() do table.insert(t, {k, v}) end return t end
+---
+...
+s = swim.new({generation = 0})
+---
+...
+iterate()
+---
+- error: '[string "function iterate() local t = {} for k, v in s..."]:1: attempt to
+    call method ''pairs'' (a nil value)'
+...
+s:cfg({uuid = uuid(1), uri = uri(), gc_mode = 'off'})
+---
+- true
+...
+s.pairs()
+---
+- error: 'builtin/swim.lua:<line>: swim:pairs: first argument is not a SWIM instance'
+...
+iterate()
+---
+- - - 00000000-0000-1000-8000-000000000001
+    - uri: 127.0.0.1:<port>
+      status: alive
+      incarnation: cdata {generation = 0ULL, version = 1ULL}
+      uuid: 00000000-0000-1000-8000-000000000001
+      payload_size: 0
+...
+s:add_member({uuid = uuid(2), uri = uri()})
+---
+- true
+...
+iterate()
+---
+- - - 00000000-0000-1000-8000-000000000002
+    - uri: 127.0.0.1:<port>
+      status: alive
+      incarnation: cdata {generation = 0ULL, version = 0ULL}
+      uuid: 00000000-0000-1000-8000-000000000002
+      payload_size: 0
+  - - 00000000-0000-1000-8000-000000000001
+    - uri: 127.0.0.1:<port>
+      status: alive
+      incarnation: cdata {generation = 0ULL, version = 1ULL}
+      uuid: 00000000-0000-1000-8000-000000000001
+      payload_size: 0
+...
+s:add_member({uuid = uuid(3), uri = uri()})
+---
+- true
+...
+iterate()
+---
+- - - 00000000-0000-1000-8000-000000000001
+    - uri: 127.0.0.1:<port>
+      status: alive
+      incarnation: cdata {generation = 0ULL, version = 1ULL}
+      uuid: 00000000-0000-1000-8000-000000000001
+      payload_size: 0
+  - - 00000000-0000-1000-8000-000000000003
+    - uri: 127.0.0.1:<port>
+      status: alive
+      incarnation: cdata {generation = 0ULL, version = 0ULL}
+      uuid: 00000000-0000-1000-8000-000000000003
+      payload_size: 0
+  - - 00000000-0000-1000-8000-000000000002
+    - uri: 127.0.0.1:<port>
+      status: alive
+      incarnation: cdata {generation = 0ULL, version = 0ULL}
+      uuid: 00000000-0000-1000-8000-000000000002
+      payload_size: 0
+...
+s:delete()
+---
+...
+--
+-- Payload caching.
+--
+s1 = swim.new({uuid = uuid(1), uri = uri(), heartbeat_rate = 0.01, generation = 0})
+---
+...
+s2 = swim.new({uuid = uuid(2), uri = uri(), heartbeat_rate = 0.01, generation = 0})
+---
+...
+s1_self = s1:self()
+---
+...
+_ = s1:add_member({uuid = s2:self():uuid(), uri = s2:self():uri()})
+---
+...
+_ = s2:add_member({uuid = s1_self:uuid(), uri = s1_self:uri()})
+---
+...
+s1:size()
+---
+- 2
+...
+s2:size()
+---
+- 2
+...
+s1_view = s2:member_by_uuid(s1_self:uuid())
+---
+...
+s1:set_payload({a = 100})
+---
+- true
+...
+p = s1_self:payload()
+---
+...
+s1_self:payload() == p
+---
+- true
+...
+while not s1_view:payload() do fiber.sleep(0.01) end
+---
+...
+p = s1_view:payload()
+---
+...
+s1_view:payload() == p
+---
+- true
+...
+s1:delete()
+---
+...
+s2:delete()
+---
+...
+--
+-- Member table cache in Lua.
+--
+s = swim.new({uuid = uuid(1), uri = uri()})
+---
+...
+self = s:self()
+---
+...
+s:self() == self
+---
+- true
+...
+s:add_member({uuid = uuid(2), uri = 1})
+---
+- true
+...
+s2 = s:member_by_uuid(uuid(2))
+---
+...
+s2
+---
+- uri: 127.0.0.1:<port>
+  status: alive
+  incarnation: cdata {generation = 0ULL, version = 0ULL}
+  uuid: 00000000-0000-1000-8000-000000000002
+  payload_size: 0
+...
+-- Next lookups return the same member table.
+s2_old_uri = s2:uri()
+---
+...
+-- Check, that it is impossible to take removed member from the
+-- cached table.
+s:remove_member(uuid(2))
+---
+- true
+...
+s:member_by_uuid(uuid(2))
+---
+- null
+...
+-- GC automatically removes members from the member table.
+self = nil
+---
+...
+s2 = nil
+---
+...
+collectgarbage('collect')
+---
+- 0
+...
+s.cache_table
+---
+- []
+...
+s:add_member({uuid = uuid(2), uri = 2})
+---
+- true
+...
+s2 = s:member_by_uuid(uuid(2))
+---
+...
+s2:uri() ~= s2_old_uri
+---
+- true
+...
+s:delete()
+---
+...
+--
+-- Encryption.
+--
+s1 = swim.new({uuid = uuid(1), uri = uri(), generation = 0})
+---
+...
+s2 = swim.new({uuid = uuid(2), uri = uri(), generation = 0})
+---
+...
+s1.set_codec()
+---
+- error: 'builtin/swim.lua:<line>: swim:set_codec: first argument is not a SWIM instance'
+...
+s1:set_codec(100)
+---
+- error: 'builtin/swim.lua:<line>: swim:set_codec: expected table codec configuration'
+...
+s1:set_codec({})
+---
+- error: 'builtin/swim.lua:<line>: swim:set_codec: unknown crypto algorithm'
+...
+s1:set_codec({algo = 100})
+---
+- error: 'builtin/swim.lua:<line>: swim:set_codec: unknown crypto algorithm'
+...
+cfg = {algo = 'aes128', mode = 'unknown'}
+---
+...
+s1:set_codec(cfg)
+---
+- error: 'builtin/swim.lua:<line>: swim:set_codec: unknown crypto algorithm mode'
+...
+cfg.mode = 'cbc'
+---
+...
+s1:set_codec(cfg)
+---
+- null
+- key size expected 16, got 0
+...
+cfg.key_size = 'str'
+---
+...
+s1:set_codec(cfg)
+---
+- error: 'builtin/swim.lua:<line>: swim:set_codec: expected number key size'
+...
+cfg.key_size = 200
+---
+...
+cfg.key = true
+---
+...
+s1:set_codec(cfg)
+---
+- error: 'builtin/swim.lua:<line>: swim:set_codec: key should be either string or cdata'
+...
+cfg.key = 'key'
+---
+...
+s1:set_codec(cfg)
+---
+- error: 'builtin/swim.lua:<line>: swim:set_codec: explicit key size > string length'
+...
+cfg.key = ffi.new('char[?]', 20)
+---
+...
+cfg.key_size = nil
+---
+...
+s1:set_codec(cfg)
+---
+- error: 'builtin/swim.lua:<line>: swim:set_codec: size is mandatory for cdata key'
+...
+cfg.key_size = 20
+---
+...
+s1:set_codec(cfg)
+---
+- null
+- key size expected 16, got 20
+...
+cfg.key = '1234567812345678'
+---
+...
+cfg.key_size = 16
+---
+...
+s1:set_codec(cfg)
+---
+- true
+...
+-- S2 uses different encryption and can't decode the ping.
+s1:probe_member(s2:self():uri())
+---
+- true
+...
+fiber.sleep(0.01)
+---
+...
+s1:size()
+---
+- 1
+...
+s2:size()
+---
+- 1
+...
+s2:set_codec(cfg)
+---
+- true
+...
+s1:probe_member(s2:self():uri())
+---
+- true
+...
+while s1:size() ~= 2 do fiber.sleep(0.01) end
+---
+...
+s2:size()
+---
+- 2
+...
+s1:remove_member(s2:self():uuid()) s2:remove_member(s1:self():uuid())
+---
+...
+-- Set different private key - again can't decode.
+cfg.key = '8765432187654321'
+---
+...
+cfg.key_size = nil
+---
+...
+s2:set_codec(cfg)
+---
+- true
+...
+s1:probe_member(s2:self():uri())
+---
+- true
+...
+fiber.sleep(0.01)
+---
+...
+s1:size()
+---
+- 1
+...
+s2:size()
+---
+- 1
+...
+cfg.key = '12345678'
+---
+...
+cfg.algo = 'des'
+---
+...
+cfg.mode = 'cfb'
+---
+...
+s1:set_codec(cfg)
+---
+- true
+...
+s1:probe_member(s2:self():uri())
+---
+- true
+...
+fiber.sleep(0.01)
+---
+...
+s1:size()
+---
+- 1
+...
+s2:size()
+---
+- 1
+...
+s1:set_codec({algo = 'none'})
+---
+- true
+...
+s2:set_codec({algo = 'none'})
+---
+- true
+...
+s1:probe_member(s2:self():uri())
+---
+- true
+...
+while s1:member_by_uuid(s2:self():uuid()) == nil do fiber.sleep(0.01) end
+---
+...
+s2:member_by_uuid(s1:self():uuid())
+---
+- uri: 127.0.0.1:<port>
+  status: alive
+  incarnation: cdata {generation = 0ULL, version = 1ULL}
+  uuid: 00000000-0000-1000-8000-000000000001
+  payload_size: 0
+...
+s1:delete()
+---
+...
+s2:delete()
+---
+...
+--
+-- gh-4250: allow to set triggers on a new member appearance, old
+-- member drop, member update.
+--
+s1 = swim.new({generation = 0})
+---
+...
+s1.on_member_event()
+---
+- error: 'builtin/swim.lua:<line>: swim:on_member_event: first argument is not a SWIM
+    instance'
+...
+m_list = {}
+---
+...
+e_list = {}
+---
+...
+ctx_list = {}
+---
+...
+f = nil
+---
+...
+f_need_sleep = false
+---
+...
+_ = test_run:cmd("setopt delimiter ';'")
+---
+...
+t_save_event = function(m, e, ctx)
+    table.insert(m_list, m)
+    table.insert(e_list, e)
+    table.insert(ctx_list, ctx)
+end;
+---
+...
+t_yield = function(m, e, ctx)
+    f = fiber.self()
+    t_save_event(m, e, ctx)
+    while f_need_sleep do fiber.sleep(10000) end
+end;
+---
+...
+_ = test_run:cmd("setopt delimiter ''");
+---
+...
+t_save_event_id = s1:on_member_event(t_save_event, 'ctx')
+---
+...
+-- Not equal, because SWIM wraps user triggers with a closure for
+-- context preprocessing.
+t_save_event_id ~= t_save_event
+---
+- true
+...
+s1:cfg{uuid = uuid(1), uri = uri(), heartbeat_rate = 0.01}
+---
+- true
+...
+while #m_list < 1 do fiber.sleep(0) end
+---
+...
+m_list
+---
+- - uri: 127.0.0.1:<port>
+    status: alive
+    incarnation: cdata {generation = 0ULL, version = 1ULL}
+    uuid: 00000000-0000-1000-8000-000000000001
+    payload_size: 0
+...
+e_list
+---
+- - is_new_version: true
+    is_update: true
+    is_new_uri: true
+    is_new: true
+    is_new_incarnation: true
+...
+ctx_list
+---
+- - ctx
+...
+m_list = {} e_list = {} ctx_list = {}
+---
+...
+t_yield_id = s1:on_member_event(t_yield, 'ctx2')
+---
+...
+f_need_sleep = true
+---
+...
+s2 = swim.new({uuid = uuid(2), uri = uri(), heartbeat_rate = 0.01, generation = 0})
+---
+...
+s2:add_member({uuid = s1:self():uuid(), uri = s1:self():uri()})
+---
+- true
+...
+while s1:size() ~= 2 do fiber.sleep(0.01) end
+---
+...
+-- Only first trigger worked. Second is waiting, because first
+-- sleeps.
+m_list
+---
+- - uri: 127.0.0.1:<port>
+    status: alive
+    incarnation: cdata {generation = 0ULL, version = 1ULL}
+    uuid: 00000000-0000-1000-8000-000000000002
+    payload_size: 0
+...
+e_list
+---
+- - is_new: true
+...
+ctx_list
+---
+- - ctx2
+...
+m_list = {} e_list = {} ctx_list = {}
+---
+...
+-- But it does not prevent normal SWIM operation.
+s1:set_payload('payload')
+---
+- true
+...
+while not s2:member_by_uuid(s1:self():uuid()):payload() do fiber.sleep(0.01) end
+---
+...
+s2:member_by_uuid(s1:self():uuid()):payload()
+---
+- payload
+...
+f_need_sleep = false
+---
+...
+fiber.wakeup(f)
+---
+...
+while #m_list ~= 3 do fiber.sleep(0.01) end
+---
+...
+m_list
+---
+- - uri: 127.0.0.1:<port>
+    status: alive
+    incarnation: cdata {generation = 0ULL, version = 1ULL}
+    uuid: 00000000-0000-1000-8000-000000000002
+    payload_size: 0
+  - &0
+    uri: 127.0.0.1:<port>
+    status: alive
+    incarnation: cdata {generation = 0ULL, version = 2ULL}
+    uuid: 00000000-0000-1000-8000-000000000001
+    payload_size: 8
+  - *0
+...
+e_list
+---
+- - is_new: true
+  - is_new_payload: true
+    is_new_version: true
+    is_new_incarnation: true
+    is_update: true
+  - is_new_payload: true
+    is_new_version: true
+    is_new_incarnation: true
+    is_update: true
+...
+ctx_list
+---
+- - ctx
+  - ctx2
+  - ctx
+...
+m_list = {} e_list = {} ctx_list = {}
+---
+...
+#s1:on_member_event()
+---
+- 2
+...
+s1:on_member_event(nil, t_yield_id)
+---
+...
+s2:quit()
+---
+...
+while s1:size() ~= 1 do fiber.sleep(0.01) end
+---
+...
+-- Process event.
+fiber.sleep(0)
+---
+...
+-- Two events - status update to 'left', and 'drop'.
+m_list
+---
+- - &0
+    uri: 127.0.0.1:<port>
+    status: left
+    incarnation: cdata {generation = 0ULL, version = 1ULL}
+    uuid: 00000000-0000-1000-8000-000000000002
+    payload_size: 0
+  - *0
+...
+e_list
+---
+- - is_new_status: true
+    is_update: true
+  - is_drop: true
+...
+ctx_list
+---
+- - ctx
+  - ctx
+...
+m = m_list[1]
+---
+...
+-- Cached member table works even when a member is deleted.
+m_list[1] == m_list[2]
+---
+- true
+...
+m_list = {} e_list = {} ctx_list = {}
+---
+...
+s1:on_member_event(nil, t_save_event_id)
+---
+...
+s1:add_member({uuid = m:uuid(), uri = m:uri()})
+---
+- true
+...
+fiber.sleep(0)
+---
+...
+-- No events - all the triggers are dropped.
+m_list
+---
+- []
+...
+e_list
+---
+- []
+...
+ctx_list
+---
+- []
+...
+s1:delete()
+---
+...
+--
+-- gh-4280: 'generation' counter to detect restarts and refute
+-- information left from previous lifes of a SWIM instance.
+--
+s1 = swim.new({uuid = uuid(1), uri = 0, heartbeat_rate = 0.01, generation = 0})
+---
+...
+s2 = swim.new({uuid = uuid(2), uri = 0, heartbeat_rate = 0.01})
+---
+...
+s2:add_member({uuid = uuid(1), uri = s1:self():uri()})
+---
+- true
+...
+s1_view = s2:member_by_uuid(uuid(1))
+---
+...
+s1:set_payload('payload 1')
+---
+- true
+...
+while not s1_view:payload() do fiber.sleep(0.1) end
+---
+...
+s1_view:payload()
+---
+- payload 1
+...
+s1:self():incarnation()
+---
+- cdata {generation = 0ULL, version = 2ULL}
+...
+-- Now S2 knows S1's payload as 'payload 1'.
+new_gen_ev = nil
+---
+...
+_ = s2:on_member_event(function(m, e) if e:is_new_generation() then new_gen_ev = e end end)
+---
+...
+s1:delete()
+---
+...
+s1 = swim.new({uuid = uuid(1), uri = 0, heartbeat_rate = 0.01, generation = 1})
+---
+...
+s1:add_member({uuid = uuid(2), uri = s2:self():uri()})
+---
+- true
+...
+s1:set_payload('payload 2')
+---
+- true
+...
+-- Without the new generation S2 would believe that S1's payload
+-- is still 'payload 1'. Because 'payload 1' and 'payload 2' were
+-- disseminated with the same version.
+s1:self():incarnation()
+---
+- cdata {generation = 1ULL, version = 2ULL}
+...
+while s1_view:payload() ~= 'payload 2' do fiber.sleep(0.1) end
+---
+...
+s1_view:payload()
+---
+- payload 2
+...
+new_gen_ev
+---
+- is_new_version: true
+  is_new_generation: true
+  is_update: true
+  is_new_payload: true
+  is_new_uri: true
+  is_new_incarnation: true
+...
+-- Generation is static parameter.
+s1:cfg({generation = 5})
+---
+- error: 'swim:cfg: unknown option generation'
+...
+s1:delete()
+---
+...
+s2:delete()
+---
+...
+-- It is allowed to create a SWIM with a generation value, but do
+-- not configure it.
+swim.new({generation = 0})
+---
+- []
+...
+--
+-- Check that Lua triggers don't keep a reference of SWIM instance
+-- preventing its GC.
+--
+s = swim.new({uri = 0, uuid = uuid(1)})
+---
+...
+_ = s:on_member_event(function() end)
+---
+...
+s = setmetatable({s}, {__mode = 'v'})
+---
+...
+collectgarbage('collect')
+---
+- 0
+...
+s
+---
+- []
+...
+--
+-- Check that SWIM GC doesn't block nor crash garbage collector.
+--
+s = swim.new()
+---
+...
+allow_gc = false
+---
+...
+_ = s:on_member_event(function() while not allow_gc do pcall(fiber.sleep, 0.01) end end)
+---
+...
+s:cfg({uri = 0, uuid = uuid(1)})
+---
+- true
+...
+s = setmetatable({s}, {__mode = 'v'})
+---
+...
+collectgarbage('collect')
+---
+- 0
+...
+s
+---
+- []
+...
+allow_gc = true
+---
+...
+test_run:cmd("clear filter")
+---
+- true
+...

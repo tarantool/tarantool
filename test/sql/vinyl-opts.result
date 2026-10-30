@@ -1,0 +1,58 @@
+test_run = require('test_run').new()
+---
+...
+test_run:cmd("create server test with script='sql/vinyl-opts-cfg.lua'")
+---
+- true
+...
+test_run:cmd("start server test")
+---
+- true
+...
+test_run:cmd("switch test")
+---
+- true
+...
+box.space._session_settings:update('sql_default_engine', {{'=', 2, 'vinyl'}})
+---
+- ['sql_default_engine', 'vinyl']
+...
+box.execute('CREATE TABLE v1 (id INT PRIMARY KEY, b INT);')
+---
+- row_count: 1
+...
+box.space.v1.index[0].options
+---
+- page_size: 32768
+  run_count_per_level: 3
+  run_size_ratio: 5
+  bloom_fpr: 0.1
+  range_size: 536870912
+...
+box.execute('CREATE INDEX i1 ON v1(b);')
+---
+- row_count: 1
+...
+box.space.v1.index[1].options
+---
+- page_size: 32768
+  run_count_per_level: 3
+  run_size_ratio: 5
+  bloom_fpr: 0.1
+  range_size: 536870912
+...
+box.space.v1:drop()
+---
+...
+test_run:cmd('switch default')
+---
+- true
+...
+test_run:cmd("stop server test")
+---
+- true
+...
+test_run:cmd("cleanup server test")
+---
+- true
+...

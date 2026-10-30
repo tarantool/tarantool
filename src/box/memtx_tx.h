@@ -1,0 +1,680 @@
+#pragma once
+/*
+ * Copyright 2010-2020, Tarantool AUTHORS, please see AUTHORS file.
+ *
+ * Redistribution and use in source and binary forms, with or
+ * without modification, are permitted provided that the following
+ * conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above
+ *    copyright notice, this list of conditions and the
+ *    following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above
+ *    copyright notice, this list of conditions and the following
+ *    disclaimer in the documentation and/or other materials
+ *    provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+ * <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+ * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+#include "small/rlist.h"
+#include "index.h"
+#include "tuple.h"
+#include "space.h"
+#include "txn.h"
+#include "memtx_index.h"
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+/**
+ * Global flag that enables mvcc engine.
+ * If set, memtx starts to apply statements through txn history mechanism
+ * and tx manager itself transaction reads in order to detect conflicts.
+ */
+extern bool memtx_tx_manager_use_mvcc_engine;
+
+enum memtx_tx_alloc_type {
+	MEMTX_TX_ALLOC_TRACKER = 0,
+	MEMTX_TX_ALLOC_CONFLICT = 1,
+	MEMTX_TX_ALLOC_TYPE_MAX,
+};
+
+extern const char *memtx_tx_alloc_type_strs[];
+
+/**
+ * Memtx_tx allocation objects for memtx_tx_region and memtx_tx_mempool.
+ */
+enum memtx_tx_alloc_object {
+	/**
+	 * Deprecated object of type struct memtx_tx_conflict.
+	 * Left for statistics compatibility.
+	 * TODO(gh-8149): remove it considering monitoring module.
+	 */
+	MEMTX_TX_OBJECT_CONFLICT = 0,
+	/**
+	 * Deprecated object of type struct tx_conflict_tracker.
+	 * Left for statistics compatibility.
+	 * TODO(gh-8149): remove it considering monitoring module.
+	 */
+	MEMTX_TX_OBJECT_CONFLICT_TRACKER = 1,
+	/**
+	 * Object of type struct tx_read_tracker.
+	 */
+	MEMTX_TX_OBJECT_READ_TRACKER = 2,
+	/**
+	 * Object of type struct memtx_del_story_link.
+	 */
+	MEMTX_TX_OBJECT_STMT_DEL_STORY_LINK = 3,
+	MEMTX_TX_OBJECT_MAX,
+};
+
+/**
+ * Status of story. Describes the reason why it is not deleted.
+ * In the case when story fits several statuses at once, status with
+ * least value is chosen.
+ */
+enum memtx_tx_story_status {
+	/**
+	 * The story is used directly by some transactions.
+	 */
+	MEMTX_TX_STORY_USED = 0,
+	/**
+	 *  The story can be used by a read view.
+	 */
+	MEMTX_TX_STORY_READ_VIEW = 1,
+	/**
+	 * The story is used for gap tracking.
+	 */
+	MEMTX_TX_STORY_TRACK_GAP = 2,
+	MEMTX_TX_STORY_STATUS_MAX = 3,
+};
+
+extern const char *memtx_tx_story_status_strs[];
+
+/**
+ * Snapshot cleaner is a short part of history that is supposed to clarify
+ * tuples in a index snapshot. It's also supposed to be used in another
+ * thread while common clarify would probably crash in that case.
+ */
+struct memtx_tx_snapshot_cleaner {
+	struct mh_snapshot_cleaner_t *ht;
+	/** Index whose entries are cleaned, used to compare logical keys. */
+	struct index *index;
+};
+
+/**
+ * Cell of stats with total and count statistics.
+ */
+struct memtx_tx_stats {
+	/* Total memory over all objects. */
+	size_t total;
+	/* Number of measured objects. */
+	size_t count;
+};
+
+/**
+ * Memory statistics of memtx mvcc engine.
+ */
+struct memtx_tx_statistics {
+	struct memtx_tx_stats stories[MEMTX_TX_STORY_STATUS_MAX];
+	struct memtx_tx_stats retained_tuples[MEMTX_TX_STORY_STATUS_MAX];
+	size_t memtx_tx_total[MEMTX_TX_ALLOC_TYPE_MAX];
+	size_t memtx_tx_max[MEMTX_TX_ALLOC_TYPE_MAX];
+	size_t tx_total[TX_ALLOC_TYPE_MAX];
+	size_t tx_max[TX_ALLOC_TYPE_MAX];
+	/* Number of txns registered in memtx transaction manager. */
+	size_t txn_count;
+};
+
+/**
+ * Collect MVCC memory usage statics.
+ */
+void
+memtx_tx_statistics_collect(struct memtx_tx_statistics *stats);
+
+/**
+ * Initialize MVCC part of a transaction.
+ * Must be called even if MVCC engine is not enabled in config.
+ */
+void
+memtx_tx_register_txn(struct txn *txn);
+
+/**
+ * Initialize memtx transaction manager.
+ */
+void
+memtx_tx_manager_init();
+
+/**
+ * Free resources of memtx transaction manager.
+ */
+void
+memtx_tx_manager_free();
+
+/**
+ * Transaction providing DDL changes is disallowed to yield after
+ * modifications of internal caches (i.e. after ALTER operation finishes).
+ *
+ * NB: can trigger story garbage collection.
+ */
+void
+memtx_tx_acquire_ddl(struct txn *tx);
+
+/**
+ * Implementation of engine_send_to_read_view callback.
+ * Do not use directly.
+ */
+void
+memtx_tx_abort_with_conflict(struct txn *txn);
+
+/**
+ * Implementation of engine_abort_with_conflict callback.
+ * Do not use directly.
+ */
+void
+memtx_tx_send_to_read_view(struct txn *txn, int64_t psn);
+
+/**
+ * @brief Add a statement to the memtx transaction manager.
+ * Performs physical updates in the @a space's indexes and statistics. If MVCC
+ * is enabled, additionally handles concurrency control of the read/write
+ * set of the transaction and multi-versioning logic for the updated tuple's
+ * state.
+ * Follows signature of @sa memtx_space_replace_all_keys.
+ *
+ * NB: can trigger story garbage collection.
+ *
+ * @param space	    the space to which the statement is applied.
+ * @param old_tuple the tuple that should be removed (can be NULL).
+ * @param new_tuple the tuple that should be inserted (can be NULL).
+ * @param mode      dup_replace_mode, used only if new_tuple is not
+ *                  NULL and old_tuple is NULL, and only for the
+ *                  primary key.
+ * @param result - old or replaced tuple.
+ * @return 0 on success, -1 on error (diag is set).
+ */
+int
+memtx_tx_add_stmt(struct space *space, struct tuple *old_tuple,
+		  struct tuple *new_tuple, enum dup_replace_mode mode,
+		  struct tuple **result);
+
+/**
+ * @brief Rollback (undo) a statement from transaction manager's history.
+ * It's just make the statement invisible to all.
+ * Prepared statements could be also removed, but for consistency all latter
+ * prepared statement must be also rolled back.
+ *
+ * NB: can trigger story garbage collection.
+ *
+ * @param stmt current statement.
+ */
+void
+memtx_tx_history_rollback_stmt(struct txn_stmt *stmt);
+
+/**
+ * @brief Prepare statement in history for further commit.
+ * Prepared statements are still invisible for read-only transactions
+ * but are visible to all read-write transactions.
+ * Prepared and in-progress transactions use the same links for creating
+ * chains of stories in history. The difference is that the order of
+ * prepared transactions is fixed while in-progress transactions are
+ * added to the end of list in any order. Thus to switch to prepared
+ * we have to reorder story in such a way that current story will be
+ * between earlier prepared stories and in-progress stories. That's what
+ * this function does.
+ *
+ * NB: can trigger story garbage collection.
+ *
+ * @param stmt current statement.
+ */
+void
+memtx_tx_history_prepare_stmt(struct txn_stmt *stmt);
+
+/**
+ * Helper of `memtx_tx_prepare_finalize`.
+ */
+void
+memtx_tx_prepare_finalize_slow(struct txn *txn);
+
+/**
+ * Finish preparing of a transaction.
+ * Must be called for entire transaction after `memtx_tx_history_rollback_stmt`
+ * was called for each transaction statement.
+ *
+ * NB: can trigger story garbage collection.
+ */
+static inline void
+memtx_tx_prepare_finalize(struct txn *txn)
+{
+	if (memtx_tx_manager_use_mvcc_engine)
+		memtx_tx_prepare_finalize_slow(txn);
+}
+
+/**
+ * @brief Commit statement in history.
+ * Make the statement's changes permanent. It becomes visible to all.
+ *
+ * NB: can trigger story garbage collection.
+ *
+ * @param stmt current statement.
+ */
+void
+memtx_tx_history_commit_stmt(struct txn_stmt *stmt);
+
+/** Helper of memtx_tx_index_entry_clarify. */
+struct tuple *
+memtx_tx_index_entry_clarify_slow(struct txn *txn, struct space *space,
+				  struct index *index,
+				  struct memtx_index_entry entry,
+				  bool force_read_prepared);
+
+/** Helper of memtx_tx_track_point */
+void
+memtx_tx_track_point_slow(struct txn *txn, struct index *index,
+			  const char *key);
+
+/**
+ * Record in TX manager that a transaction @a txn have read a nothing
+ * from @a space and @a index with @a key.
+ * The key is expected to be full, that is has part count equal to part
+ * count in unique cmp_key of the index.
+ *
+ * NB: can trigger story garbage collection.
+ *
+ * @return 0 on success, -1 on memory error.
+ */
+static inline void
+memtx_tx_track_point(struct txn *txn, struct space *space,
+		     struct index *index, const char *key)
+{
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return;
+	if (txn == NULL || space == NULL || space->def->opts.is_ephemeral)
+		return;
+	memtx_tx_track_point_slow(txn, index, key);
+}
+
+/**
+ * Helper of memtx_tx_track_gap.
+ */
+void
+memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *index,
+			struct memtx_index_entry successor,
+			enum iterator_type type, const char *key,
+			uint32_t part_count);
+
+/**
+ * Record in TX manager that a transaction @a txn have read nothing
+ * from @a space and @a index with @a key, somewhere from interval between
+ * some unknown predecessor and @a successor.
+ * This function must be used for ordered indexes, such as TREE, for queries
+ * when iteration type is not EQ or when the key is not full (otherwise
+ * it's faster to use memtx_tx_track_point).
+ *
+ * NB: can trigger story garbage collection.
+ */
+static inline void
+memtx_tx_track_gap(struct txn *txn, struct space *space, struct index *index,
+		   struct memtx_index_entry successor, enum iterator_type type,
+		   const char *key, uint32_t part_count)
+{
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return;
+	if (txn == NULL || space == NULL || space->def->opts.is_ephemeral)
+		return;
+	memtx_tx_track_gap_slow(txn, space, index, successor,
+				type, key, part_count);
+}
+
+/**
+ * Helper of memtx_tx_track_count.
+ */
+uint32_t
+memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
+				struct index *index, enum iterator_type type,
+				const char *key, uint32_t part_count,
+				struct tuple *until, hint_t until_hint);
+
+/**
+ * Record in TX manager that a transaction @a txn have counted @a index from @a
+ * space by @a key and iterator @a type. This function must be used for queries
+ * that count tuples in indexes (for example, index:size or index:count).
+ *
+ * NB: can trigger story garbage collection.
+ *
+ * @return the amount of invisible tuples counted.
+ */
+static inline uint32_t
+memtx_tx_track_count(struct txn *txn, struct space *space,
+		     struct index *index, enum iterator_type type,
+		     const char *key, uint32_t part_count)
+{
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return 0;
+	return memtx_tx_track_count_until_slow(txn, space, index, type, key,
+					       part_count, NULL, HINT_NONE);
+}
+
+/**
+ * Record in TX manager that a transaction @a txn have counted @a index from @a
+ * space by @a key and iterator @a type @a until a tuple. This function must be
+ * used when all tuples matching the key and iterator until the given one are
+ * skipped by a transaction without reading (e. g. select with offset).
+ *
+ * NB: can trigger story garbage collection.
+ *
+ * @return the amount of invisible tuples counted.
+ *
+ * @pre The @a until tuple (if not NULL) must be clarified by @a txn.
+ */
+static inline uint32_t
+memtx_tx_track_count_until(struct txn *txn, struct space *space,
+			   struct index *index, enum iterator_type type,
+			   const char *key, uint32_t part_count,
+			   struct tuple *until, hint_t until_hint)
+{
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return 0;
+	return memtx_tx_track_count_until_slow(txn, space, index, type, key,
+					       part_count, until, until_hint);
+}
+
+/**
+ * Helper of memtx_tx_track_full_scan.
+ */
+void
+memtx_tx_track_full_scan_slow(struct txn *txn, struct index *index);
+
+/**
+ * Record in TX manager that a transaction @a txn have read full @a index
+ * from @a space.
+ * This function must be used for unordered indexes, such as HASH, for queries
+ * when iteration type is ALL.
+ *
+ * NB: can trigger story garbage collection.
+ *
+ * @return 0 on success, -1 on memory error.
+ */
+static inline void
+memtx_tx_track_full_scan(struct txn *txn, struct space *space,
+			 struct index *index)
+{
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return;
+	if (txn == NULL || space == NULL || space->def->opts.is_ephemeral)
+		return;
+	memtx_tx_track_full_scan_slow(txn, index);
+}
+
+/**
+ * Return the visible version of a logical index entry.
+ *
+ * The complete entry identity is required for multikey and functional indexes.
+ * The returned tuple may be NULL if the entry is not visible.
+ */
+static inline struct tuple *
+memtx_tx_index_entry_clarify(struct txn *txn, struct space *space,
+			     struct index *index,
+			     struct memtx_index_entry entry)
+{
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return entry.tuple;
+	return memtx_tx_index_entry_clarify_slow(txn, space, index, entry,
+						 /*force_read_prepared=*/false);
+}
+
+/**
+ * Same as the previous function, but for writing statements -
+ * regardless of the isolation level, it always sees prepared statements.
+ *
+ * The complete entry identity is required for multikey and functional indexes.
+ * The returned tuple may be NULL if the entry is not visible.
+ */
+static inline struct tuple *
+memtx_tx_index_entry_clarify_rw(struct txn *txn, struct space *space,
+				struct index *index,
+				struct memtx_index_entry entry)
+{
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return entry.tuple;
+	return memtx_tx_index_entry_clarify_slow(txn, space, index, entry,
+						 /*force_read_prepared=*/true);
+}
+
+/**
+ * Adapt tuple-only index reads to memtx_tx_index_entry_clarify().
+ *
+ * This adapter is only valid for regular, non-functional, non-multikey
+ * indexes, where a tuple uniquely identifies an index entry. Indexes that need
+ * key data to preserve entry identity must call
+ * memtx_tx_index_entry_clarify().
+ */
+static inline struct tuple *
+memtx_tx_tuple_clarify(struct txn *txn, struct space *space,
+		       struct index *index, struct tuple *tuple)
+{
+	assert(!index->def->key_def->is_multikey);
+	assert(!index->def->key_def->for_func_index);
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return tuple;
+	struct memtx_index_entry entry = {
+		.tuple = tuple,
+		.key_data = HINT_NONE,
+	};
+	return memtx_tx_index_entry_clarify_slow(txn, space, index, entry,
+						 /*force_read_prepared=*/false);
+}
+
+/**
+ * Same as the previous function, but for writing statements -
+ * regardless of the isolation level, it always sees prepared statements.
+ *
+ * @param txn - current transactions.
+ * @param space - space in which the tuple was found.
+ * @param index - index in which the tuple was found.
+ * @param tuple - tuple to clean.
+ * @return clean tuple (can be NULL).
+ */
+static inline struct tuple *
+memtx_tx_tuple_clarify_rw(struct txn *txn, struct space *space,
+			  struct index *index, struct tuple *tuple)
+{
+	assert(!index->def->key_def->is_multikey);
+	assert(!index->def->key_def->for_func_index);
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return tuple;
+	struct memtx_index_entry entry = {
+		.tuple = tuple,
+		.key_data = HINT_NONE,
+	};
+	return memtx_tx_index_entry_clarify_slow(txn, space, index, entry,
+						 /*force_read_prepared=*/true);
+}
+
+/**
+ * Helper of memtx_tx_index_invisible_count_matching_until.
+ */
+uint32_t
+memtx_tx_index_invisible_count_matching_until_slow(
+	struct txn *txn, struct space *space, struct index *index,
+	enum iterator_type type, const char *key, uint32_t part_count,
+	struct tuple *until, hint_t until_hint);
+
+/**
+ * When MVCC engine is enabled, an index can contain temporary non-committed
+ * tuples that are not visible outside their transaction. That's why internal
+ * index size can be greater than visible by standalone observer.
+ *
+ * The function calculates the number of tuples that are physically present
+ * in index, but have no visible value. But only tuples that match the given
+ * key and iterator type and are located strictly before the given @a until
+ * tuple according to the iterator order are counted.
+ *
+ * E. g. for index: [1, 2, 3, 4, 5], given all items in the index are invisible
+ * to the transaction, counting matching LE 3 until 1 will give 2 (3 and 2 will
+ * be counted, 1 will not since we count everything strictly before 1).
+ */
+static inline uint32_t
+memtx_tx_index_invisible_count_matching_until(
+	struct txn *txn, struct space *space, struct index *index,
+	enum iterator_type type, const char *key, uint32_t part_count,
+	struct tuple *until, hint_t until_hint)
+{
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return 0;
+	return memtx_tx_index_invisible_count_matching_until_slow(
+		txn, space, index, type, key, part_count, until, until_hint);
+}
+
+/** Helper of memtx_tx_index_entry_is_visible. */
+bool
+memtx_tx_index_entry_is_visible_slow(struct txn *txn, struct space *space,
+				     struct index *index,
+				     struct memtx_index_entry entry);
+
+/**
+ * Detect whether @a entry from @a index of @a space is visible to @a txn.
+ */
+static inline bool
+memtx_tx_index_entry_is_visible(struct txn *txn, struct space *space,
+				struct index *index,
+				struct memtx_index_entry entry)
+{
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return true;
+	return memtx_tx_index_entry_is_visible_slow(txn, space, index, entry);
+}
+
+/**
+ * Clean memtx_tx part of @a txn.
+ *
+ * NB: can trigger story garbage collection.
+ */
+void
+memtx_tx_clean_txn(struct txn *txn);
+
+/**
+ * Invalidate space in memtx tx: abort all concurrent transactions interacting
+ * with the space and remove all the objects associated with the space and its
+ * schema. The indexes are populated with tuples according to what `ddl_owner`
+ * observes.
+ *
+ * NB: can trigger story garbage collection.
+ */
+void
+memtx_tx_invalidate_space(struct space *space, struct txn *ddl_owner);
+
+/**
+ * Create a snapshot cleaner.
+ * @param cleaner - cleaner to create.
+ * @param space - space for which the cleaner must be created.
+ * @param index - index for which the cleaner must be created.
+ */
+void
+memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
+				 struct space *space, struct index *index);
+
+/** Helper of txm_snapshot_clafify. */
+struct memtx_index_entry
+memtx_tx_snapshot_clarify_slow(struct memtx_tx_snapshot_cleaner *cleaner,
+			       struct memtx_index_entry entry);
+
+/**
+ * Like a common clarify that function returns proper entry if original
+ * entry in index is dirty.
+ * @param cleaner - pre-created snapshot cleaner.
+ * @param entry - index entry to clean.
+ * @return cleaned entry, its tuple can be NULL. The key data of a cleaned
+ *  entry is the multikey position in the cleaned tuple, it is HINT_NONE
+ *  for a functional index.
+ */
+static inline struct memtx_index_entry
+memtx_tx_snapshot_clarify(struct memtx_tx_snapshot_cleaner *cleaner,
+			  struct memtx_index_entry entry)
+{
+	if (cleaner->ht == NULL)
+		return entry;
+	return memtx_tx_snapshot_clarify_slow(cleaner, entry);
+}
+
+/**
+ * Free resources.in shapshot @cleaner.
+ */
+void
+memtx_tx_snapshot_cleaner_destroy(struct memtx_tx_snapshot_cleaner *cleaner);
+
+/**
+ * Export step of garbage collector for internal purposes (tests, for example).
+ */
+void
+memtx_tx_story_gc_step(void);
+
+/** Helper of memtx_tx_snapshot_invisible_count_matching. */
+size_t
+memtx_tx_snapshot_invisible_count_matching_until_slow(
+	struct memtx_tx_snapshot_cleaner *cleaner, struct index_def *index_def,
+	enum iterator_type type, const char *key, uint32_t part_count,
+	struct tuple *until, hint_t until_hint);
+
+/**
+ * Count the amount of invisible tuples matching to the given @a key and
+ * iterator @a type. The tuples are matched using the key_def.
+ */
+static inline size_t
+memtx_tx_snapshot_invisible_count_matching(
+	struct memtx_tx_snapshot_cleaner *cleaner, struct index_def *index_def,
+	enum iterator_type type, const char *key, uint32_t part_count)
+{
+	if (cleaner->ht == NULL)
+		return 0;
+	return memtx_tx_snapshot_invisible_count_matching_until_slow(
+		cleaner, index_def, type, key, part_count, NULL, HINT_NONE);
+}
+
+/**
+ * Count the amount of invisible tuples matching to the given @a key and
+ * iterator @a type up to the given tuple (exclusively) according to the
+ * index order in the snapshot. The tuples are matched using the key_def,
+ * the @a until tuple is compared using the cmp_def.
+ */
+static inline size_t
+memtx_tx_snapshot_invisible_count_matching_until(
+	struct memtx_tx_snapshot_cleaner *cleaner, struct index_def *index_def,
+	enum iterator_type type, const char *key, uint32_t part_count,
+	struct tuple *until, hint_t until_hint)
+{
+	if (cleaner->ht == NULL)
+		return 0;
+	return memtx_tx_snapshot_invisible_count_matching_until_slow(
+		cleaner, index_def, type, key, part_count, until, until_hint);
+}
+
+/**
+ * Detect whether the index @a entry is visible in the snapshot with the given
+ * @a cleaner.
+ */
+static inline bool
+memtx_tx_snapshot_entry_is_visible(struct memtx_tx_snapshot_cleaner *cleaner,
+				   struct memtx_index_entry entry)
+{
+	return memtx_tx_snapshot_clarify(cleaner, entry).tuple != NULL;
+}
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */

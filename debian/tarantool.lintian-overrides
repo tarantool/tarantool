@@ -1,0 +1,3 @@
+tarantool: unstripped-binary-or-object usr/bin/tarantool
+tarantool: embedded-library usr/bin/tarantool: curl
+tarantool: embedded-library usr/bin/tarantool: libyaml

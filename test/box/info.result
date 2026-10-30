@@ -1,0 +1,280 @@
+fiber = require('fiber')
+---
+...
+-- Test Lua from admin console. Whenever producing output,
+-- make sure it's a valid YAML
+box.info.unknown_variable
+---
+- null
+...
+box.info[23]
+---
+- null
+...
+box.info['unknown_variable']
+---
+- null
+...
+string.match(box.info.version, '^[1-9]') ~= nil
+---
+- true
+...
+string.match(box.info.pid, '^[1-9][0-9]*$') ~= nil
+---
+- true
+...
+box.info.id > 0
+---
+- true
+...
+box.info.uuid == box.space._cluster:get(box.info.id)[2]
+---
+- true
+...
+box.info.lsn >= 0
+---
+- true
+...
+box.info.signature >= 0
+---
+- true
+...
+box.info.ro == false
+---
+- true
+...
+box.info.replication[1].id
+---
+- 1
+...
+box.info.status
+---
+- running
+...
+string.len(box.info.uptime) > 0
+---
+- true
+...
+string.match(box.info.uptime, '^[1-9][0-9]*$') ~= nil
+---
+- true
+...
+box.info.replicaset.uuid == box.space._schema:get{'replicaset_uuid'}[2]
+---
+- true
+...
+type(box.info.hostname) == 'string'
+---
+- true
+...
+t = {}
+---
+...
+for k, _ in pairs(box.info()) do table.insert(t, k) end
+---
+...
+table.sort(t)
+---
+...
+t
+---
+- - cluster
+  - config
+  - election
+  - gc
+  - health
+  - hostname
+  - id
+  - listen
+  - lsn
+  - memory
+  - name
+  - package
+  - pid
+  - replicaset
+  - replication
+  - replication_anon
+  - ro
+  - schema_version
+  - signature
+  - sql
+  - status
+  - synchro
+  - uptime
+  - uuid
+  - vclock
+  - version
+  - vinyl
+...
+-- Tarantool 1.6.x compat
+box.info.server.id == box.info.id
+---
+- true
+...
+box.info.server.uuid == box.info.uuid
+---
+- true
+...
+box.info.server.lsn == box.info.lsn
+---
+- true
+...
+box.info.ro == box.info.server.ro
+---
+- true
+...
+box.info().server.id == box.info.id
+---
+- true
+...
+box.info().server.uuid == box.info.uuid
+---
+- true
+...
+box.info().server.lsn == box.info.lsn
+---
+- true
+...
+box.info().ro == box.info.server.ro
+---
+- true
+...
+--
+-- box.ctl.wait_ro and box.ctl.wait_rw
+--
+box.ctl.wait_ro("abc") -- invalid argument
+---
+- error: expected number as 1 argument
+...
+box.ctl.wait_rw("def") -- invalid argument
+---
+- error: expected number as 1 argument
+...
+box.info.ro -- false
+---
+- false
+...
+box.ctl.wait_rw() -- success
+---
+...
+box.ctl.wait_ro(0.001) -- timeout
+---
+- error: timed out
+...
+box.cfg{read_only = true}
+---
+...
+box.ctl.wait_ro() -- success
+---
+...
+box.ctl.wait_rw(0.001) -- timeout
+---
+- error: timed out
+...
+status, err = nil
+---
+...
+f = fiber.create(function() status, err = pcall(box.ctl.wait_rw) end)
+---
+...
+fiber.sleep(0.001)
+---
+...
+f:cancel()
+---
+...
+while f:status() ~= 'dead' do fiber.sleep(0.001) end
+---
+...
+status, err -- fiber is cancelled
+---
+- false
+- fiber is cancelled
+...
+box.cfg{read_only = false}
+---
+...
+status, err = nil
+---
+...
+f = fiber.create(function() status, err = pcall(box.ctl.wait_ro) end)
+---
+...
+fiber.sleep(0.001)
+---
+...
+f:cancel()
+---
+...
+while f:status() ~= 'dead' do fiber.sleep(0.001) end
+---
+...
+status, err -- fiber is cancelled
+---
+- false
+- fiber is cancelled
+...
+ch = fiber.channel(1)
+---
+...
+_ = fiber.create(function() box.ctl.wait_ro() ch:put(box.info.ro) end)
+---
+...
+fiber.sleep(0.001)
+---
+...
+box.cfg{read_only = true}
+---
+...
+ch:get() -- true
+---
+- true
+...
+_ = fiber.create(function() box.ctl.wait_rw() ch:put(box.info.ro) end)
+---
+...
+fiber.sleep(0.001)
+---
+...
+box.cfg{read_only = false}
+---
+...
+ch:get() -- false
+---
+- false
+...
+--
+-- box.info.cluster compat. Before 3.0.0 it meant the current replicaset. Now it
+-- means the whole cluster.
+--
+compat = require('compat')
+---
+...
+info = compat.box_info_cluster_meaning
+---
+...
+assert(info.current == 'default')
+---
+- true
+...
+assert(info.default == 'new')
+---
+- true
+...
+rs_uuid = box.info.replicaset.uuid
+---
+...
+assert(box.info.cluster.uuid ~= rs_uuid)
+---
+- true
+...
+compat.box_info_cluster_meaning = 'old'
+---
+...
+assert(box.info.cluster.uuid == rs_uuid)
+---
+- true
+...
+compat.box_info_cluster_meaning = 'default'
+---
+...

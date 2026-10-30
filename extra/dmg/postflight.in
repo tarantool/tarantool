@@ -1,0 +1,22 @@
+#!/usr/bin/env sh
+ 
+PLIST_PRODUCT=@LUANCHD_PLIST@
+LUANCHD_PLIST=/Library/LaunchDaemons/${PLIST_PRODUCT}
+
+if [ -f ${LUANCHD_PLIST} ]
+then
+	launchctl unload ${LUANCHD_PLIST}
+	rm -f ${LUANCHD_PLIST}
+fi
+
+cp ${3}@CMAKE_INSTALL_PREFIX@/share/tarantool/${PLIST_PRODUCT} ${LUANCHD_PLIST}
+
+if [ -f ${LUANCHD_PLIST} ]
+then
+	launchctl load ${LUANCHD_PLIST}
+else
+	echo "${LUANCHD_PLIST} could not install"
+	exit 1
+fi
+
+exit 0

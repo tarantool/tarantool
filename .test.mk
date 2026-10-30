@@ -1,0 +1,238 @@
+#
+# CI testing rules
+#
+
+SRC_DIR = .
+BUILD_DIR ?= .
+STATIC_DIR = static-build
+STATIC_BIN_DIR = ${STATIC_DIR}/tarantool-prefix/src/tarantool-build
+LUAJIT_TEST_BUILD_DIR = ${BUILD_DIR}
+
+# `nproc`                   - for Linux
+# `sysctl -n hw.logicalcpu` - for OSX
+# `sysctl -n hw.ncpu`       - for FreeBSD (deprecated in OSX)
+NPROC ?= $(shell nproc || sysctl -n hw.logicalcpu || sysctl -n hw.ncpu)
+
+N_TRIALS ?= 128
+COMMIT_RANGE ?= master..HEAD
+
+VARDIR ?= /tmp/t
+TEST_RUN_PARAMS = --builddir $(realpath ${BUILD_DIR})
+
+CMAKE = ${CMAKE_ENV} cmake -S ${SRC_DIR} -B ${BUILD_DIR}
+CMAKE_BUILD = ${CMAKE_BUILD_ENV} cmake --build ${BUILD_DIR} --parallel ${NPROC}
+
+.PHONY: configure
+configure:
+	${CMAKE} ${CMAKE_PARAMS} ${CMAKE_EXTRA_PARAMS}
+
+# Static Analysis
+
+.PHONY: luacheck
+luacheck: configure
+	${CMAKE_BUILD} --target luacheck
+
+# Building
+
+.PHONY: build
+build: configure
+	${CMAKE_BUILD}
+
+# Testing
+
+.PHONY: run-luajit-test
+run-luajit-test:
+	${LUAJIT_TEST_ENV} cmake --build ${LUAJIT_TEST_BUILD_DIR} --parallel ${NPROC} --target LuaJIT-test
+
+.PHONY: install-test-deps
+install-test-deps:
+	python3 -m pip install -r test-run/requirements.txt
+
+.PHONY: run-test
+run-test: install-test-deps
+	cd test && ${TEST_RUN_ENV} ./test-run.py --force --vardir ${VARDIR} ${TEST_RUN_PARAMS} ${TEST_RUN_EXTRA_PARAMS}
+
+.PHONY: run-test-ctest
+run-test-ctest:
+	cmake --build ${STATIC_BIN_DIR} --target test-force-ctest
+
+.PHONY: run-perf-test
+run-perf-test:
+	cmake --build ${BUILD_DIR} --parallel
+	cmake --build ${BUILD_DIR} --target test-perf
+
+##############################
+# Linux                      #
+##############################
+
+# Release build
+
+.PHONY: test-release
+test-release: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+                             -DENABLE_WERROR=ON \
+                             -DTEST_BUILD=ON
+
+test-release: build run-luajit-test run-test
+
+.PHONY: test-perf
+test-perf: CMAKE_ENV = BENCH_CMD="${BENCH_CMD}"
+test-perf: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+                          -DENABLE_BUNDLED_LIBBENCHMARK=ON \
+                          -DENABLE_WERROR=ON \
+                          -DTEST_BUILD=ON
+
+test-perf: build run-perf-test
+
+.PHONY: test-perf-aggregate
+test-perf-aggregate:
+	cmake --build ${BUILD_DIR} --target test-perf-aggregate
+
+# *_ASAN variables are common part of respective variables for all ASAN builds.
+CMAKE_PARAMS_ASAN = -DENABLE_WERROR=ON \
+                    -DENABLE_ASAN=ON \
+                    -DENABLE_UB_SANITIZER=ON \
+                    -DTEST_BUILD=ON
+# Some checks are temporary suppressed in the scope of the issue
+# https://github.com/tarantool/tarantool/issues/4360:
+#   - ASAN: to suppress failures of memory error checks caught while tests run, the asan/asan.supp
+#     file is used. It is set as a value for the `-fsanitize-blacklist` option at the build time in
+#     the cmake/profile.cmake file.
+#   - LSAN: to suppress failures of memory leak checks caught while tests run, the asan/lsan.supp
+#     file is used.
+TEST_RUN_ENV_ASAN = ASAN=ON \
+                    LSAN_OPTIONS=suppressions=${PWD}/asan/lsan.supp \
+                    ASAN_OPTIONS=heap_profile=0:unmap_shadow_on_exit=1:$\
+                                 detect_invalid_pointer_pairs=1:symbolize=1:$\
+                                 detect_leaks=1:dump_instruction_bytes=1:$\
+                                 print_suppressions=0
+LUAJIT_TEST_ENV_ASAN = LSAN_OPTIONS=suppressions=${PWD}/asan/lsan.supp \
+                       ASAN_OPTIONS=detect_invalid_pointer_pairs=1:$\
+                                    detect_leaks=1:$\
+                                    dump_instruction_bytes=1:$\
+                                    heap_profile=0:$\
+                                    print_suppressions=0:$\
+                                    symbolize=1:$\
+                                    unmap_shadow_on_exit=1
+
+# Release ASAN build
+
+.PHONY: test-release-asan
+# FIBER_STACK_SIZE=640Kb: The default value of fiber stack size
+# is 512Kb, but several tests in test/PUC-Rio-Lua-5.1-test suite
+# in the LuaJIT repo (e.g. some cases with deep recursion in
+# errors.lua or pm.lua) have already been tweaked according to the
+# limitations mentioned in #5782, but the crashes still occur
+# while running LuaJIT tests with ASan support enabled.
+# Experiments once again confirm the notorious quote that "640 Kb
+# ought to be enough for anybody".
+test-release-asan: CMAKE_PARAMS = ${CMAKE_PARAMS_ASAN} \
+                                  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+                                  -DFIBER_STACK_SIZE=640Kb
+test-release-asan: TEST_RUN_ENV = ${TEST_RUN_ENV_ASAN}
+test-release-asan: LUAJIT_TEST_ENV = ${LUAJIT_TEST_ENV_ASAN}
+test-release-asan: build run-luajit-test run-test
+
+# Debug ASAN build
+
+.PHONY: test-debug-asan
+# We need even larger fiber stacks in ASAN debug build for luajit tests
+# to pass. Value twice as big as in ASAN release is just a wild guess.
+test-debug-asan: CMAKE_PARAMS = ${CMAKE_PARAMS_ASAN} \
+                                -DCMAKE_BUILD_TYPE=Debug \
+                                -DFIBER_STACK_SIZE=1280Kb
+test-debug-asan: TEST_RUN_ENV = ${TEST_RUN_ENV_ASAN}
+test-debug-asan: LUAJIT_TEST_ENV = ${LUAJIT_TEST_ENV_ASAN}
+# Increase timeouts as some tests in ASAN debug build take quite a lot
+# of time to finish.
+test-debug-asan: TEST_RUN_PARAMS += --test-timeout 620 \
+                                    --no-output-timeout 630 \
+                                    --server-start-timeout 610
+test-debug-asan: build run-luajit-test run-test
+
+# Debug build
+
+.PHONY: test-debug
+test-debug: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=Debug \
+                           -DTEST_BUILD=ON
+test-debug: build run-luajit-test run-test
+
+# Static build
+
+.PHONY: test-static
+test-static: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+                            -DENABLE_WERROR=ON \
+                            -DBUILD_STATIC=ON \
+                            -DTEST_BUILD=ON
+test-static: build run-luajit-test run-test
+
+# Static build (cmake)
+
+.PHONY: test-static-cmake
+test-static-cmake: SRC_DIR = ${STATIC_DIR}
+test-static-cmake: BUILD_DIR = ${STATIC_DIR}
+test-static-cmake: CMAKE_PARAMS = -DCMAKE_TARANTOOL_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo;-DENABLE_WERROR=ON;-DTEST_BUILD=ON"
+test-static-cmake: build run-test-ctest
+
+# Coverage build
+
+.PHONY: test-coverage
+test-coverage: CMAKE_PARAMS = -G Ninja \
+                              -DCMAKE_BUILD_TYPE=Debug \
+                              -DENABLE_GCOV=ON \
+                              -DTEST_BUILD=ON
+test-coverage: OUTPUT_FILE = coverage.info
+test-coverage: build run-luajit-test run-test
+	lcov --capture \
+	     --compat-libtool \
+	     --directory ${BUILD_DIR}/src/ \
+	     --output-file ${OUTPUT_FILE} \
+	     --rc lcov_function_coverage=1 \
+	     --rc lcov_branch_coverage=1 \
+	     --exclude '/usr/*' \
+	     --exclude '*/build/*' \
+	     --exclude '*/test/*' \
+	     --exclude '*/third_party/*'
+	lcov --list ${OUTPUT_FILE}
+
+# Flaky catching workflow build
+
+.PHONY: test-debug-flaky
+test-debug-flaky: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=Debug \
+                                 -DTEST_BUILD=ON
+test-debug-flaky: LUA_PATTERN = "./*/*test.lua"
+test-debug-flaky: UNITTEST_PATTERN = "./unit/*.c*"
+
+test-debug-flaky: build install-test-deps
+	cd test && \
+	TESTS=$$(git diff --relative=test --name-only \
+	         ${COMMIT_RANGE} -- ${LUA_PATTERN} ${UNITTEST_PATTERN} | \
+	         sed 's/\.\(c\|cpp\|cc\)$$//' | grep . | sort -u) && \
+	(([ -n "$${TESTS}" ] && ${TEST_RUN_ENV} \
+	  ./test-run.py --force \
+	                --vardir ${VARDIR} \
+	                --retries=0 \
+	                --repeat=${N_TRIALS} \
+	                ${TEST_RUN_PARAMS} ${TEST_RUN_EXTRA_PARAMS} \
+	                $${TESTS}) || \
+	 [ ! -n "$${TESTS}" ])
+
+
+##############################
+# OSX                        #
+##############################
+
+.PHONY: prebuild-osx
+prebuild-osx:
+	sysctl vm.swapusage
+
+##############################
+# LuaJIT integration testing #
+##############################
+
+test-luajit-Linux-x86_64: build run-luajit-test
+
+test-luajit-Linux-ARM64: build run-luajit-test
+
+test-luajit-macOS-x86_64: prebuild-osx build run-luajit-test
+
+test-luajit-macOS-ARM64: prebuild-osx build run-luajit-test

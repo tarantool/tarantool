@@ -1,0 +1,9 @@
+#!/bin/sh -e
+
+(
+   sed -ne '1,\%/\* ECB.H BEGIN \*/%p' ev.c
+   #perl -ne 'print unless /^#if ECB_CPP/ .. /^#endif/' <~/src/libecb/ecb.h
+   cat ~/src/libecb/ecb.h
+   sed -ne '\%/\* ECB.H END \*/%,$p' ev.c
+) >ev.c~ && mv ev.c~ ev.c
+

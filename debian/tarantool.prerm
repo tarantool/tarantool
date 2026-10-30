@@ -1,0 +1,9 @@
+#!/bin/sh -e
+
+case "$1" in
+    remove)
+        update-alternatives --remove lua-interpreter /usr/bin/tarantool
+        ;;
+esac
+
+#DEBHELPER#

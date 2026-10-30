@@ -1,0 +1,22 @@
+env = require('test_run')
+fio = require("fio")
+test_run = env.new()
+
+--
+-- gh-4703: Make sure that on_shutdown triggers are executed after
+-- EOF.
+--
+file_name = "on_shutdown_triggered.txt"
+test_run:cmd("setopt delimiter ';'");
+-- Extra \n is required on openSUSE.
+on_shutdown_cmd = "box.ctl.on_shutdown(function() local fio = require('fio') "..
+                   "fio.open('"..file_name.."', "..
+                   "{'O_CREAT', 'O_TRUNC', 'O_WRONLY'}, 777):close() end)\n";
+test_run:cmd("setopt delimiter ''");
+-- Unset XDG_STATE_HOME and HOME environment variables to skip readline
+-- history file write. Otherwise it clogs user's own history.
+server = io.popen('unset XDG_STATE_HOME; unset HOME; tarantool -i', 'w')
+server:write(on_shutdown_cmd)
+server:close()
+fio.path.lexists(file_name) == true
+os.remove(file_name)

@@ -1,0 +1,830 @@
+#include "dt.h"
+#include <assert.h>
+#include <inttypes.h>
+#include <stdint.h>
+#include <string.h>
+#include <time.h>
+
+#include "datetime.h"
+#include "mp_datetime.h"
+#include "msgpuck.h"
+#include "mp_extension_types.h"
+#include "small/static.h"
+#include "trivia/util.h"
+#include "tzcode/tzcode.h"
+#include "tt_static.h"
+
+#define UNIT_TAP_COMPATIBLE 1
+#include "unit.h"
+
+#define TAP_TEST_LOCATION() note("%s [%zu]", __func__, index + 1)
+
+/** Minimum supported date - -5879610-06-22. */
+#define MIN_DATE_YEAR -5879610
+
+#define TZOFFSET_H_MIN (TZOFFSET_MIN / 60)
+#define TZOFFSET_H_MAX (TZOFFSET_MAX / 60)
+
+/** See ISO 8601-1:2019 5.3.4.1 for time shift format. */
+static const char *
+tzoffset_str(int16_t x, char shift_type)
+{
+	int h = x / 60, m = abs(x) % 60;
+	if (shift_type == 'X') {
+		return tt_sprintf("%+03d:%02d", h, m);
+	} else if (shift_type == 'H') {
+		assert(m == 0);
+		return tt_sprintf("%+03d", h);
+	}
+	assert(shift_type == ' ');
+	return tt_sprintf("%+03d%02d", h, m);
+}
+
+static const char *
+dt_tzoffset_str(const char *dt, int16_t tzoffset, char shift_type)
+{
+	return tt_sprintf("%s%s", dt, tzoffset_str(tzoffset, shift_type));
+}
+
+/** 1356363000 is 2012-12-24T15:30Z */
+#define DEFAULT_SAMPLE_EPOCH 1356363000
+#define S(s) {s, sizeof(s) - 1, DEFAULT_SAMPLE_EPOCH}
+#define SAMPLE_NON_DEF_EPOCH(s, sample_epoch) {s, sizeof(s) - 1, sample_epoch}
+#define DELTA(delta) (DEFAULT_SAMPLE_EPOCH + (delta))
+struct {
+	const char *str;
+	size_t len;
+	double sample_epoch;
+} tests[] = {
+	S("2012-12-24 15:30Z"),
+	S("2012-12-24 15:30z"),
+	S("2012-12-24 15:30"),
+	S("2012-12-24 16:30+01:00"),
+	S("2012-12-24 16:30+0100"),
+	S("2012-12-24 16:30+01"),
+	S("2012-12-24 14:30-01:00"),
+	S("2012-12-24 14:30-0100"),
+	S("2012-12-24 14:30-01"),
+	S("2012-12-24 15:30:00Z"),
+	S("2012-12-24 15:30:00z"),
+	S("2012-12-24 15:30:00"),
+	S("2012-12-24 16:30:00+01:00"),
+	S("2012-12-24 16:30:00+0100"),
+	S("2012-12-24 14:30:00-01:00"),
+	S("2012-12-24 14:30:00-0100"),
+	S("2012-12-24 15:30:00.123456Z"),
+	S("2012-12-24 15:30:00.123456z"),
+	S("2012-12-24 15:30:00.123456"),
+	S("2012-12-24 16:30:00.123456+01:00"),
+	S("2012-12-24 16:30:00.123456+01"),
+	S("2012-12-24 14:30:00.123456-01:00"),
+	S("2012-12-24 14:30:00.123456-01"),
+	S("2012-12-24t15:30Z"),
+	S("2012-12-24t15:30z"),
+	S("2012-12-24t15:30"),
+	S("2012-12-24t16:30+01:00"),
+	S("2012-12-24t16:30+0100"),
+	S("2012-12-24t14:30-01:00"),
+	S("2012-12-24t14:30-0100"),
+	S("2012-12-24t15:30:00Z"),
+	S("2012-12-24t15:30:00z"),
+	S("2012-12-24t15:30:00"),
+	S("2012-12-24t16:30:00+01:00"),
+	S("2012-12-24t16:30:00+0100"),
+	S("2012-12-24t14:30:00-01:00"),
+	S("2012-12-24t14:30:00-0100"),
+	S("2012-12-24t15:30:00.123456Z"),
+	S("2012-12-24t15:30:00.123456z"),
+	S("2012-12-24t16:30:00.123456+01:00"),
+	S("2012-12-24t14:30:00.123456-01:00"),
+	S("2012-12-24 16:30 +01:00"),
+	S("2012-12-24 14:30 -01:00"),
+	S("2012-12-24 15:30 UTC"),
+	/**
+	 * Unsupported cases commented out (gh-12095):
+	 * S("2012-12-24 16:30 UTC+1"),
+	 * S("2012-12-24 16:30 UTC+01"),
+	 * S("2012-12-24 16:30 UTC+0100"),
+	 * S("2012-12-24 16:30 UTC+01:00"),
+	 * S("2012-12-24 14:30 UTC-1"),
+	 * S("2012-12-24 14:30 UTC-01"),
+	 * S("2012-12-24 14:30 UTC-01:00"),
+	 * S("2012-12-24 14:30 UTC-0100"),
+	 */
+	S("2012-12-24 15:30 GMT"),
+	/**
+	 * Unsupported cases commented out (gh-12095):
+	 * S("2012-12-24 16:30 GMT+1"),
+	 * S("2012-12-24 16:30 GMT+01"),
+	 * S("2012-12-24 16:30 GMT+0100"),
+	 * S("2012-12-24 16:30 GMT+01:00"),
+	 * S("2012-12-24 14:30 GMT-1"),
+	 * S("2012-12-24 14:30 GMT-01"),
+	 * S("2012-12-24 14:30 GMT-01:00"),
+	 * S("2012-12-24 14:30 GMT-0100"),
+	 */
+	S("2012-12-24 14:30 -01:00"),
+	S("2012-12-24 16:30:00 +01:00"),
+	S("2012-12-24 14:30:00 -01:00"),
+	S("2012-12-24 16:30:00.123456 +01:00"),
+	S("2012-12-24 14:30:00.123456 -01:00"),
+	S("2012-12-24 15:30:00.123456 -00:00"),
+	S("20121224T1630+01:00"),
+	S("2012-12-24T1630+01:00"),
+	S("20121224T16:30+01"),
+	S("20121224T16:30 +01"),
+	S("20121224T16,5+0100"),
+	S("20121224T16,5+01:00"),
+	SAMPLE_NON_DEF_EPOCH("20121224T16.75+0100", DELTA(15 * 60)),
+	SAMPLE_NON_DEF_EPOCH("20121224T16.625+0100", DELTA(7 * 60 + 30)),
+	S("2012-12-24T16,5+01:00"),
+	SAMPLE_NON_DEF_EPOCH("2012-12-24T16.75+01:00", DELTA(15 * 60)),
+	SAMPLE_NON_DEF_EPOCH("2012-12-24T16.625+01:00", DELTA(7 * 60 + 30)),
+	S("20121224T1630.0+0100"),
+	SAMPLE_NON_DEF_EPOCH("20121224T1630.5+0100", DELTA(30)),
+	S("20121224T16:30.0+0100"),
+	SAMPLE_NON_DEF_EPOCH("20121224T16:30.5+0100", DELTA(30)),
+	SAMPLE_NON_DEF_EPOCH("20121224T16:30,1+0100", DELTA(6)),
+	SAMPLE_NON_DEF_EPOCH("20121224T16:30,01666667+0100", DELTA(1)),
+};
+#undef S
+#undef SAMPLE_NON_DEF_EPOCH
+#undef DELTA
+#undef DEFAULT_SAMPLE_EPOCH
+
+static void
+datetime_parse_full_ok_test(void)
+{
+	size_t index;
+
+	const unsigned tap_tests_per_iter = 7;
+	plan(tap_tests_per_iter * lengthof(tests));
+	for (index = 0; index < lengthof(tests); index++) {
+		TAP_TEST_LOCATION();
+		/* Result of datetime_parse_full. */
+		ssize_t parse_len;
+		/* Results of datetime_(strftime|strptime). */
+		size_t flen, plen;
+		const char *test_str = tests[index].str;
+		size_t test_len = tests[index].len;
+		size_t test_sample_epoch = tests[index].sample_epoch;
+		struct datetime date;
+
+		parse_len = datetime_parse_full(&date, test_str, test_len);
+		is((parse_len > 0) && ((size_t)parse_len == test_len), true,
+		   "correct datetime_parse_full "
+		   "parsed symbols for '%s'", test_str);
+		is(date.epoch, test_sample_epoch,
+		   "correct datetime_parse_full output "
+		   "seconds for '%s",
+		   test_str);
+
+		/*
+		 * check that stringized literal produces the same date
+		 * time fields
+		 */
+		static char buff[DT_TO_STRING_BUFSIZE];
+		flen = datetime_strftime(buff, sizeof(buff), "%F %T%z", &date);
+		ok(flen > 0, "datetime_strftime");
+		struct datetime date_strp;
+		plen = datetime_strptime(&date_strp, buff, "%F %T%z");
+		is(plen == flen, true, "correct datetime_strptime "
+		   "parsed symbols for '%s'", buff);
+		is(date.epoch, date_strp.epoch,
+		   "reversible seconds via datetime_strptime for '%s'", buff);
+		struct datetime date_parsed;
+		parse_len = datetime_parse_full(&date_parsed, buff, flen);
+		is((parse_len > 0) & ((size_t)parse_len == flen), true,
+		   "correct datetime_parse_full "
+		   "parsed symbols for '%s'", buff);
+		is(date.epoch, date_parsed.epoch,
+		   "reversible seconds via datetime_parse_full for '%s'", buff);
+	}
+	check_plan();
+}
+
+static void
+datetime_parse_full_fail_test(void)
+{
+	const char *const invalid_tests[] = {
+		/* Out of range tzoffset. */
+		dt_tzoffset_str("8400329 10", (TZOFFSET_H_MIN - 1) * 60, 'H'),
+		dt_tzoffset_str("8400329 10", (TZOFFSET_H_MAX + 1) * 60, 'H'),
+		dt_tzoffset_str("8400329 10", TZOFFSET_MIN - 1, ' '),
+		dt_tzoffset_str("8400329 10", TZOFFSET_MAX + 1, ' '),
+		dt_tzoffset_str("8400329 10", TZOFFSET_MIN - 1, 'X'),
+		dt_tzoffset_str("8400329 10", TZOFFSET_MAX + 1, 'X'),
+	};
+
+	const unsigned tap_tests_per_iter = 1;
+	plan(tap_tests_per_iter * lengthof(invalid_tests));
+	for (size_t index = 0; index < lengthof(invalid_tests); index++) {
+		TAP_TEST_LOCATION();
+		ssize_t parse_len;
+		const char *test_str = invalid_tests[index];
+		size_t test_len = strlen(test_str);
+		struct datetime date;
+
+		parse_len = datetime_parse_full(&date, test_str, test_len);
+		is(parse_len < 0, true, "datetime_parse_full "
+		   "fails for '%s'", test_str);
+	}
+	check_plan();
+}
+
+static void
+tostring_datetime_test(void)
+{
+	static struct {
+		const char *string;
+		int64_t     secs;
+		uint32_t    nsec;
+		uint32_t    offset;
+	} tests[] = {
+		{"1970-01-01T02:00:00+0200",        0,         0,  120},
+		{"1970-01-01T01:30:00+0130",        0,         0,   90},
+		{"1970-01-01T01:00:00+0100",        0,         0,   60},
+		{"1970-01-01T00:01:00+0001",        0,         0,    1},
+		{"1970-01-01T00:00:00Z",            0,         0,    0},
+		{"1969-12-31T23:59:00-0001",        0,         0,   -1},
+		{"1969-12-31T23:00:00-0100",        0,         0,  -60},
+		{"1969-12-31T22:30:00-0130",        0,         0,  -90},
+		{"1969-12-31T22:00:00-0200",        0,         0, -120},
+		{"1970-01-01T00:00:00.123456789Z",  0, 123456789,    0},
+		{"1970-01-01T00:00:00.123456Z",     0, 123456000,    0},
+		{"1970-01-01T00:00:00.123Z",        0, 123000000,    0},
+		{"1973-11-29T21:33:09Z",    123456789,         0,    0},
+		{"2013-10-28T17:51:56Z",   1382982716,         0,    0},
+		{"9999-12-31T23:59:59Z", 253402300799,         0,    0},
+		{"10000-01-01T00:00:00Z", 253402300800,        0,    0},
+		{"5879611-07-11T00:00:00Z", 185480451417600,   0,    0},
+	};
+	size_t index;
+
+	const unsigned tap_tests_per_iter = 1;
+	plan(tap_tests_per_iter * lengthof(tests));
+	for (index = 0; index < lengthof(tests); index++) {
+		TAP_TEST_LOCATION();
+		struct datetime date = {
+			tests[index].secs,
+			tests[index].nsec,
+			tests[index].offset,
+			0
+		};
+		char buf[DT_TO_STRING_BUFSIZE];
+		datetime_snprint(buf, sizeof(buf), &date);
+		is(strcmp(buf, tests[index].string), 0,
+		   "string '%s' expected, received '%s'",
+		   tests[index].string, buf);
+	}
+	check_plan();
+}
+
+static int64_t
+_dt_to_epoch(dt_t dt)
+{
+	return ((int64_t)dt_rdn(dt) - DT_EPOCH_1970_OFFSET) * SECS_PER_DAY;
+}
+
+static void
+parse_date_iso8601_valid_test(void)
+{
+	static struct {
+		int64_t epoch;
+		const char *string;
+		size_t len; /* expected parsed length, may be not full */
+	} const valid_tests[] = {
+		{ 1356307200, "20121224", 8 },
+		{ 1356307200, "20121224  Foo bar", 8 },
+		{ 1356307200, "2012-12-24", 10 },
+		{ 1356307200, "2012-12-24 23:59:59", 10 },
+		{ 1356307200, "2012-12-24T00:00:00+00:00", 10 },
+		{ 1356307200, "2012359", 7 },
+		{ 1356307200, "2012359T235959+0130", 7 },
+		{ 1356307200, "2012-359", 8 },
+		{ 1356307200, "2012W521", 8 },
+		{ 1356307200, "2012-W52-1", 10 },
+		{ 1356307200, "2012Q485", 8 },
+		{ 1356307200, "2012-Q4-85", 10 },
+		{ -62135596800, "0001-Q1-01", 10 },
+		{ -62135596800, "0001-W01-1", 10 },
+		{ -62135596800, "0001-01-01", 10 },
+		{ -62135596800, "0001-001", 8 },
+
+		/* Tarantool extra ranges */
+		{ -62167219200, "0000-01-01", 10 },
+		{ -62167046400, "0000-W01-1", 10 },
+		{ -62167219200, "0000-Q1-01", 10 },
+		{ -68447116800, "-200-12-31", 10 },
+		{ -377705203200, "-10000-12-31", 12 },
+		{ -185604722870400, "-5879610-06-22", 14 },
+		{ -185604706627200, "-5879610W521", 12 },
+		{ 253402214400, "9999-12-31", 10 },
+		{ 253402300800, "10000-01-01", 11 },
+		{ 185480451417600, "5879611-07-11", 13 },
+		{ 185480434915200, "5879611Q101", 11 },
+	};
+	size_t index;
+
+	const unsigned tap_tests_per_iter = 2;
+	plan(tap_tests_per_iter * lengthof(valid_tests));
+	for (index = 0; index < lengthof(valid_tests); index++) {
+		TAP_TEST_LOCATION();
+		dt_t dt = 0;
+		const char *str = valid_tests[index].string;
+		size_t expected_len = valid_tests[index].len;
+		int64_t expected_epoch = valid_tests[index].epoch;
+		size_t len = tnt_dt_parse_iso_date(str, expected_len, &dt);
+		int64_t epoch = _dt_to_epoch(dt);
+		is(len, expected_len, "string '%s' parse, len %lu", str,
+		   len);
+		is(epoch, expected_epoch, "string '%s' parse, epoch %" PRId64,
+		   str, epoch);
+	}
+	check_plan();
+}
+
+static void
+parse_date_iso8601_invalid_test(void)
+{
+	static const char *const invalid_tests[] = {
+		"20121232",    /* Invalid day of month */
+		"2012-12-310", /* Invalid day of month */
+		"2012-13-24",  /* Invalid month */
+		"2012367",     /* Invalid day of year */
+		"2012-000",    /* Invalid day of year */
+		"2012W533",    /* Invalid week of year */
+		"2012-W52-8",  /* Invalid day of week */
+		"2012Q495",    /* Invalid day of quarter */
+		"2012-Q5-85",  /* Invalid quarter */
+		"20123670",    /* Trailing digit */
+		"201212320",   /* Trailing digit */
+		"2012-12",     /* Reduced accuracy */
+		"2012-Q4",     /* Reduced accuracy */
+		"2012-Q42",    /* Invalid */
+		"2012-Q1-1",   /* Invalid day of quarter */
+		"2012Q/* 420", /* Invalid */
+		"2012-Q-420",  /* Invalid */
+		"2012Q11",     /* Incomplete */
+		"2012Q1234",   /* Trailing digit */
+		"2012W12",     /* Incomplete */
+		"2012W1234",   /* Trailing digit */
+		"2012W-123",   /* Invalid */
+		"2012-W12",    /* Incomplete */
+		"2012-W12-12", /* Trailing digit */
+		"2012U1234",   /* Invalid */
+		"2012-1234",   /* Invalid */
+		"2012-X1234",  /* Invalid */
+	};
+
+	const unsigned tap_tests_per_iter = 1;
+	plan(tap_tests_per_iter * lengthof(invalid_tests));
+	for (size_t index = 0; index < lengthof(invalid_tests); index++) {
+		TAP_TEST_LOCATION();
+		dt_t dt = 0;
+		const char *str = invalid_tests[index];
+		size_t len = tnt_dt_parse_iso_date(str, strlen(str), &dt);
+		is(len, 0, "expected failure of string '%s' parse, len %lu",
+		   str, len);
+	}
+	check_plan();
+}
+
+static void
+parse_date_strptime_valid_test(void)
+{
+	/* Check strptime valid formats. */
+	const struct {
+		const char *fmt;
+		const char *text;
+	} format_tests[] = {
+		{ "%A",                      "Thursday" },
+		{ "%a",                      "Thu" },
+		{ "%B",                      "January" },
+		{ "%b",                      "Jan" },
+		{ "%h",                      "Jan" },
+		{ "%c",                      "Thu Jan  1 03:00:00 1970" },
+		{ "%D",                      "01/01/70" },
+		{ "%m/%d/%y",                "01/01/70" },
+		{ "%d",                      "01" },
+		{ "%Ec",                     "Thu Jan  1 03:00:00 1970" },
+		{ "%Ex",                     "01/01/70" },
+		{ "%EX",                     "03:00:00" },
+		{ "%Ey",                     "70" },
+		{ "%EY",                     "1970" },
+		{ "%Od",                     "01" },
+		{ "%OH",                     "03" },
+		{ "%OI",                     "03" },
+		{ "%Om",                     "01" },
+		{ "%OM",                     "00" },
+		{ "%OS",                     "00" },
+		{ "%Ou",                     "4" },
+		{ "%OU",                     "00" },
+		{ "%Ow",                     "4" },
+		{ "%OW",                     "00" },
+		{ "%Oy",                     "70" },
+		{ "%e",                      " 1" },
+		{ "%F",                      "1970-01-01" },
+		{ "%Y-%m-%d",                "1970-01-01" },
+		{ "%H",                      "03" },
+		{ "%I",                      "03" },
+		{ "%j",                      "001" },
+		{ "%k",                      " 3" },
+		{ "%l",                      " 3" },
+		{ "%M",                      "00" },
+		{ "%m",                      "01" },
+		{ "%n",                      "\n" },
+		{ "%p",                      "AM" },
+		{ "%R",                      "03:00" },
+		{ "%H:%M",                   "03:00" },
+		{ "%r",                      "03:00:00 AM" },
+		{ "%I:%M:%S %p",             "03:00:00 AM" },
+		{ "%S",                      "00" },
+		{ "%s",                      "10800" },
+		{ "%f",                      "125" },
+		{ "%T",                      "03:00:00" },
+		{ "%H:%M:%S",                "03:00:00" },
+		{ "%t",                      "\t" },
+		{ "%U",                      "00" },
+		{ "%u",                      "4" },
+		{ "%G",                      "1970" },
+		{ "%g",                      "70" },
+		{ "%v",                      " 1-Jan-1970" },
+		{ "%e-%b-%Y",                " 1-Jan-1970" },
+		{ "%W",                      "00" },
+		{ "%w",                      "4" },
+		{ "%X",                      "03:00:00" },
+		{ "%x",                      "01/01/70" },
+		{ "%y",                      "70" },
+		{ "%Y",                      "1970" },
+		{ "%z",                      "+0300" },
+		{ "%%",                      "%" },
+		{ "%Y-%m-%dT%H:%M:%S.%9f%z", "1970-01-01T03:00:00.125000000+0300" },
+		{ "%Y-%m-%dT%H:%M:%S.%f%z",  "1970-01-01T03:00:00.125+0300" },
+		{ "%Y-%m-%dT%H:%M:%S.%f",    "1970-01-01T03:00:00.125" },
+		{ "%FT%T.%f",                "1970-01-01T03:00:00.125" },
+		{ "%FT%T.%f%z",              "1970-01-01T03:00:00.125+0300" },
+		{ "%FT%T.%9f%z",             "1970-01-01T03:00:00.125000000+0300" },
+		{ "%Y-%m-%d",                "0000-01-01" },
+		{ "%Y-%m-%d",                "0001-01-01" },
+		{ "%Y-%m-%d",                "9999-01-01" },
+		{ "%Y-%m-%d",                "10000-01-01" },
+		{ "%Y-%m-%d",                "10000-01-01" },
+		{ "%Y-%m-%d",                "5879611-07-11" },
+	};
+
+	const unsigned tap_tests_per_iter = 1;
+	plan(tap_tests_per_iter * lengthof(format_tests));
+	for (size_t index = 0; index < lengthof(format_tests); index++) {
+		TAP_TEST_LOCATION();
+		const char *fmt = format_tests[index].fmt;
+		const char *text = format_tests[index].text;
+		struct tnt_tm date = { .tm_epoch = 0};
+		char *ptr = tnt_strptime(text, fmt, &date);
+		isnt(ptr, NULL, "parse string '%s' using '%s' (result '%s')",
+		     text, fmt, TOSTR(tnt_strftime, "%FT%T%z", &date));
+	}
+
+	check_plan();
+}
+
+static void
+parse_date_strptime_invalid_test(void)
+{
+	/* Check strptime invalid formats. */
+	const struct {
+		const char *fmt;
+		const char *text;
+		const char *fail_case;
+	} format_fail_tests[] = {
+		/* 0000-001 is 0000-01-01. */
+		{
+			"%m%g%j",
+			"07001",
+			"%j %m both are used and their months are different"
+		},
+		/* 2025-321 is 2025-11-17. */
+		{
+			"%G-%j %m",
+			"2025-321 12",
+			"%j %m both are used and their months are different"
+		},
+	};
+
+	const unsigned tap_tests_per_iter = 2;
+	plan(tap_tests_per_iter * lengthof(format_fail_tests));
+	for (size_t index = 0; index < lengthof(format_fail_tests); index++) {
+		TAP_TEST_LOCATION();
+		const char *fmt = format_fail_tests[index].fmt;
+		const char *text = format_fail_tests[index].text;
+		const char *fail_case = format_fail_tests[index].fail_case;
+
+		struct tnt_tm tm = { 0 };
+		char *ptr = tnt_strptime(text, fmt, &tm);
+		is(ptr, NULL, "tnt_strptime parse string '%s' "
+		   "using '%s' must fail on: %s",
+		   text, fmt, fail_case);
+
+		struct datetime date = { 0 };
+		size_t res = datetime_strptime(&date, text, fmt);
+		is(res, 0, "datetime_strptime fail to"
+		   " parse string '%s' using '%s'",
+		   text, fmt);
+	}
+
+	check_plan();
+}
+
+static void
+mp_datetime_test()
+{
+	static struct {
+		int64_t     secs;
+		uint32_t    nsec;
+		uint32_t    offset;
+		uint32_t    len;
+	} tests[] = {
+		{ /* '1970-01-01T02:00+02:00' */ 0, 0, 120, 18 },
+		{ /* '1970-01-01T01:30+01:30' */ 0, 0, 90, 18 },
+		{ /* '1970-01-01T01:00+01:00' */ 0, 0, 60, 18 },
+		{ /* '1970-01-01T00:01+00:01' */ 0, 0, 1, 18 },
+		{ /* '1970-01-01T00:00Z' */ 0, 0, 0, 10 },
+		{ /* '1969-12-31T23:59-00:01' */ 0, 0, -1, 18 },
+		{ /* '1969-12-31T23:00-01:00' */ 0, 0, -60, 18 },
+		{ /* '1969-12-31T22:30-01:30' */ 0, 0, -90, 18 },
+		{ /* '1969-12-31T22:00-02:00' */ 0, 0, -120, 18 },
+		{ /* '1970-01-01T00:00:00.123456789Z' */ 0, 123456789, 0, 18 },
+		{ /* '1970-01-01T00:00:00.123456Z' */ 0, 123456000, 0, 18 },
+		{ /* '1970-01-01T00:00:00.123Z' */ 0, 123000000, 0, 18 },
+		{ /* '1973-11-29T21:33:09Z' */ 123456789, 0, 0, 10 },
+		{ /* '2013-10-28T17:51:56Z' */ 1382982716, 0, 0, 10 },
+		{ /* '9999-12-31T23:59:59Z' */ 253402300799, 0, 0, 10 },
+		{ /* '9999-12-31T23:59:59.123456789Z' */ 253402300799,
+		  123456789, 0, 18 },
+		{ /* '9999-12-31T23:59:59.123456789-02:00' */ 253402300799,
+		  123456789, -120, 18 },
+	};
+	size_t index;
+
+	const unsigned tap_tests_per_iter = 5;
+	plan(tap_tests_per_iter * lengthof(tests));
+	for (index = 0; index < lengthof(tests); index++) {
+		TAP_TEST_LOCATION();
+		struct datetime date = {
+			tests[index].secs,
+			tests[index].nsec,
+			tests[index].offset,
+			0
+		};
+		char buf[24], *data = buf;
+		const char *data1 = buf;
+		struct datetime ret;
+
+		char *end = mp_encode_datetime(data, &date);
+		uint32_t len = mp_sizeof_datetime(&date);
+		is(len, tests[index].len, "len %u, expected len %u",
+		   len, tests[index].len);
+		is(end - data, len,
+		   "tnt_mp_sizeof_datetime(%d) == encoded length %ld",
+		   len, end - data);
+
+		struct datetime *rc = mp_decode_datetime(&data1, &ret);
+		is(rc, &ret, "mp_decode_datetime() return code");
+		is(data1, end, "data1 == end (%lu)", data1 - end);
+		is(datetime_compare(&date, &ret), 0, "datetime_compare(&date, &ret)");
+	}
+	check_plan();
+}
+
+/**
+ * Binary, MessagePack representation of datetime
+ * payload in MP value.
+ */
+struct binary_datetime {
+	/** Seconds since Epoch. */
+	int64_t epoch;
+	/** Nanoseconds, if any. */
+	int32_t nsec;
+	/** Offset in minutes from UTC. */
+	int16_t tzoffset;
+	/** Olson timezone id. */
+	int16_t tzindex;
+};
+
+static void
+mp_datetime_unpack_ok_test(void)
+{
+	static struct binary_datetime valid_values[] = {
+		{.epoch = MAX_EPOCH_SECS_VALUE},
+		{.epoch = MIN_EPOCH_SECS_VALUE},
+		{.nsec = MAX_NANOS_PER_SEC - 1},
+		{.nsec = 0},
+		{.tzoffset = TZOFFSET_MIN},
+		{.tzoffset = TZOFFSET_MAX},
+		{.tzindex = MAX_TZINDEX},
+		{.tzindex = 0},
+	};
+	size_t index;
+	const char *p;
+	struct datetime date;
+
+	const unsigned tap_tests_per_iter = 2;
+	plan(tap_tests_per_iter * lengthof(valid_values));
+	for (index = 0; index < lengthof(valid_values); index++) {
+		TAP_TEST_LOCATION();
+		struct binary_datetime value = valid_values[index];
+		p = (char *)&value;
+		memset(&date, 0, sizeof(date));
+		struct datetime *dt = datetime_unpack(&p, sizeof(value), &date);
+		isnt(dt, NULL, "datetime_unpack() is not NULL");
+		is((int64_t)dt->epoch, value.epoch, "epoch value expected");
+	}
+
+	check_plan();
+}
+
+static void
+mp_datetime_unpack_fail_test(void)
+{
+	static struct binary_datetime invalid_values[] = {
+		{.epoch = MAX_EPOCH_SECS_VALUE + 1},
+		{.epoch = MIN_EPOCH_SECS_VALUE - 1},
+		{.nsec = MAX_NANOS_PER_SEC},
+		{.nsec = -1},
+		{.tzoffset = TZOFFSET_MIN - 1},
+		{.tzoffset = TZOFFSET_MAX + 1},
+		{.tzindex = MAX_TZINDEX + 1},
+		{.tzindex = -1},
+	};
+
+	const unsigned tap_tests_per_iter = 1;
+	plan(tap_tests_per_iter * lengthof(invalid_values));
+	for (size_t index = 0; index < lengthof(invalid_values); index++) {
+		TAP_TEST_LOCATION();
+		const char *p;
+		struct datetime date;
+		struct binary_datetime value = invalid_values[index];
+		p = (char *)&value;
+		memset(&date, 0, sizeof(date));
+		struct datetime *dt = datetime_unpack(&p, sizeof(value), &date);
+		is(dt, NULL, "datetime_unpack() is NULL");
+	}
+	check_plan();
+}
+
+static int
+mp_fprint_ext_test(FILE *file, const char **data, int depth)
+{
+	(void)depth;
+	int8_t type;
+	uint32_t len = mp_decode_extl(data, &type);
+	if (type != MP_DATETIME)
+		return fprintf(file, "undefined");
+	return mp_fprint_datetime(file, data, len);
+}
+
+static int
+mp_snprint_ext_test(char *buf, int size, const char **data, int depth)
+{
+        (void)depth;
+        int8_t type;
+        uint32_t len = mp_decode_extl(data, &type);
+        if (type != MP_DATETIME)
+                return snprintf(buf, size, "undefined");
+        return mp_snprint_datetime(buf, size, data, len);
+}
+
+static void
+mp_print_test(void)
+{
+	plan(5);
+	header();
+
+	mp_snprint_ext = mp_snprint_ext_test;
+	mp_fprint_ext = mp_fprint_ext_test;
+
+	char sample[64];
+	char buffer[64];
+	char str[64];
+	struct datetime date = {0, 0, 0, 0}; // 1970-01-01T00:00Z
+
+	mp_encode_datetime(buffer, &date);
+	int sz = datetime_snprint(str, sizeof(str), &date);
+	int rc = mp_snprint(NULL, 0, buffer);
+	is(rc, sz, "correct mp_snprint size %u with empty buffer", rc);
+	rc = mp_snprint(str, sizeof(str), buffer);
+	is(rc, sz, "correct mp_snprint size %u", rc);
+	datetime_snprint(sample, sizeof(sample), &date);
+	is(strcmp(str, sample), 0, "correct mp_snprint result");
+
+	FILE *f = tmpfile();
+	rc = mp_fprint(f, buffer);
+	is(rc, sz, "correct mp_fprint size %u", sz);
+	rewind(f);
+	rc = fread(str, 1, sizeof(str), f);
+	str[rc] = 0;
+	is(strcmp(str, sample), 0, "correct mp_fprint result %u", rc);
+	fclose(f);
+
+	mp_snprint_ext = mp_snprint_ext_default;
+	mp_fprint_ext = mp_fprint_ext_default;
+
+	footer();
+	check_plan();
+}
+
+static void
+interval_from_map_test(void)
+{
+	plan(2);
+	header();
+
+	struct interval iv;
+	char buffer[128];
+	int rc = mp_format(buffer, sizeof(buffer), "{%s%d}", "year", 100);
+	fail_if(rc >= (int)sizeof(buffer));
+	rc = interval_from_map(&iv, buffer);
+	is(rc, 0, "normal year");
+	const char *suboptimal_data =
+		"\x81\xa4year\xd3\x00\xff\xff\xff\xff\xff\xff\xff";
+	rc = interval_from_map(&iv, suboptimal_data);
+	is(rc, -1, "too big year inside mp_int");
+
+	footer();
+	check_plan();
+}
+
+static void
+datetime_from_map_overflow_test(void)
+{
+	plan(2);
+	header();
+
+	struct datetime dt;
+	char buffer[128];
+	int rc = mp_format(buffer, sizeof(buffer), "{%s%d}", "year",
+			   MIN_DATE_YEAR + 1);
+	fail_if(rc >= (int)sizeof(buffer));
+	rc = datetime_from_map(&dt, buffer);
+	is(rc, 0, "min full year");
+	is(dt.epoch, -185604706195200, "min full year epoch");
+
+	footer();
+	check_plan();
+}
+
+static void
+snprint_test(void)
+{
+	plan(4);
+	header();
+
+	static char *zero_date = "1970-01-01T00:00:00Z";
+	static char *zero_fmt = "%FT%TZ";
+	struct datetime d;
+	memset(&d, 0, sizeof(d));
+	struct tnt_tm t;
+	datetime_to_tm(&d, &t);
+
+	char *res;
+	res = TOSTR(datetime_snprint, &d);
+	is(strcmp(res, zero_date), 0, res);
+
+	res = TOSTR(datetime_strftime, zero_fmt, &d);
+	is(strcmp(res, zero_date), 0, res);
+
+	res = TOSTR(tnt_strftime, zero_fmt, &t);
+	is(strcmp(res, zero_date), 0, res);
+
+	static char *zero_i = "+0 seconds";
+	struct interval i;
+	memset(&i, 0, sizeof(i));
+
+	res = TOSTR(interval_snprint, &i);
+	is(strcmp(res, zero_i), 0, res);
+
+	footer();
+	check_plan();
+}
+
+int
+main(void)
+{
+	plan(14);
+	datetime_parse_full_ok_test();
+	datetime_parse_full_fail_test();
+	tostring_datetime_test();
+	parse_date_iso8601_valid_test();
+	parse_date_iso8601_invalid_test();
+	parse_date_strptime_valid_test();
+	parse_date_strptime_invalid_test();
+	mp_datetime_unpack_ok_test();
+	mp_datetime_unpack_fail_test();
+	mp_datetime_test();
+	mp_print_test();
+	interval_from_map_test();
+	datetime_from_map_overflow_test();
+	snprint_test();
+
+	return check_plan();
+}

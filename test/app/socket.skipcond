@@ -1,0 +1,31 @@
+
+# vim: set ft=python :
+import re
+import os.path
+import socket
+import os
+import tempfile
+import platform
+
+test_dir = tempfile.mkdtemp(prefix='tarantool-test-socket')
+test_path = os.path.join(test_dir, 'socket')
+
+s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+try:
+    s.bind(test_path)
+except:
+    self.skip = 1
+
+s.close()
+
+if os.path.exists(test_path):
+    os.remove(test_path)
+    os.rmdir(test_dir)
+
+# Disabled on FreeBSD due to flaky fail #4271.
+if platform.system() == 'FreeBSD':
+    self.skip = 1
+
+# Disabled on OpenBSD due to fail #XXX.
+if platform.system() == 'OpenBSD':
+    self.skip = 1

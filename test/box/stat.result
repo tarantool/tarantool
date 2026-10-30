@@ -1,0 +1,174 @@
+-- clear statistics
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+test_run:cmd('restart server default with cleanup=1')
+box.stat.INSERT.total
+---
+- 0
+...
+box.stat.DELETE.total
+---
+- 0
+...
+box.stat.UPDATE.total
+---
+- 0
+...
+box.stat.REPLACE.total
+---
+- 0
+...
+box.stat.SELECT.total
+---
+- 0
+...
+box.stat.ERROR.total
+---
+- 0
+...
+space = box.schema.space.create('tweedledum')
+---
+...
+-- create_space performs a select when choosing a new space id
+box.stat.SELECT.total
+---
+- 1
+...
+index = space:create_index('primary', { type = 'hash' })
+---
+...
+-- check stat_cleanup
+-- add several tuples
+for i=1,10 do space:insert{i, 'tuple'..tostring(i)} end
+---
+...
+box.stat.INSERT.total
+---
+- 12
+...
+box.stat.DELETE.total
+---
+- 0
+...
+box.stat.UPDATE.total
+---
+- 0
+...
+box.stat.REPLACE.total
+---
+- 0
+...
+box.stat.SELECT.total
+---
+- 5
+...
+-- check exceptions
+space:get('Impossible value')
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected unsigned'
+...
+box.stat.ERROR.total
+---
+- 1
+...
+-- select, get, and pairs
+space:get(1)
+---
+- [1, 'tuple1']
+...
+box.stat.SELECT.total
+---
+- 6
+...
+space:get(11)
+---
+...
+box.stat.SELECT.total
+---
+- 7
+...
+space:select(5)
+---
+- - [5, 'tuple5']
+...
+box.stat.SELECT.total
+---
+- 8
+...
+space:select(15)
+---
+- []
+...
+box.stat.SELECT.total
+---
+- 9
+...
+for _ in space:pairs() do end
+---
+...
+box.stat.SELECT.total
+---
+- 10
+...
+-- reset
+box.stat.reset()
+---
+...
+box.stat.INSERT.total
+---
+- 0
+...
+box.stat.DELETE.total
+---
+- 0
+...
+box.stat.UPDATE.total
+---
+- 0
+...
+box.stat.REPLACE.total
+---
+- 0
+...
+box.stat.SELECT.total
+---
+- 0
+...
+box.stat.ERROR.total
+---
+- 0
+...
+test_run:cmd('restart server default')
+-- statistics must be zero
+box.stat.INSERT.total
+---
+- 0
+...
+box.stat.DELETE.total
+---
+- 0
+...
+box.stat.UPDATE.total
+---
+- 0
+...
+box.stat.REPLACE.total
+---
+- 0
+...
+box.stat.SELECT.total
+---
+- 0
+...
+box.stat.ERROR.total
+---
+- 0
+...
+-- cleanup
+box.space.tweedledum:drop()
+---
+...

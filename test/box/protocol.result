@@ -1,0 +1,53 @@
+--------------------------------------------------------------------------------
+-- Test case for #273: IPROTO_ITERATOR ignored in network protocol
+--------------------------------------------------------------------------------
+space = box.schema.space.create('tweedledum')
+---
+...
+index = space:create_index('primary', { type = 'tree'})
+---
+...
+box.schema.user.grant('guest', 'read', 'space', 'tweedledum')
+---
+...
+for i=1,5 do space:insert{i} end
+---
+...
+LISTEN = require('uri').parse(box.cfg.listen)
+---
+...
+LISTEN ~= nil
+---
+- true
+...
+conn = (require 'net.box').connect(LISTEN.host, LISTEN.service)
+---
+...
+conn.space[space.id]:select(3, { iterator = 'GE' })
+---
+- - [3]
+  - [4]
+  - [5]
+...
+conn.space[space.id]:select(3, { iterator = 'LE' })
+---
+- - [3]
+  - [2]
+  - [1]
+...
+conn.space[space.id]:select(3, { iterator = 'GT' })
+---
+- - [4]
+  - [5]
+...
+conn.space[space.id]:select(3, { iterator = 'LT' })
+---
+- - [2]
+  - [1]
+...
+conn:close()
+---
+...
+space:drop()
+---
+...

@@ -1,0 +1,596 @@
+/*
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
+ *
+ * Redistribution and use in source and binary forms, with or
+ * without modification, are permitted provided that the following
+ * conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above
+ *    copyright notice, this list of conditions and the
+ *    following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above
+ *    copyright notice, this list of conditions and the following
+ *    disclaimer in the documentation and/or other materials
+ *    provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+ * <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+ * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+#include "memtx_bitset.h"
+
+#include <string.h>
+#include <small/mempool.h>
+
+#include "trivia/util.h"
+
+#include "bitset/index.h"
+#include "fiber.h"
+#include "index.h"
+#include "schema.h"
+#include "tuple.h"
+#include "txn.h"
+#include "memtx_tx.h"
+#include "memtx_engine.h"
+#include "memtx_index.h"
+
+struct memtx_bitset_index {
+	struct index base;
+	struct tt_bitset_index index;
+#ifndef OLD_GOOD_BITSET
+	struct matras *id_to_tuple;
+	struct mh_bitset_index_t *tuple_to_id;
+	uint32_t spare_id;
+#endif /*#ifndef OLD_GOOD_BITSET*/
+};
+
+#ifndef OLD_GOOD_BITSET
+#include "small/matras.h"
+struct mh_bitset_index_t;
+
+struct bitset_hash_entry {
+	struct tuple *tuple;
+	uint32_t id;
+};
+#define mh_int_t uint32_t
+#define mh_arg_t int
+
+#if UINTPTR_MAX == 0xffffffff
+#define mh_hash_key(a, arg) ((uintptr_t)(a))
+#else
+#define mh_hash_key(a, arg) ((uint32_t)(((uintptr_t)(a)) >> 33 ^ ((uintptr_t)(a)) ^ ((uintptr_t)(a)) << 11))
+#endif
+#define mh_hash(a, arg) mh_hash_key((a)->tuple, arg)
+#define mh_cmp(a, b, arg) ((a)->tuple != (b)->tuple)
+#define mh_cmp_key(a, b, arg) ((a) != (b)->tuple)
+
+#define mh_node_t struct bitset_hash_entry
+#define mh_key_t struct tuple *
+#define mh_name _bitset_index
+#define MH_SOURCE 1
+#include <salad/mhash.h>
+
+enum {
+	SPARE_ID_END = 0xFFFFFFFF
+};
+
+static int
+memtx_bitset_index_register_tuple(struct memtx_bitset_index *index,
+				  struct tuple *tuple)
+{
+	uint32_t id;
+	struct tuple **place;
+	if (index->spare_id != SPARE_ID_END) {
+		id = index->spare_id;
+		void *mem = matras_get(index->id_to_tuple, id);
+		index->spare_id = *(uint32_t *)mem;
+		place = (struct tuple **)mem;
+	} else {
+		place = (struct tuple **)matras_alloc(index->id_to_tuple, &id);
+		if (place == NULL)
+			return -1;
+	}
+	*place = tuple;
+
+	struct bitset_hash_entry entry;
+	entry.id = id;
+	entry.tuple = tuple;
+	mh_bitset_index_put(index->tuple_to_id, &entry, 0, 0);
+	return 0;
+}
+
+static void
+memtx_bitset_index_unregister_tuple(struct memtx_bitset_index *index,
+				    struct tuple *tuple)
+{
+
+	uint32_t k = mh_bitset_index_find(index->tuple_to_id, tuple, 0);
+	struct bitset_hash_entry *e = mh_bitset_index_node(index->tuple_to_id, k);
+	void *mem = matras_get(index->id_to_tuple, e->id);
+	*(uint32_t *)mem = index->spare_id;
+	index->spare_id = e->id;
+	mh_bitset_index_del(index->tuple_to_id, k, 0);
+}
+
+/**
+ * Get the value of @a tuple in @a index. Return false if the tuple is not
+ * in the index.
+ */
+static bool
+memtx_bitset_index_tuple_to_value(struct memtx_bitset_index *index,
+				  struct tuple *tuple, uint32_t *value)
+{
+	uint32_t k = mh_bitset_index_find(index->tuple_to_id, tuple, 0);
+	if (k == mh_end(index->tuple_to_id))
+		return false;
+	*value = mh_bitset_index_node(index->tuple_to_id, k)->id;
+	return true;
+}
+
+static struct tuple *
+memtx_bitset_index_value_to_tuple(struct memtx_bitset_index *index,
+				  uint32_t value)
+{
+	void *mem = matras_get(index->id_to_tuple, value);
+	return *(struct tuple **)mem;
+}
+#else /* #ifndef OLD_GOOD_BITSET */
+static inline struct tuple *
+value_to_tuple(size_t value);
+
+static inline size_t
+tuple_to_value(struct tuple *tuple)
+{
+	/*
+	 * @todo small_ptr_compress() is broken
+	 * https://github.com/tarantool/tarantool/issues/49
+	 */
+	/* size_t value = small_ptr_compress(tuple); */
+	size_t value = (intptr_t) tuple >> 2;
+	assert(value_to_tuple(value) == tuple);
+	return value;
+}
+
+static inline struct tuple *
+value_to_tuple(size_t value)
+{
+	/* return (struct tuple *) salloc_ptr_from_index(value); */
+	return (struct tuple *) (value << 2);
+}
+#endif /* #ifndef OLD_GOOD_BITSET */
+
+struct bitset_index_iterator {
+	struct iterator base; /* Must be the first member. */
+	struct tt_bitset_iterator bitset_it;
+	/** Memory pool the iterator was allocated from. */
+	struct mempool *pool;
+};
+
+static_assert(sizeof(struct bitset_index_iterator) <= MEMTX_ITERATOR_SIZE,
+	      "sizeof(struct bitset_index_iterator) must be less than or equal "
+	      "to MEMTX_ITERATOR_SIZE");
+
+static struct bitset_index_iterator *
+bitset_index_iterator(struct iterator *it)
+{
+	return (struct bitset_index_iterator *) it;
+}
+
+static void
+bitset_index_iterator_free(struct iterator *iterator)
+{
+	assert(iterator->free == bitset_index_iterator_free);
+	struct bitset_index_iterator *it = bitset_index_iterator(iterator);
+
+	tt_bitset_iterator_destroy(&it->bitset_it);
+	mempool_free(it->pool, it);
+}
+
+static int
+bitset_index_iterator_next(struct iterator *iterator, struct tuple **ret)
+{
+	assert(iterator->free == bitset_index_iterator_free);
+	struct bitset_index_iterator *it = bitset_index_iterator(iterator);
+	struct space *space;
+	struct index *index_base;
+	index_weak_ref_get_checked(&iterator->index_ref, &space, &index_base);
+	do {
+		size_t value = tt_bitset_iterator_next(&it->bitset_it);
+		if (value == SIZE_MAX) {
+			*ret = NULL;
+			return 0;
+		}
+#ifndef OLD_GOOD_BITSET
+		struct memtx_bitset_index *index =
+			(struct memtx_bitset_index *)index_base;
+		struct tuple *tuple =
+			memtx_bitset_index_value_to_tuple(index, value);
+#else /* #ifndef OLD_GOOD_BITSET */
+		struct tuple *tuple = value_to_tuple(value);
+#endif /* #ifndef OLD_GOOD_BITSET */
+		struct txn *txn = in_txn();
+		*ret = memtx_tx_tuple_clarify(txn, space, index_base, tuple);
+	} while (*ret == NULL);
+
+	return 0;
+}
+
+static void
+memtx_bitset_index_destroy(struct index *base)
+{
+	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
+	tt_bitset_index_destroy(&index->index);
+#ifndef OLD_GOOD_BITSET
+	mh_bitset_index_delete(index->tuple_to_id);
+	matras_destroy(index->id_to_tuple);
+	free(index->id_to_tuple);
+#endif /* #ifndef OLD_GOOD_BITSET */
+	free(index);
+}
+
+static ssize_t
+memtx_bitset_index_size(struct index *base)
+{
+	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
+	struct space *space = space_by_id(base->def->space_id);
+	/* Substract invisible count. */
+	return tt_bitset_index_size(&index->index) -
+	       memtx_tx_track_count(in_txn(), space, base, ITER_GE, NULL, 0);
+}
+
+static ssize_t
+memtx_bitset_index_bsize(struct index *base)
+{
+	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
+	size_t result = 0;
+	result += tt_bitset_index_bsize(&index->index);
+#ifndef OLD_GOOD_BITSET
+	result += matras_extent_count(index->id_to_tuple) * MEMTX_EXTENT_SIZE;
+	result += mh_bitset_index_memsize(index->tuple_to_id);
+#endif /* #ifndef OLD_GOOD_BITSET */
+	return result;
+}
+
+static inline const char *
+make_key(const char *field, uint32_t *key_len)
+{
+	static uint64_t u64key;
+	switch (mp_typeof(*field)) {
+	case MP_UINT:
+		u64key = mp_decode_uint(&field);
+		*key_len = sizeof(uint64_t);
+		return (const char *) &u64key;
+		break;
+	case MP_STR:
+		return mp_decode_str(&field, key_len);
+		break;
+	case MP_BIN:
+		return mp_decode_bin(&field, key_len);
+		break;
+	default:
+		*key_len = 0;
+		unreachable();
+		return NULL;
+	}
+}
+
+/** Delete one exact tuple from the index. */
+static int
+memtx_bitset_index_delete(struct index *base, struct memtx_index_entry entry,
+			  struct memtx_index_entry *result)
+{
+	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
+	*result = memtx_index_entry_null;
+	assert(entry.tuple != NULL);
+#ifndef OLD_GOOD_BITSET
+	uint32_t value;
+	if (!memtx_bitset_index_tuple_to_value(index, entry.tuple, &value))
+		return 0;
+	assert(tt_bitset_index_contains_value(&index->index, (size_t)value));
+#else /* #ifndef OLD_GOOD_BITSET */
+	size_t value = tuple_to_value(entry.tuple);
+	if (!tt_bitset_index_contains_value(&index->index, value))
+		return 0;
+#endif /* #ifndef OLD_GOOD_BITSET */
+	result->tuple = entry.tuple;
+	tt_bitset_index_remove_value(&index->index, value);
+#ifndef OLD_GOOD_BITSET
+	memtx_bitset_index_unregister_tuple(index, entry.tuple);
+#endif /* #ifndef OLD_GOOD_BITSET */
+	return 0;
+}
+
+/**
+ * Replace an old tuple with a new tuple in the index.
+ *
+ * BITSET values use numeric IDs that may be retained by concurrent iterators.
+ * Replacing a tuple must reuse the old ID atomically so that an iterator never
+ * resolves a retained ID through a free-list slot.
+ */
+static int
+memtx_bitset_index_replace(struct index *base, struct tuple *old_tuple,
+			   struct memtx_index_entry new_entry,
+			   enum dup_replace_mode mode,
+			   struct memtx_index_entry *result,
+			   struct memtx_index_entry *successor)
+{
+	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
+
+	/* BITSET index doesn't support ordering. */
+	*successor = memtx_index_entry_null;
+
+	assert(!base->def->opts.is_unique);
+	assert(!base->def->key_def->is_multikey);
+	struct tuple *new_tuple = new_entry.tuple;
+	assert(new_tuple != NULL);
+	(void) mode;
+
+	*result = memtx_index_entry_null;
+	if (old_tuple != NULL) {
+		struct memtx_index_entry old_entry;
+		old_entry.tuple = old_tuple;
+		old_entry.key_data = HINT_NONE;
+		VERIFY(memtx_bitset_index_delete(base, old_entry, result) == 0);
+	}
+
+	const char *field = tuple_field_by_part(new_tuple,
+						base->def->key_def->parts,
+						MULTIKEY_NONE);
+	uint32_t key_len;
+	const void *key = make_key(field, &key_len);
+#ifndef OLD_GOOD_BITSET
+	if (memtx_bitset_index_register_tuple(index, new_tuple) != 0) {
+		/*
+		 * If the old tuple was removed, its ID is first on the spare
+		 * list and registration cannot fail.
+		 */
+		assert(result->tuple == NULL);
+		return -1;
+	}
+	uint32_t value;
+	if (!memtx_bitset_index_tuple_to_value(index, new_tuple, &value))
+		unreachable();
+#else /* #ifndef OLD_GOOD_BITSET */
+	uint32_t value = tuple_to_value(new_tuple);
+#endif /* #ifndef OLD_GOOD_BITSET */
+	if (tt_bitset_index_insert(&index->index, key, key_len, value) < 0) {
+#ifndef OLD_GOOD_BITSET
+		memtx_bitset_index_unregister_tuple(index, new_tuple);
+#endif /* #ifndef OLD_GOOD_BITSET */
+		diag_set(OutOfMemory, 0, "memtx_bitset_index", "insert");
+		return -1;
+	}
+	return 0;
+}
+
+/** Implementation of create_iterator for memtx bitset index. */
+static struct iterator *
+memtx_bitset_index_create_iterator(struct index *base, enum iterator_type type,
+				   const char *key, uint32_t part_count,
+				   const char *pos)
+{
+	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
+	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
+
+	assert(part_count == 0 || key != NULL);
+	(void) part_count;
+	if (pos != NULL) {
+		diag_set(UnsupportedIndexFeature, base->def, "pagination");
+		return NULL;
+	}
+
+	struct bitset_index_iterator *it = (struct bitset_index_iterator *)
+		mempool_alloc(&memtx->iterator_pool);
+	if (!it) {
+		diag_set(OutOfMemory, sizeof(*it),
+			 "memtx_bitset_index", "iterator");
+		return NULL;
+	}
+
+	iterator_create(&it->base, base);
+	it->pool = &memtx->iterator_pool;
+	it->base.next_internal = bitset_index_iterator_next;
+	it->base.next = memtx_iterator_next;
+	it->base.position = generic_iterator_position;
+	it->base.free = bitset_index_iterator_free;
+
+	tt_bitset_iterator_create(&it->bitset_it, realloc_with_free);
+	const void *bitset_key = NULL;
+	uint32_t bitset_key_size = 0;
+
+	if (type != ITER_ALL) {
+		assert(part_count == 1);
+		bitset_key = make_key(key, &bitset_key_size);
+	}
+
+	struct tt_bitset_expr expr;
+	tt_bitset_expr_create(&expr, realloc_with_free);
+
+	int rc = 0;
+	switch (type) {
+	case ITER_ALL:
+		rc = tt_bitset_index_expr_all(&expr);
+		break;
+	case ITER_EQ:
+		rc = tt_bitset_index_expr_equals(&expr, bitset_key,
+						 bitset_key_size);
+		break;
+	case ITER_BITS_ALL_SET:
+		rc = tt_bitset_index_expr_all_set(&expr, bitset_key,
+						  bitset_key_size);
+		break;
+	case ITER_BITS_ALL_NOT_SET:
+		rc = tt_bitset_index_expr_all_not_set(&expr, bitset_key,
+						      bitset_key_size);
+		break;
+	case ITER_BITS_ANY_SET:
+		rc = tt_bitset_index_expr_any_set(&expr, bitset_key,
+						  bitset_key_size);
+		break;
+	default:
+		unreachable();
+	}
+
+	if (rc != 0) {
+		diag_set(OutOfMemory, 0, "memtx_bitset_index",
+			 "iterator expression");
+		goto fail;
+	}
+
+	if (tt_bitset_index_init_iterator(&index->index, &it->bitset_it,
+					  &expr) != 0) {
+		diag_set(OutOfMemory, 0, "memtx_bitset_index",
+			 "iterator state");
+		goto fail;
+	}
+
+	tt_bitset_expr_destroy(&expr);
+	return (struct iterator *)it;
+fail:
+	tt_bitset_expr_destroy(&expr);
+	mempool_free(&memtx->iterator_pool, it);
+	return NULL;
+}
+
+static ssize_t
+memtx_bitset_index_count(struct index *base, enum iterator_type type,
+			 const char *key, uint32_t part_count)
+{
+	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
+
+	if (type == ITER_ALL)
+		return memtx_bitset_index_size(base);
+
+	assert(part_count == 1); /* checked by iterator_validate() */
+	uint32_t bitset_key_size = 0;
+	const void *bitset_key = make_key(key, &bitset_key_size);
+	struct bit_iterator bit_it;
+	size_t bit;
+	if (type == ITER_BITS_ANY_SET) {
+		/**
+		 * Optimization: for an empty key return 0.
+		 */
+		bit_iterator_init(&bit_it, bitset_key, bitset_key_size, true);
+		bit = bit_iterator_next(&bit_it);
+		if (bit == SIZE_MAX)
+			return 0;
+		/**
+		 * Optimiation: for a single bit key use
+		 * bitset_index_count().
+		 */
+		if (bit_iterator_next(&bit_it) == SIZE_MAX)
+			return tt_bitset_index_count(&index->index, bit);
+	} else if (type == ITER_BITS_ALL_SET) {
+		/**
+		 * Optimization: for an empty key return 0.
+		 */
+		bit_iterator_init(&bit_it, bitset_key, bitset_key_size, true);
+		bit = bit_iterator_next(&bit_it);
+		if (bit == SIZE_MAX)
+			return 0;
+		/**
+		 * Optimiation: for a single bit key use
+		 * bitset_index_count().
+		 */
+		if (bit_iterator_next(&bit_it) == SIZE_MAX)
+			return tt_bitset_index_count(&index->index, bit);
+	} else if (type == ITER_BITS_ALL_NOT_SET) {
+		/**
+		 * Optimization: for an empty key return the number of items
+		 * in the index.
+		 */
+		bit_iterator_init(&bit_it, bitset_key, bitset_key_size, true);
+		bit = bit_iterator_next(&bit_it);
+		if (bit == SIZE_MAX)
+			return tt_bitset_index_size(&index->index);
+		/**
+		 * Optimiation: for the single bit key use
+		 * bitset_index_count().
+		 */
+		if (bit_iterator_next(&bit_it) == SIZE_MAX)
+			return tt_bitset_index_size(&index->index) -
+				tt_bitset_index_count(&index->index, bit);
+	}
+
+	/* Call generic method */
+	return generic_index_count(base, type, key, part_count);
+}
+
+static const struct index_vtab memtx_bitset_index_vtab_base = {
+	/* .destroy = */ memtx_bitset_index_destroy,
+	/* .commit_create = */ generic_index_commit_create,
+	/* .abort_create = */ generic_index_abort_create,
+	/* .commit_modify = */ generic_index_commit_modify,
+	/* .commit_drop = */ generic_index_commit_drop,
+	/* .update_def = */ generic_index_update_def,
+	/* .depends_on_pk = */ generic_index_depends_on_pk,
+	/* .def_change_requires_rebuild = */
+		memtx_index_def_change_requires_rebuild,
+	/* .size = */ memtx_bitset_index_size,
+	/* .bsize = */ memtx_bitset_index_bsize,
+	/* .quantile = */ generic_index_quantile,
+	/* .min = */ generic_index_min,
+	/* .max = */ generic_index_max,
+	/* .random = */ generic_index_random,
+	/* .count = */ memtx_bitset_index_count,
+	/* .get = */ generic_index_get,
+	/* .create_iterator = */ memtx_bitset_index_create_iterator,
+	/* .create_iterator_with_offset = */
+	generic_index_create_iterator_with_offset,
+	/* .create_arrow_stream = */ generic_index_create_arrow_stream,
+	/* .create_read_view = */ generic_index_create_read_view,
+	/* .info = */ generic_index_info,
+	/* .stat = */ generic_index_stat,
+	/* .compact = */ generic_index_compact,
+	/* .reset_stat = */ generic_index_reset_stat,
+};
+
+static const struct memtx_index_vtab memtx_bitset_index_vtab = {
+	/* .base = */ memtx_bitset_index_vtab_base,
+	/* .get_internal = */ generic_memtx_index_get_internal,
+	/* .replace_entry = */ memtx_bitset_index_replace,
+	/* .delete_entry = */ memtx_bitset_index_delete,
+	/* .begin_build = */ generic_memtx_index_begin_build,
+	/* .reserve = */ generic_memtx_index_reserve,
+	/* .build_next = */ generic_memtx_index_build_next,
+	/* .end_build = */ generic_memtx_index_end_build,
+};
+
+struct index *
+memtx_bitset_index_new(struct memtx_engine *memtx, struct index_def *def)
+{
+	assert(def->iid > 0);
+	assert(!def->opts.is_unique);
+
+	struct memtx_bitset_index *index =
+		(struct memtx_bitset_index *)xcalloc(1, sizeof(*index));
+	index_create(&index->base, (struct engine *)memtx,
+		     (struct index_vtab *)&memtx_bitset_index_vtab, def);
+
+#ifndef OLD_GOOD_BITSET
+	index->spare_id = SPARE_ID_END;
+	index->id_to_tuple = (struct matras *)malloc(sizeof(*index->id_to_tuple));
+	if (index->id_to_tuple == NULL)
+		panic("failed to allocate memtx bitset index");
+	matras_create(index->id_to_tuple, sizeof(struct tuple *),
+		      &memtx->index_extent_allocator,
+		      &memtx->index_extent_stats);
+
+	index->tuple_to_id = mh_bitset_index_new();
+#endif /* #ifndef OLD_GOOD_BITSET */
+
+	tt_bitset_index_create(&index->index, realloc_with_free);
+	return &index->base;
+}

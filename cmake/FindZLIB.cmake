@@ -1,0 +1,28 @@
+find_path(ZLIB_INCLUDE_DIR
+  NAMES zlib.h
+)
+
+if(BUILD_STATIC)
+    set(ZLIB_LIB_NAME libz.a)
+else()
+    set(ZLIB_LIB_NAME z)
+endif()
+
+find_library(ZLIB_LIBRARY
+    NAMES ${ZLIB_LIB_NAME}
+)
+
+set(ZLIB_INCLUDE_DIRS "${ZLIB_INCLUDE_DIR}")
+set(ZLIB_LIBRARIES "${ZLIB_LIBRARY}")
+
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(ZLIB REQUIRED_VARS
+    ZLIB_LIBRARY ZLIB_INCLUDE_DIR)
+
+mark_as_advanced(ZLIB_LIBRARY ZLIB_INCLUDE_DIR)
+
+add_library(ZLIB::ZLIB UNKNOWN IMPORTED)
+set_target_properties(ZLIB::ZLIB PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES "${ZLIB_INCLUDE_DIRS}")
+set_property(TARGET ZLIB::ZLIB APPEND PROPERTY
+    IMPORTED_LOCATION "${ZLIB_LIBRARY}")

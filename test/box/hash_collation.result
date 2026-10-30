@@ -1,0 +1,62 @@
+-- test-run result file version 2
+-------------------------------------------------------------------------------
+-- Collation test
+-------------------------------------------------------------------------------
+
+hash = box.schema.space.create('tweedledum')
+ | ---
+ | ...
+tmp = hash:create_index('primary', { type = 'hash', parts = {{1, 'string', collation = 'unicode_ci'}}, unique = true})
+ | ---
+ | ...
+tmp = hash:create_index('secondary', { type = 'hash', parts = {{2, 'scalar', collation = 'unicode_ci'}}, unique = true})
+ | ---
+ | ...
+
+hash:insert{'Ёж', 'Hedgehog'}
+ | ---
+ | - ['Ёж', 'Hedgehog']
+ | ...
+hash:insert{'Ёлка', 'Spruce'}
+ | ---
+ | - ['Ёлка', 'Spruce']
+ | ...
+hash:insert{'Jogurt', 'Йогурт'}
+ | ---
+ | - ['Jogurt', 'Йогурт']
+ | ...
+hash:insert{'Один', 1}
+ | ---
+ | - ['Один', 1]
+ | ...
+
+hash.index.primary:get('ёж')
+ | ---
+ | - ['Ёж', 'Hedgehog']
+ | ...
+hash.index.primary:get('елка')
+ | ---
+ | - ['Ёлка', 'Spruce']
+ | ...
+hash.index.secondary:get('spruce')
+ | ---
+ | - ['Ёлка', 'Spruce']
+ | ...
+hash.index.secondary:get('йогурт')
+ | ---
+ | - ['Jogurt', 'Йогурт']
+ | ...
+hash.index.secondary:get(1)
+ | ---
+ | - ['Один', 1]
+ | ...
+hash.index.secondary:get('иогурт')
+ | ---
+ | ...
+hash.index.secondary:get(2)
+ | ---
+ | ...
+
+hash:drop()
+ | ---
+ | ...

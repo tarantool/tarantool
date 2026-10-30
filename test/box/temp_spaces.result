@@ -1,0 +1,125 @@
+-- data-temporary spaces
+_space = box.space._space
+---
+...
+-- not a data-temporary
+FLAGS = 6
+---
+...
+s = box.schema.space.create('t', { temporary = true })
+---
+...
+s.temporary
+---
+- true
+...
+s:drop()
+---
+...
+-- not a data-temporary, too
+s = box.schema.space.create('t', { temporary = false })
+---
+...
+s.temporary
+---
+- false
+...
+s:drop()
+---
+...
+-- not a data-temporary, too
+s = box.schema.space.create('t', { temporary = nil })
+---
+...
+s.temporary
+---
+- false
+...
+s:drop()
+---
+...
+s = box.schema.space.create('t', { temporary = true })
+---
+...
+index = s:create_index('primary', { type = 'hash' })
+---
+...
+s:insert{1, 2, 3}
+---
+- [1, 2, 3]
+...
+s:get{1}
+---
+- [1, 2, 3]
+...
+s:len()
+---
+- 1
+...
+_ = _space:update(s.id, {{'=', FLAGS, {temporary = true}}})
+---
+...
+s.temporary
+---
+- true
+...
+_ = _space:update(s.id, {{'=', FLAGS, {temporary = false}}})
+---
+- error: 'Can''t modify space ''t'': can not change data-temporariness on a non-empty
+    space'
+...
+s.temporary
+---
+- true
+...
+-- check that data-temporary space can be modified in read-only mode (gh-1378)
+box.cfg{read_only=true}
+---
+...
+box.cfg.read_only
+---
+- true
+...
+s:insert{2, 3, 4}
+---
+- [2, 3, 4]
+...
+s:get{2}
+---
+- [2, 3, 4]
+...
+s:len()
+---
+- 2
+...
+box.cfg{read_only=false}
+---
+...
+box.cfg.read_only
+---
+- false
+...
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+test_run:cmd('restart server default')
+s = box.space.t
+---
+...
+s:len()
+---
+- 0
+...
+s.temporary
+---
+- true
+...
+s:drop()
+---
+...
+s = nil
+---
+...

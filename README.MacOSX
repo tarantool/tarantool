@@ -1,0 +1,96 @@
+Target OS: MacOS X "High Sierra"
+
+In the Homebrew environment, you can download the latest tarantool package
+with a single command:
+
+brew install tarantool
+
+This downloads an already built release version of tarantool.
+
+If you want to manually build tarantool from sources, read the following
+instructions on how to do it using either the default Apple developer software
+(Xcode Tools), or external package managers (Homebrew or MacPorts).
+
+1. Install necessary packages
+-------------
+
+For the default Xcode Tools by Apple:
+sudo xcode-select --install
+sudo xcode-select -switch /Applications/Xcode.app/Contents/Developer
+
+For Homebrew:
+brew install openssl readline curl icu4c libiconv zlib cmake python3
+
+For MacPorts:
+port install binutils cmake ncurses zlib readline openssl python37
+
+
+2. Install test-required packages and modules for Python 3.x
+-------------
+
+You need: pyYAML, python-daemon, gevent, six
+
+To install these packages, we recommend easy_install, pip, or setup.py.
+
+For easy_install:
+sudo easy_install pyyaml
+sudo easy_install argparse
+sudo easy_install gevent
+sudo easy_install six
+
+For pip:
+sudo pip install -r test-run/requirements.txt
+
+For setup.py:
+tar -xzf module.tar.gz
+cd module-dir
+sudo python setup.py install
+
+where 'module' is the name of the installed python module and 'module-dir'
+is the name of the directory where the module's archive is deflated into.
+
+3. Download & build tarantool source code
+-------------
+
+Download tarantool source code from the repository at GitHub:
+
+git clone https://github.com/tarantool/tarantool.git --recursive
+git submodule update --init
+
+Create a build directory and build the tarantool project manually, for example:
+
+cd tarantool
+mkdir build && cd build
+cmake .. \
+-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+-DCURL_INCLUDE_DIR=$(xcode-select --sdk macosx --show-sdk-path)/usr/include \
+-DCURL_LIBRARY=/usr/lib/libcurl.dylib \
+-DDARWIN_BUILD_TYPE=Ports
+make
+
+In this example, we are making a developer's build (-DCMAKE_BUILD_TYPE=RelWithDebInfo)
+with cmake using MacPorts (-DDARWIN_BUILD_TYPE=Ports). To build a release version,
+set -DCMAKE_BUILD_TYPE=Release.
+
+Remember also to set up the cmake's flag -DDARWIN_BUILD_TYPE depending on the package
+manager you use ('-DDARWIN_BUILD_TYPE=None' for Xcode Tools and Homebrew, and
+'-DDARWIN_BUILD_TYPE=Ports' for MacPorts). It is set to None by default.
+
+Some Homebrew formulas are "keg-only", which means that they're not
+symlinked into `/usr/local`. So, if you have used Homebrew for
+dependencies, you would need following flags for it to find `openssl`
+and GNU `readline`:
+
+-DOPENSSL_ROOT_DIR=$(brew --prefix openssl) -DREADLINE_ROOT=$(brew --prefix readline)
+
+4. Run tarantool test suite
+-------------
+
+To run all tests, execute:
+
+make test
+
+-- EOF
+
+
+

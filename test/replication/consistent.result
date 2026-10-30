@@ -1,0 +1,532 @@
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+engine = test_run:get_cfg('engine')
+---
+...
+--# create server replica with rpl_master=default, script='replication/replica.lua'
+--# start server replica
+--# set connection default
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+---
+...
+-- Wait until the grant reaches the replica
+--# set connection replica
+while box.space['_priv']:len() < 1 do box.fiber.sleep(0.01) end
+---
+...
+--# setopt delimiter ';'
+--# set connection default, replica
+do
+    begin_lsn = -1
+    function _set_pri_lsn(_lsn)
+        begin_lsn = _lsn
+    end
+    function _print_lsn()
+        return (box.info.lsn - begin_lsn + 1)
+    end
+    function _insert(_begin, _end, msg)
+        local a = {}
+        for i = _begin, _end do
+            table.insert(a, box.space[0]:insert{i, msg..' - '..i})
+        end
+        return unpack(a)
+    end
+    function _select(_begin, _end)
+        local a = {}
+        while box.info.lsn < begin_lsn + _end + 2 do
+            box.fiber.sleep(0.001)
+        end
+        for i = _begin, _end do
+            table.insert(a, box.space[0]:get{i})
+        end
+        return unpack(a)
+    end
+end;
+---
+...
+--# setopt delimiter ''
+--# set connection default
+--# set variable replica_port to 'replica.primary_port'
+-- set begin lsn on master and replica.
+begin_lsn = box.info.lsn
+---
+...
+a = box.net.box.new('127.0.0.1', replica_port)
+---
+...
+a:call('_set_pri_lsn', box.info.lsn)
+---
+- []
+...
+a:close()
+---
+- true
+...
+s = box.schema.space.create('tweedledum', {id = 0, engine = engine});
+---
+...
+-- vinyl does not support hash index
+index = s:create_index('primary', {type = (engine == 'vinyl' and 'tree' or 'hash') })
+---
+...
+_insert(1, 10, 'master')
+---
+- [1, 'master - 1']
+- [2, 'master - 2']
+- [3, 'master - 3']
+- [4, 'master - 4']
+- [5, 'master - 5']
+- [6, 'master - 6']
+- [7, 'master - 7']
+- [8, 'master - 8']
+- [9, 'master - 9']
+- [10, 'master - 10']
+...
+_select(1, 10)
+---
+- [1, 'master - 1']
+- [2, 'master - 2']
+- [3, 'master - 3']
+- [4, 'master - 4']
+- [5, 'master - 5']
+- [6, 'master - 6']
+- [7, 'master - 7']
+- [8, 'master - 8']
+- [9, 'master - 9']
+- [10, 'master - 10']
+...
+--# set connection replica
+_select(1, 10)
+---
+- [1, 'master - 1']
+- [2, 'master - 2']
+- [3, 'master - 3']
+- [4, 'master - 4']
+- [5, 'master - 5']
+- [6, 'master - 6']
+- [7, 'master - 7']
+- [8, 'master - 8']
+- [9, 'master - 9']
+- [10, 'master - 10']
+...
+--# set connection default
+-- Master LSN:
+_print_lsn()
+---
+- 13
+...
+--# set connection replica
+-- Replica LSN:
+_print_lsn()
+---
+- 13
+...
+-----------------------------
+--  Master LSN > Replica LSN
+-----------------------------
+--------------------
+-- Replica to Master
+--------------------
+old_replication_source = box.cfg.replication_source
+---
+...
+box.cfg{replication_source=""}
+---
+...
+--# set connection default
+_insert(11, 20, 'master')
+---
+- [11, 'master - 11']
+- [12, 'master - 12']
+- [13, 'master - 13']
+- [14, 'master - 14']
+- [15, 'master - 15']
+- [16, 'master - 16']
+- [17, 'master - 17']
+- [18, 'master - 18']
+- [19, 'master - 19']
+- [20, 'master - 20']
+...
+_select(11, 20)
+---
+- [11, 'master - 11']
+- [12, 'master - 12']
+- [13, 'master - 13']
+- [14, 'master - 14']
+- [15, 'master - 15']
+- [16, 'master - 16']
+- [17, 'master - 17']
+- [18, 'master - 18']
+- [19, 'master - 19']
+- [20, 'master - 20']
+...
+--# set connection replica
+_insert (11, 15, 'replica')
+---
+- [11, 'replica - 11']
+- [12, 'replica - 12']
+- [13, 'replica - 13']
+- [14, 'replica - 14']
+- [15, 'replica - 15']
+...
+_select (11, 15)
+---
+- [11, 'replica - 11']
+- [12, 'replica - 12']
+- [13, 'replica - 13']
+- [14, 'replica - 14']
+- [15, 'replica - 15']
+...
+--# set connection default
+-- Master LSN:
+_print_lsn()
+---
+- 23
+...
+--# set connection replica
+-- Replica LSN:
+_print_lsn()
+---
+- 18
+...
+-------------------
+-- rollback Replica
+-------------------
+box.cfg{replication_source=old_replication_source}
+---
+...
+_select(11, 20)
+---
+- [11, 'replica - 11']
+- [12, 'replica - 12']
+- [13, 'replica - 13']
+- [14, 'replica - 14']
+- [15, 'replica - 15']
+- [16, 'master - 16']
+- [17, 'master - 17']
+- [18, 'master - 18']
+- [19, 'master - 19']
+- [20, 'master - 20']
+...
+--# set connection default
+-- Master LSN:
+_print_lsn()
+---
+- 23
+...
+--# set connection replica
+-- Replica LSN:
+_print_lsn()
+---
+- 23
+...
+------------------------------
+--  Master LSN == Replica LSN
+------------------------------
+--------------------
+-- Replica to Master
+--------------------
+box.cfg{replication_source=""}
+---
+...
+--# set connection default
+_insert(21, 30, 'master')
+---
+- [21, 'master - 21']
+- [22, 'master - 22']
+- [23, 'master - 23']
+- [24, 'master - 24']
+- [25, 'master - 25']
+- [26, 'master - 26']
+- [27, 'master - 27']
+- [28, 'master - 28']
+- [29, 'master - 29']
+- [30, 'master - 30']
+...
+_select(21, 30)
+---
+- [21, 'master - 21']
+- [22, 'master - 22']
+- [23, 'master - 23']
+- [24, 'master - 24']
+- [25, 'master - 25']
+- [26, 'master - 26']
+- [27, 'master - 27']
+- [28, 'master - 28']
+- [29, 'master - 29']
+- [30, 'master - 30']
+...
+--# set connection replica
+_insert(21, 30, 'replica')
+---
+- [21, 'replica - 21']
+- [22, 'replica - 22']
+- [23, 'replica - 23']
+- [24, 'replica - 24']
+- [25, 'replica - 25']
+- [26, 'replica - 26']
+- [27, 'replica - 27']
+- [28, 'replica - 28']
+- [29, 'replica - 29']
+- [30, 'replica - 30']
+...
+_select(21, 30)
+---
+- [21, 'replica - 21']
+- [22, 'replica - 22']
+- [23, 'replica - 23']
+- [24, 'replica - 24']
+- [25, 'replica - 25']
+- [26, 'replica - 26']
+- [27, 'replica - 27']
+- [28, 'replica - 28']
+- [29, 'replica - 29']
+- [30, 'replica - 30']
+...
+--# set connection default
+-- Master LSN:
+_print_lsn()
+---
+- 33
+...
+--# set connection replica
+-- Replica LSN:
+_print_lsn()
+---
+- 33
+...
+-------------------
+-- rollback Replica
+-------------------
+box.cfg{replication_source=old_replication_source}
+---
+...
+_select(21, 30)
+---
+- [21, 'replica - 21']
+- [22, 'replica - 22']
+- [23, 'replica - 23']
+- [24, 'replica - 24']
+- [25, 'replica - 25']
+- [26, 'replica - 26']
+- [27, 'replica - 27']
+- [28, 'replica - 28']
+- [29, 'replica - 29']
+- [30, 'replica - 30']
+...
+--# set connection default
+-- Master LSN:
+_print_lsn()
+---
+- 33
+...
+--# set connection replica
+-- Replica LSN:
+_print_lsn()
+---
+- 33
+...
+-----------------------------
+--  Master LSN < Replica LSN
+-----------------------------
+--------------------
+-- Replica to Master
+--------------------
+box.cfg{replication_source=""}
+---
+...
+--# set connection default
+_insert(31, 40, 'master')
+---
+- [31, 'master - 31']
+- [32, 'master - 32']
+- [33, 'master - 33']
+- [34, 'master - 34']
+- [35, 'master - 35']
+- [36, 'master - 36']
+- [37, 'master - 37']
+- [38, 'master - 38']
+- [39, 'master - 39']
+- [40, 'master - 40']
+...
+_select(31, 40)
+---
+- [31, 'master - 31']
+- [32, 'master - 32']
+- [33, 'master - 33']
+- [34, 'master - 34']
+- [35, 'master - 35']
+- [36, 'master - 36']
+- [37, 'master - 37']
+- [38, 'master - 38']
+- [39, 'master - 39']
+- [40, 'master - 40']
+...
+--# set connection replica
+_insert(31, 50, 'replica')
+---
+- [31, 'replica - 31']
+- [32, 'replica - 32']
+- [33, 'replica - 33']
+- [34, 'replica - 34']
+- [35, 'replica - 35']
+- [36, 'replica - 36']
+- [37, 'replica - 37']
+- [38, 'replica - 38']
+- [39, 'replica - 39']
+- [40, 'replica - 40']
+- [41, 'replica - 41']
+- [42, 'replica - 42']
+- [43, 'replica - 43']
+- [44, 'replica - 44']
+- [45, 'replica - 45']
+- [46, 'replica - 46']
+- [47, 'replica - 47']
+- [48, 'replica - 48']
+- [49, 'replica - 49']
+- [50, 'replica - 50']
+...
+_select(31, 50)
+---
+- [31, 'replica - 31']
+- [32, 'replica - 32']
+- [33, 'replica - 33']
+- [34, 'replica - 34']
+- [35, 'replica - 35']
+- [36, 'replica - 36']
+- [37, 'replica - 37']
+- [38, 'replica - 38']
+- [39, 'replica - 39']
+- [40, 'replica - 40']
+- [41, 'replica - 41']
+- [42, 'replica - 42']
+- [43, 'replica - 43']
+- [44, 'replica - 44']
+- [45, 'replica - 45']
+- [46, 'replica - 46']
+- [47, 'replica - 47']
+- [48, 'replica - 48']
+- [49, 'replica - 49']
+- [50, 'replica - 50']
+...
+--# set connection default
+-- Master LSN:
+_print_lsn()
+---
+- 43
+...
+--# set connection replica
+-- Replica LSN:
+_print_lsn()
+---
+- 53
+...
+-------------------
+-- rollback Replica
+-------------------
+box.cfg{replication_source=old_replication_source}
+---
+...
+_select(31, 50)
+---
+- [31, 'replica - 31']
+- [32, 'replica - 32']
+- [33, 'replica - 33']
+- [34, 'replica - 34']
+- [35, 'replica - 35']
+- [36, 'replica - 36']
+- [37, 'replica - 37']
+- [38, 'replica - 38']
+- [39, 'replica - 39']
+- [40, 'replica - 40']
+- [41, 'replica - 41']
+- [42, 'replica - 42']
+- [43, 'replica - 43']
+- [44, 'replica - 44']
+- [45, 'replica - 45']
+- [46, 'replica - 46']
+- [47, 'replica - 47']
+- [48, 'replica - 48']
+- [49, 'replica - 49']
+- [50, 'replica - 50']
+...
+--# set connection default
+_insert(41, 60, 'master')
+---
+- [41, 'master - 41']
+- [42, 'master - 42']
+- [43, 'master - 43']
+- [44, 'master - 44']
+- [45, 'master - 45']
+- [46, 'master - 46']
+- [47, 'master - 47']
+- [48, 'master - 48']
+- [49, 'master - 49']
+- [50, 'master - 50']
+- [51, 'master - 51']
+- [52, 'master - 52']
+- [53, 'master - 53']
+- [54, 'master - 54']
+- [55, 'master - 55']
+- [56, 'master - 56']
+- [57, 'master - 57']
+- [58, 'master - 58']
+- [59, 'master - 59']
+- [60, 'master - 60']
+...
+--# set connection replica
+_select(41, 60)
+---
+- [41, 'replica - 41']
+- [42, 'replica - 42']
+- [43, 'replica - 43']
+- [44, 'replica - 44']
+- [45, 'replica - 45']
+- [46, 'replica - 46']
+- [47, 'replica - 47']
+- [48, 'replica - 48']
+- [49, 'replica - 49']
+- [50, 'replica - 50']
+- [51, 'master - 51']
+- [52, 'master - 52']
+- [53, 'master - 53']
+- [54, 'master - 54']
+- [55, 'master - 55']
+- [56, 'master - 56']
+- [57, 'master - 57']
+- [58, 'master - 58']
+- [59, 'master - 59']
+- [60, 'master - 60']
+...
+--# set connection default
+-- Master LSN:
+_print_lsn()
+---
+- 63
+...
+--# set connection replica
+-- Replica LSN:
+_print_lsn()
+---
+- 63
+...
+-- Test that a replica replies with master connection URL on update request
+--# push filter '127.0.0.1:.*' to '127.0.0.1:<port>'
+box.space[0]:insert{0, 'replica is RO'}
+---
+- error: 'Can''t modify data on a replication slave. My master is: 127.0.0.1:<port>
+...
+--# clear filter
+--# stop server replica
+--# cleanup server replica
+--# set connection default
+box.space[0]:drop()
+---
+...
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+---
+...

@@ -1,0 +1,16 @@
+strict = require('strict')
+---
+...
+strict.on()
+---
+...
+if a then a = true end
+---
+- error: '[string "if a then a = true end "]:1: variable ''a'' is not declared'
+...
+strict.off()
+---
+...
+if a then a = true end
+---
+...

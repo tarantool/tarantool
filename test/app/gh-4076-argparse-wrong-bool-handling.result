@@ -1,0 +1,203 @@
+-- test-run result file version 2
+test_run = require('test_run').new()
+ | ---
+ | ...
+test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua:<line>\"]: '")
+ | ---
+ | - true
+ | ...
+argparse = require('internal.argparse').parse
+ | ---
+ | ...
+--
+-- gh-4076: argparse incorrectly processed boolean parameters,
+-- that led to problems with tarantoolctl usage.
+--
+params = {}
+ | ---
+ | ...
+params[1] = {'flag1', 'boolean'}
+ | ---
+ | ...
+params[2] = {'flag2', 'boolean'}
+ | ---
+ | ...
+params[3] = {'flag3', 'boolean'}
+ | ---
+ | ...
+args = {'--flag1', 'positional value', '--flag2'}
+ | ---
+ | ...
+argparse(args, params)
+ | ---
+ | - 1: positional value
+ |   flag1: true
+ |   flag2: true
+ | ...
+
+--
+-- When several 'boolean' arguments are passed, the result will be
+-- `true` (just as for one such argument).
+--
+params = {}
+ | ---
+ | ...
+params[1] = {'foo', 'boolean'}
+ | ---
+ | ...
+args = {'--foo', '--foo'}
+ | ---
+ | ...
+argparse(args, params)
+ | ---
+ | - foo: true
+ | ...
+
+--
+-- When several 'boolean+' arguments are passed, the result will
+-- be a list of `true` values.
+--
+params = {}
+ | ---
+ | ...
+params[1] = {'foo', 'boolean+'}
+ | ---
+ | ...
+args = {'--foo', '--foo'}
+ | ---
+ | ...
+argparse(args, params)
+ | ---
+ | - foo:
+ |   - true
+ |   - true
+ | ...
+
+params = {}
+ | ---
+ | ...
+params[1] = {'foo', 'boolean+'}
+ | ---
+ | ...
+args = {'--foo', 'positional value', '--foo'}
+ | ---
+ | ...
+argparse(args, params)
+ | ---
+ | - foo:
+ |   - true
+ |   - true
+ |   1: positional value
+ | ...
+
+--
+-- When a value is provided for a 'boolean' / 'boolean+' option
+-- using --foo=bar syntax, the error should state that a value is
+-- not expected for this option.
+--
+params = {}
+ | ---
+ | ...
+params[1] = {'foo', 'boolean'}
+ | ---
+ | ...
+argparse({'--foo=bar'}, params)
+ | ---
+ | - error: 'builtin/internal.argparse.lua:<line>"]: Bad value for parameter "foo". No value
+ |     expected, got "bar"'
+ | ...
+
+params = {}
+ | ---
+ | ...
+params[1] = {'foo', 'boolean+'}
+ | ---
+ | ...
+argparse({'--foo=bar'}, params)
+ | ---
+ | - error: 'builtin/internal.argparse.lua:<line>"]: Bad value for parameter "foo". No value
+ |     expected, got "bar"'
+ | ...
+
+--
+-- When parameter value was omitted, it was replaced internally
+-- with boolean true, and sometimes was showed in error messages.
+-- Now it is 'nothing'.
+--
+params = {}
+ | ---
+ | ...
+params[1] = {'value', 'number'}
+ | ---
+ | ...
+argparse({'--value'}, params)
+ | ---
+ | - error: 'builtin/internal.argparse.lua:<line>"]: Bad value for parameter "value". Expected
+ |     number, got nothing'
+ | ...
+
+params = {}
+ | ---
+ | ...
+params[1] = {'value', 'string'}
+ | ---
+ | ...
+argparse({'--value'}, params)
+ | ---
+ | - error: 'builtin/internal.argparse.lua:<line>"]: Bad value for parameter "value". Expected
+ |     string, got nothing'
+ | ...
+
+--
+-- Verify that short 'boolean' and 'boolean+' options behaviour
+-- is the same as for long options.
+--
+params = {}
+ | ---
+ | ...
+params[1] = {'f', 'boolean'}
+ | ---
+ | ...
+args = {'-f'}
+ | ---
+ | ...
+argparse(args, params)
+ | ---
+ | - f: true
+ | ...
+args = {'-f', '-f'}
+ | ---
+ | ...
+argparse(args, params)
+ | ---
+ | - f: true
+ | ...
+
+params = {}
+ | ---
+ | ...
+params[1] = {'f', 'boolean+'}
+ | ---
+ | ...
+args = {'-f'}
+ | ---
+ | ...
+argparse(args, params)
+ | ---
+ | - f:
+ |   - true
+ | ...
+args = {'-f', '-f'}
+ | ---
+ | ...
+argparse(args, params)
+ | ---
+ | - f:
+ |   - true
+ |   - true
+ | ...
+
+test_run:cmd("clear filter")
+ | ---
+ | - true
+ | ...

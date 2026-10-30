@@ -1,0 +1,22 @@
+	*** test_empty_expr ***
+	*** test_empty_expr: done ***
+	*** test_empty_expr_conj1 ***
+	*** test_empty_expr_conj1: done ***
+	*** test_empty_expr_conj2 ***
+	*** test_empty_expr_conj2: done ***
+	*** test_empty_result ***
+	*** test_empty_result: done ***
+	*** test_first_result ***
+	*** test_first_result: done ***
+	*** test_simple ***
+	*** test_simple: done ***
+	*** test_big ***
+Setting bits... ok
+Iterating... ok
+	*** test_big: done ***
+	*** test_not_empty ***
+	*** test_not_empty: done ***
+	*** test_not_last ***
+	*** test_not_last: done ***
+	*** test_disjunction ***
+	*** test_disjunction: done ***

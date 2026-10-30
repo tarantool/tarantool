@@ -1,0 +1,276 @@
+local t = require('luatest')
+local cluster = require('luatest.replica_set')
+local proxy = require('luatest.replica_proxy')
+local server = require('luatest.server')
+
+local g = t.group('cover-box-wait-limbo-acked')
+--
+-- gh-7318:
+-- Cover promotion's synchro queue quorum wait with tests.
+--
+local wait_timeout = 10
+
+local function wait_pair_sync(server1, server2)
+    -- Without retrying it fails sometimes when vclocks are empty and both
+    -- instances are in 'connect' state instead of 'follow'.
+    t.helpers.retrying({timeout = wait_timeout}, function()
+        server1:wait_for_vclock_of(server2)
+        server2:wait_for_vclock_of(server1)
+        server1:assert_follows_upstream(server2:get_instance_id())
+        server2:assert_follows_upstream(server1:get_instance_id())
+    end)
+end
+
+local function server_wait_wal_is_blocked(server)
+    server:exec(function(wait_timeout)
+        t.helpers.retrying({timeout = wait_timeout}, function()
+            t.assert(box.error.injection.get('ERRINJ_WAL_DELAY'))
+        end)
+    end, {wait_timeout})
+end
+
+local function server_wait_synchro_queue_len_is_equal(server, expected)
+    server:exec(function(expected, wait_timeout)
+        t.helpers.retrying({timeout = wait_timeout}, function(expected)
+            t.assert_equals(box.info.synchro.queue.len, expected)
+        end, expected)
+    end, {expected, wait_timeout})
+end
+
+local function get_wait_quorum_count(server)
+    return server:exec(function()
+        return box.error.injection.get('ERRINJ_WAIT_QUORUM_COUNT')
+    end)
+end
+
+local function server_wait_wait_quorum_count_ge_than(server, threshold)
+    server:exec(function(threshold, wait_timeout)
+        t.helpers.retrying({timeout = wait_timeout}, function(threshold)
+            t.assert_ge(box.error.injection.get('ERRINJ_WAIT_QUORUM_COUNT'),
+                threshold)
+        end, threshold)
+    end, {threshold, wait_timeout})
+end
+
+g.before_each(function(cg)
+    t.tarantool.skip_if_not_debug()
+
+    cg.cluster = cluster:new({})
+    cg.master = cg.cluster:build_and_add_server({
+        alias = 'master',
+        box_cfg = {
+            replication = {
+                server.build_listen_uri('master', cg.cluster.id),
+                server.build_listen_uri('replica_proxy'),
+            },
+            election_mode = 'candidate',
+            replication_synchro_quorum = 2,
+            replication_synchro_timeout = 100000,
+            replication_timeout = 0.1,
+            election_fencing_mode='off',
+        }
+    })
+    cg.replica = cg.cluster:build_and_add_server({
+        alias = 'replica',
+        box_cfg = {
+            replication = {
+                server.build_listen_uri('replica', cg.cluster.id),
+                server.build_listen_uri('master_proxy'),
+            },
+            election_mode = 'off',
+            replication_synchro_quorum = 2,
+            replication_synchro_timeout = 100000,
+            replication_timeout = 0.1,
+            election_fencing_mode='off',
+        }
+    })
+    cg.master_proxy = proxy:new({
+        client_socket_path = server.build_listen_uri('master_proxy'),
+        server_socket_path = server.build_listen_uri('master', cg.cluster.id),
+    })
+    t.assert(cg.master_proxy:start({force = true}))
+    cg.replica_proxy = proxy:new({
+        client_socket_path = server.build_listen_uri('replica_proxy'),
+        server_socket_path = server.build_listen_uri('replica', cg.cluster.id),
+    })
+    t.assert(cg.replica_proxy:start({force = true}))
+    cg.cluster:start()
+    cg.master:wait_until_election_leader_found()
+    cg.replica:wait_until_election_leader_found()
+
+    cg.master:exec(function()
+        box.schema.space.create('test', {is_sync = true})
+        box.space.test:create_index('pk')
+    end)
+    wait_pair_sync(cg.replica, cg.master)
+end)
+
+g.after_each(function(cg)
+    cg.cluster:drop()
+    cg.master_proxy:stop()
+    cg.replica_proxy:stop()
+end)
+
+g.test_update_greatest_term_while_wait_quorum = function(cg)
+    -- The purpose of the test is to cover synchro queue term bump right after
+    -- the quorum for pending transactions was gathered.
+    cg.replica:exec(function()
+        box.cfg{election_mode = 'manual'}
+    end)
+    local term = cg.master:exec(function()
+        local fiber = require('fiber')
+        box.cfg{
+            election_mode = 'manual',
+            election_timeout = 1000,
+            replication_synchro_quorum = 3,
+        }
+        t.assert_equals(box.info.election.state, 'leader')
+        rawset(_G, 'f_txn', fiber.create(function()
+            fiber.self():set_joinable(true)
+            box.space.test:replace{1}
+        end))
+        t.assert_equals(box.info.synchro.queue.len, 1)
+        t.assert_equals(box.info.synchro.queue.owner, box.info.id)
+        t.assert_equals(box.info.election.state, 'leader')
+        box.ctl.demote()
+        t.assert_equals(box.info.election.state, 'follower')
+        rawset(_G, 'f_promote', fiber.create(function()
+            fiber.self():set_joinable(true)
+            box.ctl.promote()
+        end))
+        t.helpers.retrying({timeout = 120}, function()
+            t.assert_equals(box.info.election.state, 'leader')
+        end)
+        t.assert_equals(box.info.synchro.queue.owner, box.info.id)
+        t.assert_lt(box.info.synchro.queue.term, box.info.election.term)
+        return box.info.election.term
+    end)
+    cg.replica:exec(function(term)
+        t.helpers.retrying({timeout = 120}, function()
+            t.assert_equals(box.info.election.term, term)
+        end)
+        box.cfg{
+            replication_synchro_quorum = 1,
+            election_timeout = 1000,
+        }
+        box.ctl.promote()
+    end, {term})
+    cg.master:wait_for_vclock_of(cg.replica)
+    cg.master:exec(function()
+        t.assert_not((_G.f_promote:join(120)))
+        t.assert((_G.f_txn:join(120)))
+    end)
+end
+
+g.test_txn_limbo_is_empty_while_wait_quorum = function(cg)
+    -- The purpose of the test is to see what happens when the synchro queue
+    -- gets empty during quorum wait.
+    local f = cg.replica:exec(function()
+        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
+        local f = require('fiber').create(function()
+            return pcall(box.ctl.promote)
+        end)
+        f:set_joinable(true)
+        return f:id()
+    end)
+    server_wait_wal_is_blocked(cg.replica)
+    cg.replica_proxy:pause()
+    t.helpers.retrying({timeout = wait_timeout}, function()
+        cg.master:exec(function()
+            local status = box.info.replication[2].upstream.status
+            t.assert(status ~= 'follow')
+        end)
+    end)
+    cg.master:exec(function()
+        require('fiber').create(function() box.space.test:insert{1} end)
+    end)
+    server_wait_synchro_queue_len_is_equal(cg.replica, 1)
+    -- The master must not send 'CONFIRM' before fiber 'f'
+    -- reaches the quorum waiting code. However, we must collect
+    -- quorum now, because then limbo on the master will be
+    -- frozen after we write a new term on the replica.
+    cg.master_proxy:pause()
+    t.helpers.retrying({timeout = wait_timeout}, function()
+        cg.replica:exec(function()
+            local status = box.info.replication[1].upstream.status
+            t.assert(status ~= 'follow')
+        end)
+    end)
+    cg.master:exec(function()
+        box.cfg{replication_synchro_quorum=1}
+    end)
+    server_wait_synchro_queue_len_is_equal(cg.master, 0)
+    cg.master:exec(function()
+        box.cfg{replication_synchro_quorum=2}
+    end)
+    local wait_quorum_count = get_wait_quorum_count(cg.replica)
+    local ff = require('fiber').create(function()
+        cg.replica:exec(function(f)
+            box.error.injection.set('ERRINJ_WAL_DELAY', false)
+            local _, ok, err = require('fiber').find(f):join()
+            t.assert(ok)
+            t.assert(not err)
+        end, {f})
+    end)
+    ff:set_joinable(true)
+    server_wait_wait_quorum_count_ge_than(cg.replica, wait_quorum_count + 1)
+    -- Now the master will send 'CONFIRM'.
+    cg.master_proxy:resume()
+    server_wait_synchro_queue_len_is_equal(cg.replica, 0)
+    cg.replica_proxy:resume()
+    local ok, err = ff:join()
+    t.assert(ok)
+    t.assert(not err)
+end
+
+g.test_quorum_less_replication_synchro_quorum = function(cg)
+    -- The purpose of the test is to cover what happens when the quorum is
+    -- changing during synchro queue quorum waiting.
+    local f = cg.replica:exec(function()
+        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
+        local f = require('fiber').create(function()
+            return pcall(box.ctl.promote)
+        end)
+        f:set_joinable(true)
+        return f:id()
+    end)
+    server_wait_wal_is_blocked(cg.replica)
+    cg.master:exec(function()
+        require('fiber').create(function() box.space.test:insert{1} end)
+    end)
+    -- Replica will store the local variable 'quorum' with the value 1.
+    cg.replica:exec(function()
+        box.cfg{replication_synchro_quorum=1}
+    end)
+    server_wait_synchro_queue_len_is_equal(cg.replica, 1)
+    cg.replica:exec(function()
+        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+    end)
+    server_wait_wal_is_blocked(cg.replica)
+    -- Currently 'quorum' = 1. Now let's increase the replica quorum value.
+    cg.replica:exec(function()
+        box.cfg{replication_synchro_quorum=2}
+    end)
+    cg.replica:exec(function(f)
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+        local _, ok, err = require('fiber').find(f):join()
+        t.assert(ok)
+        t.assert_not(err)
+        t.assert_equals(box.info.synchro.queue.len, 0)
+    end, {f})
+    -- Make sure the master gets the PROMOTE from replica so it has all the
+    -- replica journal entries and can get its vote.
+    cg.master:wait_for_vclock_of(cg.replica)
+    cg.master:exec(function(timeout)
+        -- Replication timeout being small enough can lead to disconnects under
+        -- load during heavy stress testing.
+        t.helpers.retrying({timeout = timeout}, function()
+            local ok, err = pcall(box.ctl.promote)
+            if not ok then
+                t.assert_equals(err.code, box.error.NO_ELECTION_QUORUM)
+            end
+        end)
+        t.assert_equals(box.info.synchro.queue.len, 0)
+    end, {wait_timeout})
+end

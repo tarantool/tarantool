@@ -1,0 +1,1122 @@
+local fiber = require('fiber')
+local fio = require('fio')
+local yaml = require('yaml')
+local instance_config = require('internal.config.instance_config')
+local cluster_config = require('internal.config.cluster_config')
+local configdata = require('internal.config.configdata')
+local aboard = require('internal.config.utils.aboard')
+local tarantool = require('tarantool')
+local textutils = require('internal.config.utils.textutils')
+local log = require('internal.config.utils.log')
+local ssl_certificate = require('internal.ssl_certificate')
+
+-- Tarantool Enterprise Edition has its own additions
+-- for config module.
+--
+-- Tarantool Community Edition may be extended using the same
+-- mechanism.
+local function load_extras()
+    local has_extras, extras = pcall(require, 'internal.config.extras')
+
+    -- The module is built into Tarantool EE executable. If it
+    -- can't be loaded, something is definitely going wrong.
+    if not has_extras and tarantool.package == 'Tarantool Enterprise' then
+        error('Tarantool Enterprise Edition build seems broken: built-in ' ..
+            'module internal.config.extras is not found')
+    end
+
+    -- The module may be provided by a user for Tarantool CE, but
+    -- it is optional.
+    if not has_extras then
+        return
+    end
+
+    -- Verify the contract.
+    assert(type(extras) == 'table')
+    assert(type(extras.initialize) == 'function')
+    assert(type(extras.post_apply) == 'function')
+
+    return extras
+end
+
+local extras
+
+-- {{{ Helpers
+
+-- Extract all fields from a table except ones that start from
+-- the underscore.
+--
+-- Useful for __serialize.
+local function filter_out_private_fields(t)
+    local res = {}
+    for k, v in pairs(t) do
+        if not k:startswith('_') then
+            res[k] = v
+        end
+    end
+    return res
+end
+
+-- Point the module search root to process.work_dir.
+--
+-- The first box.cfg() call changes the current working directory
+-- to process.work_dir and modules installed into it (for
+-- example, into the .rocks subdirectory) become resolvable,
+-- because the module search is relative to the current directory
+-- by default.
+--
+-- However, modules are needed before box.cfg(): roles and an
+-- application marked with the early_load tag and their metadata
+-- scan, and the schema defaults that depend on an installed
+-- module version (see the vshard_since annotation), which are
+-- evaluated when the configdata object is constructed. Set the
+-- search root as soon as the working directory is known to make
+-- modules installed into it resolvable before the chdir occurs.
+--
+-- This is a stopgap that covers the module search only. It is
+-- planned to enter process.work_dir right at this point instead,
+-- so that everything before box.cfg() works as if the process was
+-- started in the working directory, see gh-13086.
+local function set_searchroot(iconfig, vars)
+    if type(box.cfg) ~= 'function' then
+        -- box.cfg() is already called, the current working
+        -- directory is process.work_dir. Nothing to do.
+        return
+    end
+    local work_dir = instance_config:get(iconfig, 'process.work_dir')
+    if work_dir == nil then
+        return
+    end
+    -- `package.setsearchroot()` is a public API and the root can
+    -- be pinned manually (e.g. luatest pins it for the test
+    -- servers it spawns). An unset root falls back to the
+    -- current directory. Respect non-default values and don't
+    -- override.
+    --
+    -- A root explicitly pinned to the current directory is
+    -- indistinguishable from an unset one and is overridden here.
+    -- It is going to be resolved when a chdir to process.work_dir
+    -- is performed at this point instead of the search root
+    -- change, see gh-13086.
+    local searchroot = package.searchroot()
+    if searchroot ~= fio.cwd() then
+        log.verbose('the module search root is not set: it is already ' ..
+                    'pinned to %q', searchroot)
+        return
+    end
+    -- The variables are substituted later, when the configdata
+    -- object is constructed. Substitute the name variables here
+    -- in the same way. The other ones (config.context.*) can't be
+    -- resolved at this point: the context files are relative to
+    -- the working directory itself. Leave the module search as is
+    -- in this case.
+    work_dir = work_dir:gsub('{{ *(.-) *}}', function(var_name)
+        return vars[var_name]
+    end)
+    if work_dir:find('{{', 1, true) then
+        log.verbose('the module search root is not set: unable to ' ..
+                    'resolve process.work_dir %q', work_dir)
+        return
+    end
+    -- A relative process.work_dir is interpreted against the
+    -- startup working directory, which is not changed yet.
+    work_dir = fio.abspath(work_dir)
+    package.setsearchroot(work_dir)
+    log.verbose('set the module search root to %q', work_dir)
+end
+
+-- }}} Helpers
+
+local methods = {}
+local mt = {
+    __index = methods,
+    __serialize = filter_out_private_fields,
+}
+
+local function selfcheck(self, method_name)
+    if type(self) ~= 'table' or getmetatable(self) ~= mt then
+        local fmt_str = 'Use config:%s(<...>) instead of config.%s(<...>)'
+        error(fmt_str:format(method_name, method_name), 0)
+    end
+end
+
+local function initcheck(self, method_name, cluster_or_instance)
+    if self._status ~= 'uninitialized' then
+        return
+    end
+
+    assert(self._configdata_applied == nil)
+    local fmt_str = 'config:%s(): no %s config available yet'
+    error(fmt_str:format(method_name, cluster_or_instance), 0)
+end
+
+local function broadcast(self)
+    box.broadcast('config.info', self:info())
+end
+
+local status_names = {
+    uninitialized = true,
+    startup_in_progress = true,
+    reload_in_progress = true,
+    check_errors = true,
+    check_warnings = true,
+    ready = true,
+}
+
+local function normalize_waited_statuses(statuses)
+    if type(statuses) == 'string' then
+        statuses = {statuses}
+    elseif type(statuses) ~= 'table' then
+        error(('Expected string or table, got %s'):format(type(statuses)), 0)
+    end
+
+    local res = {}
+    for i, status in ipairs(statuses) do
+        if type(status) ~= 'string' then
+            error(('Expected string, got %s at index %d'):format(
+                type(status), i), 0)
+        end
+        if not status_names[status] then
+            error(('Unknown config status %q'):format(status), 0)
+        end
+        res[status] = true
+    end
+
+    if next(res) == nil then
+        error('Expected at least one config status', 0)
+    end
+
+    return res
+end
+
+-- The metrics filter helpers below mirror the logic from `metrics.cfg()`
+-- (see third_party/metrics/metrics/cfg.lua).
+local metrics_tarantool
+
+local function is_default_metric(name)
+    if name == 'all' then
+        return true
+    end
+
+    if metrics_tarantool == nil then
+        metrics_tarantool = require('metrics.tarantool')
+    end
+    return metrics_tarantool.is_default_metric(name)
+end
+
+local metrics_filter_cache = {
+    configdata = nil,
+}
+
+local function split_metric_groups_and_selectors(values, default_value,
+                                                 empty_default,
+                                                 empty_selectors)
+    values = values or default_value
+
+    if type(values) == 'string' then
+        return values, values
+    end
+
+    assert(type(values) == 'table')
+
+    local default_metrics = {}
+    local custom_selectors = {}
+    for _, value in ipairs(values) do
+        if value == 'all' then
+            table.insert(default_metrics, value)
+            return default_metrics, 'all'
+        elseif is_default_metric(value) then
+            table.insert(default_metrics, value)
+        else
+            table.insert(custom_selectors, value)
+        end
+    end
+
+    if next(default_metrics) == nil then
+        default_metrics = empty_default
+    end
+
+    if next(custom_selectors) == nil then
+        custom_selectors = empty_selectors
+    end
+
+    return default_metrics, custom_selectors
+end
+
+local function metrics_filter(self)
+    local configdata = self._configdata_applied
+    if rawequal(metrics_filter_cache.configdata, configdata) then
+        return metrics_filter_cache
+    end
+
+    local default_include, selector_include =
+        split_metric_groups_and_selectors(self:get('metrics.include'), 'all',
+                                          'none', 'all')
+    local default_exclude, selector_exclude =
+        split_metric_groups_and_selectors(self:get('metrics.exclude'), {}, {},
+                                          {})
+
+    metrics_filter_cache = {
+        configdata = configdata,
+        default_include = default_include,
+        selector_include = selector_include,
+        default_exclude = default_exclude,
+        selector_exclude = selector_exclude,
+    }
+    return metrics_filter_cache
+end
+
+local function metric_group_matches(name, rules)
+    if rules == 'all' then
+        return true
+    elseif rules == 'none' then
+        return false
+    end
+
+    for _, rule in ipairs(rules) do
+        if rule == 'all' or name == rule then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function metric_selector_matches(name, rules)
+    if rules == 'all' then
+        return true
+    elseif rules == 'none' then
+        return false
+    end
+
+    for _, rule in ipairs(rules) do
+        if name == rule or name:startswith(rule .. '.') then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function metric_is_enabled(name, filter)
+    if is_default_metric(name) then
+        if metric_group_matches(name, filter.default_exclude) then
+            return false
+        end
+        return metric_group_matches(name, filter.default_include)
+    end
+
+    if metric_selector_matches(name, filter.selector_exclude) then
+        return false
+    end
+
+    return metric_selector_matches(name, filter.selector_include)
+end
+
+function methods._meta(self, source_name, key, value)
+    local data = self._metadata[source_name] or {}
+    data[key] = value
+    self._metadata[source_name] = data
+end
+
+function methods._register_source(self, source)
+    assert(type(source) == 'table')
+    assert(source.name ~= nil)
+    assert(source.type == 'instance' or source.type == 'cluster')
+    assert(source.sync ~= nil)
+    assert(source.get ~= nil)
+    table.insert(self._sources, source)
+end
+
+function methods._register_applier(self, applier)
+    assert(type(applier) == 'table')
+    assert(applier.name ~= nil)
+    assert(applier.apply ~= nil)
+    table.insert(self._appliers, applier)
+end
+
+function methods._initialize(self)
+    extras = load_extras()
+
+    -- The sources are synchronized in the order of registration:
+    -- env, file, etcd (present in Tarantool EE), env for
+    -- defaults.
+    --
+    -- The configuration values from the first source has highest
+    -- priority. The menthal rule here is the following: values
+    -- closer to the process are preferred: env first, then file,
+    -- then etcd (if available). And only then the env source with
+    -- defaults.
+    self:_register_source(require('internal.config.source.env').new())
+
+    if self._config_file ~= nil then
+        self:_register_source(require('internal.config.source.file').new())
+    end
+
+    self:_register_applier(require('internal.config.applier.lua'))
+    self:_register_applier(require('internal.config.applier.compat'))
+    self:_register_applier(require('internal.config.applier.mkdir'))
+    self:_register_applier(require('internal.config.applier.console'))
+    self:_register_applier(require('internal.config.applier.runtime_priv'))
+    self:_register_applier(require('internal.config.applier.session_settings'))
+    self:_register_applier(require('internal.config.applier.sharding').stage_1)
+    self:_register_applier(require('internal.config.applier.roles').stage_1)
+    self:_register_applier(require('internal.config.applier.app').stage_1)
+    self:_register_applier(require('internal.config.applier.box_cfg'))
+    self:_register_applier(require('internal.config.applier.box_status'))
+    self:_register_applier(require('internal.config.applier.credentials'))
+    self:_register_applier(require('internal.config.applier.fiber'))
+    self:_register_applier(require('internal.config.applier.sharding').stage_2)
+    self:_register_applier(require('internal.config.applier.autoexpel'))
+    self:_register_applier(require('internal.config.applier.connpool'))
+    self:_register_applier(require('internal.config.applier.roles').stage_2)
+    self:_register_applier(require('internal.config.applier.app').stage_2)
+
+    if extras ~= nil then
+        extras.initialize(self)
+    end
+
+    self:_register_source(require('internal.config.source.env').new({
+        env_var_suffix = 'default',
+    }))
+
+    local skipped_once = false
+    box.watch('box.internal.SIGUSR2', function()
+        -- The watcher function is invoked once the watcher is
+        -- registered, but we only need to react to signals here.
+        if not skipped_once then
+            skipped_once = true
+            return
+        end
+
+        log.info('Configuration reloading by SIGUSR2 is started')
+        local ok, err = self:_reload_noexc({sync_source = 'all'})
+        if not ok then
+            log.warn('Configuration reloading by SIGUSR2 is failed: %s', err)
+        else
+            log.info('Configuration reloading by SIGUSR2 is finished: ' ..
+                'status=%s', self._status)
+        end
+    end)
+end
+
+-- Collect data from configuration sources.
+--
+-- Return instance config, cluster config and sources information.
+--
+-- This method doesn't store anything in the config object.
+--
+-- It can be used with self._instance_name == nil to obtain a
+-- cluster configuration. All the instance_name related checks are
+-- in the self:_store() method.
+function methods._collect(self, opts)
+    assert(type(opts) == 'table')
+    local sync_source = opts.sync_source
+
+    local iconfig = {}
+    local cconfig = {}
+
+    -- For error reporting.
+    local source_info = {}
+
+    for _, source in ipairs(self._sources) do
+        -- Gather config values.
+        --
+        -- The configdata object is not constructed yet, so we
+        -- pass currently collected instance config as the second
+        -- argument. The 'config' section of the config may
+        -- contain a configuration needed for a source.
+        if sync_source == source.name or sync_source == 'all' then
+            source:sync(self, iconfig)
+        end
+
+        -- Validate configurations gathered from the sources.
+        if source.type == 'instance' then
+            instance_config:validate(source:get())
+        elseif source.type == 'cluster' then
+            cluster_config:validate(source:get())
+        else
+            assert(false)
+        end
+
+        -- Merge configurations from the sources.
+        --
+        -- Instantiate a cluster config to an instance config for
+        -- cluster config sources.
+        --
+        -- The configuration values from a first source has highest
+        -- priority. We should keep already gathered values in the
+        -- accumulator and fill only missed ones from next sources.
+        --
+        -- :merge() prefers values from the second argument, so the
+        -- accumulator is passed as the second.
+        local source_iconfig
+        if source.type == 'cluster' then
+            local source_cconfig = source:get()
+
+            -- Extract and merge conditional sections into the
+            -- data from the source.
+            --
+            -- It is important to call :apply_conditional() before
+            -- :merge() for each cluster config.
+            --
+            -- The 'conditional' field is an array and if several
+            -- sources have the field, the last one replaces all
+            -- the previous ones. If we merge all the configs and
+            -- then call :apply_conditional(), we loss all the
+            -- conditional sections except the last one.
+            --
+            -- The same is applicable for config sources that
+            -- construct a config from several separately stored
+            -- parts using :merge(). They should call
+            -- :apply_conditional() for each of the parts before
+            -- :merge().
+            source_cconfig = cluster_config:apply_conditional(source_cconfig)
+
+            cconfig = cluster_config:merge(source_cconfig, cconfig)
+            source_iconfig = cluster_config:instantiate(cconfig,
+                self._instance_name)
+        elseif source.type == 'instance' then
+            source_iconfig = source:get()
+        else
+            assert(false)
+        end
+        iconfig = instance_config:merge(source_iconfig, iconfig)
+
+        -- If a source returns an empty table, mark it as ones
+        -- that provide no data.
+        local has_data = next(source:get()) ~= nil
+        table.insert(source_info, ('* %q [type: %s]%s'):format(source.name,
+            source.type, has_data and '' or ' (no data)'))
+    end
+
+    return iconfig, cconfig, source_info
+end
+
+-- Store the given configuration in the config object.
+--
+-- The method accepts collected instance config, cluster config
+-- and configuration source information and based on the given
+-- values performs several checks and stores the configuration
+-- within the config object as a configdata object.
+function methods._store(self, iconfig, cconfig, source_info)
+    if next(cconfig) == nil then
+        local is_reload = self._status == 'reload_in_progress'
+        local action = is_reload and 'Reload' or 'Startup'
+        local source_info_str = table.concat(source_info, '\n')
+        error(textutils.dedent([[
+            %s failure.
+
+            No cluster config received from the given configuration sources.
+
+            %s
+
+            The %q instance cannot find itself in the group/replicaset/instance
+            topology and it is unknown, whether it should join a replicaset or
+            create its own database.
+
+            Recipes:
+
+            * Use --config <file> command line option.
+            * Use TT_CONFIG_ETCD_* environment variables (available on Tarantool
+              Enterprise Edition).
+        ]]):format(action, source_info_str, self._instance_name), 0)
+    end
+
+    local found = cluster_config:find_instance(cconfig, self._instance_name)
+    if found == nil then
+        local is_reload = self._status == 'reload_in_progress'
+        local action = is_reload and 'Reload' or 'Startup'
+        local source_info_str = table.concat(source_info, '\n')
+        error(textutils.dedent([[
+            %s failure.
+
+            Unable to find instance %q in the group/replicaset/instance
+            topology provided by the given cluster configuration sources.
+
+            %s
+
+            It is unknown, whether the instance should join a replicaset or
+            create its own database.
+
+            Minimal cluster config:
+
+            groups:
+              group-001:
+                replicasets:
+                  replicaset-001:
+                    instances:
+                      instance-001: {}
+        ]]):format(action, self._instance_name, source_info_str), 0)
+    end
+
+    set_searchroot(iconfig, {
+        instance_name = self._instance_name,
+        replicaset_name = found.replicaset_name,
+        group_name = found.group_name,
+    })
+    self._configdata = configdata.new(iconfig, cconfig, self._instance_name)
+end
+
+-- Invoke the appliers depending on the phase. The first phase
+-- might be long due to the long recovery process.
+function methods._apply_on_startup(self, opts)
+    local first_phase_appliers = {
+        lua = true,
+        compat = true,
+        mkdir = true,
+        console = true,
+        runtime_priv = true,
+        ['sharding.stage_1'] = true,
+        ['roles.stage_1'] = true,
+        ['app.stage_1'] = true,
+        box_cfg = true,
+    }
+
+    assert(type(opts) == 'table')
+    local phase = opts.phase
+
+    if phase == 1 then
+        local needs_retry = false
+        for _, applier in ipairs(self._appliers) do
+            if first_phase_appliers[applier.name] then
+                local res = applier.apply(self)
+                if res ~= nil and res.needs_retry then
+                    needs_retry = true
+                end
+            end
+        end
+        return needs_retry
+    elseif phase == 2 then
+        for _, applier in ipairs(self._appliers) do
+            if not first_phase_appliers[applier.name] then
+                applier.apply(self)
+            end
+        end
+
+        self._configdata_applied = self._configdata
+    else
+        assert(false)
+    end
+end
+
+function methods._apply(self)
+    for _, applier in ipairs(self._appliers) do
+        applier.apply(self)
+    end
+
+    self._configdata_applied = self._configdata
+end
+
+function methods._post_apply(self)
+    for _, applier in ipairs(self._appliers) do
+        if applier.post_apply ~= nil then
+            applier.post_apply(self)
+        end
+    end
+    ssl_certificate.apply(self)
+end
+
+-- Set proper status depending on received alerts.
+function methods._set_status_based_on_alerts(self)
+    self._status = self._aboard:status()
+    broadcast(self)
+end
+
+function methods._startup_impl(self, instance_name, config_file)
+    assert(self._status == 'uninitialized')
+
+    local ok, err = cluster_config:validate_name(instance_name)
+    if not ok then
+        error(('[--name] %s'):format(err), 0)
+    end
+
+    self._status = 'startup_in_progress'
+    self._instance_name = instance_name
+    -- box.cfg() changes a current working directory that
+    -- invalidates relative paths.
+    --
+    -- Let's calculate an absolute path to access the file later
+    -- on :reload().
+    if config_file ~= nil then
+        self._config_file = fio.abspath(config_file)
+    end
+    broadcast(self)
+
+    self:_initialize()
+
+    -- Startup phase 1/2.
+    --
+    -- Start first-phase appliers. The box_cfg applier may force
+    -- the read-only mode on this phase.
+    --
+    -- This phase may take a long time due to recovery.
+    self:_store(self:_collect({sync_source = 'all'}))
+    local needs_retry = self:_apply_on_startup({phase = 1})
+
+    -- Startup phase 2/2.
+    --
+    -- If the previous phase is considered as potentially taking a
+    -- long time, re-read the configuration and apply the fresh
+    -- one.
+    --
+    -- Otherwise finish applying the existing configuration.
+    if needs_retry then
+        self:_store(self:_collect({sync_source = 'all'}))
+        self:_apply()
+    else
+        self:_apply_on_startup({phase = 2})
+    end
+
+    self:_post_apply()
+    self:_set_status_based_on_alerts()
+    if self._status == 'ready' or self._status == 'check_warnings' then
+        self._active_metadata = self._metadata
+    end
+    if extras ~= nil then
+        extras.post_apply(self)
+    end
+end
+
+function methods._startup(self, instance_name, config_file)
+    local ok, err = pcall(self._startup_impl, self, instance_name, config_file)
+    if not ok then
+        if self._configdata ~= nil then
+            local ok, iconfig = pcall(self._configdata.masked_iconfig,
+                                      self._configdata)
+            if ok then
+                log.debug('Instance configuration at startup failure:\n%s',
+                          yaml.encode(iconfig))
+            else
+                log.debug('Unable to prepare instance configuration for ' ..
+                          'startup failure report: %s', iconfig)
+            end
+        end
+        log.error(err)
+        os.exit(1)
+    end
+end
+
+function methods._print_env_list(self)
+    local env_source = require('internal.config.source.env').new()
+    io.stdout:write(env_source:_env_list())
+end
+
+-- Note: There is a difference between missing opts.instance and
+-- opts.instance that is equal to the given instance name. The
+-- former returns an instance configuration taking into account
+-- instance configuration sources (environment variables). The
+-- latter takes into account only cluster configuration, so the
+-- environment variables are ignored.
+--
+-- If opts.env is false, the environment variables are ignored
+-- even when opts.instance is missing. If opts.env is true and
+-- opts.instance is set, an error is raised.
+function methods.get(self, path, opts)
+    selfcheck(self, 'get')
+    initcheck(self, 'get', 'instance')
+
+    opts = opts or {}
+
+    if type(opts) ~= 'table' then
+        error(('Expected table, got %s'):format(type(opts)), 0)
+    end
+    if opts.instance ~= nil and type(opts.instance) ~= 'string' then
+        error(('Expected string, got %s'):format(type(opts.instance)), 0)
+    end
+    if opts.env ~= nil and type(opts.env) ~= 'boolean' then
+        error(('Expected boolean, got %s'):format(type(opts.env)), 0)
+    end
+    if opts.instance ~= nil and opts.env == true then
+        error('config:get: "instance" and "env = true" options can\'t be ' ..
+              'used together, because it is unknown which TT_* environment ' ..
+              'variables were passed to another instance', 0)
+    end
+
+    -- At this point, either:
+    --  * opts.env == true  => lookup in environment/global scope, instance
+    --    must be nil, or
+    --  * opts.env == nil or false => instance-level lookup, instance may be
+    --    explicitly set or unspecified.
+    -- For instance-level lookups, default to the current instance if none is
+    -- provided.
+    local instance = opts.instance
+    if opts.env == false then
+        instance = instance or self._configdata_applied:names().instance_name
+    end
+
+    return self._configdata_applied:get(path, {
+        instance = instance,
+        use_default = true,
+    })
+end
+
+function methods._reload_noexc(self, opts)
+    assert(type(opts) == 'table')
+    if self._status == 'uninitialized' then
+        return false, 'config:reload(): no instance config available yet'
+    end
+    if self._status == 'startup_in_progress' or
+       self._status == 'reload_in_progress' then
+        return false, 'config:reload(): instance configuration is already in '..
+                      'progress'
+    end
+    self._status = 'reload_in_progress'
+    broadcast(self)
+
+    self._aboard:clean()
+    self._metadata = {}
+
+    local ok, err = pcall(function(opts)
+        self:_store(self:_collect(opts))
+        self:_apply()
+        self:_post_apply()
+    end, opts)
+
+    assert(not ok or err == nil)
+    if not ok then
+        self._aboard:set({type = 'error', message = err})
+    end
+
+    self:_set_status_based_on_alerts()
+    if self._status == 'ready' or self._status == 'check_warnings' then
+        self._active_metadata = self._metadata
+    end
+    if extras ~= nil then
+        extras.post_apply(self)
+    end
+
+    return ok, err
+end
+
+function methods.reload(self)
+    selfcheck(self, 'reload')
+    local ok, err = self:_reload_noexc({sync_source = 'all'})
+    if not ok then
+        error(err, 0)
+    end
+end
+
+function methods._hierarchy_info(self)
+    if self._configdata_applied == nil then
+        return {}
+    end
+
+    local names = self._configdata_applied:names()
+    return {
+        group = names.group_name,
+        replicaset = names.replicaset_name,
+        instance = names.instance_name,
+    }
+end
+
+function methods.info(self, version)
+    selfcheck(self, 'info')
+    version = version == nil and 'v1' or version
+    local health = package.loaded['internal.healthcheck']
+    if type(health) == 'table' and
+       type(health._sync_alerts) == 'function' then
+        pcall(health._sync_alerts, {skip = {config = true}})
+    end
+    local info = {}
+    local alerts = self._aboard:alerts()
+    local hierarchy = self:_hierarchy_info()
+    info['v1'] = {
+        alerts = alerts,
+        meta = self._metadata,
+        status = self._status,
+        hierarchy = hierarchy,
+    }
+    info['v2'] = {
+        alerts = alerts,
+        meta = {
+            active = self._active_metadata,
+            last = self._metadata,
+        },
+        status = self._status,
+        hierarchy = hierarchy,
+    }
+    if info[version] ~= nil then
+        return info[version]
+    end
+
+    local supported_versions = {}
+    for key in pairs(info) do
+        table.insert(supported_versions, key)
+    end
+    table.sort(supported_versions)
+
+    error(('config:info() expects %s or nil as an argument, got %q'):format(
+        table.concat(supported_versions, ', '), version), 0)
+end
+
+function methods.wait_status(self, statuses, timeout)
+    selfcheck(self, 'wait_status')
+
+    local waited_statuses = normalize_waited_statuses(statuses)
+
+    if timeout ~= nil and type(timeout) ~= 'number' then
+        error(('Expected timeout to be a non-negative number or nil, ' ..
+              'got %s'):format(type(timeout)), 0)
+    end
+
+    if timeout ~= nil and timeout < 0 then
+        error('Expected timeout to be a non-negative number or nil, ' ..
+              'got negative number', 0)
+    end
+
+    local actual_status = self._status
+    if waited_statuses[actual_status] then
+        return actual_status
+    end
+
+    local cond = fiber.cond()
+    local watcher = box.watch('config.info', function(_, info)
+        -- Fallback to the status from self._status when config.info is nil,
+        -- as the config may not be initialized yet.
+        actual_status = info and info.status or self._status
+        if waited_statuses[actual_status] then
+            cond:signal()
+        end
+    end)
+
+    local ok, err = pcall(function()
+        local deadline = fiber.clock() + (timeout or math.huge)
+        repeat
+        until waited_statuses[actual_status] or
+            not cond:wait(math.max(0, deadline - fiber.clock()))
+    end)
+
+    watcher:unregister()
+
+    if not ok then
+        error(err, 0)
+    end
+
+    return actual_status
+end
+
+function methods.is_storage(self, opts)
+    selfcheck(self, 'is_storage')
+    initcheck(self, 'is_storage', 'cluster')
+
+    opts = opts or {}
+    if opts.instance ~= nil and type(opts.instance) ~= 'string' then
+        error(('Expected string, got %s'):format(type(opts.instance)), 0)
+    end
+
+    local sharding_roles = self:get(
+        'sharding.roles', {instance = opts.instance}) or {}
+
+    for _, role in ipairs(sharding_roles) do
+        if role == 'storage' then
+            return true
+        end
+    end
+    return false
+end
+
+function methods.is_router(self, opts)
+    selfcheck(self, 'is_router')
+    initcheck(self, 'is_router', 'cluster')
+
+    opts = opts or {}
+    if opts.instance ~= nil and type(opts.instance) ~= 'string' then
+        error(('Expected string, got %s'):format(type(opts.instance)), 0)
+    end
+
+    local sharding_roles = self:get(
+        'sharding.roles', {instance = opts.instance}) or {}
+
+    for _, role in ipairs(sharding_roles) do
+        if role == 'router' then
+            return true
+        end
+    end
+    return false
+end
+
+function methods.has_role(self, role, opts)
+    selfcheck(self, 'has_role')
+    initcheck(self, 'has_role', 'cluster')
+    if type(role) ~= 'string' then
+        error(('Expected string, got %s'):format(type(role)), 0)
+    end
+
+    opts = opts or {}
+    if opts.instance ~= nil and type(opts.instance) ~= 'string' then
+        error(('Expected string, got %s'):format(type(opts.instance)), 0)
+    end
+
+    local roles = self:get('roles', {instance = opts.instance}) or {}
+
+    for _, r in ipairs(roles) do
+        if r == role then
+            return true
+        end
+    end
+    return false
+end
+
+-- Check the effective metrics filter from the applied configuration.
+-- This method answers whether a metric group or selector is enabled by
+-- metrics.include / metrics.exclude, not whether a collector exists in the
+-- metrics registry at the moment.
+function methods.is_metric_enabled(self, name)
+    selfcheck(self, 'is_metric_enabled')
+    initcheck(self, 'is_metric_enabled', 'instance')
+
+    if type(name) ~= 'string' then
+        error(('Expected string, got %s'):format(type(name)), 0)
+    end
+    if name == '' then
+        error('Expected non-empty metric name', 0)
+    end
+
+    return metric_is_enabled(name, metrics_filter(self))
+end
+
+-- Cluster configuration.
+--
+-- It is given as is after merging from all the configuration
+-- sources. Default values are NOT applied. Variables are NOT
+-- substituted.
+--
+-- Use config:get() to receive an instance config for a particular
+-- instance with applied defaults and substituted variables.
+function methods.cluster_config(self)
+    selfcheck(self, 'cluster_config')
+    initcheck(self, 'cluster_config', 'cluster')
+
+    return table.deepcopy(self._configdata_applied:cconfig())
+end
+
+-- Cluster configuration (internal method).
+function methods._cconfig(self)
+    selfcheck(self, '_cconfig')
+    initcheck(self, '_cconfig', 'cluster')
+
+    return self._configdata_applied:cconfig()
+end
+
+-- List all instances of the cluster.
+--
+-- Returns a table of the following format.
+--
+-- {
+--     [<instance_name>] = {
+--         instance_name = <...>,
+--         replicaset_name = <...>,
+--         group_name = <...>,
+--     },
+--     <...>
+-- }
+function methods.instances(self)
+    selfcheck(self, 'instances')
+    initcheck(self, 'instances', 'cluster')
+
+    local res = {}
+
+    for group_name, group in pairs(self:_cconfig().groups or {}) do
+        for replicaset_name, replicaset in pairs(group.replicasets or {}) do
+            for instance_name, _ in pairs(replicaset.instances or {}) do
+                assert(res[instance_name] == nil)
+                res[instance_name] = {
+                    instance_name = instance_name,
+                    replicaset_name = replicaset_name,
+                    group_name = group_name,
+                }
+            end
+        end
+    end
+
+    return res
+end
+
+function methods.instance_uri(self, uri_type, opts)
+    selfcheck(self, 'instance_uri')
+    initcheck(self, 'instance_uri', 'cluster')
+    uri_type = uri_type == nil and 'peer' or uri_type
+    if uri_type ~= 'peer' and uri_type ~= 'sharding' then
+        error(('Expected "peer" or "sharding", got %q'):format(uri_type), 0)
+    end
+    opts = opts == nil and {} or opts
+    if type(opts) ~= 'table' then
+        error(('Expected table, got %s'):format(type(opts)), 0)
+    end
+    if opts.instance ~= nil and type(opts.instance) ~= 'string' then
+        error(('Expected string, got %s'):format(type(opts.instance)), 0)
+    end
+    if opts.login ~= nil and type(opts.login) ~= 'string' then
+        error(('Expected string, got %s'):format(type(opts.login)), 0)
+    end
+    if opts.password ~= nil and type(opts.password) ~= 'string' then
+        error(('Expected string, got %s'):format(type(opts.password)), 0)
+    end
+    if opts.params ~= nil and type(opts.params) ~= 'table' then
+        error(('Expected table, got %s'):format(type(opts.params)), 0)
+    end
+    if opts.password ~= nil and opts.login == nil then
+        error('Password cannot be set without setting login', 0)
+    end
+
+    local uri_opts = {
+        instance = opts.instance,
+        use_default = true,
+        login = opts.login,
+        password = opts.password,
+        params = opts.params,
+    }
+    return self._configdata_applied:_instance_uri(uri_type, uri_opts)
+end
+
+function methods.jsonschema(self)
+    selfcheck(self, 'jsonschema')
+
+    return cluster_config:jsonschema()
+end
+
+function methods.new_alerts_namespace(self, name)
+    selfcheck(self, 'new_alerts_namespace')
+
+    return self._aboard:new_namespace(name)
+end
+
+-- The object is a singleton. The constructor should be called
+-- only once.
+local function new()
+    local self = setmetatable({
+        _sources = {},
+        _appliers = {},
+        -- There are values the module need to hold, which are not
+        -- part of the configuration. They're stored here.
+        _instance_name = nil,
+        _config_file = nil,
+        -- Collected config values.
+        _configdata = nil,
+        -- Track applied config values as well.
+        _configdata_applied = nil,
+        -- Metadata from sources.
+        _metadata = {},
+        -- Current status.
+        _status = 'uninitialized',
+    }, mt)
+
+    -- Track situations when something is going wrong.
+    self._aboard = aboard.new({
+        -- Transit from 'check_warnings' to 'ready' if the last
+        -- warning is dropped.
+        on_drop = function(_, _)
+            if not self._aboard:is_empty() then
+                return
+            end
+            if self._status == 'check_warnings' then
+                self._status = 'ready'
+            end
+        end,
+    })
+
+    return self
+end
+
+return new()

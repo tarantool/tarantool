@@ -1,0 +1,399 @@
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+test_run:cmd('restart server default with cleanup=1')
+test_run:cmd('switch default')
+---
+- true
+...
+--
+-- No replication
+--
+master_id = box.info.id
+---
+...
+#box.info.vclock == 0
+---
+- true
+...
+#box.info.replication == 1
+---
+- true
+...
+box.space._cluster:count() == 1
+---
+- true
+...
+box.info.uuid == box.space._cluster:get(master_id)[2]
+---
+- true
+...
+-- LSN is nil until a first request is made
+box.info.vclock[master_id] == nil
+---
+- true
+...
+--- box.info.lsn == box.info.vclock[master_id]
+box.info.lsn == 0
+---
+- true
+...
+-- Make the first request
+box.schema.user.grant('guest', 'replication')
+---
+...
+-- LSN is 1 after the first request
+#box.info.vclock == 1
+---
+- true
+...
+box.info.vclock[master_id] == 1
+---
+- true
+...
+box.info.lsn == box.info.vclock[master_id]
+---
+- true
+...
+master = box.info.replication[master_id]
+---
+...
+master.id == master_id
+---
+- true
+...
+master.uuid == box.space._cluster:get(master_id)[2]
+---
+- true
+...
+master.lsn == box.info.vclock[master_id]
+---
+- true
+...
+master.upstream == nil
+---
+- true
+...
+master.downstream == nil
+---
+- true
+...
+-- Start Master -> Slave replication
+test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
+---
+- true
+...
+test_run:cmd("start server replica")
+---
+- true
+...
+--
+-- Master
+--
+test_run:cmd('switch default')
+---
+- true
+...
+#box.info.vclock == 1 -- box.info.vclock[replica_id] is nil
+---
+- true
+...
+#box.info.replication == 2
+---
+- true
+...
+box.space._cluster:count() == 2
+---
+- true
+...
+-- master's status
+master_id = box.info.id
+---
+...
+box.info.vclock[master_id] == 2 -- grant + registration == 2
+---
+- true
+...
+box.info.lsn == box.info.vclock[master_id]
+---
+- true
+...
+master = box.info.replication[master_id]
+---
+...
+master.id == master_id
+---
+- true
+...
+master.uuid == box.space._cluster:get(master_id)[2]
+---
+- true
+...
+master.lsn == box.info.vclock[master_id]
+---
+- true
+...
+master.upstream == nil
+---
+- true
+...
+master.downstream == nil
+---
+- true
+...
+-- replica's status
+replica_id = test_run:get_server_id('replica')
+---
+...
+box.info.vclock[replica_id] == nil
+---
+- true
+...
+replica = box.info.replication[replica_id]
+---
+...
+replica.id == replica_id
+---
+- true
+...
+replica.uuid == box.space._cluster:get(replica_id)[2]
+---
+- true
+...
+-- replica.lsn == box.info.vclock[replica_id]
+replica.lsn == 0
+---
+- true
+...
+replica.upstream == nil
+---
+- true
+...
+test_run:wait_downstream(replica_id, {status = 'follow'})
+---
+- true
+...
+-- wait for the replication vclock
+test_run:wait_cond(function()                    \
+    local r = box.info.replication[replica_id].downstream.vclock \
+    return (r ~= nil and box.info.vclock ~= nil and \
+            r[master_id] == box.info.vclock[master_id] and \
+            r[replica_id] == box.info.vclock[replica_id]) \
+    end) or require('log').error(box.info)
+---
+- true
+...
+--
+-- Replica
+--
+test_run:cmd('switch replica')
+---
+- true
+...
+#box.info.vclock == 1 -- box.info.vclock[replica_id] is nil
+---
+- true
+...
+#box.info.replication == 2
+---
+- true
+...
+box.space._cluster:count() == 2
+---
+- true
+...
+-- master's status
+master_id = test_run:get_server_id('default')
+---
+...
+box.info.vclock[master_id] == 2
+---
+- true
+...
+master = box.info.replication[master_id]
+---
+...
+master.id == master_id
+---
+- true
+...
+master.uuid == box.space._cluster:get(master_id)[2]
+---
+- true
+...
+test_run:wait_upstream(master_id, {status = 'follow'})
+---
+- true
+...
+master.upstream.lag < 1
+---
+- true
+...
+master.upstream.idle < 1
+---
+- true
+...
+master.upstream.peer:match("unix/")
+---
+- unix/
+...
+master.downstream == nil
+---
+- true
+...
+-- replica's status
+replica_id = box.info.id
+---
+...
+box.info.vclock[replica_id] == nil
+---
+- true
+...
+-- box.info.lsn == box.info.vclock[replica_id]
+box.info.lsn == 0
+---
+- true
+...
+replica = box.info.replication[replica_id]
+---
+...
+replica.id == replica_id
+---
+- true
+...
+replica.uuid == box.space._cluster:get(replica_id)[2]
+---
+- true
+...
+-- replica.lsn == box.info.vclock[replica_id]
+replica.lsn == 0
+---
+- true
+...
+replica.upstream == nil
+---
+- true
+...
+replica.downstream == nil
+---
+- true
+...
+--
+-- ClientError during replication
+--
+test_run:cmd('switch replica')
+---
+- true
+...
+box.space._schema:insert({'dup'})
+---
+- ['dup']
+...
+test_run:cmd('switch default')
+---
+- true
+...
+box.space._schema:insert({'dup'})
+---
+- ['dup']
+...
+test_run:cmd('switch replica')
+---
+- true
+...
+test_run:wait_upstream(1, {status = 'stopped', message_re = 'Duplicate'})
+---
+- true
+...
+test_run:cmd('switch default')
+---
+- true
+...
+box.space._schema:delete({'dup'})
+---
+- ['dup']
+...
+test_run:cmd("push filter ', lsn: [0-9]+' to ', lsn: <number>'")
+---
+- true
+...
+test_run:grep_log('replica', 'error applying row: .*')
+---
+- 'error applying row: {type: ''INSERT'', replica_id: 1, lsn: <number>, space_id: 272, index_id:
+  0, tuple: ["dup"]}'
+...
+test_run:cmd("clear filter")
+---
+- true
+...
+--
+-- Check box.info.replication login
+--
+test_run:cmd('switch replica')
+---
+- true
+...
+test_run:cmd("set variable master_port to 'replica.master'")
+---
+- true
+...
+replica_uri = os.getenv("LISTEN")
+---
+...
+box.cfg{replication = {"guest@unix/:" .. master_port, replica_uri}}
+---
+...
+master_id = test_run:get_server_id('default')
+---
+...
+master = box.info.replication[master_id]
+---
+...
+master.id == master_id
+---
+- true
+...
+master.upstream.status == "follow"
+---
+- false
+...
+master.upstream.peer:match("guest")
+---
+- guest
+...
+master.upstream.peer:match("unix/")
+---
+- unix/
+...
+master.downstream == nil
+---
+- true
+...
+test_run:cmd('switch default')
+---
+- true
+...
+--
+-- Cleanup
+--
+box.schema.user.revoke('guest', 'replication')
+---
+...
+test_run:cmd("stop server replica")
+---
+- true
+...
+test_run:cmd("cleanup server replica")
+---
+- true
+...
+test_run:cmd("delete server replica")
+---
+- true
+...
+test_run:cleanup_cluster()
+---
+...

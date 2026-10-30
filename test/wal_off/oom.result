@@ -1,0 +1,303 @@
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+test_run:cmd('restart server default with cleanup=1')
+test_run:cmd("push filter 'error: Failed to allocate [0-9]+ ' to 'error: Failed to allocate <NUM> '")
+---
+- true
+...
+space = box.schema.space.create('tweedledum')
+---
+...
+index = space:create_index('primary')
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+i = 1;
+---
+...
+while true do
+    space:insert{space:len(), string.rep('test', i)}
+    i = i + 1
+end;
+---
+- error: Failed to allocate <NUM> bytes in slab allocator for memtx_tuple
+...
+space:len() > 5000;
+---
+- true
+...
+i = 1;
+---
+...
+while true do
+    space:insert{space:len(), string.rep('test', i)}
+    i = i + 1
+end;
+---
+- error: Failed to allocate <NUM> bytes in slab allocator for memtx_tuple
+...
+space:len() > 5000;
+---
+- true
+...
+i = 1;
+---
+...
+while true do
+    space:insert{space:len(), string.rep('test', i)}
+    i = i + 1
+end;
+---
+- error: Failed to allocate <NUM> bytes in slab allocator for memtx_tuple
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+space:len() > 5000
+---
+- true
+...
+space.index['primary']:get{0}
+---
+- [0, 'test']
+...
+space.index['primary']:get{5}
+---
+- [5, 'testtesttesttesttesttest']
+...
+space.index['primary']:get{9}
+---
+- [9, 'testtesttesttesttesttesttesttesttesttest']
+...
+space.index['primary']:get{11}
+---
+- [11, 'testtesttesttesttesttesttesttesttesttesttesttest']
+...
+space.index['primary']:get{15}
+---
+- [15, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+...
+-- check that iterators work
+i = 0
+---
+...
+t = {}
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+for state, v in space:pairs() do
+    table.insert(t, v)
+    i = i + 1
+    if i == 50 then
+        break
+    end
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+t
+---
+- - [0, 'test']
+  - [1, 'testtest']
+  - [2, 'testtesttest']
+  - [3, 'testtesttesttest']
+  - [4, 'testtesttesttesttest']
+  - [5, 'testtesttesttesttesttest']
+  - [6, 'testtesttesttesttesttesttest']
+  - [7, 'testtesttesttesttesttesttesttest']
+  - [8, 'testtesttesttesttesttesttesttesttest']
+  - [9, 'testtesttesttesttesttesttesttesttesttest']
+  - [10, 'testtesttesttesttesttesttesttesttesttesttest']
+  - [11, 'testtesttesttesttesttesttesttesttesttesttesttest']
+  - [12, 'testtesttesttesttesttesttesttesttesttesttesttesttest']
+  - [13, 'testtesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [14, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [15, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [16, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [17, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [18, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [19, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [20, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [21, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [22, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [23, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [24, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [25, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [26, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [27, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [28, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [29, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [30, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [31, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [32, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [33, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [34, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [35, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [36, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [37, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [38, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [39, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [40, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [41, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [42, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [43, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [44, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [45, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [46, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [47, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [48, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [49, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+...
+-- TODO(gh-3807) - may fail to truncate due to memory limit is reached
+box.cfg{memtx_memory = box.cfg.memtx_memory + 1024}
+---
+...
+space:truncate()
+---
+...
+space:insert{0, 'test'}
+---
+- [0, 'test']
+...
+space.index['primary']:get{0}
+---
+- [0, 'test']
+...
+collectgarbage('collect')
+---
+- 0
+...
+--
+-- Check that statement-level rollback does not leak tuples
+--
+space:truncate()
+---
+...
+function insert(a) space:insert(a) end
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+function dup_key()
+    box.begin()
+    space:insert{1}
+    local i = 1
+    while i < 2000 do
+        local status, _ = pcall(insert, {1, string.rep('test', i)})
+        if status then
+            error('Unexpected success when inserting a duplicate')
+        end
+        if box.error.last().code ~= box.error.TUPLE_FOUND then
+            box.error()
+        end
+        i = i + 1
+    end
+    box.commit()
+    return i
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+dup_key()
+---
+- 2000
+...
+space:select{}
+---
+- - [1]
+...
+--
+-- Cleanup
+--
+space:drop()
+---
+...
+t = nil
+---
+...
+-- https://github.com/tarantool/tarantool/issues/962 index:delete() failed
+test_run:cmd('restart server default')
+arena_bytes = box.cfg.memtx_memory
+---
+...
+str = string.rep('a', 15000) -- about size of index memory block
+---
+...
+space = box.schema.space.create('tweedledum')
+---
+...
+index = space:create_index('primary')
+---
+...
+collectgarbage('collect')
+---
+- 0
+...
+for i=1,10492 do space:insert{i, str} end
+---
+- error: Failed to allocate <NUM> bytes in slab allocator for memtx_tuple
+...
+definitely_used = index:count() * 16 * 1024
+---
+...
+2 * definitely_used > arena_bytes -- at least half memory used
+---
+- true
+...
+to_del = index:count()
+---
+...
+for i=1,to_del do space:delete{i} end
+---
+...
+index:count()
+---
+- 0
+...
+collectgarbage('collect')
+---
+- 0
+...
+for i=1,10492 do space:insert{i, str} end
+---
+- error: Failed to allocate <NUM> bytes in slab allocator for memtx_tuple
+...
+definitely_used = index:count() * 16 * 1024
+---
+...
+2 * definitely_used > arena_bytes -- at least half memory used
+---
+- true
+...
+space:truncate()
+---
+...
+index:count()
+---
+- 0
+...
+space:drop()
+---
+...
+str = nil
+---
+...

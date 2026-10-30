@@ -1,0 +1,53 @@
+name: Install Deps Debian
+
+description: Install build and test dependencies on Debian-based systems
+
+runs:
+  using: composite
+  steps:
+    - run: |
+        # GitHub-hosted runners run the steps as a regular user.
+        SUDO=$([ "$(id -u)" = 0 ] || echo sudo)
+        ${SUDO} apt-get --allow-releaseinfo-change update
+        ${SUDO} apt-get -y -f install \
+          build-essential \
+          ninja-build \
+          lua5.1 \
+          luarocks \
+          lcov \
+          ruby-dev \
+          liblz4-dev \
+          libbenchmark-dev \
+          autoconf \
+          automake \
+          libtool \
+          util-linux
+        # Install cmake 3.26.0 if cmake was missing or the cmake version was
+        # less than 3.26.0.
+        CMAKE_VERSION=3.26.0
+        version_gt() {
+          [ "$1" != "$2" ] && [ "$2" = "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" ]
+        }
+        CURRENT_VERSION="0.0.0"
+        if command -v cmake >/dev/null 2>&1; then
+          CURRENT_VERSION=$(cmake --version | head -n 1 | awk '{print $3}')
+        fi
+        if version_gt "$CMAKE_VERSION" "$CURRENT_VERSION"; then
+          ${SUDO} apt-get purge --auto-remove cmake -y
+          ARCH=$(uname -m)
+          curl -f -O -L https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-${ARCH}.tar.gz
+          ${SUDO} tar -xvf cmake-${CMAKE_VERSION}-linux-${ARCH}.tar.gz -C /usr/local --strip-components=1
+          rm cmake-${CMAKE_VERSION}-linux-${ARCH}.tar.gz
+        fi
+        # (Re)install luacheck only if it is not installed (or if another
+        # version is installed).
+        #
+        # This reduces amount of failures when connectivity to luarocks.org is
+        # unreliable. See the following issues for details:
+        #
+        # https://github.com/tarantool/tarantool/issues/12600
+        # https://github.com/tarantool/tarantool/issues/12783
+        luarocks show luacheck 0.26.1 ||
+          ${SUDO} luarocks install luacheck 0.26.1
+        ${SUDO} gem install coveralls-lcov
+      shell: bash

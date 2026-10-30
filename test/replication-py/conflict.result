@@ -1,0 +1,63 @@
+box.schema.user.grant('guest', 'replication')
+---
+...
+reset master-master replication
+parallel send: box.space.test:update(1, {{'#', 2, 1}})
+parallel send: box.space.test:update(1, {{'#', 2, 1}})
+replication state is correct
+box.space.test:select{1}
+---
+- - [1]
+...
+box.space.test:select{1}
+---
+- - [1]
+...
+reset master-master replication
+parallel send: box.space.test:insert{20, 1}
+parallel send: box.space.test:insert{20, 2}
+replication state is correct
+reset master-master replication
+parallel send: box.space.test:update(2, {{'=', 2, 1}})
+parallel send: box.space.test:update(2, {{'=', 2, 2}})
+replication state is correct
+reset master-master replication
+parallel send: box.space.test:update(1, {{'+', 2, 1}})
+parallel send: box.space.test:update(1, {{'+', 2, 2}})
+replication state is correct
+box.space.test:select{1}
+---
+- - [1, 4]
+...
+box.space.test:select{1}
+---
+- - [1, 4]
+...
+reset master-master replication
+parallel send: box.space.test:delete(999)
+parallel send: box.space.test:delete(999)
+replication state is correct
+box.space.test:select{}
+---
+- - [1, 1]
+  - [2, 4]
+  - [3, 9]
+  - [4, 16]
+  - [5, 25]
+  - [6, 36]
+  - [7, 49]
+  - [8, 64]
+  - [9, 81]
+...
+box.space.test:select{}
+---
+- - [1, 1]
+  - [2, 4]
+  - [3, 9]
+  - [4, 16]
+  - [5, 25]
+  - [6, 36]
+  - [7, 49]
+  - [8, 64]
+  - [9, 81]
+...

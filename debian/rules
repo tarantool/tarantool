@@ -1,0 +1,58 @@
+#!/usr/bin/make -f
+
+
+VERSION  := $(shell dpkg-parsechangelog|grep ^Version|awk '{print $$2}')
+UVERSION := $(shell echo $(VERSION)|sed 's/-[[:digit:]]\+$$//')
+CMAKE_BUILD_TYPE := $(shell echo $${CMAKE_BUILD_TYPE:-RelWithDebInfo})
+
+DEB_CMAKE_EXTRA_FLAGS := \
+	-DCMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE) \
+	-DCMAKE_INSTALL_LIBDIR=lib/$(DEB_HOST_MULTIARCH) \
+	-DCMAKE_INSTALL_SYSCONFDIR=/etc \
+	-DCMAKE_INSTALL_LOCALSTATEDIR=/var \
+	-DENABLE_DIST=ON
+
+# Append -DLUAJIT_ENABLE_GC64=ON flag if ${GC64} env variable is 'true'.
+ifeq ($(GC64), true)
+	DEB_CMAKE_EXTRA_FLAGS += -DLUAJIT_ENABLE_GC64=ON
+endif
+
+ifneq ($(MAKE_CHECK), false)
+	DEB_MAKE_CHECK_TARGET := test-force
+endif
+
+DEB_DH_INSTALLINIT_ARGS                     := --name=tarantool
+
+# Needed for proper backtraces in fiber.info()
+DEB_DH_STRIP_ARGS	        := -X/usr/bin/tarantool
+DPKG_EXPORT_BUILDFLAGS = 1
+
+include /usr/share/dpkg/buildflags.mk
+include /usr/share/cdbs/1/rules/debhelper.mk
+include /usr/share/cdbs/1/class/cmake.mk
+
+tarball: clean
+	git describe --long --always > VERSION
+	tar --exclude=.git --exclude=debian 		\
+		--exclude=doc/www					\
+		--exclude=doc/sphinx				\
+		--exclude=src/lib/small/debian		\
+		--exclude=src/lib/msgpuck/debian    \
+		--exclude=test-run/lib/tarantool-python/debian \
+		--exclude=third_party/luafun/debian \
+		--exclude=FreeBSD \
+		--exclude="*.exe" \
+		--exclude="*.dll" \
+		--transform='s,^\.,tarantool_$(UVERSION),S' \
+		-czf ../tarantool_$(UVERSION).orig.tar.gz .
+
+clean::
+	find -type f -name \*.pyc -delete
+	find -type d -name CMakeFiles -exec rm -fr '{}' +
+	rm -f CMakeCache.txt
+	rm -f CPackConfig.cmake
+	rm -f CPackSourceConfig.cmake
+	rm -f src/trivia/config.h
+
+install/tarantool::
+

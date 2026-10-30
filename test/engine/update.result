@@ -1,0 +1,1212 @@
+test_run = require('test_run')
+---
+...
+inspector = test_run.new()
+---
+...
+engine = inspector:get_cfg('engine')
+---
+...
+-- update (str)
+space = box.schema.space.create('test', { engine = engine })
+---
+...
+index = space:create_index('primary', { type = 'tree', parts = {1, 'string'} })
+---
+...
+for key = 1, 100 do space:replace({tostring(key)}) end
+---
+...
+for key = 1, 100 do space:update({tostring(key)}, {{'=', 2, key}}) end
+---
+...
+t = {}
+---
+...
+for key = 1, 100 do table.insert(t, space:get({tostring(key)})) end
+---
+...
+t
+---
+- - ['1', 1]
+  - ['2', 2]
+  - ['3', 3]
+  - ['4', 4]
+  - ['5', 5]
+  - ['6', 6]
+  - ['7', 7]
+  - ['8', 8]
+  - ['9', 9]
+  - ['10', 10]
+  - ['11', 11]
+  - ['12', 12]
+  - ['13', 13]
+  - ['14', 14]
+  - ['15', 15]
+  - ['16', 16]
+  - ['17', 17]
+  - ['18', 18]
+  - ['19', 19]
+  - ['20', 20]
+  - ['21', 21]
+  - ['22', 22]
+  - ['23', 23]
+  - ['24', 24]
+  - ['25', 25]
+  - ['26', 26]
+  - ['27', 27]
+  - ['28', 28]
+  - ['29', 29]
+  - ['30', 30]
+  - ['31', 31]
+  - ['32', 32]
+  - ['33', 33]
+  - ['34', 34]
+  - ['35', 35]
+  - ['36', 36]
+  - ['37', 37]
+  - ['38', 38]
+  - ['39', 39]
+  - ['40', 40]
+  - ['41', 41]
+  - ['42', 42]
+  - ['43', 43]
+  - ['44', 44]
+  - ['45', 45]
+  - ['46', 46]
+  - ['47', 47]
+  - ['48', 48]
+  - ['49', 49]
+  - ['50', 50]
+  - ['51', 51]
+  - ['52', 52]
+  - ['53', 53]
+  - ['54', 54]
+  - ['55', 55]
+  - ['56', 56]
+  - ['57', 57]
+  - ['58', 58]
+  - ['59', 59]
+  - ['60', 60]
+  - ['61', 61]
+  - ['62', 62]
+  - ['63', 63]
+  - ['64', 64]
+  - ['65', 65]
+  - ['66', 66]
+  - ['67', 67]
+  - ['68', 68]
+  - ['69', 69]
+  - ['70', 70]
+  - ['71', 71]
+  - ['72', 72]
+  - ['73', 73]
+  - ['74', 74]
+  - ['75', 75]
+  - ['76', 76]
+  - ['77', 77]
+  - ['78', 78]
+  - ['79', 79]
+  - ['80', 80]
+  - ['81', 81]
+  - ['82', 82]
+  - ['83', 83]
+  - ['84', 84]
+  - ['85', 85]
+  - ['86', 86]
+  - ['87', 87]
+  - ['88', 88]
+  - ['89', 89]
+  - ['90', 90]
+  - ['91', 91]
+  - ['92', 92]
+  - ['93', 93]
+  - ['94', 94]
+  - ['95', 95]
+  - ['96', 96]
+  - ['97', 97]
+  - ['98', 98]
+  - ['99', 99]
+  - ['100', 100]
+...
+space:update({tostring(101)}, {{'=', 2, 101}})
+---
+...
+space:get({tostring(101)})
+---
+...
+space:drop()
+---
+...
+-- update (num)
+space = box.schema.space.create('test', { engine = engine })
+---
+...
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
+---
+...
+for key = 1, 100 do space:replace({key}) end
+---
+...
+for key = 1, 100 do space:update({key}, {{'=', 2, key}}) end
+---
+...
+t = {}
+---
+...
+for key = 1, 100 do table.insert(t, space:get({key})) end
+---
+...
+t
+---
+- - [1, 1]
+  - [2, 2]
+  - [3, 3]
+  - [4, 4]
+  - [5, 5]
+  - [6, 6]
+  - [7, 7]
+  - [8, 8]
+  - [9, 9]
+  - [10, 10]
+  - [11, 11]
+  - [12, 12]
+  - [13, 13]
+  - [14, 14]
+  - [15, 15]
+  - [16, 16]
+  - [17, 17]
+  - [18, 18]
+  - [19, 19]
+  - [20, 20]
+  - [21, 21]
+  - [22, 22]
+  - [23, 23]
+  - [24, 24]
+  - [25, 25]
+  - [26, 26]
+  - [27, 27]
+  - [28, 28]
+  - [29, 29]
+  - [30, 30]
+  - [31, 31]
+  - [32, 32]
+  - [33, 33]
+  - [34, 34]
+  - [35, 35]
+  - [36, 36]
+  - [37, 37]
+  - [38, 38]
+  - [39, 39]
+  - [40, 40]
+  - [41, 41]
+  - [42, 42]
+  - [43, 43]
+  - [44, 44]
+  - [45, 45]
+  - [46, 46]
+  - [47, 47]
+  - [48, 48]
+  - [49, 49]
+  - [50, 50]
+  - [51, 51]
+  - [52, 52]
+  - [53, 53]
+  - [54, 54]
+  - [55, 55]
+  - [56, 56]
+  - [57, 57]
+  - [58, 58]
+  - [59, 59]
+  - [60, 60]
+  - [61, 61]
+  - [62, 62]
+  - [63, 63]
+  - [64, 64]
+  - [65, 65]
+  - [66, 66]
+  - [67, 67]
+  - [68, 68]
+  - [69, 69]
+  - [70, 70]
+  - [71, 71]
+  - [72, 72]
+  - [73, 73]
+  - [74, 74]
+  - [75, 75]
+  - [76, 76]
+  - [77, 77]
+  - [78, 78]
+  - [79, 79]
+  - [80, 80]
+  - [81, 81]
+  - [82, 82]
+  - [83, 83]
+  - [84, 84]
+  - [85, 85]
+  - [86, 86]
+  - [87, 87]
+  - [88, 88]
+  - [89, 89]
+  - [90, 90]
+  - [91, 91]
+  - [92, 92]
+  - [93, 93]
+  - [94, 94]
+  - [95, 95]
+  - [96, 96]
+  - [97, 97]
+  - [98, 98]
+  - [99, 99]
+  - [100, 100]
+...
+space:update({101}, {{'=', 2, 101}})
+---
+...
+space:get({101})
+---
+...
+space:drop()
+---
+...
+-- update multi-part (num, num)
+space = box.schema.space.create('test', { engine = engine })
+---
+...
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned', 2, 'unsigned'} })
+---
+...
+for key = 1, 100 do space:replace({key, key}) end
+---
+...
+for key = 1, 100 do space:update({key, key}, {{'=', 3, key}}) end
+---
+...
+t = {}
+---
+...
+for key = 1, 100 do table.insert(t, space:get({key, key})) end
+---
+...
+t
+---
+- - [1, 1, 1]
+  - [2, 2, 2]
+  - [3, 3, 3]
+  - [4, 4, 4]
+  - [5, 5, 5]
+  - [6, 6, 6]
+  - [7, 7, 7]
+  - [8, 8, 8]
+  - [9, 9, 9]
+  - [10, 10, 10]
+  - [11, 11, 11]
+  - [12, 12, 12]
+  - [13, 13, 13]
+  - [14, 14, 14]
+  - [15, 15, 15]
+  - [16, 16, 16]
+  - [17, 17, 17]
+  - [18, 18, 18]
+  - [19, 19, 19]
+  - [20, 20, 20]
+  - [21, 21, 21]
+  - [22, 22, 22]
+  - [23, 23, 23]
+  - [24, 24, 24]
+  - [25, 25, 25]
+  - [26, 26, 26]
+  - [27, 27, 27]
+  - [28, 28, 28]
+  - [29, 29, 29]
+  - [30, 30, 30]
+  - [31, 31, 31]
+  - [32, 32, 32]
+  - [33, 33, 33]
+  - [34, 34, 34]
+  - [35, 35, 35]
+  - [36, 36, 36]
+  - [37, 37, 37]
+  - [38, 38, 38]
+  - [39, 39, 39]
+  - [40, 40, 40]
+  - [41, 41, 41]
+  - [42, 42, 42]
+  - [43, 43, 43]
+  - [44, 44, 44]
+  - [45, 45, 45]
+  - [46, 46, 46]
+  - [47, 47, 47]
+  - [48, 48, 48]
+  - [49, 49, 49]
+  - [50, 50, 50]
+  - [51, 51, 51]
+  - [52, 52, 52]
+  - [53, 53, 53]
+  - [54, 54, 54]
+  - [55, 55, 55]
+  - [56, 56, 56]
+  - [57, 57, 57]
+  - [58, 58, 58]
+  - [59, 59, 59]
+  - [60, 60, 60]
+  - [61, 61, 61]
+  - [62, 62, 62]
+  - [63, 63, 63]
+  - [64, 64, 64]
+  - [65, 65, 65]
+  - [66, 66, 66]
+  - [67, 67, 67]
+  - [68, 68, 68]
+  - [69, 69, 69]
+  - [70, 70, 70]
+  - [71, 71, 71]
+  - [72, 72, 72]
+  - [73, 73, 73]
+  - [74, 74, 74]
+  - [75, 75, 75]
+  - [76, 76, 76]
+  - [77, 77, 77]
+  - [78, 78, 78]
+  - [79, 79, 79]
+  - [80, 80, 80]
+  - [81, 81, 81]
+  - [82, 82, 82]
+  - [83, 83, 83]
+  - [84, 84, 84]
+  - [85, 85, 85]
+  - [86, 86, 86]
+  - [87, 87, 87]
+  - [88, 88, 88]
+  - [89, 89, 89]
+  - [90, 90, 90]
+  - [91, 91, 91]
+  - [92, 92, 92]
+  - [93, 93, 93]
+  - [94, 94, 94]
+  - [95, 95, 95]
+  - [96, 96, 96]
+  - [97, 97, 97]
+  - [98, 98, 98]
+  - [99, 99, 99]
+  - [100, 100, 100]
+...
+space:update({101, 101}, {{'=', 3, 101}})
+---
+...
+space:get({101, 101})
+---
+...
+space:drop()
+---
+...
+-- update with box.tuple.new
+space = box.schema.space.create('test', { engine = engine })
+---
+...
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned', 2, 'unsigned'} })
+---
+...
+for key = 1, 100 do space:replace({key, key}) end
+---
+...
+for key = 1, 100 do space:update(box.tuple.new{key, key}, box.tuple.new{{'=', 3, key}}) end
+---
+...
+t = {}
+---
+...
+for key = 1, 100 do table.insert(t, space:get({key, key})) end
+---
+...
+t
+---
+- - [1, 1, 1]
+  - [2, 2, 2]
+  - [3, 3, 3]
+  - [4, 4, 4]
+  - [5, 5, 5]
+  - [6, 6, 6]
+  - [7, 7, 7]
+  - [8, 8, 8]
+  - [9, 9, 9]
+  - [10, 10, 10]
+  - [11, 11, 11]
+  - [12, 12, 12]
+  - [13, 13, 13]
+  - [14, 14, 14]
+  - [15, 15, 15]
+  - [16, 16, 16]
+  - [17, 17, 17]
+  - [18, 18, 18]
+  - [19, 19, 19]
+  - [20, 20, 20]
+  - [21, 21, 21]
+  - [22, 22, 22]
+  - [23, 23, 23]
+  - [24, 24, 24]
+  - [25, 25, 25]
+  - [26, 26, 26]
+  - [27, 27, 27]
+  - [28, 28, 28]
+  - [29, 29, 29]
+  - [30, 30, 30]
+  - [31, 31, 31]
+  - [32, 32, 32]
+  - [33, 33, 33]
+  - [34, 34, 34]
+  - [35, 35, 35]
+  - [36, 36, 36]
+  - [37, 37, 37]
+  - [38, 38, 38]
+  - [39, 39, 39]
+  - [40, 40, 40]
+  - [41, 41, 41]
+  - [42, 42, 42]
+  - [43, 43, 43]
+  - [44, 44, 44]
+  - [45, 45, 45]
+  - [46, 46, 46]
+  - [47, 47, 47]
+  - [48, 48, 48]
+  - [49, 49, 49]
+  - [50, 50, 50]
+  - [51, 51, 51]
+  - [52, 52, 52]
+  - [53, 53, 53]
+  - [54, 54, 54]
+  - [55, 55, 55]
+  - [56, 56, 56]
+  - [57, 57, 57]
+  - [58, 58, 58]
+  - [59, 59, 59]
+  - [60, 60, 60]
+  - [61, 61, 61]
+  - [62, 62, 62]
+  - [63, 63, 63]
+  - [64, 64, 64]
+  - [65, 65, 65]
+  - [66, 66, 66]
+  - [67, 67, 67]
+  - [68, 68, 68]
+  - [69, 69, 69]
+  - [70, 70, 70]
+  - [71, 71, 71]
+  - [72, 72, 72]
+  - [73, 73, 73]
+  - [74, 74, 74]
+  - [75, 75, 75]
+  - [76, 76, 76]
+  - [77, 77, 77]
+  - [78, 78, 78]
+  - [79, 79, 79]
+  - [80, 80, 80]
+  - [81, 81, 81]
+  - [82, 82, 82]
+  - [83, 83, 83]
+  - [84, 84, 84]
+  - [85, 85, 85]
+  - [86, 86, 86]
+  - [87, 87, 87]
+  - [88, 88, 88]
+  - [89, 89, 89]
+  - [90, 90, 90]
+  - [91, 91, 91]
+  - [92, 92, 92]
+  - [93, 93, 93]
+  - [94, 94, 94]
+  - [95, 95, 95]
+  - [96, 96, 96]
+  - [97, 97, 97]
+  - [98, 98, 98]
+  - [99, 99, 99]
+  - [100, 100, 100]
+...
+space:update({101, 101}, {{'=', 3, 101}})
+---
+...
+space:get({101, 101})
+---
+...
+space:drop()
+---
+...
+-- update multiple indices
+space = box.schema.space.create('test', { engine = engine })
+---
+...
+index1 = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned', 2, 'string'} })
+---
+...
+index2 = space:create_index('secondary', { type = 'tree', parts = {2, 'string'}, unique = false })
+---
+...
+index3 = space:create_index('third', { type = 'tree', parts = {3, 'scalar', 2, 'string', 1, 'unsigned'}, unique = false })
+---
+...
+space:insert({1, 'fwoen', 324})
+---
+- [1, 'fwoen', 324]
+...
+space:insert({2, 'fwoen', 123})
+---
+- [2, 'fwoen', 123]
+...
+space:insert({3, 'fwoen', 324})
+---
+- [3, 'fwoen', 324]
+...
+space:insert({4, '21qn2', 213})
+---
+- [4, '21qn2', 213]
+...
+space:insert({5, 'fgb', '231293'})
+---
+- [5, 'fgb', '231293']
+...
+space:insert({6, 'nrhjrt', -1231.234})
+---
+- [6, 'nrhjrt', -1231.234]
+...
+index1:update({1}, {{'+', 3, 10}})
+---
+- error: Invalid key part count in an exact match (expected 2, got 1)
+...
+index1:update({1, 'fwoen'}, {{'+', 3, 10}})
+---
+- [1, 'fwoen', 334]
+...
+index1:update({0, 'fwoen'}, {{'=', 3, 5}})
+---
+...
+index2:update({'fwoen'}, {'=', 3, 1000})
+---
+- error: Get() doesn't support partial keys and non-unique indexes
+...
+index3:update({324, 'fwoen', 3}, {{'-', 3, 100}})
+---
+- error: Get() doesn't support partial keys and non-unique indexes
+...
+space:drop()
+---
+...
+space = box.schema.space.create('test', { engine = engine })
+---
+...
+index1 = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
+---
+...
+index2 = space:create_index('secondary', { type = 'tree', parts = {2, 'unsigned'} })
+---
+...
+index3 = space:create_index('third', { type = 'tree', parts = {3, 'unsigned'}, unique = false })
+---
+...
+space:insert({1, 1, 1})
+---
+- [1, 1, 1]
+...
+space:insert({2, 2, 2})
+---
+- [2, 2, 2]
+...
+space:insert({3, 3, 3})
+---
+- [3, 3, 3]
+...
+space:select{}
+---
+- - [1, 1, 1]
+  - [2, 2, 2]
+  - [3, 3, 3]
+...
+space:update({1}, {{'=', 2, 2}, {'=', 3, 3}})
+---
+- error: Duplicate key exists in unique index "secondary" in space "test" with old
+    tuple - [2, 2, 2] and new tuple - [1, 2, 3]
+...
+index1:select{}
+---
+- - [1, 1, 1]
+  - [2, 2, 2]
+  - [3, 3, 3]
+...
+index2:select{}
+---
+- - [1, 1, 1]
+  - [2, 2, 2]
+  - [3, 3, 3]
+...
+index3:select{}
+---
+- - [1, 1, 1]
+  - [2, 2, 2]
+  - [3, 3, 3]
+...
+space:drop()
+---
+...
+-- https://github.com/tarantool/tarantool/issues/1854
+space = box.schema.space.create('test', { engine = engine })
+---
+...
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
+---
+...
+space:insert({1, 1, 1})
+---
+- [1, 1, 1]
+...
+space:insert({2, 2, 2})
+---
+- [2, 2, 2]
+...
+space:insert({3, 3, 3})
+---
+- [3, 3, 3]
+...
+space:select{}
+---
+- - [1, 1, 1]
+  - [2, 2, 2]
+  - [3, 3, 3]
+...
+space:update({2}, {})
+---
+- [2, 2, 2]
+...
+space:select{}
+---
+- - [1, 1, 1]
+  - [2, 2, 2]
+  - [3, 3, 3]
+...
+space:drop()
+---
+...
+--
+-- gh-3051 Lost format while tuple update
+--
+format = {}
+---
+...
+format[1] = {name = 'KEY', type = 'unsigned'}
+---
+...
+format[2] = {name = 'VAL', type = 'string'}
+---
+...
+s = box.schema.space.create('tst_sample', {engine = engine, format = format})
+---
+...
+pk = s:create_index('pk')
+---
+...
+s:insert({1, 'sss', '3', '4', '5', '6', '7'})
+---
+- [1, 'sss', '3', '4', '5', '6', '7']
+...
+aa = box.space.tst_sample:get(1)
+---
+...
+aa.VAL
+---
+- sss
+...
+aa = aa:update({{'=',2,'ssss'}})
+---
+...
+aa.VAL
+---
+- ssss
+...
+-- invalid update
+aa:update({{'=',2, 666}})
+---
+- error: 'Tuple field 2 (VAL) type does not match one required by operation: expected
+    string, got unsigned'
+...
+-- test transform integrity
+aa:transform(-1, 1)
+---
+- [1, 'ssss', '3', '4', '5', '6']
+...
+aa:transform(1, 6)
+---
+- ['7']
+...
+aa = nil
+---
+...
+s:upsert({2, 'wwwww'}, {{'=', 2, 'wwwww'}})
+---
+...
+box.space.tst_sample:get(2).VAL
+---
+- wwwww
+...
+s:upsert({2, 'wwwww2'}, {{'=', 2, 'wwwww2'}})
+---
+...
+box.space.tst_sample:get(2).VAL
+---
+- wwwww2
+...
+-- invalid upsert
+s:upsert({2, 666}, {{'=', 2, 666}})
+---
+- error: 'Tuple field 2 (VAL) type does not match one required by operation: expected
+    string, got unsigned'
+...
+s:drop()
+---
+...
+--
+-- gh-4242 Tuple is missing from secondary index after update.
+--
+s = box.schema.space.create('test', {engine = engine})
+---
+...
+pk = s:create_index('pk')
+---
+...
+sk = s:create_index('sk', {parts = {2, 'unsigned'}})
+---
+...
+s:insert{1, 1, 1}
+---
+- [1, 1, 1]
+...
+box.begin() s:update(1, {{'=', 2, 2}}) s:update(1, {{'=', 3, 2}}) box.commit()
+---
+...
+pk:select()
+---
+- - [1, 2, 2]
+...
+sk:select()
+---
+- - [1, 2, 2]
+...
+s:drop()
+---
+...
+--
+-- gh-1261: tuple update by JSON.
+-- At first, test tuple update by field names.
+--
+format = {}
+---
+...
+format[1] = {'field1', 'unsigned'}
+---
+...
+format[2] = {'field2', 'array'}
+---
+...
+format[3] = {'field3', 'map'}
+---
+...
+format[4] = {'field4', 'string'}
+---
+...
+format[5] = {'field5', 'any'}
+---
+...
+format[6] = {'field6', 'integer'}
+---
+...
+format[7] = {'[1]', 'unsigned'}
+---
+...
+s = box.schema.create_space('test', {format = format})
+---
+...
+pk = s:create_index('pk')
+---
+...
+t = s:replace{1, {10, 11, 12}, {a = 20, b = 21, c = 22}, 'abcdefgh', true, -100, 200}
+---
+...
+t:update({{'+', 'field1', 1}})
+---
+- [2, [10, 11, 12], {'b': 21, 'a': 20, 'c': 22}, 'abcdefgh', true, -100, 200]
+...
+t:update({{'=', 'field2', {13, 14, 15}}})
+---
+- [1, [13, 14, 15], {'b': 21, 'a': 20, 'c': 22}, 'abcdefgh', true, -100, 200]
+...
+t:update({{':', 'field4', 3, 3, 'bbccdd'}, {'+', 'field6', 50}, {'!', 7, 300}})
+---
+- [1, [10, 11, 12], {'b': 21, 'a': 20, 'c': 22}, 'abbbccddfgh', true, -50, 300, 200]
+...
+-- Any path is interpreted as a field name first. And only then
+-- as JSON.
+t:update({{'+', '[1]', 50}})
+---
+- [1, [10, 11, 12], {'b': 21, 'a': 20, 'c': 22}, 'abcdefgh', true, -100, 250]
+...
+s:update({1}, {{'=', 'field3', {d = 30, e = 31, f = 32}}})
+---
+- [1, [10, 11, 12], {'d': 30, 'f': 32, 'e': 31}, 'abcdefgh', true, -100, 200]
+...
+s:drop()
+---
+...
+--
+-- gh-3378: allow update absent nullable fields
+-- '!'
+s = box.schema.create_space('test', {engine = engine})
+---
+...
+pk = s:create_index('pk')
+---
+...
+s:replace{1, 2}
+---
+- [1, 2]
+...
+s:update({1}, {{'!', 4, 0}})
+---
+- [1, 2, null, 0]
+...
+_ = s:delete({1})
+---
+...
+-- '#'
+s:replace{1, 2}
+---
+- [1, 2]
+...
+s:update({1}, {{'#', 4, 1}})
+---
+- [1, 2]
+...
+s:drop()
+---
+...
+-- Update respects field_count
+s = box.schema.create_space('test', {engine = engine, field_count = 2})
+---
+...
+pk = s:create_index('pk')
+---
+...
+s:replace{1, 2}
+---
+- [1, 2]
+...
+s:update({1}, {{'!', 3, 0}})
+---
+- error: Tuple field count 3 does not match space field count 2
+...
+s:update({1}, {{'=', 3, 0}})
+---
+- error: Tuple field count 3 does not match space field count 2
+...
+s:drop()
+---
+...
+-- '='
+s = box.schema.create_space('test', {engine = engine})
+---
+...
+pk = s:create_index('pk')
+---
+...
+s:replace{1, 2}
+---
+- [1, 2]
+...
+s:update({1}, {{'=', 4, 0}})
+---
+- [1, 2, null, 0]
+...
+s:drop()
+---
+...
+-- Negative field number, fixed field_count
+format = {}
+---
+...
+format[1] = {name = 'field1', type = 'unsigned'}
+---
+...
+format[2] = {name = 'field2', type = 'unsigned'}
+---
+...
+format[3] = {name = 'field3', type = 'unsigned', is_nullable = true}
+---
+...
+format[4] = {name = 'field4', type = 'unsigned', is_nullable = true}
+---
+...
+s = box.schema.create_space('test', {engine = engine, format = format, field_count = 4})
+---
+...
+pk = s:create_index('pk')
+---
+...
+s:replace{1, 2, box.NULL, box.NULL}
+---
+- [1, 2, null, null]
+...
+s:update({1}, {{'!', -1, 42}})
+---
+- error: Tuple field count 5 does not match space field count 4
+...
+s:update({1}, {{'=', -1, 128}})
+---
+- [1, 2, null, 128]
+...
+s:drop()
+---
+...
+-- Negative field number, no field_count
+format = {}
+---
+...
+format[1] = {name = 'field1', type = 'unsigned'}
+---
+...
+format[2] = {name = 'field2', type = 'unsigned'}
+---
+...
+format[3] = {name = 'field3', type = 'unsigned', is_nullable = true}
+---
+...
+format[4] = {name = 'field4', type = 'unsigned', is_nullable = true}
+---
+...
+s = box.schema.create_space('test', {engine = engine, format = format})
+---
+...
+pk = s:create_index('pk')
+---
+...
+s:replace{1, 2}
+---
+- [1, 2]
+...
+s:update({1}, {{'!', -1, 42}})
+---
+- [1, 2, 42]
+...
+s:update({1}, {{'=', -1, 128}})
+---
+- [1, 2, 128]
+...
+s:drop()
+---
+...
+-- '#' doesn't trim nulls
+s = box.schema.create_space('test', {engine = engine})
+---
+...
+pk = s:create_index('pk')
+---
+...
+s:replace{1, 2}
+---
+- [1, 2]
+...
+s:update({1}, {{'!', 4, 0}})
+---
+- [1, 2, null, 0]
+...
+s:update({1}, {{'#', 4, 1}})
+---
+- [1, 2, null]
+...
+s:update({1}, {{'#', 3, 1}})
+---
+- [1, 2]
+...
+s:drop()
+---
+...
+-- Maps (fail if don't exist)
+format = {}
+---
+...
+format[1] = {name = 'field1', type = 'unsigned'}
+---
+...
+format[2] = {name = 'field2', type = 'map'}
+---
+...
+s = box.schema.create_space('test', {engine = engine, format = format})
+---
+...
+pk = s:create_index('pk')
+---
+...
+map = {key1 = 1, key2 = 2}
+---
+...
+s:replace{1, map}
+---
+- [1, {'key1': 1, 'key2': 2}]
+...
+s:update({1}, {{'!', 'field42', 0}})
+---
+- error: Field 'field42' was not found in the tuple
+...
+s:update({1}, {{'!', '[3].key1', 1}})
+---
+- error: Field ''[3].key1'' was not found in the tuple
+...
+s:update({1}, {{'!', 3, 3}})
+---
+- [1, {'key1': 1, 'key2': 2}, 3]
+...
+s:drop()
+---
+...
+-- Arrays (fail if don't exist)
+format = {}
+---
+...
+format[1] = {name = 'field1', type = 'unsigned'}
+---
+...
+format[2] = {name = 'field2', type = 'array'}
+---
+...
+s = box.schema.create_space('test', {engine = engine, format = format})
+---
+...
+pk = s:create_index('pk')
+---
+...
+arr = {11, 22, {111, 222}}
+---
+...
+s:replace{1, arr}
+---
+- [1, [11, 22, [111, 222]]]
+...
+s:update({1}, {{'!', '[2][42]', 0}})
+---
+- error: Field ''[2][42]'' was not found in the tuple
+...
+s:update({1}, {{'!', '[2][3][42]', 0}})
+---
+- error: Field ''[2][3][42]'' was not found in the tuple
+...
+s:drop()
+---
+...
+-- JSON (fail if don't exists)
+format = {}
+---
+...
+format[1] = {'field1', 'unsigned'};
+---
+...
+format[2] = {'field2', 'map'};
+---
+...
+format[3] = {'field3', 'array'};
+---
+...
+s = box.schema.create_space('test', {engine = engine, format = format})
+---
+...
+pk = s:create_index('pk')
+---
+...
+s:replace({1, {key1 = 'value'}, {1, 2}})
+---
+- [1, {'key1': 'value'}, [1, 2]]
+...
+-- it's okey, create new {key2, value} pair in map
+s:update({1}, {{'!', 'field2.key2', 0}})
+---
+- [1, {'key2': 0, 'key1': 'value'}, [1, 2]]
+...
+-- error: field3[5] was not found in the tuple
+s:update({1}, {{'!', 'field3[5]', 0}})
+---
+- error: Field ''field3[5]'' was not found in the tuple
+...
+-- error: field4.key1 was not found in the tuple
+s:update({1}, {{'!', 'field4.key1', 0}})
+---
+- error: Field 'field4.key1' was not found in the tuple
+...
+s:drop()
+---
+...
+--
+-- Autofill of nils is baned for nested arrays.
+--
+s = box.schema.create_space('test', {engine = engine})
+---
+...
+pk = s:create_index('pk')
+---
+...
+s:insert({1, 2, {11, 22}})
+---
+- [1, 2, [11, 22]]
+...
+-- When two operations are used for one array, internally it looks very similar
+-- to how the root array is represented. Still the ban should work.
+op1 = {'=', '[3][1]', 11}
+---
+...
+op2 = {'=', '[3][4]', 44}
+---
+...
+s:update({1}, {op1, op2})
+---
+- error: Field ''[3][4]'' was not found in the tuple
+...
+s:update({1}, {op1})
+---
+- [1, 2, [11, 22]]
+...
+s:update({1}, {op2})
+---
+- error: Field ''[3][4]'' was not found in the tuple
+...
+s:drop()
+---
+...
+format = {}
+---
+...
+format[1] = {name = 'field1', type = 'unsigned'}
+---
+...
+format[2] = {name = 'field2', type = 'unsigned', is_nullable = true}
+---
+...
+format[3] = {name = 'field3', type = 'unsigned', is_nullable = true}
+---
+...
+s = box.schema.create_space('test', {format = format})
+---
+...
+_ = s:create_index('pk')
+---
+...
+t = s:replace({1})
+---
+...
+t:update({{'=', 3, 3}})
+---
+- [1, null, 3]
+...
+t:update({{'=', '[3]', 3}})
+---
+- [1, null, 3]
+...
+t:update({{'=', 'field3', 3}})
+---
+- [1, null, 3]
+...
+s:drop()
+---
+...

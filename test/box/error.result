@@ -1,0 +1,1051 @@
+-- test-run result file version 2
+env = require('test_run')
+ | ---
+ | ...
+test_run = env.new()
+ | ---
+ | ...
+
+space = box.schema.space.create('tweedledum')
+ | ---
+ | ...
+index = space:create_index('primary', { type = 'hash' })
+ | ---
+ | ...
+
+box.error({code = 123, reason = 'test'})
+ | ---
+ | - error: test
+ | ...
+box.error(box.error.ILLEGAL_PARAMS, "foo")
+ | ---
+ | - error: foo
+ | ...
+box.error()
+ | ---
+ | - error: foo
+ | ...
+e = box.error.last()
+ | ---
+ | ...
+e
+ | ---
+ | - foo
+ | ...
+u = e:unpack()
+ | ---
+ | ...
+u.trace[1].line = nil
+ | ---
+ | ...
+u
+ | ---
+ | - code: 0
+ |   base_type: IllegalParams
+ |   type: IllegalParams
+ |   message: foo
+ |   trace:
+ |   - file: builtin/box/console.lua
+ | ...
+e.type
+ | ---
+ | - IllegalParams
+ | ...
+e.code
+ | ---
+ | - 0
+ | ...
+e.message
+ | ---
+ | - foo
+ | ...
+tostring(e)
+ | ---
+ | - foo
+ | ...
+e = nil
+ | ---
+ | ...
+box.error.clear()
+ | ---
+ | ...
+box.error.last()
+ | ---
+ | - null
+ | ...
+space = box.space.tweedledum
+ | ---
+ | ...
+
+--
+-- gh-2080: box.error() crashes with wrong parameters
+box.error(box.error.UNSUPPORTED, "x", "x%s")
+ | ---
+ | - error: x does not support x%s
+ | ...
+box.error(box.error.UNSUPPORTED, "x")
+ | ---
+ | - error: 'bad argument #3 to ''?'' (no value)'
+ | ...
+box.error(box.error.UNSUPPORTED)
+ | ---
+ | - error: 'box.error(): bad arguments'
+ | ...
+
+--
+-- gh-3031: allow to create an error object with no throwing it.
+--
+e = box.error.new(box.error.UNKNOWN)
+ | ---
+ | ...
+e
+ | ---
+ | - Unknown error
+ | ...
+e = box.error.new(box.error.CREATE_SPACE, "space", "error")
+ | ---
+ | ...
+e
+ | ---
+ | - 'Failed to create space ''space'': error'
+ | ...
+box.error.new()
+ | ---
+ | - error: 'box.error.new(): bad arguments'
+ | ...
+
+--
+-- gh-4489: box.error has __concat metamethod
+--
+test_run:cmd("push filter '(.builtin/.*.lua):[0-9]+' to '\\1'")
+ | ---
+ | - true
+ | ...
+e = box.error.new(box.error.UNKNOWN)
+ | ---
+ | ...
+'left side: ' .. e
+ | ---
+ | - 'left side: Unknown error'
+ | ...
+e .. ': right side'
+ | ---
+ | - 'Unknown error: right side'
+ | ...
+e .. nil
+ | ---
+ | - error: 'builtin/error.lua: attempt to concatenate local ''rhs'' (a nil value)'
+ | ...
+nil .. e
+ | ---
+ | - error: 'builtin/error.lua: attempt to concatenate local ''lhs'' (a nil value)'
+ | ...
+e .. box.NULL
+ | ---
+ | - error: 'builtin/error.lua: attempt to concatenate ''string'' and ''void *'''
+ | ...
+box.NULL .. e
+ | ---
+ | - error: 'builtin/error.lua: attempt to concatenate ''void *'' and ''string'''
+ | ...
+123 .. e
+ | ---
+ | - 123Unknown error
+ | ...
+e .. 123
+ | ---
+ | - Unknown error123
+ | ...
+e .. e
+ | ---
+ | - Unknown errorUnknown error
+ | ...
+e .. {}
+ | ---
+ | - error: 'builtin/error.lua: attempt to concatenate local ''rhs'' (a table value)'
+ | ...
+{} .. e
+ | ---
+ | - error: 'builtin/error.lua: attempt to concatenate local ''lhs'' (a table value)'
+ | ...
+-1ULL .. e
+ | ---
+ | - error: 'builtin/error.lua: attempt to concatenate ''uint64_t'' and ''string'''
+ | ...
+e .. -1ULL
+ | ---
+ | - error: 'builtin/error.lua: attempt to concatenate ''string'' and ''uint64_t'''
+ | ...
+1LL .. e
+ | ---
+ | - error: 'builtin/error.lua: attempt to concatenate ''int64_t'' and ''string'''
+ | ...
+e .. 1LL
+ | ---
+ | - error: 'builtin/error.lua: attempt to concatenate ''string'' and ''int64_t'''
+ | ...
+e = nil
+ | ---
+ | ...
+
+--
+-- System errors expose errno as a field.
+--
+_, err = require('fio').open('not_existing_file')
+ | ---
+ | ...
+type(err.errno)
+ | ---
+ | - number
+ | ...
+-- Errors not related to the standard library do
+-- not expose errno.
+err = box.error.new(box.error.PROC_LUA, "errno")
+ | ---
+ | ...
+type(err.errno)
+ | ---
+ | - nil
+ | ...
+
+t = {}
+ | ---
+ | ...
+test_run:cmd("setopt delimiter ';'")
+ | ---
+ | - true
+ | ...
+
+for k,v in pairs(box.error) do
+   if type(v) == 'number' and not k:startswith('TEST') then
+    t[v] = 'box.error.'..tostring(k)
+   end
+end;
+ | ---
+ | ...
+t;
+ | ---
+ | - 0: box.error.UNKNOWN
+ |   1: box.error.ILLEGAL_PARAMS
+ |   2: box.error.MEMORY_ISSUE
+ |   3: box.error.TUPLE_FOUND
+ |   5: box.error.UNSUPPORTED
+ |   7: box.error.READONLY
+ |   8: box.error.INJECTION
+ |   9: box.error.CREATE_SPACE
+ |   10: box.error.SPACE_EXISTS
+ |   11: box.error.DROP_SPACE
+ |   12: box.error.ALTER_SPACE
+ |   13: box.error.INDEX_TYPE
+ |   14: box.error.MODIFY_INDEX
+ |   15: box.error.LAST_DROP
+ |   16: box.error.TUPLE_FORMAT_LIMIT
+ |   17: box.error.DROP_PRIMARY_KEY
+ |   18: box.error.KEY_PART_TYPE
+ |   19: box.error.EXACT_MATCH
+ |   20: box.error.INVALID_MSGPACK
+ |   22: box.error.TUPLE_NOT_ARRAY
+ |   23: box.error.FIELD_TYPE
+ |   24: box.error.INDEX_PART_TYPE_MISMATCH
+ |   25: box.error.UPDATE_SPLICE
+ |   26: box.error.UPDATE_ARG_TYPE
+ |   27: box.error.FORMAT_MISMATCH_INDEX_PART
+ |   28: box.error.UNKNOWN_UPDATE_OP
+ |   29: box.error.UPDATE_FIELD
+ |   30: box.error.FUNCTION_TX_ACTIVE
+ |   31: box.error.KEY_PART_COUNT
+ |   32: box.error.PROC_LUA
+ |   33: box.error.NO_SUCH_PROC
+ |   34: box.error.NO_SUCH_TRIGGER
+ |   35: box.error.NO_SUCH_INDEX_ID
+ |   36: box.error.NO_SUCH_SPACE
+ |   37: box.error.NO_SUCH_FIELD_NO
+ |   38: box.error.EXACT_FIELD_COUNT
+ |   39: box.error.FIELD_MISSING
+ |   40: box.error.WAL_IO
+ |   41: box.error.MORE_THAN_ONE_TUPLE
+ |   42: box.error.ACCESS_DENIED
+ |   43: box.error.CREATE_USER
+ |   44: box.error.DROP_USER
+ |   45: box.error.NO_SUCH_USER
+ |   46: box.error.USER_EXISTS
+ |   47: box.error.CREDS_MISMATCH
+ |   48: box.error.UNKNOWN_REQUEST_TYPE
+ |   49: box.error.UNKNOWN_SCHEMA_OBJECT
+ |   50: box.error.CREATE_FUNCTION
+ |   51: box.error.NO_SUCH_FUNCTION
+ |   52: box.error.FUNCTION_EXISTS
+ |   53: box.error.BEFORE_REPLACE_RET
+ |   54: box.error.MULTISTATEMENT_TRANSACTION
+ |   55: box.error.TRIGGER_EXISTS
+ |   56: box.error.USER_MAX
+ |   57: box.error.NO_SUCH_ENGINE
+ |   58: box.error.RELOAD_CFG
+ |   59: box.error.CFG
+ |   60: box.error.SAVEPOINT_EMPTY_TX
+ |   61: box.error.NO_SUCH_SAVEPOINT
+ |   62: box.error.UNKNOWN_REPLICA
+ |   63: box.error.REPLICASET_UUID_MISMATCH
+ |   64: box.error.INVALID_UUID
+ |   65: box.error.REPLICASET_UUID_IS_RO
+ |   66: box.error.INSTANCE_UUID_MISMATCH
+ |   67: box.error.REPLICA_ID_IS_RESERVED
+ |   69: box.error.MISSING_REQUEST_FIELD
+ |   70: box.error.IDENTIFIER
+ |   71: box.error.DROP_FUNCTION
+ |   72: box.error.ITERATOR_TYPE
+ |   73: box.error.REPLICA_MAX
+ |   77: box.error.NO_CONNECTION
+ |   78: box.error.TIMEOUT
+ |   79: box.error.ACTIVE_TRANSACTION
+ |   80: box.error.CURSOR_NO_TRANSACTION
+ |   82: box.error.NO_SUCH_ROLE
+ |   83: box.error.ROLE_EXISTS
+ |   84: box.error.CREATE_ROLE
+ |   85: box.error.INDEX_EXISTS
+ |   86: box.error.SESSION_CLOSED
+ |   87: box.error.ROLE_LOOP
+ |   88: box.error.GRANT
+ |   89: box.error.PRIV_GRANTED
+ |   90: box.error.ROLE_GRANTED
+ |   91: box.error.PRIV_NOT_GRANTED
+ |   92: box.error.ROLE_NOT_GRANTED
+ |   93: box.error.MISSING_SNAPSHOT
+ |   94: box.error.CANT_UPDATE_PRIMARY_KEY
+ |   95: box.error.UPDATE_INTEGER_OVERFLOW
+ |   96: box.error.GUEST_USER_PASSWORD
+ |   97: box.error.TRANSACTION_CONFLICT
+ |   98: box.error.UNSUPPORTED_PRIV
+ |   99: box.error.LOAD_FUNCTION
+ |   100: box.error.FUNCTION_LANGUAGE
+ |   101: box.error.RTREE_RECT
+ |   102: box.error.PROC_C
+ |   104: box.error.PROTOCOL
+ |   106: box.error.WRONG_INDEX_RECORD
+ |   107: box.error.WRONG_INDEX_PARTS
+ |   108: box.error.WRONG_INDEX_OPTIONS
+ |   109: box.error.WRONG_SCHEMA_VERSION
+ |   110: box.error.MEMTX_MAX_TUPLE_SIZE
+ |   111: box.error.WRONG_SPACE_OPTIONS
+ |   112: box.error.UNSUPPORTED_INDEX_FEATURE
+ |   113: box.error.VIEW_IS_RO
+ |   114: box.error.NO_TRANSACTION
+ |   115: box.error.SYSTEM
+ |   116: box.error.LOADING
+ |   117: box.error.CONNECTION_TO_SELF
+ |   119: box.error.COMPRESSION
+ |   120: box.error.CHECKPOINT_IN_PROGRESS
+ |   121: box.error.SUB_STMT_MAX
+ |   122: box.error.COMMIT_IN_SUB_STMT
+ |   123: box.error.ROLLBACK_IN_SUB_STMT
+ |   124: box.error.DECOMPRESSION
+ |   125: box.error.INVALID_XLOG_TYPE
+ |   126: box.error.ALREADY_RUNNING
+ |   127: box.error.INDEX_FIELD_COUNT_LIMIT
+ |   128: box.error.LOCAL_INSTANCE_ID_IS_READ_ONLY
+ |   129: box.error.BACKUP_IN_PROGRESS
+ |   130: box.error.READ_VIEW_ABORTED
+ |   131: box.error.INVALID_INDEX_FILE
+ |   132: box.error.INVALID_RUN_FILE
+ |   133: box.error.INVALID_VYLOG_FILE
+ |   134: box.error.CASCADE_ROLLBACK
+ |   135: box.error.VY_QUOTA_TIMEOUT
+ |   136: box.error.PARTIAL_KEY
+ |   137: box.error.TRUNCATE_SYSTEM_SPACE
+ |   138: box.error.LOAD_MODULE
+ |   139: box.error.VINYL_MAX_TUPLE_SIZE
+ |   140: box.error.WRONG_DD_VERSION
+ |   141: box.error.WRONG_SPACE_FORMAT
+ |   142: box.error.CREATE_SEQUENCE
+ |   143: box.error.ALTER_SEQUENCE
+ |   144: box.error.DROP_SEQUENCE
+ |   145: box.error.NO_SUCH_SEQUENCE
+ |   146: box.error.SEQUENCE_EXISTS
+ |   147: box.error.SEQUENCE_OVERFLOW
+ |   148: box.error.NO_SUCH_INDEX_NAME
+ |   149: box.error.SPACE_FIELD_IS_DUPLICATE
+ |   150: box.error.CANT_CREATE_COLLATION
+ |   151: box.error.WRONG_COLLATION_OPTIONS
+ |   152: box.error.NULLABLE_PRIMARY
+ |   153: box.error.NO_SUCH_FIELD_NAME_IN_SPACE
+ |   154: box.error.TRANSACTION_YIELD
+ |   155: box.error.NO_SUCH_GROUP
+ |   157: box.error.SQL_BIND_TYPE
+ |   158: box.error.SQL_BIND_PARAMETER_MAX
+ |   159: box.error.SQL_EXECUTE
+ |   160: box.error.UPDATE_DECIMAL_OVERFLOW
+ |   161: box.error.SQL_BIND_NOT_FOUND
+ |   162: box.error.ACTION_MISMATCH
+ |   163: box.error.VIEW_MISSING_SQL
+ |   164: box.error.FOREIGN_KEY_CONSTRAINT
+ |   165: box.error.NO_SUCH_MODULE
+ |   166: box.error.NO_SUCH_COLLATION
+ |   167: box.error.CREATE_FK_CONSTRAINT
+ |   169: box.error.NO_SUCH_CONSTRAINT
+ |   170: box.error.CONSTRAINT_EXISTS
+ |   171: box.error.SQL_TYPE_MISMATCH
+ |   172: box.error.ROWID_OVERFLOW
+ |   173: box.error.DROP_COLLATION
+ |   174: box.error.ILLEGAL_COLLATION_MIX
+ |   175: box.error.SQL_NO_SUCH_PRAGMA
+ |   176: box.error.SQL_CANT_RESOLVE_FIELD
+ |   177: box.error.INDEX_EXISTS_IN_SPACE
+ |   178: box.error.INCONSISTENT_TYPES
+ |   180: box.error.SQL_STACK_OVERFLOW
+ |   181: box.error.SQL_SELECT_WILDCARD
+ |   182: box.error.SQL_STATEMENT_EMPTY
+ |   183: box.error.SQL_KEYWORD_IS_RESERVED
+ |   184: box.error.SQL_SYNTAX_NEAR_TOKEN
+ |   185: box.error.SQL_UNKNOWN_TOKEN
+ |   186: box.error.SQL_PARSER_GENERIC
+ |   188: box.error.SQL_COLUMN_COUNT_MAX
+ |   189: box.error.HEX_LITERAL_MAX
+ |   190: box.error.INT_LITERAL_MAX
+ |   191: box.error.SQL_PARSER_LIMIT
+ |   192: box.error.INDEX_DEF_UNSUPPORTED
+ |   194: box.error.MULTIKEY_INDEX_MISMATCH
+ |   195: box.error.CREATE_CK_CONSTRAINT
+ |   197: box.error.SQL_COLUMN_COUNT
+ |   198: box.error.FUNC_INDEX_FUNC
+ |   199: box.error.FUNC_INDEX_FORMAT
+ |   200: box.error.FUNC_INDEX_PARTS
+ |   201: box.error.NO_SUCH_FIELD_NAME
+ |   202: box.error.FUNC_WRONG_ARG_COUNT
+ |   203: box.error.BOOTSTRAP_READONLY
+ |   204: box.error.SQL_FUNC_WRONG_RET_COUNT
+ |   205: box.error.FUNC_INVALID_RETURN_TYPE
+ |   207: box.error.REPLICA_NOT_ANON
+ |   208: box.error.CANNOT_REGISTER
+ |   209: box.error.SESSION_SETTING_INVALID_VALUE
+ |   210: box.error.SQL_PREPARE
+ |   211: box.error.WRONG_QUERY_ID
+ |   212: box.error.SEQUENCE_NOT_STARTED
+ |   213: box.error.NO_SUCH_SESSION_SETTING
+ |   214: box.error.UNCOMMITTED_FOREIGN_SYNC_TXNS
+ |   216: box.error.SYNC_QUORUM_TIMEOUT
+ |   217: box.error.SYNC_ROLLBACK
+ |   218: box.error.TUPLE_METADATA_IS_TOO_BIG
+ |   219: box.error.XLOG_GAP
+ |   220: box.error.TOO_EARLY_SUBSCRIBE
+ |   221: box.error.SQL_CANT_ADD_AUTOINC
+ |   222: box.error.QUORUM_WAIT
+ |   223: box.error.INTERFERING_PROMOTE
+ |   224: box.error.ELECTION_DISABLED
+ |   225: box.error.TXN_ROLLBACK
+ |   226: box.error.NOT_LEADER
+ |   227: box.error.SYNC_QUEUE_UNCLAIMED
+ |   228: box.error.SYNC_QUEUE_FOREIGN
+ |   229: box.error.UNABLE_TO_PROCESS_IN_STREAM
+ |   230: box.error.UNABLE_TO_PROCESS_OUT_OF_STREAM
+ |   231: box.error.TRANSACTION_TIMEOUT
+ |   232: box.error.ACTIVE_TIMER
+ |   233: box.error.TUPLE_FIELD_COUNT_LIMIT
+ |   234: box.error.CREATE_CONSTRAINT
+ |   235: box.error.FIELD_CONSTRAINT_FAILED
+ |   236: box.error.TUPLE_CONSTRAINT_FAILED
+ |   237: box.error.CREATE_FOREIGN_KEY
+ |   238: box.error.FOREIGN_KEY_INTEGRITY
+ |   239: box.error.FIELD_FOREIGN_KEY_FAILED
+ |   240: box.error.COMPLEX_FOREIGN_KEY_FAILED
+ |   241: box.error.WRONG_SPACE_UPGRADE_OPTIONS
+ |   242: box.error.NO_ELECTION_QUORUM
+ |   243: box.error.SSL
+ |   244: box.error.SPLIT_BRAIN
+ |   245: box.error.OLD_TERM
+ |   246: box.error.INTERFERING_ELECTIONS
+ |   247: box.error.ITERATOR_POSITION
+ |   248: box.error.DEFAULT_VALUE_TYPE
+ |   249: box.error.UNKNOWN_AUTH_METHOD
+ |   250: box.error.INVALID_AUTH_DATA
+ |   251: box.error.INVALID_AUTH_REQUEST
+ |   252: box.error.WEAK_PASSWORD
+ |   253: box.error.OLD_PASSWORD
+ |   254: box.error.NO_SUCH_SESSION
+ |   255: box.error.WRONG_SESSION_TYPE
+ |   256: box.error.PASSWORD_EXPIRED
+ |   257: box.error.AUTH_DELAY
+ |   258: box.error.AUTH_REQUIRED
+ |   259: box.error.SQL_SEQ_SCAN
+ |   260: box.error.NO_SUCH_EVENT
+ |   261: box.error.BOOTSTRAP_NOT_UNANIMOUS
+ |   262: box.error.CANT_CHECK_BOOTSTRAP_LEADER
+ |   263: box.error.BOOTSTRAP_CONNECTION_NOT_TO_ALL
+ |   264: box.error.NIL_UUID
+ |   265: box.error.WRONG_FUNCTION_OPTIONS
+ |   266: box.error.MISSING_SYSTEM_SPACES
+ |   267: box.error.CLUSTER_NAME_MISMATCH
+ |   268: box.error.REPLICASET_NAME_MISMATCH
+ |   269: box.error.INSTANCE_NAME_DUPLICATE
+ |   270: box.error.INSTANCE_NAME_MISMATCH
+ |   271: box.error.SCHEMA_NEEDS_UPGRADE
+ |   272: box.error.SCHEMA_UPGRADE_IN_PROGRESS
+ |   273: box.error.DEPRECATED
+ |   274: box.error.UNCONFIGURED
+ |   275: box.error.CREATE_DEFAULT_FUNC
+ |   276: box.error.DEFAULT_FUNC_FAILED
+ |   277: box.error.INVALID_DEC
+ |   278: box.error.IN_ANOTHER_PROMOTE
+ |   279: box.error.SHUTDOWN
+ |   280: box.error.FIELD_VALUE_OUT_OF_RANGE
+ |   281: box.error.REPLICASET_NOT_FOUND
+ |   282: box.error.REPLICASET_NO_WRITABLE
+ |   283: box.error.REPLICASET_MORE_THAN_ONE_WRITABLE
+ |   284: box.error.TXN_COMMIT
+ |   285: box.error.READ_VIEW_BUSY
+ |   286: box.error.READ_VIEW_CLOSED
+ |   287: box.error.WAL_QUEUE_FULL
+ |   288: box.error.INVALID_VCLOCK
+ |   289: box.error.SYNC_QUEUE_FULL
+ |   290: box.error.KEY_PART_VALUE_OUT_OF_RANGE
+ |   291: box.error.REPLICA_GC
+ |   292: box.error.ALIEN_ENGINE
+ |   293: box.error.MVCC_UNAVAILABLE
+ |   294: box.error.CANT_UPGRADE_INDEXED_FIELD
+ |   295: box.error.SYNC_TIMEOUT
+ |   296: box.error.FIELD_IRREPRESENTABLE_VALUE
+ |   297: box.error.KEY_PART_IRREPRESENTABLE_VALUE
+ |   298: box.error.INVALID_SORTDATA_FILE
+ |   299: box.error.NO_SUCH_THREAD
+ |   300: box.error.UNABLE_TO_PROCESS_IN_THREAD
+ |   301: box.error.DICT_OVERFLOW
+ |   302: box.error.NO_SUCH_THREAD_GROUP
+ |   303: box.error.XLOG_NOT_FOUND
+ |   304: box.error.RECOVERY_POINT_TXN_LAST_ROW
+ |   305: box.error.NO_SUCH_READ_VIEW
+ |   306: box.error.READ_VIEW_THROTTLED
+ | ...
+
+test_run:cmd("setopt delimiter ''");
+ | ---
+ | - true
+ | ...
+
+-- gh-4778: don't add created via box.error.new() errors to
+-- Tarantool's diagnostic area.
+--
+err = box.error.new({code = 111, reason = "cause"})
+ | ---
+ | ...
+assert(box.error.last() ~= err)
+ | ---
+ | - true
+ | ...
+box.error.set(err)
+ | ---
+ | ...
+assert(box.error.last() == err)
+ | ---
+ | - true
+ | ...
+-- Consider wrong or tricky inputs to box.error.set()
+--
+box.error.set(1)
+ | ---
+ | - error: 'Invalid argument #1 (error expected, got number)'
+ | ...
+box.error.set(nil)
+ | ---
+ | - error: 'Invalid argument #1 (error expected, got nil)'
+ | ...
+-- Check that box.error.new() does not set error to diag.
+--
+box.error.clear()
+ | ---
+ | ...
+err = box.error.new(1, "cause")
+ | ---
+ | ...
+assert(box.error.last() == nil)
+ | ---
+ | - true
+ | ...
+
+-- box.error.new() does not accept error objects.
+--
+box.error.new(err)
+ | ---
+ | - error: 'box.error.new(): bad arguments'
+ | ...
+
+-- box.error() is supposed to re-throw last diagnostic error.
+-- Make sure it does not fail if there's no errors at all
+-- (in diagnostics area).
+--
+box.error.clear()
+ | ---
+ | ...
+box.error()
+ | ---
+ | ...
+
+space:drop()
+ | ---
+ | ...
+
+-- gh-1148: errors can be arranged into list (so called
+-- stacked diagnostics).
+--
+e1 = box.error.new({code = 111, reason = "cause"})
+ | ---
+ | ...
+assert(e1.prev == nil)
+ | ---
+ | - true
+ | ...
+e1:set_prev(e1)
+ | ---
+ | - error: Cycles are not allowed
+ | ...
+assert(e1.prev == nil)
+ | ---
+ | - true
+ | ...
+e2 = box.error.new({code = 111, reason = "cause of cause"})
+ | ---
+ | ...
+e1:set_prev(e2)
+ | ---
+ | ...
+assert(e1.prev == e2)
+ | ---
+ | - true
+ | ...
+e2:set_prev(e1)
+ | ---
+ | - error: Cycles are not allowed
+ | ...
+assert(e2.prev == nil)
+ | ---
+ | - true
+ | ...
+-- At this point stack is following: e1 -> e2
+-- Let's test following cases:
+-- 1. e3 -> e2, e1 -> NULL (e3:set_prev(e2))
+-- 2. e1 -> e3, e2 -> NULL (e1:set_prev(e3))
+-- 3. e3 -> e1 -> e2 (e3:set_prev(e1))
+-- 4. e1 -> e2 -> e3 (e2:set_prev(e3))
+--
+e3 = box.error.new({code = 111, reason = "another cause"})
+ | ---
+ | ...
+e3:set_prev(e2)
+ | ---
+ | ...
+assert(e3.prev == e2)
+ | ---
+ | - true
+ | ...
+assert(e2.prev == nil)
+ | ---
+ | - true
+ | ...
+assert(e1.prev == nil)
+ | ---
+ | - true
+ | ...
+
+-- Reset stack to e1 -> e2 and test case 2.
+--
+e1:set_prev(e2)
+ | ---
+ | ...
+assert(e2.prev == nil)
+ | ---
+ | - true
+ | ...
+assert(e3.prev == nil)
+ | ---
+ | - true
+ | ...
+e1:set_prev(e3)
+ | ---
+ | ...
+assert(e2.prev == nil)
+ | ---
+ | - true
+ | ...
+assert(e1.prev == e3)
+ | ---
+ | - true
+ | ...
+assert(e3.prev == nil)
+ | ---
+ | - true
+ | ...
+
+-- Reset stack to e1 -> e2 and test case 3.
+--
+e1:set_prev(e2)
+ | ---
+ | ...
+assert(e1.prev == e2)
+ | ---
+ | - true
+ | ...
+assert(e2.prev == nil)
+ | ---
+ | - true
+ | ...
+assert(e3.prev == nil)
+ | ---
+ | - true
+ | ...
+e3:set_prev(e1)
+ | ---
+ | ...
+assert(e1.prev == e2)
+ | ---
+ | - true
+ | ...
+assert(e2.prev == nil)
+ | ---
+ | - true
+ | ...
+assert(e3.prev == e1)
+ | ---
+ | - true
+ | ...
+
+-- Unlink errors and test case 4.
+--
+e1:set_prev(nil)
+ | ---
+ | ...
+e2:set_prev(nil)
+ | ---
+ | ...
+e3:set_prev(nil)
+ | ---
+ | ...
+e1:set_prev(e2)
+ | ---
+ | ...
+e2:set_prev(e3)
+ | ---
+ | ...
+assert(e1.prev == e2)
+ | ---
+ | - true
+ | ...
+assert(e2.prev == e3)
+ | ---
+ | - true
+ | ...
+assert(e3.prev == nil)
+ | ---
+ | - true
+ | ...
+
+-- Test circle detecting. At the moment stack is
+-- following: e1 -> e2 -> e3
+--
+e3:set_prev(e1)
+ | ---
+ | - error: Cycles are not allowed
+ | ...
+assert(e3.prev == nil)
+ | ---
+ | - true
+ | ...
+e3:set_prev(e2)
+ | ---
+ | - error: Cycles are not allowed
+ | ...
+assert(e3.prev == nil)
+ | ---
+ | - true
+ | ...
+
+-- Test splitting list into two ones.
+-- After that we will get two lists: e1->e2->e5 and e3->e4
+--
+e4 = box.error.new({code = 111, reason = "yet another cause"})
+ | ---
+ | ...
+e5 = box.error.new({code = 111, reason = "and another one"})
+ | ---
+ | ...
+e3:set_prev(e4)
+ | ---
+ | ...
+e2:set_prev(e5)
+ | ---
+ | ...
+assert(e1.prev == e2)
+ | ---
+ | - true
+ | ...
+assert(e2.prev == e5)
+ | ---
+ | - true
+ | ...
+assert(e3.prev == e4)
+ | ---
+ | - true
+ | ...
+assert(e5.prev == nil)
+ | ---
+ | - true
+ | ...
+assert(e4.prev == nil)
+ | ---
+ | - true
+ | ...
+
+-- Another splitting option: e1->e2 and e5->e3->e4
+-- But firstly restore to one single list e1->e2->e3->e4
+--
+e2:set_prev(e3)
+ | ---
+ | ...
+e5:set_prev(e3)
+ | ---
+ | ...
+assert(e1.prev == e2)
+ | ---
+ | - true
+ | ...
+assert(e2.prev == nil)
+ | ---
+ | - true
+ | ...
+assert(e5.prev == e3)
+ | ---
+ | - true
+ | ...
+assert(e3.prev == e4)
+ | ---
+ | - true
+ | ...
+assert(e4.prev == nil)
+ | ---
+ | - true
+ | ...
+
+-- In case error is destroyed, it unrefs reference counter
+-- of its previous error. In turn, box.error.clear() refs/unrefs
+-- only head and doesn't touch other errors.
+--
+e2:set_prev(nil)
+ | ---
+ | ...
+box.error.set(e1)
+ | ---
+ | ...
+assert(box.error.last() == e1)
+ | ---
+ | - true
+ | ...
+assert(box.error.last().prev == e2)
+ | ---
+ | - true
+ | ...
+box.error.clear()
+ | ---
+ | ...
+assert(box.error.last() == nil)
+ | ---
+ | - true
+ | ...
+assert(e1.prev == e2)
+ | ---
+ | - true
+ | ...
+assert(e2.code == 111)
+ | ---
+ | - true
+ | ...
+box.error.set(e1)
+ | ---
+ | ...
+box.error.clear()
+ | ---
+ | ...
+assert(e1.prev == e2)
+ | ---
+ | - true
+ | ...
+
+-- Set middle of an error stack into the diagnostics area.
+e1:set_prev(e2)
+ | ---
+ | ...
+e2:set_prev(e3)
+ | ---
+ | ...
+box.error.set(e2)
+ | ---
+ | ...
+assert(e1.prev == nil)
+ | ---
+ | - true
+ | ...
+assert(e2.prev == e3)
+ | ---
+ | - true
+ | ...
+
+-- gh-4829: always promote error created via box.error() to
+-- diagnostic area.
+e1 = box.error.new({code = 111, reason = "cause"})
+ | ---
+ | ...
+box.error({code = 111, reason = "err"})
+ | ---
+ | - error: err
+ | ...
+box.error.last()
+ | ---
+ | - err
+ | ...
+box.error(e1)
+ | ---
+ | - error: cause
+ | ...
+assert(box.error.last() == e1)
+ | ---
+ | - true
+ | ...
+--
+-- gh-4398: custom error type.
+--
+-- Try no code.
+e = box.error.new({type = 'TestType', reason = 'Test reason'})
+ | ---
+ | ...
+e:unpack()
+ | ---
+ | - code: 0
+ |   base_type: CustomError
+ |   type: TestType
+ |   custom_type: TestType
+ |   message: Test reason
+ |   trace:
+ |   - file: '[string "e = box.error.new({type = ''TestType'', reason ..."]'
+ |     line: 1
+ | ...
+-- Try code not the same as used by default.
+e = box.error.new({type = 'TestType', reason = 'Test reason', code = 123})
+ | ---
+ | ...
+e:unpack()
+ | ---
+ | - code: 123
+ |   base_type: CustomError
+ |   type: TestType
+ |   custom_type: TestType
+ |   message: Test reason
+ |   trace:
+ |   - file: '[string "e = box.error.new({type = ''TestType'', reason ..."]'
+ |     line: 1
+ | ...
+-- Try to omit message.
+e = box.error.new({type = 'TestType'})
+ | ---
+ | ...
+e:unpack()
+ | ---
+ | - code: 0
+ |   base_type: CustomError
+ |   type: TestType
+ |   custom_type: TestType
+ |   message: 
+ |   trace:
+ |   - file: '[string "e = box.error.new({type = ''TestType''}) "]'
+ |     line: 1
+ | ...
+-- Try long type name.
+e = box.error.new({type = string.rep('a', 128)})
+ | ---
+ | ...
+#e.type
+ | ---
+ | - 128
+ | ...
+
+-- gh-4887: accessing 'prev' member also refs it so that after
+-- error is gone, its 'prev' is staying alive.
+--
+lua_code = [[function(tuple) local json = require('json') return json.encode(tuple) end]]
+ | ---
+ | ...
+box.schema.func.create('runtimeerror', {body = lua_code, is_deterministic = true, is_sandboxed = true})
+ | ---
+ | ...
+s = box.schema.space.create('withdata')
+ | ---
+ | ...
+pk = s:create_index('pk')
+ | ---
+ | ...
+idx = s:create_index('idx', {func = box.func.runtimeerror.id, parts = {{1, 'string'}}})
+ | ---
+ | ...
+
+function test_func() return pcall(s.insert, s, {1}) end
+ | ---
+ | ...
+ok, err = test_func()
+ | ---
+ | ...
+preve = err.prev
+ | ---
+ | ...
+gc_err = setmetatable({preve}, {__mode = 'v'})
+ | ---
+ | ...
+err:set_prev(nil)
+ | ---
+ | ...
+err.prev
+ | ---
+ | - null
+ | ...
+collectgarbage('collect')
+ | ---
+ | - 0
+ | ...
+--  Still one reference to err.prev so it should not be collected.
+--
+gc_err
+ | ---
+ | - - '[string "return function(tuple) local json = require(''..."]:1: attempt to call
+ |     global ''require'' (a nil value)'
+ | ...
+preve = nil
+ | ---
+ | ...
+collectgarbage('collect')
+ | ---
+ | - 0
+ | ...
+gc_err
+ | ---
+ | - []
+ | ...
+
+s:drop()
+ | ---
+ | ...
+box.schema.func.drop('runtimeerror')
+ | ---
+ | ...
+
+-- gh-4903: add format string usage for a CustomError message
+--
+err = box.error.new('TestType', 'Message arg1: %s. Message arg2: %u', '1', 2)
+ | ---
+ | ...
+err.message
+ | ---
+ | - 'Message arg1: 1. Message arg2: 2'
+ | ...
+
+-- gh-4975: errors in init scripts are stripped
+err = box.error.new('TestType', string.rep('a', 10000))
+ | ---
+ | ...
+string.len(err.message)
+ | ---
+ | - 10000
+ | ...

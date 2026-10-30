@@ -1,0 +1,23 @@
+find_path(LIBYAML_INCLUDE_DIR
+  NAMES yaml.h
+)
+
+if(BUILD_STATIC)
+    set(YAML_LIB_NAME libyaml.a)
+else()
+    set(YAML_LIB_NAME yaml)
+endif()
+
+find_library(LIBYAML_LIBRARY
+    NAMES ${YAML_LIB_NAME}
+)
+
+set(LIBYAML_INCLUDE_DIRS "${LIBYAML_INCLUDE_DIR}")
+set(LIBYAML_LIBRARIES "${LIBYAML_LIBRARY}")
+
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(LibYAML REQUIRED_VARS
+    LIBYAML_LIBRARIES LIBYAML_INCLUDE_DIRS)
+
+mark_as_advanced(LIBYAML_LIBRARY LIBYAML_LIBRARIES
+    LIBYAML_INCLUDE_DIR LIBYAML_INCLUDE_DIRS)

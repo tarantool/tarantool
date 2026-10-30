@@ -1,0 +1,628 @@
+-- test-run result file version 2
+decimal = require('decimal')
+ | ---
+ | ...
+test_run = require('test_run').new()
+ | ---
+ | ...
+ffi = require('ffi')
+ | ---
+ | ...
+
+-- check various constructors
+decimal.new('1234.5678')
+ | ---
+ | - 1234.5678
+ | ...
+decimal.new('1e6')
+ | ---
+ | - 1E+6
+ | ...
+decimal.new('-6.234612e2')
+ | ---
+ | - -623.4612
+ | ...
+-- check (u)int16/32/64_t
+decimal.new(2ULL ^ 63)
+ | ---
+ | - 9223372036854775808
+ | ...
+decimal.new(123456789123456789ULL)
+ | ---
+ | - 123456789123456789
+ | ...
+decimal.new(-123456789123456789LL)
+ | ---
+ | - -123456789123456789
+ | ...
+decimal.new(ffi.new('uint8_t', 231))
+ | ---
+ | - 231
+ | ...
+decimal.new(ffi.new('int8_t', -113))
+ | ---
+ | - -113
+ | ...
+decimal.new(ffi.new('uint16_t', 65535))
+ | ---
+ | - 65535
+ | ...
+decimal.new(ffi.new('int16_t', -31263))
+ | ---
+ | - -31263
+ | ...
+decimal.new(ffi.new('uint32_t', 4123123123))
+ | ---
+ | - 4123123123
+ | ...
+decimal.new(ffi.new('int32_t', -2123123123))
+ | ---
+ | - -2123123123
+ | ...
+decimal.new(ffi.new('float', 128.5))
+ | ---
+ | - 128.5
+ | ...
+decimal.new(ffi.new('double', 128.5))
+ | ---
+ | - 128.5
+ | ...
+
+decimal.new(1)
+ | ---
+ | - 1
+ | ...
+decimal.new(-1)
+ | ---
+ | - -1
+ | ...
+decimal.new(2^64)
+ | ---
+ | - 1.84467440737096E+19
+ | ...
+decimal.new(2^(-20))
+ | ---
+ | - 9.5367431640625E-7
+ | ...
+
+-- incorrect constructions
+decimal.new(box.NULL)
+ | ---
+ | - error: expected decimal, number or string as 1 argument
+ | ...
+decimal.new(ffi.new('float', 1 / 0))
+ | ---
+ | - error: incorrect value to convert to decimal as 1 argument
+ | ...
+decimal.new(ffi.new('double', 1 / 0))
+ | ---
+ | - error: incorrect value to convert to decimal as 1 argument
+ | ...
+decimal.new(1 / 0)
+ | ---
+ | - error: incorrect value to convert to decimal as 1 argument
+ | ...
+decimal.new({1, 2, 3})
+ | ---
+ | - error: expected decimal, number or string as 1 argument
+ | ...
+decimal.new()
+ | ---
+ | - error: 'usage: decimal.new(value)'
+ | ...
+decimal.new('inf')
+ | ---
+ | - error: incorrect value to convert to decimal as 1 argument
+ | ...
+decimal.new('NaN')
+ | ---
+ | - error: incorrect value to convert to decimal as 1 argument
+ | ...
+decimal.new('not a valid number')
+ | ---
+ | - error: incorrect value to convert to decimal as 1 argument
+ | ...
+
+a = decimal.new('10')
+ | ---
+ | ...
+a
+ | ---
+ | - 10
+ | ...
+b = decimal.new('0.1')
+ | ---
+ | ...
+b
+ | ---
+ | - 0.1
+ | ...
+a + b
+ | ---
+ | - 10.1
+ | ...
+a - b
+ | ---
+ | - 9.9
+ | ...
+a * b
+ | ---
+ | - 1.0
+ | ...
+a / b
+ | ---
+ | - 1.0E+2
+ | ...
+a ^ b
+ | ---
+ | - 1.258925411794167210423954106395800606093617409466931069107923019526647615783
+ | ...
+b ^ a
+ | ---
+ | - 1E-10
+ | ...
+-a + -b == -(a + b)
+ | ---
+ | - true
+ | ...
+a
+ | ---
+ | - 10
+ | ...
+b
+ | ---
+ | - 0.1
+ | ...
+
+a < b
+ | ---
+ | - false
+ | ...
+b < a
+ | ---
+ | - true
+ | ...
+a <= b
+ | ---
+ | - false
+ | ...
+b <= a
+ | ---
+ | - true
+ | ...
+a > b
+ | ---
+ | - true
+ | ...
+b > a
+ | ---
+ | - false
+ | ...
+a >= b
+ | ---
+ | - true
+ | ...
+b >= a
+ | ---
+ | - false
+ | ...
+a == b
+ | ---
+ | - false
+ | ...
+a ~= b
+ | ---
+ | - true
+ | ...
+a
+ | ---
+ | - 10
+ | ...
+b
+ | ---
+ | - 0.1
+ | ...
+
+-- check comparsion with nil
+a == nil
+ | ---
+ | - false
+ | ...
+a ~= nil
+ | ---
+ | - true
+ | ...
+a > nil
+ | ---
+ | - error: '[string "return a > nil "]:1: attempt to compare decimal with nil'
+ | ...
+a < nil
+ | ---
+ | - error: '[string "return a < nil "]:1: attempt to compare decimal with nil'
+ | ...
+a >= nil
+ | ---
+ | - error: '[string "return a >= nil "]:1: attempt to compare decimal with nil'
+ | ...
+a <= nil
+ | ---
+ | - error: '[string "return a <= nil "]:1: attempt to compare decimal with nil'
+ | ...
+-- and with box.NULL
+--
+a == box.NULL
+ | ---
+ | - false
+ | ...
+a ~= box.NULL
+ | ---
+ | - true
+ | ...
+a > box.NULL
+ | ---
+ | - error: '[string "return a > box.NULL "]:1: expected decimal, number or string as
+ |     1 argument'
+ | ...
+a < box.NULL
+ | ---
+ | - error: '[string "return a < box.NULL "]:1: expected decimal, number or string as
+ |     2 argument'
+ | ...
+a >= box.NULL
+ | ---
+ | - error: '[string "return a >= box.NULL "]:1: expected decimal, number or string as
+ |     1 argument'
+ | ...
+a <= box.NULL
+ | ---
+ | - error: '[string "return a <= box.NULL "]:1: expected decimal, number or string as
+ |     2 argument'
+ | ...
+
+decimal.sqrt(a)
+ | ---
+ | - 3.162277660168379331998893544432718533719555139325216826857504852792594438639
+ | ...
+decimal.ln(a)
+ | ---
+ | - 2.302585092994045684017991454684364207601101488628772976033327900967572609677
+ | ...
+decimal.log10(a)
+ | ---
+ | - 1
+ | ...
+decimal.exp(a)
+ | ---
+ | - 22026.46579480671651695790064528424436635351261855678107423542635522520281857
+ | ...
+a == decimal.ln(decimal.exp(a))
+ | ---
+ | - true
+ | ...
+a == decimal.sqrt(a ^ 2)
+ | ---
+ | - true
+ | ...
+a == decimal.log10('10' ^ a)
+ | ---
+ | - true
+ | ...
+a == decimal.abs(-a)
+ | ---
+ | - true
+ | ...
+a + -a == 0
+ | ---
+ | - true
+ | ...
+a
+ | ---
+ | - 10
+ | ...
+
+a = decimal.new('1.1234567891234567891234567891234567891')
+ | ---
+ | ...
+a
+ | ---
+ | - 1.1234567891234567891234567891234567891
+ | ...
+decimal.precision(a)
+ | ---
+ | - 38
+ | ...
+decimal.scale(a)
+ | ---
+ | - 37
+ | ...
+decimal.round(a, 37) == a
+ | ---
+ | - true
+ | ...
+a
+ | ---
+ | - 1.1234567891234567891234567891234567891
+ | ...
+a = decimal.round(a, 36)
+ | ---
+ | ...
+decimal.precision(a)
+ | ---
+ | - 37
+ | ...
+decimal.scale(a)
+ | ---
+ | - 36
+ | ...
+decimal.round(a, 100) == a
+ | ---
+ | - true
+ | ...
+-- noop
+decimal.round(a, -5) == a
+ | ---
+ | - true
+ | ...
+decimal.round(a, 7)
+ | ---
+ | - 1.1234568
+ | ...
+decimal.round(a, 3)
+ | ---
+ | - 1.123
+ | ...
+decimal.round(a, 0)
+ | ---
+ | - 1
+ | ...
+a
+ | ---
+ | - 1.123456789123456789123456789123456789
+ | ...
+
+decimal.ln(0)
+ | ---
+ | - error: decimal operation failed
+ | ...
+decimal.ln(-1)
+ | ---
+ | - error: decimal operation failed
+ | ...
+decimal.ln(1)
+ | ---
+ | - 0
+ | ...
+decimal.log10(0)
+ | ---
+ | - error: decimal operation failed
+ | ...
+decimal.log10(-1)
+ | ---
+ | - error: decimal operation failed
+ | ...
+decimal.log10(1)
+ | ---
+ | - 0
+ | ...
+decimal.exp(87)
+ | ---
+ | - 60760302250568721495223289381302760752.61375325962121014840857614538080439681
+ | ...
+decimal.sqrt(-5)
+ | ---
+ | - error: decimal operation failed
+ | ...
+decimal.sqrt(5)
+ | ---
+ | - 2.236067977499789696409173668731276235440618359611525724270897245410520925638
+ | ...
+
+-- various incorrect operands
+decimal.round(a)
+ | ---
+ | - error: 'usage: decimal.round(decimal, scale)'
+ | ...
+decimal.round(1, 2)
+ | ---
+ | - error: expected cdata as 1 argument
+ | ...
+decimal.scale(1.234)
+ | ---
+ | - error: expected cdata as 1 argument
+ | ...
+decimal.precision(1.234)
+ | ---
+ | - error: expected cdata as 1 argument
+ | ...
+decimal.scale()
+ | ---
+ | - error: 'usage: decimal.scale(decimal)'
+ | ...
+decimal.precision()
+ | ---
+ | - error: 'usage: decimal.precision(decimal)'
+ | ...
+decimal.abs()
+ | ---
+ | - error: 'usage: decimal.abs(decimal)'
+ | ...
+
+a = decimal.new('1e19')
+ | ---
+ | ...
+a ^ 1.9
+ | ---
+ | - 1258925411794167210423954106395800606.093617409466931069107923019526647615783
+ | ...
+a * '1e18'
+ | ---
+ | - 1E+37
+ | ...
+a = decimal.new(string.rep('9', 76))
+ | ---
+ | ...
+decimal.precision(a)
+ | ---
+ | - 76
+ | ...
+a + '0.4'
+ | ---
+ | - 9999999999999999999999999999999999999999999999999999999999999999999999999999
+ | ...
+1 / decimal.new('0')
+ | ---
+ | - error: '[string "return 1 / decimal.new(''0'') "]:1: decimal operation failed'
+ | ...
+
+a = decimal.new('-13')
+ | ---
+ | ...
+a ^ 2
+ | ---
+ | - 169
+ | ...
+-- fractional powers are allowed only for positive numbers
+a ^ 2.5
+ | ---
+ | - error: '[string "return a ^ 2.5 "]:1: decimal operation failed'
+ | ...
+
+a = decimal.new('1e5')
+ | ---
+ | ...
+a
+ | ---
+ | - 1E+5
+ | ...
+decimal.trim(a)
+ | ---
+ | - 1E+5
+ | ...
+decimal.trim(decimal.rescale(a, 10))
+ | ---
+ | - 100000
+ | ...
+decimal.rescale(a, 10)
+ | ---
+ | - 100000.0000000000
+ | ...
+decimal.rescale(a, -5)
+ | ---
+ | - 1E+5
+ | ...
+decimal.rescale(a, 0)
+ | ---
+ | - 1E+5
+ | ...
+decimal.rescale(a, 70)
+ | ---
+ | - 100000.0000000000000000000000000000000000000000000000000000000000000000000000
+ | ...
+-- scale too big
+decimal.rescale(a, 71)
+ | ---
+ | - 1E+5
+ | ...
+decimal.trim(decimal.rescale(a, 10))
+ | ---
+ | - 100000
+ | ...
+a = decimal.new('123.456789000000000')
+ | ---
+ | ...
+a
+ | ---
+ | - 123.456789000000000
+ | ...
+decimal.trim(a)
+ | ---
+ | - 123.456789
+ | ...
+
+-- check correct rounding when scale = 0
+decimal.round(decimal.new(0.9), 0)
+ | ---
+ | - 1
+ | ...
+decimal.round(decimal.new(9.9), 0)
+ | ---
+ | - 1E+1
+ | ...
+decimal.round(decimal.new(99.9), 0)
+ | ---
+ | - 1.0E+2
+ | ...
+decimal.round(decimal.new(99.4), 0)
+ | ---
+ | - 99
+ | ...
+
+-- check remainder operation
+a = decimal.new(172.51)
+ | ---
+ | ...
+a % 1
+ | ---
+ | - 0.51
+ | ...
+a % 2
+ | ---
+ | - 0.51
+ | ...
+a % 0.3
+ | ---
+ | - 0.01
+ | ...
+a % 0.13
+ | ---
+ | - 0.00
+ | ...
+a % 13.27
+ | ---
+ | - 0.00
+ | ...
+a % 100
+ | ---
+ | - 72.51
+ | ...
+a % 173
+ | ---
+ | - 172.51
+ | ...
+a % 72
+ | ---
+ | - 28.51
+ | ...
+720 % a
+ | ---
+ | - 29.96
+ | ...
+
+-- gh-4623 is_decimal function
+decimal_value = decimal.new(1)
+ | ---
+ | ...
+decimal.is_decimal(decimal_value)
+ | ---
+ | - true
+ | ...
+decimal.is_decimal('string')
+ | ---
+ | - false
+ | ...
+decimal.is_decimal(0)
+ | ---
+ | - false
+ | ...
+decimal.is_decimal(-1ULL)
+ | ---
+ | - false
+ | ...
+decimal.is_decimal(box.error.new(box.error.UNKNOWN))
+ | ---
+ | - false
+ | ...
+decimal.is_decimal(ffi.cast('char*', '42.42'))
+ | ---
+ | - false
+ | ...

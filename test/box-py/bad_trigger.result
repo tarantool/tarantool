@@ -1,0 +1,23 @@
+
+ #
+ # if on_connect() trigger raises an exception, the connection is dropped
+ #
+ 
+nosuchfunction = nil
+---
+...
+function f1() nosuchfunction() end
+---
+...
+type(box.session.on_connect(f1))
+---
+- function
+...
+greeting:  True
+fixheader:  True
+error code 32
+error message:  [string "function f1() nosuchfunction() end"]:1: attempt to call global 'nosuchfunction' (a nil value)
+eof: True
+box.session.on_connect(nil, f1)
+---
+...

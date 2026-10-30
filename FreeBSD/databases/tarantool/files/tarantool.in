@@ -1,0 +1,55 @@
+#!/bin/sh
+#
+# $FreeBSD: head/databases/tarantool/files/tarantool.in 391515 2015-07-07 16:59:55Z vg $
+
+# PROVIDE: tarantool
+# REQUIRE: LOGIN
+# KEYWORD: shutdown
+#
+# tarantool_enable="YES"
+# tarantool_instances=""
+#
+
+. /etc/rc.subr
+
+name="tarantool"
+rcvar=tarantool_enable
+
+load_rc_config "$name"
+
+tarantool_enable=${tarantool_enable:-"NO"}
+tarantool_instances=${tarantool_instances:-"%%ETCDIR%%/instances.enabled"}
+
+start_cmd="${name}_start"
+stop_cmd="${name}_stop"
+restart_cmd="${name}_restart"
+
+INSTANCES=$(find ${tarantool_instances} -type f -name '*.lua')
+TDAEMON=%%PREFIX%%/bin/tarantool
+TCTL=%%PREFIX%%/bin/tarantoolctl
+
+tarantool_start()
+{
+	echo "tarantool: Starting instances"
+	for inst in ${INSTANCES}
+	do
+		${TDAEMON} ${TCTL} start $(basename ${inst} .lua)
+	done
+}
+
+tarantool_stop()
+{
+	echo "tarantool: Stopping instances"
+	for inst in ${INSTANCES}
+	do
+		${TDAEMON} ${TCTL} stop $(basename ${inst} .lua)
+	done
+}
+
+tarantool_restart()
+{
+	tarantool_stop
+	tarantool_start
+}
+
+run_rc_command "$1"

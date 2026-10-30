@@ -1,0 +1,479 @@
+#ifndef INCLUDES_TARANTOOL_SESSION_H
+#define INCLUDES_TARANTOOL_SESSION_H
+/*
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
+ *
+ * Redistribution and use in source and binary forms, with or
+ * without modification, are permitted provided that the following
+ * conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above
+ *    copyright notice, this list of conditions and the
+ *    following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above
+ *    copyright notice, this list of conditions and the following
+ *    disclaimer in the documentation and/or other materials
+ *    provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+ * <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+ * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+#include <inttypes.h>
+#include <stdbool.h>
+#include <sys/socket.h>
+#include "trigger.h"
+#include "fiber.h"
+#include "user.h"
+#include "authentication.h"
+#include "iproto_features.h"
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+struct port;
+struct session_vtab;
+
+void
+session_init(void);
+
+void
+session_free(void);
+
+enum session_type {
+	SESSION_TYPE_BACKGROUND = 0,
+	SESSION_TYPE_BINARY,
+	SESSION_TYPE_CONSOLE,
+	SESSION_TYPE_REPL,
+	SESSION_TYPE_APPLIER,
+	session_type_MAX,
+};
+
+enum output_format {
+	OUTPUT_FORMAT_YAML = 0,
+	OUTPUT_FORMAT_LUA_LINE,
+	OUTPUT_FORMAT_LUA_BLOCK,
+};
+
+extern const char *session_type_strs[];
+
+/**
+ * Session meta is used in different ways by sessions of different
+ * types, and allows to do not store attributes in struct session,
+ * that are used only by a session of particular type.
+ */
+struct session_meta {
+	union {
+		/** IProto connection. */
+		void *connection;
+		/** Console file/socket descriptor. */
+		int fd;
+	};
+	struct {
+		union {
+			/** Peer address. */
+			struct sockaddr addr;
+			/** Peer address storage. */
+			struct sockaddr_storage addrstorage;
+		};
+		/** Peer address size or 0 if the session is local. */
+		socklen_t addrlen;
+	} peer;
+	/** Console output format. */
+	enum output_format output_format;
+	/** IPROTO client features. */
+	struct iproto_features features;
+};
+
+/**
+ * Abstraction of a single user session:
+ * for now, only provides accounting of established
+ * sessions and on-connect/on-disconnect event
+ * handling, user credentials. In future: the
+ * client/server protocol, etc.
+ * Session identifiers grow monotonically.
+ * 0 sid is reserved to mean 'no session'.
+ */
+struct session {
+	/** Session id. */
+	uint64_t id;
+	/** SQL Tarantool Default storage engine. */
+	uint8_t sql_default_engine;
+	/** SQL Connection flag for current user session */
+	uint32_t sql_flags;
+	enum session_type type;
+	/** Session virtual methods. */
+	const struct session_vtab *vtab;
+	/** Session metadata. */
+	struct session_meta meta;
+	/**
+	 * Watchers registered for this session (key -> session_watcher).
+	 * Allocated on demand.
+	 */
+	struct mh_strnptr_t *watchers;
+	/**
+	 * ID of statements prepared in current session.
+	 * This map is allocated on demand.
+	 */
+	struct mh_i32ptr_t *sql_stmts;
+	/** Session user id and global grants */
+	struct credentials credentials;
+	/** Trigger for fiber on_stop to cleanup created on-demand session */
+	struct trigger fiber_on_stop;
+	/** Link in shutdown_list. */
+	struct rlist in_shutdown_list;
+	/** Timestamp (ev_now) when the connection was established. */
+	double connect_time;
+	/** Set when the session was closed by the idle timeout. */
+	bool disconnected_by_timeout;
+};
+
+struct session_vtab {
+	/**
+	 * Push a port data into a session data channel - socket,
+	 * console or something.
+	 * @param session Session to push into.
+	 * @param port Port with data to push.
+	 *
+	 * @retval  0 Success.
+	 * @retval -1 Error.
+	 */
+	int
+	(*push)(struct session *session, struct port *port);
+	/**
+	 * Get session file descriptor if exists.
+	 * @param session Session to get descriptor from.
+	 * @retval  -1 No fd.
+	 * @retval >=0 Found fd.
+	 */
+	int
+	(*fd)(struct session *session);
+	/**
+	 * For iproto requests, we set sync to the value of packet
+	 * sync. Since the session may be reused between many
+	 * requests, the value is true only at the beginning
+	 * of the request, and gets distorted after the first
+	 * yield. For other sessions it is 0.
+	 */
+	int64_t
+	(*sync)(struct session *session);
+};
+
+extern struct session_vtab session_vtab_registry[];
+
+/** Change session type and vtab. */
+void
+session_set_type(struct session *session, enum session_type type);
+
+/**
+ * Close a session. It will return errors from all virtual methods
+ * and its type is fixed.
+ */
+void
+session_close(struct session *session);
+
+/**
+ * Find a session by id.
+ */
+struct session *
+session_find(uint64_t sid);
+
+/** Global on-connect triggers. */
+extern struct rlist session_on_connect;
+extern struct event *session_on_connect_event;
+
+/** Global on-auth triggers. */
+extern struct rlist session_on_auth;
+extern struct event *session_on_auth_event;
+
+/**
+ * Get the current session from @a fiber
+ * @param fiber fiber
+ * @return session if any
+ * @retval NULL if there is no active session
+ */
+static inline struct session *
+fiber_get_session(struct fiber *fiber)
+{
+	return fiber->storage.session;
+}
+
+/**
+ * Set the current session in @a fiber
+ * @param fiber fiber
+ * @param session a value to set
+ */
+static inline void
+fiber_set_session(struct fiber *fiber, struct session *session)
+{
+	fiber->storage.session = session;
+}
+
+/**
+ * Get the current user from @a fiber
+ * @param fiber fiber
+ * @return user if any
+ * @retval NULL if there is no active user
+ */
+static inline struct credentials *
+fiber_get_user(struct fiber *fiber)
+{
+	return fiber->storage.credentials;
+}
+
+/**
+ * Set the current user in @a fiber
+ * @param fiber fiber
+ * @param cr a value to set
+ */
+static inline void
+fiber_set_user(struct fiber *fiber, struct credentials *cr)
+{
+	fiber->storage.credentials = cr;
+}
+
+/*
+ * For use in local hot standby, which runs directly
+ * from ev watchers (without current fiber), but needs
+ * to execute transactions.
+ */
+extern struct credentials admin_credentials;
+
+/**
+ * Create a new session on demand, and set fiber on_stop
+ * trigger to destroy it when this fiber ends.
+ */
+struct session *
+session_new_on_demand(void);
+
+/*
+ * When creating a new fiber, the database (box)
+ * may not be initialized yet. When later on
+ * this fiber attempts to access the database,
+ * we have no other choice but initialize fiber-specific
+ * database state (something like a database connection)
+ * on demand. This is why this function needs to
+ * check whether or not the current session exists
+ * and create it otherwise.
+ */
+static inline struct session *
+current_session(void)
+{
+	struct session *session = fiber_get_session(fiber());
+	if (session == NULL) {
+		session = session_new_on_demand();
+		assert(session != NULL);
+	}
+	return session;
+}
+
+/*
+ * Return the current user. Create it if it doesn't
+ * exist yet.
+ * The same rationale for initializing the current
+ * user on demand as in current_session() applies.
+ */
+static inline struct credentials *
+effective_user(void)
+{
+	struct fiber *f = fiber();
+	struct credentials *u = f->storage.credentials;
+	if (u == NULL) {
+		session_new_on_demand();
+		u = f->storage.credentials;
+	}
+	return u;
+}
+
+/** Global on-disconnect triggers. */
+extern struct rlist session_on_disconnect;
+extern struct event *session_on_disconnect_event;
+
+void
+session_storage_cleanup(int sid);
+
+/**
+ * Create a session.
+ * @return handle for a created session
+ */
+struct session *
+session_new(enum session_type type);
+
+/** Return true if given statement id belongs to the session. */
+bool
+session_check_stmt_id(struct session *session, uint32_t stmt_id);
+
+/** Add prepared statement ID to the session hash. */
+void
+session_add_stmt_id(struct session *session, uint32_t stmt_id);
+
+/** Remove prepared statement ID from the session hash. */
+void
+session_remove_stmt_id(struct session *session, uint32_t stmt_id);
+
+/**
+ * Destroy a session.
+ * Must be called by the networking layer on disconnect.
+ * @param session session to destroy.
+ */
+void
+session_delete(struct session *session);
+
+/**
+ * Set session peer address.
+ */
+static inline void
+session_set_peer_addr(struct session *session,
+		      const struct sockaddr *addr, socklen_t addrlen)
+{
+	assert(addrlen <= sizeof(session->meta.peer.addrstorage));
+	memcpy(&session->meta.peer.addrstorage, addr, addrlen);
+	session->meta.peer.addrlen = addrlen;
+}
+
+/**
+ * Return session peer name or NULL if the session is local.
+ * The string is allocated in the static buffer.
+ */
+const char *
+session_peer(const struct session *session);
+
+/** Run on-connect triggers */
+int
+session_run_on_connect_triggers(struct session *session);
+
+/** Run on-disconnect triggers */
+void
+session_run_on_disconnect_triggers(struct session *session);
+
+/** Run auth triggers */
+int
+session_run_on_auth_triggers(const struct on_auth_trigger_ctx *result);
+
+typedef void
+(*session_notify_f)(struct session *session, uint64_t sync,
+		    const char *key, size_t key_len,
+		    const char *data, const char *data_end);
+
+/**
+ * If there's no watcher registered for the specified key in the given session,
+ * this function registers one, otherwise it acknowledges a notification.
+ *
+ * The callback will be called unconditionally right after registration and
+ * then every time the key is updated provided the last notification was
+ * acknowledged.
+ *
+ * The given sync number will be passed to the callback on each invocation.
+ */
+void
+session_watch(struct session *session, uint64_t sync,
+	      const char *key, size_t key_len, session_notify_f cb);
+
+/**
+ * Unregisters a watcher registered for the given session and notification key.
+ * Does nothing if there's no watcher registered
+ */
+void
+session_unwatch(struct session *session, const char *key, size_t key_len);
+
+/**
+ * Check whether or not the current user is authorized to connect
+ */
+int
+access_check_session(struct user *user);
+
+/**
+ * Check whether or not the current user can be granted
+ * the requested access to the universe.
+ */
+int
+access_check_universe(user_access_t access);
+
+/**
+ * This function is called by public API wrappers around session push.
+ * It logs a deprecation warning. If session push is disabled, it also
+ * sets diag and returns -1.
+ */
+int
+session_push_check_deprecation(void);
+
+static inline int
+session_push(struct session *session, struct port *port)
+{
+	return session->vtab->push(session, port);
+}
+
+static inline int
+session_fd(struct session *session)
+{
+	return session->vtab->fd(session);
+}
+
+static inline int
+session_sync(struct session *session)
+{
+	return session->vtab->sync(session);
+}
+
+/**
+ * In a common case, a session does not support push. This
+ * function always returns -1 and sets ER_UNSUPPORTED error.
+ */
+int
+generic_session_push(struct session *session, struct port *port);
+
+/** Return -1 from any session. */
+int
+generic_session_fd(struct session *session);
+
+/** Return 0 from any session. */
+int64_t
+generic_session_sync(struct session *session);
+
+/** Drops the whole per-user session idle timeout configuration. */
+void
+session_idle_timeout_reset(void);
+
+/**
+ * Sets the idle timeout (in seconds) for the given user name. A timeout of
+ * zero removes the entry (no timeout). The user need not exist yet: the
+ * timeout is resolved by name at authentication time.
+ */
+void
+session_idle_timeout_set(const char *name, uint32_t name_len,
+			 double timeout);
+
+/**
+ * Return the idle timeout (in seconds) configured for the user the given
+ * authentication token belongs to. Zero means no timeout.
+ */
+double
+session_idle_timeout(uint8_t auth_token);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+
+#include "diag.h"
+
+static inline void
+access_check_universe_xc(user_access_t access)
+{
+	if (access_check_universe(access) != 0)
+		diag_raise();
+}
+
+#endif /* defined(__cplusplus) */
+
+#endif /* INCLUDES_TARANTOOL_SESSION_H */

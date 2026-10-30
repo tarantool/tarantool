@@ -1,0 +1,14 @@
+test_run = require('test_run').new()
+--
+-- gh-5288: transaction limbo could crash during recovery, because in WAL write
+-- completion callback it woken up the currently active fiber.
+--
+s = box.schema.space.create('sync', {is_sync = true})
+_ = s:create_index('pk')
+box.ctl.promote()
+s:insert{1}
+box.snapshot()
+test_run:cmd('restart server default')
+box.ctl.promote()
+box.space.sync:drop()
+box.ctl.demote()

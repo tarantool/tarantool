@@ -1,0 +1,39 @@
+name: 'Pack and Deploy'
+description: 'Pack and deploy the package'
+runs:
+  using: "composite"
+  steps:
+    - run: |
+        # Our testing expects that the init process (PID 1) will
+        # reap orphan processes. At least the following test leans
+        # on it: app-tap/gh-4983-tnt-e-assert-false-hangs.test.lua.
+        export PACKPACK_EXTRA_DOCKER_RUN_PARAMS='--init'
+
+        # Create packages.
+        PACKAGE_TARGET=package-static
+        DEPLOY_TARGET=deploy-static
+        if ${{ startsWith(github.base_ref, 'release/2.') ||
+               startsWith(github.ref, 'refs/heads/release/2.') ||
+               startsWith(github.ref, 'refs/tags/2.') }}; then
+          PACKAGE_TARGET=${PACKAGE_TARGET%-static}
+          DEPLOY_TARGET=${DEPLOY_TARGET%-static}
+        fi
+
+        make -f .pack.mk ${PACKAGE_TARGET}
+
+        # Deploy pre-release (since 2.10) and release packages. It's expected
+        # that no one will push tags are used for pre-releases and releases.
+        if ${{ ( startsWith(github.ref, 'refs/tags/2.') ||
+                 startsWith(github.ref, 'refs/tags/3.') ) &&
+               !endsWith(github.ref, '-entrypoint') }}; then
+          case ${{ github.ref }} in
+            # It's relevant since 2.10 only.
+            refs/tags/*-alpha*|refs/tags/*-beta*|refs/tags/*-rc*)
+              REPO_TYPE=pre-release make -f .pack.mk ${DEPLOY_TARGET}
+              ;;
+            refs/tags/*)
+              REPO_TYPE=release make -f .pack.mk ${DEPLOY_TARGET}
+              ;;
+          esac
+        fi
+      shell: bash

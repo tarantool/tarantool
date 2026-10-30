@@ -1,0 +1,1283 @@
+-- console.lua -- internal file
+--
+-- vim: ts=4 sw=4 et
+
+local ffi = require('ffi')
+ffi.cdef[[
+    enum output_format {
+        OUTPUT_FORMAT_YAML = 0,
+        OUTPUT_FORMAT_LUA_LINE,
+        OUTPUT_FORMAT_LUA_BLOCK,
+    };
+
+    enum output_format
+    console_get_output_format();
+
+    void
+    console_set_output_format(enum output_format output_format);
+]]
+
+local internal = require('console.lib')
+local session_internal = box.internal.session
+local compat = require('compat')
+local fiber = require('fiber')
+local socket = require('socket')
+local log = require('log')
+local errno = require('errno')
+local urilib = require('uri')
+local yaml = require('yaml')
+local net_box = require('net.box')
+local help = require('help').help
+local utils = require('internal.utils')
+local tarantool = require('tarantool')
+local fio = require('fio')
+
+local DEFAULT_CONNECT_TIMEOUT = 10
+local PUSH_TAG_HANDLE = '!push!'
+
+local CONSOLE_SESSION_SCOPE_VARS_BRIEF = [[
+Whether a console session has its own variable scope.
+
+In the old behavior, all the non-local variable assignments from the console
+are written to globals.
+
+In the new behavior, they're written to a variable scope attached to the console
+session.
+
+Also, a couple of built-in modules are added into the initial console variable
+scope in the new behavior.
+
+https://tarantool.io/compat/console_session_scope_vars
+]]
+
+compat.add_option({
+    name = 'console_session_scope_vars',
+    default = 'old',
+    obsolete = nil,
+    brief = CONSOLE_SESSION_SCOPE_VARS_BRIEF,
+    action = function() end,
+})
+
+local M = {}
+
+--
+-- Default output handler set to YAML for backward
+-- compatibility reason.
+local default_output_format = { ["fmt"] = "yaml", ["opts"] = nil }
+local output_handlers = { }
+
+--
+-- This is an end-of-stream marker for text output of Tarantool
+-- server, for different output formats - yaml and Lua.
+--
+-- While for yaml ... is a standard stream end marker, using ';'
+-- for Lua output we're walking on a thin ice - ';' is legal inside
+-- a valid Lua block as well. But since this marker is used when
+-- reading data created by a Tarantool server, we can rely on it not
+-- being present inside of stream, since Tarantool server never
+-- puts it inside of a stream.
+local output_eos = { ["yaml"] = '\n...\n', ["lua"] = ';' }
+
+local default_local_eos = ''
+
+-- Each but the last string of multiline command should end with this string.
+local continuation_symbol = '\\'
+
+-- History file name.
+local HISTORY_FILE_NAME = '.tarantool_history'
+
+output_handlers["yaml"] = function(status, _opts, ...)
+    local err, ok, res
+     -- Using pcall, because serializer can raise an exception
+    if status then
+        ok, res = pcall(internal.format_yaml, ...)
+    else
+        err = ...
+        if err == nil then
+            err = box.NULL
+        end
+        ok, res = pcall(internal.format_yaml, { error = err })
+    end
+    if ok then
+        return res
+    else
+        local m = 'console: exception while formatting the output: "%s"'
+        err = m:format(tostring(res))
+        return internal.format_yaml({ error = err })
+    end
+end
+
+--
+-- Format a Lua value.
+local function format_lua_value(status, internal_opts, value)
+    if not status then
+        if value == nil then
+            value = box.NULL
+        end
+        value = { error = value }
+    end
+    local ok, res = pcall(internal.format_lua, internal_opts, value)
+    if ok then
+        return res
+    else
+        local m = 'console: exception while formatting the output: "%s"'
+        local err = m:format(tostring(res))
+        return internal.format_lua(internal_opts, { error = err })
+    end
+end
+
+--
+-- Convert options from user form to the internal format.
+local function gen_lua_opts(opts)
+    if opts == "block" then
+        return {block=true, indent=2}
+    else
+        return {block=false, indent=2}
+    end
+end
+
+output_handlers["lua"] = function(status, opts, ...)
+    local collect = {}
+    --
+    -- Convert options to internal dictionary.
+    local internal_opts = gen_lua_opts(opts)
+    for i = 1, select('#', ...) do
+        collect[i] = format_lua_value(status, internal_opts, select(i, ...))
+        if collect[i] == nil then
+            --
+            -- table.concat doesn't work for nil
+            -- so convert it explicitly.
+            collect[i] = "nil"
+        end
+    end
+    return table.concat(collect, ', ') .. output_eos["lua"]
+end
+
+local function parse_output(value)
+    if not value then
+        return 'Specify output format: lua or yaml.'
+    end
+    local fmt, opts, local_eos
+    for _, v in ipairs(value:split(',')) do
+        if v == 'yaml' or v == 'lua' then
+            fmt = v
+        elseif v == 'line' or v == 'block' then
+            opts = v
+        elseif v:find('=') then
+            local pivot = v:find('=')
+            local lhs = v:sub(1, pivot - 1)
+            local rhs = v:sub(pivot + 1, -1)
+            if lhs == 'local_eos' then
+                local_eos = rhs
+            else
+                return ('Unknown "\\set output" option: %q'):format(lhs)
+            end
+        else
+            return ('Unknown "\\set output" option: %q'):format(v)
+        end
+    end
+    if fmt == nil then
+        return 'Specify output format: lua or yaml.'
+    end
+    if (opts or local_eos) and fmt ~= 'lua' then
+        return ("Invalid language %s, opts are available only in lua."):format(fmt)
+    end
+    return nil, fmt, opts, local_eos
+end
+
+function M.set_default_output(value)
+    if value == nil then
+        error("Nil output value passed")
+    end
+    local err, fmt, opts = parse_output(value)
+    if err then
+        error(err)
+    end
+    default_output_format["fmt"] = fmt
+    default_output_format["opts"] = opts
+end
+
+function M.get_default_output(...)
+    local args = ...
+    if args ~= nil then
+        error("Arguments provided while prohibited")
+    end
+    return default_output_format
+end
+
+local function output_save(fmt, opts)
+    --
+    -- Output format descriptors are saved per
+    -- session thus each console may specify
+    -- own mode.
+    if fmt == "yaml" then
+        ffi.C.console_set_output_format(ffi.C.OUTPUT_FORMAT_YAML)
+    elseif fmt == "lua" and opts == "block" then
+        ffi.C.console_set_output_format(ffi.C.OUTPUT_FORMAT_LUA_BLOCK)
+    else
+        ffi.C.console_set_output_format(ffi.C.OUTPUT_FORMAT_LUA_LINE)
+    end
+end
+
+local function current_output()
+    local fmt = ffi.C.console_get_output_format()
+    if fmt == ffi.C.OUTPUT_FORMAT_YAML then
+        return { ["fmt"] = "yaml", ["opts"] = nil }
+    elseif fmt == ffi.C.OUTPUT_FORMAT_LUA_LINE then
+        return { ["fmt"] = "lua", ["opts"] = "line" }
+    elseif fmt == ffi.C.OUTPUT_FORMAT_LUA_BLOCK then
+        return { ["fmt"] = "lua", ["opts"] = "block" }
+    end
+end
+
+-- Used by console_session_push.
+box.internal.format_lua_push = function(value)
+    local internal_opts = gen_lua_opts(current_output()["opts"])
+    value = format_lua_value(true, internal_opts, value)
+    return '-- Push\n' .. value .. ';'
+end
+
+--
+-- Return current EOS value for currently
+-- active output format.
+local function current_eos()
+    return output_eos[current_output()["fmt"]]
+end
+
+--
+-- Set/get current console EOS value from
+-- currently active output format.
+function M.eos(eos_value)
+    if not eos_value then
+        return tostring(current_eos())
+    end
+    -- We can't allow to change yaml eos format
+    -- because it is a part of encoding standart.
+    local d = current_output()
+    if d["fmt"] == "yaml" then
+        error("console.eos(): is immutable for output " .. d["fmt"])
+    else
+        output_eos[d["fmt"]] = eos_value
+    end
+end
+
+--
+-- Map output format descriptor into a "\set" command.
+local function output_to_cmd_string(desc)
+    if desc["opts"] then
+        return string.format("\\set output %s,%s", desc["fmt"], desc["opts"])
+    else
+        return string.format("\\set output %s", desc["fmt"])
+    end
+end
+
+local function format(status, ...)
+    local d = current_output()
+    return output_handlers[d["fmt"]](status, d["opts"], ...)
+end
+
+--
+-- Set delimiter
+--
+function M.delimiter(delim)
+    local self = fiber.self().storage.console
+    if self == nil then
+        error("console.delimiter(): need existing console")
+    end
+    if delim == nil then
+        return self.delimiter
+    elseif type(delim) == 'string' then
+        self.delimiter = delim
+    else
+        error('invalid delimiter')
+    end
+end
+
+local function set_delimiter(_storage, value)
+    local console = fiber.self().storage.console
+    if console ~= nil and console.delimiter == '$EOF$' then
+        return error('Can not install delimiter for net box sessions')
+    end
+    value = value or ''
+    return M.delimiter(value)
+end
+
+local function set_language(storage, value)
+    if value == nil then
+        return { language = storage.language or 'lua' }
+    end
+    if value ~= 'lua' and value ~= 'sql' then
+        local msg = 'Invalid language "%s", supported languages: lua and sql.'
+        return error(msg:format(value))
+    end
+    if value == 'sql' and rawget(box, 'execute') == nil then
+        return error("Unable to set language to 'sql' with unconfigured box")
+    end
+    storage.language = value
+    return true
+end
+
+local function set_output(storage, value)
+    local err, fmt, opts, local_eos = parse_output(value)
+    if err then
+        return error(err)
+    end
+    if local_eos ~= nil then
+        storage.local_eos = local_eos
+    end
+    output_save(fmt, opts)
+    return true
+end
+
+local function set_continuation(storage, value)
+    if value ~= 'on' and value ~= 'off' then
+        return error('usage: \\set continuation on|off')
+    end
+    storage.continuation_on = value == 'on'
+    return true
+end
+
+local param_handlers = {
+    language = set_language,
+    lang = set_language,
+    l = set_language,
+    output = set_output,
+    o = set_output,
+    delimiter = set_delimiter,
+    delim = set_delimiter,
+    d = set_delimiter,
+    continuation = set_continuation,
+}
+
+local function set_param(storage, _func, param, value)
+    if param == nil then
+        return format(false, 'Invalid set syntax, type \\help for help')
+    end
+    if param_handlers[param] == nil then
+        return format(false, 'Unknown parameter: ' .. tostring(param))
+    end
+    return format(pcall(param_handlers[param], storage, value))
+end
+
+local function help_wrapper(_storage)
+    return format(true, help())
+end
+
+local function quit(_storage)
+    local console = fiber.self().storage.console
+    if console ~= nil then
+        console.running = false
+    end
+end
+
+local operators = {
+    help = help_wrapper,
+    h = help_wrapper,
+    set = set_param,
+    s = set_param,
+    quit = quit,
+    q = quit
+}
+
+--
+-- Generate command arguments from the line to
+-- be passed into command handlers.
+local function parse_operators(line)
+    local items = {}
+    for item in string.gmatch(line, '([^%s]+)') do
+        items[#items + 1] = item
+    end
+    if #items == 0 then
+        return 0, nil
+    end
+    if operators[items[1]] == nil then
+        return #items, nil
+    end
+    return #items, items
+end
+
+--
+-- Preprocess a command via operator helpers.
+local function preprocess(storage, line)
+    local nr_items, items = parse_operators(line)
+    if nr_items == 0 then
+        return help_wrapper()
+    end
+    if items == nil then
+        local msg = "Invalid command \\%s. Type \\help for help."
+        return format(false, msg:format(line))
+    end
+    return operators[items[1]](storage, unpack(items))
+end
+
+--
+-- Return a command without a leading slash.
+local function get_command(line)
+    if line:sub(1, 1) == '\\' then
+        return line:sub(2)
+    end
+    return nil
+end
+
+--
+-- Create wrapper for a function.
+--
+-- Without a wrapper function will be called using xpcall and the box.error
+-- trace frame will be at pcall implementation. Thus the trace test will be not
+-- strict enough (it can be any pcall beneath console pcall).
+--
+local function wrapped_call(fn)
+    return function()
+        -- With `return fn()` wrapper does not work due to tail call
+        -- optimization.
+        local res = utils.table_pack(fn())
+        return unpack(res, 1, res.n)
+    end
+end
+
+-- Calculates trace pointing to the fn() in wrapped_call.
+local function get_wrapped_trace()
+    local fun = wrapped_call(function()
+        box.error(box.error.UNKNOWN, 2)
+    end)
+    local _, err = pcall(fun)
+    return err.trace[1]
+end
+
+-- Calculates trace pointing to the fn() in wrapped_call.
+local wrapped_trace = get_wrapped_trace()
+assert(wrapped_trace.file == 'builtin/box/console.lua')
+
+--
+-- This function is intended to be used with xpcall and wrapped_call.
+-- Returns {err, info} where `info` is debug info for frame calling function
+-- wrapped in wrapped_call and `err` is just original error.
+--
+-- `info` is used to find the module that raises an error.
+--
+local function eval_error_handler(err)
+    local level = 2
+    local info = debug.getinfo(level, 'Sl')
+    -- Find place of xpcall.
+    while info ~= nil do
+        if info.short_src == wrapped_trace.file and
+           info.currentline == wrapped_trace.line then
+            break
+        end
+        level = level + 1
+        info = debug.getinfo(level, 'Sl')
+    end
+    -- Corresponds to the frame of function executed in console.
+    info = debug.getinfo(level - 1, 'S')
+    return {err = err, info = info}
+end
+
+local initial_env
+
+-- Get initial console environment.
+--
+-- If the console_session_scope_vars compat option is set to new,
+-- each console session has its own variable scope (environment)
+-- created before execution of a first command.
+--
+-- This environment initially contains a couple of frequently used
+-- built-in modules. A non-local variable assignment within a
+-- command modifies the environment.
+--
+-- The initial environment is returned by console.initial_env().
+-- It is a table that may be modified by a user or completely
+-- replaced with a new table using console.set_initial_env().
+-- These calls don't affect existing console sessions, only ones
+-- that are created afterwards.
+function M.initial_env()
+    if initial_env == nil then
+        initial_env = {
+            clock     = require('clock'),
+            compat    = require('compat'),
+            config    = require('config'),
+            datetime  = require('datetime'),
+            decimal   = require('decimal'),
+            ffi       = require('ffi'),
+            fiber     = require('fiber'),
+            fio       = require('fio'),
+            fun       = require('fun'),
+            json      = require('json'),
+            log       = require('log'),
+            msgpack   = require('msgpack'),
+            popen     = require('popen'),
+            uuid      = require('uuid'),
+            varbinary = require('varbinary'),
+            yaml      = require('yaml'),
+        }
+    end
+    return initial_env
+end
+
+-- Set initial console environment.
+--
+-- Accepts a table or a nil value. If the value is nil, the
+-- initial environment is reset to a default value.
+--
+-- See console.initial_env() for details.
+function M.set_initial_env(env)
+    if type(env) ~= 'table' and type(env) ~= 'nil' then
+        error(('console.set_initial_env: expected table or nil, got %s'):format(
+            type(env)), 2)
+    end
+    initial_env = env
+end
+
+local function create_env_on_demand(storage)
+    if compat.console_session_scope_vars:is_old() then
+        return
+    end
+    if storage.env ~= nil then
+        return
+    end
+    storage.env = setmetatable(table.copy(M.initial_env()), {
+        -- Read from globals if there is no local variable.
+        __index = _G,
+    })
+end
+
+--
+-- Evaluate command on local instance
+--
+local function local_eval(storage, line)
+    if not line then
+        return nil
+    end
+    internal.run_on_eval(line)
+    local command = get_command(line)
+    if command then
+        return preprocess(storage, command)
+    end
+    if storage.language == 'sql' then
+        return format(pcall(box.execute, line))
+    end
+    --
+    -- Attempt to append 'return ' before the chunk: if the chunk is
+    -- an expression, this pushes results of the expression onto the
+    -- stack. If the chunk is a statement, it won't compile. In that
+    -- case try to run the original string.
+    --
+    create_env_on_demand(storage)
+    -- emmylua_check: false positive, see
+    -- https://github.com/EmmyLuaLs/emmylua-analyzer-rust/issues/1274
+    ---@diagnostic disable-next-line: redundant-parameter
+    local fun, errmsg = loadstring("return "..line, nil, nil, storage.env)
+    if not fun then
+        -- emmylua_check: false positive, see
+        -- https://github.com/EmmyLuaLs/emmylua-analyzer-rust/issues/1274
+        ---@diagnostic disable-next-line: redundant-parameter
+        fun, errmsg = loadstring(line, nil, nil, storage.env)
+    end
+    if not fun then
+        return format(false, errmsg)
+    end
+    -- Wrapper is required to check error trace. See below.
+    fun = wrapped_call(fun)
+    -- box.is_in_txn() is stubbed to throw a error before call to box.cfg{}
+    local in_txn_before = ffi.C.box_txn()
+    local res = utils.table_pack(xpcall(fun, eval_error_handler))
+    --
+    -- Rollback if transaction was began in the failed expression.
+    --
+    -- In case of remote binary console if eval leaves an active transaction
+    -- then later a error is thrown overwriting error thrown by eval thus the
+    -- rollback. Also the check if we were already in transaction allows for
+    -- local and remote text console to preserve interactive transactions.
+    --
+    if not res[1] and not in_txn_before and ffi.C.box_txn() then
+        box.rollback()
+    end
+    --
+    -- In case of errors we set box.error trace frame to the place of box API
+    -- call by client (gh-9914). This should be tested. The idea is to use
+    -- existing diff tests that use console for test script execution. Let
+    -- check if trace frame is correct.
+    --
+    -- It is hard to fix box.error trace for all API at once so we will fix it
+    -- per module basis.
+    --
+    if tarantool.build.test_build and not res[1] and
+       tarantool._internal.trace_check_is_required(res[2].info.short_src) then
+        local err = res[2].err
+        if not box.error.is(err) then
+            return format(false, {err, 'Warning, box error expected'})
+        end
+        local trace = err.trace[1]
+        if not table.equals(trace, wrapped_trace) then
+            return format(false, {err, 'Warning, unexpected trace', trace})
+        end
+    end
+    if not res[1] then
+        local err = res[2].err
+        -- Unfortunately due to introduced wrapper (see above) if module
+        -- raises non box error then trace information apperead breaking
+        -- existing tests. Let's temporarily counteract by stripping
+        -- this information.
+        if type(err) == 'string' then
+            err = string.gsub(err, '^builtin/box/console.lua:%d+: ', '')
+        end
+        res[2] = err
+    end
+    -- specify length to preserve trailing nils
+    return format(unpack(res, 1, res.n))
+end
+
+function M.eval(line)
+    return local_eval(box.session.storage, line)
+end
+
+local text_connection_mt = {
+    __index = {
+        --
+        -- Close underlying socket.
+        --
+        close = function(self)
+            self._socket:close()
+        end,
+        --
+        -- Write a text into a socket.
+        -- @param test Text to send.
+        -- @retval not nil Bytes sent.
+        -- @retval     nil Error.
+        --
+        write = function(self, text)
+            return self._socket:write(text)
+        end,
+        --
+        -- Read a text from a socket until EOS.
+        -- @retval not nil Well formatted data.
+        -- @retval     nil Error.
+        --
+        read = function(self)
+            local ret = self._socket:read(self.eos)
+            if ret and ret ~= '' then
+                return ret
+            end
+        end,
+        --
+        -- The command might modify EOS so
+        -- we have to parse and preprocess it
+        -- first to not stuck in :read() forever.
+        --
+        -- Same time the EOS is per connection
+        -- value so we keep it inside the metatable
+        -- instace, and because we can't use same
+        -- name as output_eos() function we call
+        -- it simplier as self.eos.
+        preprocess_eval = function(self, text)
+            local command = get_command(text)
+            if command == nil then
+                return
+            end
+            local nr_items, items = parse_operators(command)
+            if nr_items == 3 then
+                --
+                -- Make sure it is exactly "\set output" command.
+                if operators[items[1]] == set_param and
+                    param_handlers[items[2]] == set_output then
+                    local err, fmt, opts, local_eos = parse_output(items[3])
+                    if not err then
+                        self.fmt = fmt
+                        self.eos = output_eos[fmt]
+                        if local_eos ~= nil then
+                            -- Rebuild the command without
+                            -- local_eos=<...>, because it is a client
+                            -- side option.
+                            self.local_eos = local_eos
+                            local server_cmd_opts = table.concat({fmt, opts},
+                                                                 ',')
+                            return ('\\set output %s'):format(server_cmd_opts)
+                        end
+                    end
+                end
+            end
+            if operators[items[1]] == set_param and
+                param_handlers[items[2]] == set_continuation then
+
+                local continuation = items[3]
+                if continuation == 'on' or continuation == 'off' then
+                   self.continuation_on = continuation == 'on'
+               end
+            end
+            return text
+        end,
+        --
+        -- Write + Read.
+        --
+        eval = function(self, text)
+            local server_cmd = self:preprocess_eval(text)
+            -- If `text` is a `\set output` command, server_cmd may be a cropped
+            -- version of it without some configuration, that server doesn't
+            -- need to get.
+            text = (server_cmd or text)..'$EOF$\n'
+            local fmt = self.fmt or default_output_format["fmt"]
+            if not self:write(text) then
+                error(self:set_error())
+            end
+            while true do
+                local rc = self:read()
+                if not rc then
+                    break
+                end
+                if fmt == "yaml" then
+                    local handle = yaml.decode(rc, {tag_only = true})
+                    if not handle then
+                        -- Can not fail - tags are encoded with no
+                        -- user participation and are correct always.
+                        return rc
+                    end
+                    if handle == PUSH_TAG_HANDLE and self.print_f then
+                        self.print_f(rc)
+                    end
+                else
+                    if not string.startswith(rc, '-- Push') then
+                        return rc
+                    end
+                    if self.print_f then
+                        self.print_f(rc)
+                    end
+                end
+            end
+            return error(self:set_error())
+        end,
+        --
+        -- Make the connection be in error state, set error
+        -- message.
+        -- @retval Error message.
+        --
+        set_error = function(self)
+            self.state = 'error'
+            self.error = self._socket:error()
+            if not self.error then
+                self.error = 'Peer closed'
+            end
+            return self.error
+        end,
+    }
+}
+
+--
+-- Wrap an existing socket with text Read-Write API inside a
+-- netbox-like object.
+-- @param connection Socket to wrap.
+-- @param url Parsed destination URL.
+-- @param print_f Function to print push messages.
+--
+-- @retval nil, err Error, and err contains an error message.
+-- @retval  not nil Netbox-like object.
+--
+local function wrap_text_socket(connection, url, print_f)
+    local conn = setmetatable({
+        _socket = connection,
+        state = 'active',
+        host = url.host or 'localhost',
+        port = url.service,
+        print_f = print_f,
+        eos = current_eos(),
+        fmt = current_output()["fmt"],
+        local_eos = default_local_eos,
+        continuation_on = false,
+    }, text_connection_mt)
+    --
+    -- Prepare the connection: setup EOS symbol
+    -- by executing the \set command on remote machine
+    -- explicitly, and then setup a delimiter.
+    local cmd_set_output = output_to_cmd_string(current_output()) .. '\n'
+    if not conn:write(cmd_set_output) or not conn:read() then
+        conn:set_error()
+    end
+    local cmd_delimiter = 'require("console").delimiter("$EOF$")\n'
+    if not conn:write(cmd_delimiter) or not conn:read() then
+        conn:set_error()
+    end
+    return conn
+end
+
+--
+-- Evaluate command on remote instance
+--
+local function remote_eval(self, line)
+    if line and self.remote.state == 'active' then
+        local ok, res = pcall(self.remote.console_eval, line)
+        if self.remote.state == 'active' then
+            return ok and res or format(false, res)
+        end
+    end
+    local err = self.remote.error
+    self.remote:close()
+    self.remote = nil
+    self.console_eval = nil
+    self.eval = nil
+    self.prompt = nil
+    self.completion = nil
+    pcall(self.on_client_disconnect, self)
+    return (err and format(false, err)) or ''
+end
+
+local function local_check_lua(buf)
+    local fn, err = loadstring(buf)
+    if fn ~= nil or not string.find(err, " near '<eof>'$") then
+        -- valid Lua code or a syntax error not due to
+        -- an incomplete input
+        return true
+    end
+    if loadstring('return '..buf) ~= nil then
+        -- certain obscure inputs like '(42\n)' yield the
+        -- same error as incomplete statement
+        return true
+    end
+    return false
+end
+
+--
+-- Read command from stdin
+--
+local function local_read(self)
+    local buf = ""
+    local prompt = self.prompt
+    while true do
+        local delim = self.delimiter
+        local line, discard_buffer = internal.readline({
+            prompt = prompt.. "> ",
+            completion = self.ac and self.completion or nil
+        })
+        if not line then
+            return nil
+        end
+        if discard_buffer then
+            return ''
+        end
+        buf = buf..line
+        if buf:sub(1, 1) == '\\' then
+            break
+        end
+        if delim == "" then
+            local continuation_on
+            if self.remote ~= nil then
+                continuation_on = self.remote.continuation_on
+            else
+                continuation_on = self.continuation_on
+            end
+            local lang = self.language or 'lua'
+            -- Continue reading if Lua input seems incomplete according to
+            -- internal heuristic.
+            if lang == 'lua' and not local_check_lua(buf) then
+                goto continue
+            end
+            -- Interpret continuation_symbol as a line continuation marker.
+            --
+            -- This check is performed after local_check_lua() because in some
+            -- rare cases (e.g. in multiline strings with line ending with
+            -- slash) the slash would be treated as continuation marker and
+            -- removed.
+            if continuation_on and line:endswith(continuation_symbol) then
+                buf = buf:sub(1, -1 - #continuation_symbol)
+                goto continue
+            end
+            break
+        elseif #buf >= #delim and buf:sub(#buf - #delim + 1) == delim then
+            buf = buf:sub(0, #buf - #delim)
+            break
+        end
+        ::continue::
+        buf = buf.."\n"
+        prompt = string.rep(' ', #self.prompt)
+    end
+    internal.add_history(buf)
+    if self.history_file then
+        internal.save_history(self.history_file)
+    end
+    return buf
+end
+
+--
+-- Print result to stdout
+--
+local function local_print(self, output)
+    --
+    -- Be cautious, `output` may be any printable object, e.g. tarantoolctl
+    -- passes cdata errors in some cases.
+    --
+    if type(output) == 'string' and output:endswith(output_eos["lua"]) then
+        local new_local_eos
+        if self.remote ~= nil then
+            new_local_eos = self.remote.local_eos
+        else
+            new_local_eos = self.local_eos
+        end
+        output = output:sub(1, -#output_eos["lua"] - 1) .. new_local_eos
+    end
+    print(output)
+end
+
+--
+-- Read a line or a chunk from connected client console.listen().
+--
+-- The value is returned without delimiter (if any) and trailing
+-- newline character.
+--
+local function client_read_line(self)
+    --
+    -- Byte sequences that come over the network and come from
+    -- the local client console may have a different terminal
+    -- character. We support both possible options: LF and CRLF.
+    --
+    local delim_cr = self.delimiter .. "\r"
+    local delim_lf = self.delimiter .. "\n"
+    local buf = self.client:read({delimiter = {delim_lf, delim_cr}})
+    if buf == nil then
+        return nil
+    elseif buf == "" then
+        return nil -- EOF
+    elseif buf == "~.\n" then
+        -- Escape sequence to close current connection (like SSH)
+        return nil
+    end
+    -- remove trailing delimiter
+    return buf:sub(1, -#self.delimiter-2)
+end
+
+--
+-- Read a command from connected client console.listen().
+--
+local function client_read(self)
+    local buf = ''
+    local continuation_on = self.continuation_on
+    while true do
+        local line = client_read_line(self)
+        if line == nil then
+            -- EOF or error.
+            --
+            -- Note: Even if `buf` is not empty, skip unfinished
+            -- command.
+            return nil
+        end
+        buf = buf .. line
+        if continuation_on and line:endswith(continuation_symbol) then
+            buf = buf:sub(1, -1 - #continuation_symbol)
+        else
+            break
+        end
+    end
+    return buf
+end
+
+--
+-- Print result to connected client from console.listen()
+--
+local function client_print(self, output)
+    self.client:write(output)
+end
+
+--
+-- REPL state
+--
+local repl_mt = {
+    __index = {
+        running = false;
+        delimiter = "";
+        prompt = "tarantool";
+        read = local_read;
+        eval = local_eval;
+        print = local_print;
+        completion = internal.completion_handler;
+        ac = true;
+        local_eos = default_local_eos;
+        continuation_on = false;
+    };
+}
+
+--
+-- REPL = read-eval-print-loop
+--
+local function repl(self)
+    fiber.self().storage.console = self
+    if type(self.on_start) == 'function' then
+        self:on_start()
+    end
+
+    while self.running do
+        local command = self:read()
+        local output = self:eval(command)
+        if output == nil then break end
+        self:print(output)
+    end
+    self.running = false
+    fiber.self().storage.console = nil
+end
+
+function M.on_start(foo)
+    if foo == nil or type(foo) == 'function' then
+        repl_mt.__index.on_start = foo
+        return
+    end
+    error('Wrong type of on_start hook: ' .. type(foo))
+end
+
+function M.on_client_disconnect(foo)
+    if foo == nil or type(foo) == 'function' then
+        repl_mt.__index.on_client_disconnect = foo
+        return
+    end
+    error('Wrong type of on_client_disconnect hook: ' .. type(foo))
+end
+
+--
+--
+--
+function M.ac(yes_no)
+    local self = fiber.self().storage.console
+    if self == nil then
+        error("console.ac(): need existing console")
+    end
+    self.ac = not not yes_no
+end
+
+--
+-- Start REPL on stdin
+--
+local started = false
+
+--
+-- Determine the history file path following XDG Base Directory specification.
+--
+-- The function checks for the history file in the following order:
+-- 1. $HOME/.tarantool_history (if it exists - takes priority for migration)
+-- 2. $XDG_STATE_HOME/tarantool/.tarantool_history (if XDG_STATE_HOME is set
+--    and the directory exists)
+-- 3. $HOME/.local/state/tarantool/.tarantool_history (if the directory exists)
+--
+-- If none of the above exist (fresh install), the function creates the
+-- XDG-compliant state directory and returns a path inside it:
+-- 4. $XDG_STATE_HOME/tarantool/.tarantool_history (if XDG_STATE_HOME is set)
+-- 5. $HOME/.local/state/tarantool/.tarantool_history (default)
+--
+-- Returns nil only if HOME is not set.
+--
+local function get_history_file_path()
+    local xdg_state_home = os.getenv('XDG_STATE_HOME')
+    -- Per the XDG Base Directory specification, an empty value must be
+    -- treated the same as unset.
+    if xdg_state_home == '' then
+        xdg_state_home = nil
+    end
+    local home_dir = os.getenv('HOME')
+
+    -- Legacy path takes priority for seamless migration.
+    if home_dir then
+        local home_history = fio.pathjoin(home_dir, HISTORY_FILE_NAME)
+        if fio.path.exists(home_history) then
+            return home_history
+        end
+    end
+
+    -- $XDG_STATE_HOME/tarantool/ directory already exists.
+    if xdg_state_home then
+        local xdg_history_dir = fio.pathjoin(xdg_state_home, 'tarantool')
+        if fio.path.is_dir(xdg_history_dir) then
+            return fio.pathjoin(xdg_history_dir, HISTORY_FILE_NAME)
+        end
+    end
+
+    -- $HOME/.local/state/tarantool/ directory already exists.
+    if home_dir then
+        local home_state_dir = fio.pathjoin(home_dir, '.local', 'state',
+                                            'tarantool')
+        if fio.path.is_dir(home_state_dir) then
+            return fio.pathjoin(home_state_dir, HISTORY_FILE_NAME)
+        end
+    end
+
+    -- Fresh install: create the XDG-compliant state directory.
+    if xdg_state_home then
+        local xdg_history_dir = fio.pathjoin(xdg_state_home, 'tarantool')
+        if fio.mktree(xdg_history_dir) then
+            return fio.pathjoin(xdg_history_dir, HISTORY_FILE_NAME)
+        end
+    end
+
+    if home_dir then
+        local home_state_dir = fio.pathjoin(home_dir, '.local', 'state',
+                                            'tarantool')
+        if fio.mktree(home_state_dir) then
+            return fio.pathjoin(home_state_dir, HISTORY_FILE_NAME)
+        end
+    end
+
+    return nil
+end
+
+function M.start()
+    if started then
+        error("console is already started")
+    end
+    started = true
+    local self = setmetatable({ running = true }, repl_mt)
+    local history_file = get_history_file_path()
+    if history_file then
+        self.history_file = history_file
+        internal.load_history(self.history_file)
+    end
+    session_internal.create(1, "repl") -- stdin fileno
+    repl(self)
+    started = false
+    internal.console_exited()
+end
+
+--
+-- Connect to Lua console
+--
+local function connect_lua_console(url, timeout, print_f)
+    local deadline = fiber.clock() + (timeout or DEFAULT_CONNECT_TIMEOUT)
+    local s, err = socket.tcp_connect(url.host, url.service,
+                                      deadline - fiber.clock())
+    if not s then
+        return nil, err
+    end
+    local greeting = s:read(128, deadline - fiber.clock())
+    if not greeting then
+        local err = s:error()
+        s:close()
+        return nil, err
+    end
+    if greeting:len() ~= 128 or
+       greeting:sub(64, 64) ~= '\n' or greeting:sub(128, 128) ~= '\n' or
+       not greeting:match("Tarantool%s+%d+%.%d+%.%d+%s+%(Lua console%)") then
+        s:close()
+        return nil, 'Invalid greeting'
+   end
+   return wrap_text_socket(s, url, print_f)
+end
+
+--
+-- Connect to remote instance
+--
+function M.connect(uri, opts)
+    opts = opts or {}
+
+    local self = fiber.self().storage.console
+    if self == nil then
+        error("console.connect() need existing console")
+    end
+
+    local u
+    if uri then
+        u = urilib.parse(tostring(uri))
+    end
+    if u == nil or u.service == nil then
+        error('Usage: console.connect("[login:password@][host:]port")')
+    end
+
+    -- We don't know if the remote end is binary or Lua console so we first try
+    -- to connect to it as binary using net.box and fall back on Lua console if
+    -- it fails.
+    local remote = net_box.connect(uri, {connect_timeout = opts.timeout})
+    if remote.state == 'error' then
+        local err = remote.error
+        remote = nil
+        if err == 'Unsupported protocol: Lua console' then
+            remote, err = connect_lua_console(u, opts.timeout,
+                                              function(msg) self:print(msg) end)
+        end
+        if not remote then
+            log.verbose(err)
+            box.error(box.error.NO_CONNECTION)
+        end
+        remote.console_eval = function(line)
+            return remote:eval(line)
+        end
+    else
+        if not remote.host then
+            remote.host = 'localhost'
+        end
+        local eval_obj
+        if remote.peer_protocol_features.streams then
+            eval_obj = remote:new_stream()
+        else
+            eval_obj = remote
+        end
+        remote.console_eval = function(line)
+            return eval_obj:eval('return require("console").eval(...)', {line})
+        end
+    end
+
+    -- check connection && permissions
+    local ok, res = pcall(remote.console_eval, 'return true')
+    if not ok then
+        remote:close()
+        pcall(self.on_client_disconnect, self)
+        error(res)
+    end
+
+    -- override methods
+    self.remote = remote
+    self.eval = remote_eval
+    self.prompt = string.format("%s:%s", self.remote.host, self.remote.port)
+    self.completion = function (str, pos1, pos2)
+        local c = string.format(
+            'return require("console").completion_handler(%q, %d, %d)',
+            str, pos1, pos2)
+        return yaml.decode(remote.console_eval(c))[1]
+    end
+    log.info("connected to %s:%s", self.remote.host, self.remote.port)
+    return true
+end
+
+local function client_handler(client, _peer)
+    session_internal.create(client:fd(), "console")
+    session_internal.run_on_connect()
+    session_internal.run_on_auth(box.session.user(), true)
+    local state = setmetatable({
+        running = true;
+        read = client_read;
+        print = client_print;
+        client = client;
+    }, repl_mt)
+    local version = _TARANTOOL:match("([^-]+)-")
+    state:print(string.format("%-63s\n%-63s\n",
+        "Tarantool ".. version.." (Lua console)",
+        "type 'help' for interactive help"))
+    local on_shutdown = function()
+        -- Fiber is going to be cancelled on shutdown. Do not report
+        -- cancel induced error to the peer.
+        client:close();
+    end
+    state.fiber = fiber.self()
+    box.ctl.on_shutdown(on_shutdown)
+    repl(state)
+    box.ctl.on_shutdown(nil, on_shutdown)
+    session_internal.run_on_disconnect()
+end
+
+--
+-- Start admin console
+--
+function M.listen(uri)
+    local host, port
+    if uri == nil then
+        host = 'unix/'
+        port = '/tmp/tarantool-console.sock'
+    else
+        local u = urilib.parse(tostring(uri))
+        if u == nil or u.service == nil then
+            error('Usage: console.listen("[host:]port")')
+        end
+        host = u.host
+        port = u.service or 3313
+    end
+    local s = socket.tcp_server(host, port, { handler = client_handler,
+        name = 'console'})
+    if not s then
+        error(string.format('failed to create server %s:%s: %s',
+            host, port, errno.strerror()))
+    end
+    return s
+end
+
+M.completion_handler = internal.completion_handler
+
+return M

@@ -1,0 +1,18 @@
+bin/tarantool
+bin/tarantoolctl
+%%ETCDIR%%/default/tarantool
+%%ETCDIR%%/instances.available/example.lua
+include/tarantool/lauxlib.h
+include/tarantool/lmisclib.h
+include/tarantool/lua.h
+include/tarantool/lua.hpp
+include/tarantool/luaconf.h
+include/tarantool/luajit.h
+include/tarantool/lualib.h
+include/tarantool/module.h
+man/man1/tarantool.1.gz
+man/man1/tarantoolctl.1.gz
+@dir %%ETCDIR%%/instances.enabled
+@dir(%%TT_USER%%,%%TT_GROUP%%,) %%TT_DATADIR%%
+@dir(%%TT_USER%%,%%TT_GROUP%%,) %%TT_LOGDIR%%
+@dir(%%TT_USER%%,%%TT_GROUP%%,) %%TT_RUNDIR%%

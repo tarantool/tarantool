@@ -1,0 +1,98 @@
+-- Test pickle.pack()
+pickle = require('pickle')
+---
+...
+pickle.pack()
+---
+- error: expected string as 1 argument
+...
+pickle.pack(1)
+---
+- error: 'pickle.pack: argument count does not match the format'
+...
+pickle.pack('abc')
+---
+- error: 'pickle.pack: argument count does not match the format'
+...
+pickle.pack('a', ' - hello')
+---
+- ' - hello'
+...
+pickle.pack('Aa', ' - hello', ' world')
+---
+- ' - hello world'
+...
+pickle.pack('s', 0x4d)
+---
+- "M\0"
+...
+pickle.pack('i', -1)
+---
+- "\xFF\xFF\xFF\xFF"
+...
+pickle.pack('N', -1)
+---
+- "\xFF\xFF\xFF\xFF"
+...
+pickle.pack('ssss', 25940, 29811, 28448, 11883)
+---
+- Test ok.
+...
+pickle.pack('SSSS', 25940, 29811, 28448, 11883)
+---
+- Test ok.
+...
+pickle.pack('SSSSSSSS', 28493, 29550, 27680, 27497, 29541, 20512, 29285, 8556)
+---
+- Mons likes Perl!
+...
+pickle.pack('bsil', 84, 29541, 1802444916, 2338318684567380014ULL)
+---
+- 'Test ok. Let`s '
+...
+pickle.pack('')
+---
+- 
+...
+pickle.pack('a', '')
+---
+- 
+...
+pickle.unpack('b', 'T')
+---
+- 84
+...
+pickle.unpack('s', 'Te')
+---
+- 25940
+...
+pickle.unpack('i', 'Test')
+---
+- 1953719636
+...
+pickle.unpack('l', 'Test ok.')
+---
+- 3344889333436081492
+...
+pickle.unpack('bsil', pickle.pack('bsil', 255, 65535, 4294967295, tonumber64('18446744073709551615')))
+---
+- 255
+- 65535
+- 4294967295
+- 18446744073709551615
+...
+pickle.unpack('','')
+---
+...
+pickle.unpack('a', '')
+---
+- 
+...
+pickle.unpack('ii', pickle.pack('i', 1))
+---
+- error: 'pickle.unpack(''i''): got 4 bytes (expected: 8+)'
+...
+pickle.unpack('i', pickle.pack('ii', 1, 1))
+---
+- error: 'pickle.unpack(''i''): too many bytes: unpacked 4, total 8'
+...

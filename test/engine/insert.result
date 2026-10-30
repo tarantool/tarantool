@@ -1,0 +1,1015 @@
+test_run = require('test_run')
+---
+...
+inspector = test_run.new()
+---
+...
+engine = inspector:get_cfg('engine')
+---
+...
+-- insert (str)
+space = box.schema.space.create('test', { engine = engine })
+---
+...
+index = space:create_index('primary', { type = 'tree', parts = {1, 'string'} })
+---
+...
+for key = 1, 100 do space:insert({tostring(key)}) end
+---
+...
+t = {}
+---
+...
+for key = 1, 100 do table.insert(t, space:get({tostring(key)})) end
+---
+...
+t
+---
+- - ['1']
+  - ['2']
+  - ['3']
+  - ['4']
+  - ['5']
+  - ['6']
+  - ['7']
+  - ['8']
+  - ['9']
+  - ['10']
+  - ['11']
+  - ['12']
+  - ['13']
+  - ['14']
+  - ['15']
+  - ['16']
+  - ['17']
+  - ['18']
+  - ['19']
+  - ['20']
+  - ['21']
+  - ['22']
+  - ['23']
+  - ['24']
+  - ['25']
+  - ['26']
+  - ['27']
+  - ['28']
+  - ['29']
+  - ['30']
+  - ['31']
+  - ['32']
+  - ['33']
+  - ['34']
+  - ['35']
+  - ['36']
+  - ['37']
+  - ['38']
+  - ['39']
+  - ['40']
+  - ['41']
+  - ['42']
+  - ['43']
+  - ['44']
+  - ['45']
+  - ['46']
+  - ['47']
+  - ['48']
+  - ['49']
+  - ['50']
+  - ['51']
+  - ['52']
+  - ['53']
+  - ['54']
+  - ['55']
+  - ['56']
+  - ['57']
+  - ['58']
+  - ['59']
+  - ['60']
+  - ['61']
+  - ['62']
+  - ['63']
+  - ['64']
+  - ['65']
+  - ['66']
+  - ['67']
+  - ['68']
+  - ['69']
+  - ['70']
+  - ['71']
+  - ['72']
+  - ['73']
+  - ['74']
+  - ['75']
+  - ['76']
+  - ['77']
+  - ['78']
+  - ['79']
+  - ['80']
+  - ['81']
+  - ['82']
+  - ['83']
+  - ['84']
+  - ['85']
+  - ['86']
+  - ['87']
+  - ['88']
+  - ['89']
+  - ['90']
+  - ['91']
+  - ['92']
+  - ['93']
+  - ['94']
+  - ['95']
+  - ['96']
+  - ['97']
+  - ['98']
+  - ['99']
+  - ['100']
+...
+space:insert({tostring(7)})
+---
+- error: Duplicate key exists in unique index "primary" in space "test" with old tuple
+    - ["7"] and new tuple - ["7"]
+...
+space:drop()
+---
+...
+-- insert (num)
+space = box.schema.space.create('test', { engine = engine })
+---
+...
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
+---
+...
+for key = 1, 100 do space:insert({key}) end
+---
+...
+t = {}
+---
+...
+for key = 1, 100 do table.insert(t, space:get({key})) end
+---
+...
+t
+---
+- - [1]
+  - [2]
+  - [3]
+  - [4]
+  - [5]
+  - [6]
+  - [7]
+  - [8]
+  - [9]
+  - [10]
+  - [11]
+  - [12]
+  - [13]
+  - [14]
+  - [15]
+  - [16]
+  - [17]
+  - [18]
+  - [19]
+  - [20]
+  - [21]
+  - [22]
+  - [23]
+  - [24]
+  - [25]
+  - [26]
+  - [27]
+  - [28]
+  - [29]
+  - [30]
+  - [31]
+  - [32]
+  - [33]
+  - [34]
+  - [35]
+  - [36]
+  - [37]
+  - [38]
+  - [39]
+  - [40]
+  - [41]
+  - [42]
+  - [43]
+  - [44]
+  - [45]
+  - [46]
+  - [47]
+  - [48]
+  - [49]
+  - [50]
+  - [51]
+  - [52]
+  - [53]
+  - [54]
+  - [55]
+  - [56]
+  - [57]
+  - [58]
+  - [59]
+  - [60]
+  - [61]
+  - [62]
+  - [63]
+  - [64]
+  - [65]
+  - [66]
+  - [67]
+  - [68]
+  - [69]
+  - [70]
+  - [71]
+  - [72]
+  - [73]
+  - [74]
+  - [75]
+  - [76]
+  - [77]
+  - [78]
+  - [79]
+  - [80]
+  - [81]
+  - [82]
+  - [83]
+  - [84]
+  - [85]
+  - [86]
+  - [87]
+  - [88]
+  - [89]
+  - [90]
+  - [91]
+  - [92]
+  - [93]
+  - [94]
+  - [95]
+  - [96]
+  - [97]
+  - [98]
+  - [99]
+  - [100]
+...
+space:insert({7})
+---
+- error: Duplicate key exists in unique index "primary" in space "test" with old tuple
+    - [7] and new tuple - [7]
+...
+space:drop()
+---
+...
+-- insert multi-part (num, num)
+space = box.schema.space.create('test', { engine = engine })
+---
+...
+index = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned', 2, 'unsigned'} })
+---
+...
+for key = 1, 100 do space:insert({key, key}) end
+---
+...
+t = {}
+---
+...
+for key = 1, 100 do table.insert(t, space:get({key, key})) end
+---
+...
+t
+---
+- - [1, 1]
+  - [2, 2]
+  - [3, 3]
+  - [4, 4]
+  - [5, 5]
+  - [6, 6]
+  - [7, 7]
+  - [8, 8]
+  - [9, 9]
+  - [10, 10]
+  - [11, 11]
+  - [12, 12]
+  - [13, 13]
+  - [14, 14]
+  - [15, 15]
+  - [16, 16]
+  - [17, 17]
+  - [18, 18]
+  - [19, 19]
+  - [20, 20]
+  - [21, 21]
+  - [22, 22]
+  - [23, 23]
+  - [24, 24]
+  - [25, 25]
+  - [26, 26]
+  - [27, 27]
+  - [28, 28]
+  - [29, 29]
+  - [30, 30]
+  - [31, 31]
+  - [32, 32]
+  - [33, 33]
+  - [34, 34]
+  - [35, 35]
+  - [36, 36]
+  - [37, 37]
+  - [38, 38]
+  - [39, 39]
+  - [40, 40]
+  - [41, 41]
+  - [42, 42]
+  - [43, 43]
+  - [44, 44]
+  - [45, 45]
+  - [46, 46]
+  - [47, 47]
+  - [48, 48]
+  - [49, 49]
+  - [50, 50]
+  - [51, 51]
+  - [52, 52]
+  - [53, 53]
+  - [54, 54]
+  - [55, 55]
+  - [56, 56]
+  - [57, 57]
+  - [58, 58]
+  - [59, 59]
+  - [60, 60]
+  - [61, 61]
+  - [62, 62]
+  - [63, 63]
+  - [64, 64]
+  - [65, 65]
+  - [66, 66]
+  - [67, 67]
+  - [68, 68]
+  - [69, 69]
+  - [70, 70]
+  - [71, 71]
+  - [72, 72]
+  - [73, 73]
+  - [74, 74]
+  - [75, 75]
+  - [76, 76]
+  - [77, 77]
+  - [78, 78]
+  - [79, 79]
+  - [80, 80]
+  - [81, 81]
+  - [82, 82]
+  - [83, 83]
+  - [84, 84]
+  - [85, 85]
+  - [86, 86]
+  - [87, 87]
+  - [88, 88]
+  - [89, 89]
+  - [90, 90]
+  - [91, 91]
+  - [92, 92]
+  - [93, 93]
+  - [94, 94]
+  - [95, 95]
+  - [96, 96]
+  - [97, 97]
+  - [98, 98]
+  - [99, 99]
+  - [100, 100]
+...
+space:insert({7, 7})
+---
+- error: Duplicate key exists in unique index "primary" in space "test" with old tuple
+    - [7, 7] and new tuple - [7, 7]
+...
+space:drop()
+---
+...
+-- insert with tuple.new
+space = box.schema.space.create('test', { engine = engine })
+---
+...
+index = space:create_index('primary', { type = 'tree', parts = {1, 'string'} })
+---
+...
+for key = 1, 100 do space:insert({tostring(key)}) end
+---
+...
+t = {}
+---
+...
+for key = 1, 100 do table.insert(t, space:get({tostring(key)})) end
+---
+...
+t
+---
+- - ['1']
+  - ['2']
+  - ['3']
+  - ['4']
+  - ['5']
+  - ['6']
+  - ['7']
+  - ['8']
+  - ['9']
+  - ['10']
+  - ['11']
+  - ['12']
+  - ['13']
+  - ['14']
+  - ['15']
+  - ['16']
+  - ['17']
+  - ['18']
+  - ['19']
+  - ['20']
+  - ['21']
+  - ['22']
+  - ['23']
+  - ['24']
+  - ['25']
+  - ['26']
+  - ['27']
+  - ['28']
+  - ['29']
+  - ['30']
+  - ['31']
+  - ['32']
+  - ['33']
+  - ['34']
+  - ['35']
+  - ['36']
+  - ['37']
+  - ['38']
+  - ['39']
+  - ['40']
+  - ['41']
+  - ['42']
+  - ['43']
+  - ['44']
+  - ['45']
+  - ['46']
+  - ['47']
+  - ['48']
+  - ['49']
+  - ['50']
+  - ['51']
+  - ['52']
+  - ['53']
+  - ['54']
+  - ['55']
+  - ['56']
+  - ['57']
+  - ['58']
+  - ['59']
+  - ['60']
+  - ['61']
+  - ['62']
+  - ['63']
+  - ['64']
+  - ['65']
+  - ['66']
+  - ['67']
+  - ['68']
+  - ['69']
+  - ['70']
+  - ['71']
+  - ['72']
+  - ['73']
+  - ['74']
+  - ['75']
+  - ['76']
+  - ['77']
+  - ['78']
+  - ['79']
+  - ['80']
+  - ['81']
+  - ['82']
+  - ['83']
+  - ['84']
+  - ['85']
+  - ['86']
+  - ['87']
+  - ['88']
+  - ['89']
+  - ['90']
+  - ['91']
+  - ['92']
+  - ['93']
+  - ['94']
+  - ['95']
+  - ['96']
+  - ['97']
+  - ['98']
+  - ['99']
+  - ['100']
+...
+space:insert(box.tuple.new{tostring(7)})
+---
+- error: Duplicate key exists in unique index "primary" in space "test" with old tuple
+    - ["7"] and new tuple - ["7"]
+...
+space:drop()
+---
+...
+-- In non-unique indexes select output order is undefined,
+-- so it's better to additionally sort output to receive same order every time.
+function sort_cmp(a, b) return a[1] < b[1] and true or false end
+---
+...
+function sort(t) table.sort(t, sort_cmp) return t end
+---
+...
+-- insert in space with multiple indices
+space = box.schema.space.create('test', { engine = engine })
+---
+...
+index1 = space:create_index('primary', { type = 'tree', parts = {1, 'number', 2, 'scalar'}})
+---
+...
+index2 = space:create_index('secondary', { type = 'tree', parts = {3, 'unsigned', 1, 'number'}})
+---
+...
+index3 = space:create_index('third', { type = 'tree', parts = {2, 'scalar', 4, 'string'}, unique = false})
+---
+...
+space:insert({50, 'fere', 3, 'rgrtht'})
+---
+- [50, 'fere', 3, 'rgrtht']
+...
+space:insert({-14.645, true, 562, 'jknew'})
+---
+- [-14.645, true, 562, 'jknew']
+...
+space:insert({533, 1293.352, 2132, 'hyorj'})
+---
+- [533, 1293.352, 2132, 'hyorj']
+...
+space:insert({4824, 1293.352, 684, 'hyorj'})
+---
+- [4824, 1293.352, 684, 'hyorj']
+...
+index1:select{}
+---
+- - [-14.645, true, 562, 'jknew']
+  - [50, 'fere', 3, 'rgrtht']
+  - [533, 1293.352, 2132, 'hyorj']
+  - [4824, 1293.352, 684, 'hyorj']
+...
+index2:select{}
+---
+- - [50, 'fere', 3, 'rgrtht']
+  - [-14.645, true, 562, 'jknew']
+  - [4824, 1293.352, 684, 'hyorj']
+  - [533, 1293.352, 2132, 'hyorj']
+...
+sort(index3:select{})
+---
+- - [-14.645, true, 562, 'jknew']
+  - [50, 'fere', 3, 'rgrtht']
+  - [533, 1293.352, 2132, 'hyorj']
+  - [4824, 1293.352, 684, 'hyorj']
+...
+space:drop()
+---
+...
+space = box.schema.space.create('test', { engine = engine })
+---
+...
+index1 = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'} })
+---
+...
+index2 = space:create_index('secondary', { type = 'tree', parts = {2, 'unsigned'} })
+---
+...
+index3 = space:create_index('third', { type = 'tree', parts = {3, 'unsigned'}, unique = false })
+---
+...
+space:insert({1, 1, 1})
+---
+- [1, 1, 1]
+...
+space:insert({2, 2, 2})
+---
+- [2, 2, 2]
+...
+space:insert({3, 3, 3})
+---
+- [3, 3, 3]
+...
+space:select{}
+---
+- - [1, 1, 1]
+  - [2, 2, 2]
+  - [3, 3, 3]
+...
+space:insert({1, 2, 3})
+---
+- error: Duplicate key exists in unique index "primary" in space "test" with old tuple
+    - [1, 1, 1] and new tuple - [1, 2, 3]
+...
+index1:select{}
+---
+- - [1, 1, 1]
+  - [2, 2, 2]
+  - [3, 3, 3]
+...
+index2:select{}
+---
+- - [1, 1, 1]
+  - [2, 2, 2]
+  - [3, 3, 3]
+...
+sort(index3:select{})
+---
+- - [1, 1, 1]
+  - [2, 2, 2]
+  - [3, 3, 3]
+...
+space:drop()
+---
+...
+-- gh-186 New implementation of box.replace does not check that tuple is
+-- array
+s = box.schema.space.create('s', { engine = engine })
+---
+...
+index = s:create_index('pk')
+---
+...
+s:insert(1)
+---
+- error: Tuple/Key must be MsgPack array
+...
+s:insert(1, 2)
+---
+- error: Tuple/Key must be MsgPack array
+...
+s:insert(1, 2, 3)
+---
+- error: Tuple/Key must be MsgPack array
+...
+s:insert{1}
+---
+- [1]
+...
+s:insert{2, 3}
+---
+- [2, 3]
+...
+-- xxx: silently truncates the tail - should warn perhaps
+tmp = s:delete(1, 2, 3)
+---
+...
+s:select{}
+---
+- - [2, 3]
+...
+s:drop()
+---
+...
+-- concurrent insert fail
+fiber = require('fiber')
+---
+...
+s = box.schema.space.create('s', { engine = engine })
+---
+...
+index = s:create_index('pk')
+---
+...
+n_workers = 3
+---
+...
+n_success = 0
+---
+...
+n_failed = 0
+---
+...
+c = fiber.channel(n_workers)
+---
+...
+inspector:cmd("setopt delimiter ';'")
+---
+- true
+...
+for i=1,n_workers do
+    fiber.create(function()
+        if pcall(s.insert, s, {42}) then
+            n_success = n_success + 1
+        else
+            n_failed = n_failed + 1
+        end
+        c:put(true)
+    end)
+end;
+---
+...
+inspector:cmd("setopt delimiter ''");
+---
+- true
+...
+-- Join background fibers.
+for i=1,n_workers do c:get() end
+---
+...
+n_success
+---
+- 1
+...
+n_failed
+---
+- 2
+...
+s:select{}
+---
+- - [42]
+...
+s:drop()
+---
+...
+fiber = nil
+---
+...
+-- gh-3812: Make sure that DOUBLE field type works properly.
+ffi = require('ffi')
+---
+...
+s = box.schema.space.create('s', {format = {{'i', 'integer'}, {'d', 'double'}}})
+---
+...
+_ = s:create_index('ii')
+---
+...
+--
+-- A number of Lua type NUMBER can be inserted in DOUBLE field.
+--
+s:insert({1, 1.1})
+---
+- [1, 1.1]
+...
+s:insert({2, 2.5})
+---
+- [2, 2.5]
+...
+s:insert({3, -3.0009})
+---
+- [3, -3.0009]
+...
+--
+-- Integers of Lua type NUMBER and CDATA of type int64 or uint64 can
+-- also be inserted even if they can't be loselessly converted to
+-- double. They're stored in the space "as is".
+--
+s:insert({4, 1})
+---
+- [4, 1]
+...
+s:insert({5, 9223372036854775800ULL})
+---
+- [5, 9223372036854775800]
+...
+s:insert({6, 18000000000000000000ULL})
+---
+- [6, 18000000000000000000]
+...
+--
+-- One can also cast a value to CDATA of type DOUBLE using ffi.cast().
+-- Non-integers can also be inserted this way.
+--
+s:insert({7, ffi.cast('double', 1)})
+---
+- [7, 1]
+...
+s:insert({8, ffi.cast('double', -9223372036854775800LL)})
+---
+- [8, -9223372036854775808]
+...
+s:insert({9, ffi.cast('double', tonumber('123'))})
+---
+- [9, 123]
+...
+s:insert({10, ffi.cast('double', tonumber64('18000000000000000000'))})
+---
+- [10, 18000000000000000000]
+...
+s:insert({11, ffi.cast('double', 1.1)})
+---
+- [11, 1.1]
+...
+s:insert({12, ffi.cast('double', -3.0009)})
+---
+- [12, -3.0009]
+...
+s:select()
+---
+- - [1, 1.1]
+  - [2, 2.5]
+  - [3, -3.0009]
+  - [4, 1]
+  - [5, 9223372036854775800]
+  - [6, 18000000000000000000]
+  - [7, 1]
+  - [8, -9223372036854775808]
+  - [9, 123]
+  - [10, 18000000000000000000]
+  - [11, 1.1]
+  - [12, -3.0009]
+...
+-- The keys are compared without loss, precisely (gh-9965):
+dd = s:create_index('dd', {unique = false, parts = {{2, 'double'}}})
+---
+...
+dd:select(1.1)
+---
+- - [1, 1.1]
+  - [11, 1.1]
+...
+dd:select(-9223372036854775800LL)
+---
+- []
+...
+dd:select(ffi.cast('double', -9223372036854775800LL))
+---
+- - [8, -9223372036854775808]
+...
+-- Make sure the comparisons work correctly.
+dd:select(1.1, {iterator = 'ge'})
+---
+- - [1, 1.1]
+  - [11, 1.1]
+  - [2, 2.5]
+  - [9, 123]
+  - [5, 9223372036854775800]
+  - [6, 18000000000000000000]
+  - [10, 18000000000000000000]
+...
+dd:select(1.1, {iterator = 'le'})
+---
+- - [11, 1.1]
+  - [1, 1.1]
+  - [7, 1]
+  - [4, 1]
+  - [12, -3.0009]
+  - [3, -3.0009]
+  - [8, -9223372036854775808]
+...
+dd:select(ffi.cast('double', 1.1), {iterator = 'gt'})
+---
+- - [2, 2.5]
+  - [9, 123]
+  - [5, 9223372036854775800]
+  - [6, 18000000000000000000]
+  - [10, 18000000000000000000]
+...
+dd:select(ffi.cast('double', 1.1), {iterator = 'lt'})
+---
+- - [7, 1]
+  - [4, 1]
+  - [12, -3.0009]
+  - [3, -3.0009]
+  - [8, -9223372036854775808]
+...
+dd:select(1.1, {iterator = 'all'})
+---
+- - [1, 1.1]
+  - [11, 1.1]
+  - [2, 2.5]
+  - [9, 123]
+  - [5, 9223372036854775800]
+  - [6, 18000000000000000000]
+  - [10, 18000000000000000000]
+...
+dd:select(1.1, {iterator = 'eq'})
+---
+- - [1, 1.1]
+  - [11, 1.1]
+...
+dd:select(1.1, {iterator = 'req'})
+---
+- - [11, 1.1]
+  - [1, 1.1]
+...
+s:delete(4)
+---
+- [4, 1]
+...
+s:delete(6)
+---
+- [6, 18000000000000000000]
+...
+s:delete(11)
+---
+- [11, 1.1]
+...
+s:delete(12)
+---
+- [12, -3.0009]
+...
+-- Make sure that other operations are working correctly:
+ddd = s:create_index('ddd', {parts = {{2, 'double'}}})
+---
+...
+s:update(1, {{'=', 2, 2}})
+---
+- [1, 2]
+...
+s:insert({22, 22})
+---
+- [22, 22]
+...
+s:upsert({10, 100}, {{'=', 2, 2}})
+---
+- error: Duplicate key exists in unique index "ddd" in space "s" with old tuple -
+    [1, 2] and new tuple - [10, 2]
+...
+s:upsert({101, 100}, {{'=', 2, 11}})
+---
+...
+ddd:update(1, {{'=', 1, 70}})
+---
+- error: Attempt to modify a tuple field which is part of primary index in space 's'
+...
+ddd:delete(1)
+---
+- [7, 1]
+...
+s:update(2, {{'=', 2, 2.55}})
+---
+- [2, 2.55]
+...
+s:replace({22, 22.22})
+---
+- [22, 22.22]
+...
+s:upsert({100, 100.5}, {{'=', 2, 2}})
+---
+...
+s:get(100)
+---
+- [100, 100.5]
+...
+s:upsert({10, 100.5}, {{'=', 2, 2.2}})
+---
+...
+s:get(10)
+---
+- [10, 2.2]
+...
+ddd:update(2, {{'=', 3, 111}})
+---
+- [1, 2, 111]
+...
+ddd:delete(2)
+---
+- [1, 2, 111]
+...
+s:update(2, {{'=', 2, ffi.cast('double', 255)}})
+---
+- [2, 255]
+...
+s:replace({22, ffi.cast('double', 22)})
+---
+- [22, 22]
+...
+s:upsert({200, ffi.cast('double', 200)}, {{'=', 2, 222}})
+---
+...
+s:get(200)
+---
+- [200, 200]
+...
+s:upsert({200, ffi.cast('double', 200)}, {{'=', 2, ffi.cast('double', 222)}})
+---
+...
+s:get(200)
+---
+- [200, 222]
+...
+ddd:update(22, {{'=', 3, 7}})
+---
+- [22, 22, 7]
+...
+ddd:delete(ffi.cast('double', 123))
+---
+- [9, 123]
+...
+s:select()
+---
+- - [2, 255]
+  - [3, -3.0009]
+  - [5, 9223372036854775800]
+  - [8, -9223372036854775808]
+  - [10, 2.2]
+  - [22, 22, 7]
+  - [100, 100.5]
+  - [101, 100]
+  - [200, 222]
+...
+s:drop()
+---
+...

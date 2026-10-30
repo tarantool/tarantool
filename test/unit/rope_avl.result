@@ -1,0 +1,123 @@
+	*** test_avl_rotations ***
+insert offset = 0, str = '1'
+size = 1
+string = '1'
+└──{ len = 1, height = 1, data = '1'}
+
+insert offset = 1, str = '2'
+size = 2
+string = '12'
+│  ┌──nil
+└──{ len = 1, height = 2, data = '1'}
+   └──{ len = 1, height = 1, data = '2'}
+
+insert offset = 2, str = '<'
+size = 3
+string = '12<'
+│  ┌──{ len = 1, height = 1, data = '1'}
+└──{ len = 1, height = 2, data = '2'}
+   └──{ len = 1, height = 1, data = '<'}
+
+insert offset = 0, str = '0'
+size = 4
+string = '012<'
+│     ┌──{ len = 1, height = 1, data = '0'}
+│  ┌──{ len = 1, height = 2, data = '1'}
+│  │  └──nil
+└──{ len = 1, height = 3, data = '2'}
+   └──{ len = 1, height = 1, data = '<'}
+
+insert offset = 0, str = '>'
+size = 5
+string = '>012<'
+│     ┌──{ len = 1, height = 1, data = '>'}
+│  ┌──{ len = 1, height = 2, data = '0'}
+│  │  └──{ len = 1, height = 1, data = '1'}
+└──{ len = 1, height = 3, data = '2'}
+   └──{ len = 1, height = 1, data = '<'}
+
+insert offset = 1, str = '*'
+size = 6
+string = '>*012<'
+│     ┌──nil
+│  ┌──{ len = 1, height = 2, data = '>'}
+│  │  └──{ len = 1, height = 1, data = '*'}
+└──{ len = 1, height = 3, data = '0'}
+   │  ┌──{ len = 1, height = 1, data = '1'}
+   └──{ len = 1, height = 2, data = '2'}
+      └──{ len = 1, height = 1, data = '<'}
+
+insert offset = 3, str = 'p'
+size = 7
+string = '>*0p12<'
+│     ┌──nil
+│  ┌──{ len = 1, height = 2, data = '>'}
+│  │  └──{ len = 1, height = 1, data = '*'}
+└──{ len = 1, height = 4, data = '0'}
+   │     ┌──{ len = 1, height = 1, data = 'p'}
+   │  ┌──{ len = 1, height = 2, data = '1'}
+   │  │  └──nil
+   └──{ len = 1, height = 3, data = '2'}
+      └──{ len = 1, height = 1, data = '<'}
+
+insert offset = 3, str = 'p'
+size = 8
+string = '>*0pp12<'
+│     ┌──nil
+│  ┌──{ len = 1, height = 2, data = '>'}
+│  │  └──{ len = 1, height = 1, data = '*'}
+└──{ len = 1, height = 4, data = '0'}
+   │     ┌──{ len = 1, height = 1, data = 'p'}
+   │  ┌──{ len = 1, height = 2, data = 'p'}
+   │  │  └──{ len = 1, height = 1, data = '1'}
+   └──{ len = 1, height = 3, data = '2'}
+      └──{ len = 1, height = 1, data = '<'}
+
+insert offset = 3, str = 'p'
+size = 9
+string = '>*0ppp12<'
+│     ┌──nil
+│  ┌──{ len = 1, height = 2, data = '>'}
+│  │  └──{ len = 1, height = 1, data = '*'}
+└──{ len = 1, height = 4, data = '0'}
+   │     ┌──{ len = 1, height = 1, data = 'p'}
+   │  ┌──{ len = 1, height = 2, data = 'p'}
+   │  │  └──nil
+   └──{ len = 1, height = 3, data = 'p'}
+      │  ┌──{ len = 1, height = 1, data = '1'}
+      └──{ len = 1, height = 2, data = '2'}
+         └──{ len = 1, height = 1, data = '<'}
+
+insert offset = 3, str = 'p'
+size = 10
+string = '>*0pppp12<'
+│     ┌──nil
+│  ┌──{ len = 1, height = 2, data = '>'}
+│  │  └──{ len = 1, height = 1, data = '*'}
+└──{ len = 1, height = 4, data = '0'}
+   │     ┌──{ len = 1, height = 1, data = 'p'}
+   │  ┌──{ len = 1, height = 2, data = 'p'}
+   │  │  └──{ len = 1, height = 1, data = 'p'}
+   └──{ len = 1, height = 3, data = 'p'}
+      │  ┌──{ len = 1, height = 1, data = '1'}
+      └──{ len = 1, height = 2, data = '2'}
+         └──{ len = 1, height = 1, data = '<'}
+
+insert offset = 3, str = '*'
+size = 11
+string = '>*0*pppp12<'
+│        ┌──nil
+│     ┌──{ len = 1, height = 2, data = '>'}
+│     │  └──{ len = 1, height = 1, data = '*'}
+│  ┌──{ len = 1, height = 3, data = '0'}
+│  │  │  ┌──{ len = 1, height = 1, data = '*'}
+│  │  └──{ len = 1, height = 2, data = 'p'}
+│  │     └──nil
+└──{ len = 1, height = 4, data = 'p'}
+   │  ┌──{ len = 1, height = 1, data = 'p'}
+   └──{ len = 1, height = 3, data = 'p'}
+      │  ┌──{ len = 1, height = 1, data = '1'}
+      └──{ len = 1, height = 2, data = '2'}
+         └──{ len = 1, height = 1, data = '<'}
+
+	*** test_avl_rotations: done ***

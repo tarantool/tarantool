@@ -1,0 +1,370 @@
+#!/usr/bin/env python
+
+from __future__ import print_function
+import os
+import sys
+import glob
+import re
+import subprocess
+
+
+# {{{ Helpers
+
+def popen(cmdline):
+    """ Wrapper around Popen.subprocess() that redirects the output to a pipe,
+        correctly handles encoding and raises a RuntimeError if the executable
+        was not found. Works on both Python 2 and 3.
+    """
+    popen_kwargs = {
+        'stdout': subprocess.PIPE,
+    }
+    if sys.version_info[0] == 3:
+        popen_kwargs['encoding'] = 'utf-8'
+
+    if sys.version_info[0] == 2:
+        global FileNotFoundError
+        FileNotFoundError = OSError
+
+    try:
+        return subprocess.Popen(cmdline, **popen_kwargs)
+    except FileNotFoundError as e:
+        raise RuntimeError("Unable to find '{}' executable: {}".format(
+            cmdline[0], str(e)))
+
+
+def log_debug(s):
+    if os.environ.get('DEBUG'):
+        print(s)
+
+
+# }}} Helpers
+
+
+def repository_root_dir():
+    """ Return a repository root directory.
+    """
+    # Sic: Use abspath rather than realpath because the script
+    # may be called via a symlink from another repository.
+    script_file = os.path.abspath(__file__)
+    script_dir = os.path.dirname(script_file)
+    return os.path.dirname(script_dir)
+
+
+class Commit:
+    """ Represents a result of parsing a git commit from git log.
+    """
+
+    COMMIT_LINE_RE = re.compile(r'^commit ([0-9a-f]{40})')
+    AUTHOR_RE = re.compile(r'^Author: (.*)$')
+    DATE_RE = re.compile(r'^Date: (.*)$')
+    MESSAGE_LINE_RE = re.compile(r'^[ ]{4}(.*)$')
+    CHERRY_PICKED_FROM_RE = re.compile(
+        r'^[ ]{4}\(cherry picked from commit ([0-9a-f]{40})\)$')
+    FILE_ADDED_RE = re.compile(r'^A\t(.*)$')
+    FILE_MODIFIED_RE = re.compile(r'^M\t(.*)$')
+    FILE_DELETED_RE = re.compile(r'^D\t(.*)$')
+    FILE_RENAMED_RE = re.compile(r'^R[0-9]+')
+
+    def __init__(self):
+        self._commit_id = None
+        self._author = None
+        self._date = None
+        self._subject = None
+        self._body = None
+        self._cherry_picked_from = None
+        self._added_files = []
+        self._modified_files = []
+        self._deleted_files = []
+
+    def commit_id(self):
+        return self._commit_id
+
+    def subject(self):
+        return self._subject
+
+    def cherry_picked_from(self):
+        return self._cherry_picked_from
+
+    def changelog_entries(self):
+        res = []
+        for f in self._added_files:
+            if f.startswith('changelogs/unreleased/'):
+                res.append(os.path.basename(f))
+        return res
+
+    def __str__(self):
+        return 'commit {} ("{}")'.format(self._commit_id[:12], self._subject)
+
+    def __repr__(self):
+        return str(self)
+
+    def add_line(self, line):
+        m = self.COMMIT_LINE_RE.match(line)
+        if m:
+            assert self._commit_id is None
+            self._commit_id = m.group(1)
+            return
+
+        m = self.AUTHOR_RE.match(line)
+        if m:
+            assert self._author is None
+            self._author = m.group(1)
+            return
+
+        m = self.DATE_RE.match(line)
+        if m:
+            assert self._date is None
+            self._date = m.group(1)
+            return
+
+        # The empty line after the headers and before the message.
+        if line == '':
+            return
+
+        m = self.MESSAGE_LINE_RE.match(line)
+        if m:
+            xline = m.group(1)
+            if self._subject is None:
+                self._subject = xline
+                return
+            if self._body is None and xline == '':
+                return
+            if self._body is None:
+                self._body = ''
+            self._body += xline + '\n'
+
+            m = self.CHERRY_PICKED_FROM_RE.match(line)
+            if m:
+                assert self._cherry_picked_from is None
+                self._cherry_picked_from = m.group(1)
+                return
+
+            return
+
+        m = self.FILE_ADDED_RE.match(line)
+        if m:
+            self._added_files.append(m.group(1))
+            return
+
+        m = self.FILE_MODIFIED_RE.match(line)
+        if m:
+            self._modified_files.append(m.group(1))
+            return
+
+        m = self.FILE_DELETED_RE.match(line)
+        if m:
+            self._deleted_files.append(m.group(1))
+            return
+
+        m = self.FILE_RENAMED_RE.match(line)
+        if m:
+            # Ignore for now.
+            return
+
+        raise RuntimeError('Unexpected line: {}'.format(line))
+
+
+if __name__ == '__main__':
+    # The story: there are two branches: say, release/2.11 and
+    # master (future 3.0.0). The latter was forked from the former
+    # at some point, let's call this point a 'merge base'.
+    #
+    # There were one or several 2.11 releases and now we're about
+    # to release 3.0.0.
+    #
+    # We want to publish release notes for 3.0.0 as if its
+    # development was derived from latest 2.11 commit (or latest
+    # 2.11 release, it doesn't matter much). IOW, the changes that
+    # are present in 2.11 should be excluded from 3.0.0 release
+    # notes.
+    #
+    # TODO: Accept these refspecs as CLI arguments.
+    base_refspec = 'origin/release/2.11'
+    target_refspec = 'origin/master'
+
+    # Setup paths.
+    repo_dir = repository_root_dir()
+    entries_dir = os.path.join(repo_dir, 'changelogs', 'unreleased')
+
+    # Determine the merge base.
+    process = popen(['git', '-C', repo_dir, 'merge-base', base_refspec,
+                     target_refspec])
+    merge_base = process.stdout.read().rstrip()
+    process.wait()
+    log_debug('merge_base: ' + merge_base)
+
+    # Assume that there are no changelog entries at the merge base
+    # point or they were deleted manually after the branching.
+    # IOW, we don't look at git log before the merge base.
+    #
+    # Example: commit c99bbdd69ee9 ("changelogs: delete released
+    # changelogs").
+
+    # Prepare a 'database' of base refspec commits. It will be
+    # used to determine, whether given commit is present in the
+    # base branch or not.
+    base_commits = {
+        'by_cherry_picked_from': {},
+        'by_subject': {},
+        'by_changelog_entry': {},
+    }
+    process = popen(['git', '-C', repo_dir, 'log',
+                     '--reverse',
+                     '--name-status',
+                     '{}..{}'.format(merge_base, base_refspec)])
+
+    log_debug(['git', '-C', repo_dir, 'log',
+               '--reverse',
+               '--name-status',
+               '{}..{}'.format(merge_base, base_refspec)])
+
+    # We assume that those file names are unique. While it is,
+    # of course, not so in the general case, it is enough for
+    # our fuzzy matching.
+    #
+    # Exclude entries that are present several times by the
+    # manually crafted list.
+    ignored_entries = [
+        'gh-6548-luajit-fixes.md',
+        'gh-7230-luajit-fixes.md',
+        'gh-8069-luajit-fixes.md',
+        'gh-8516-luajit-fixes.md',
+        'gh-8825-luajit-fixes.md',
+    ]
+
+    ignored_subjects = ['luajit: bump new version']
+
+    cur = Commit()
+    for line in process.stdout:
+        line = line.rstrip()
+        if line.startswith('commit'):
+            cherry_picked_from = cur.cherry_picked_from()
+            if cherry_picked_from:
+                assert cherry_picked_from not in \
+                    base_commits['by_cherry_picked_from']
+                base_commits['by_cherry_picked_from'][cherry_picked_from] = cur
+
+            subject = cur.subject()
+            if subject:
+                if subject not in base_commits['by_subject']:
+                    base_commits['by_subject'][subject] = []
+                base_commits['by_subject'][subject].append(cur)
+
+            for entry in cur.changelog_entries():
+                if entry not in ignored_entries and \
+                        entry in base_commits['by_changelog_entry']:
+                    found_commit_id = \
+                        base_commits['by_changelog_entry'][entry].commit_id()
+                    raise RuntimeError(('Found duplicate changelog entry: {}' +
+                                       ' (commit {} and commit {}').format(
+                                           entry, found_commit_id,
+                                           cur.commit_id()))
+                base_commits['by_changelog_entry'][entry] = cur
+
+            cur = Commit()
+        cur.add_line(line)
+    process.wait()
+
+    entries_glob = os.path.join(entries_dir, '*.md')
+    entries = glob.glob(entries_glob)
+
+    # TODO: Perform all the actions in a semi-automatic way, like
+    # `git rebase -i` does, instead of writing *.txt to let a
+    # human perform the file manipulations.
+
+    def_fh = open('def.txt', 'w')
+    print('Writing definitely found entries into def.txt')
+
+    ign_fh = open('ign.txt', 'w')
+    print('Writing ignored entries into ign.txt')
+
+    fuz_fh = open('fuz.txt', 'w')
+    print('Writing fuzzy matched entries into fuz.txt')
+
+    nfd_fh = open('nfd.txt', 'w')
+    print('Writing not found entries into nfd.txt')
+
+    # We can run `git log` once, parse it and match with file
+    # names, but that's tiresome.
+    for entry in entries:
+        entry = os.path.basename(entry)
+
+        # See comment for ignored_entries.
+        if entry in ignored_entries:
+            print('changelogs/unreleased/{}'.format(entry), file=ign_fh)
+            print('    ignored by changelog entry name', file=ign_fh)
+            continue
+
+        # Find all commits that touch the changelog entry.
+        commits = []
+        process = popen(['git', '-C', repo_dir, 'log',
+                         '--reverse',
+                         '--name-status',
+                         'changelogs/unreleased/{}'.format(entry)])
+        for line in process.stdout:
+            line = line.rstrip()
+            if line.startswith('commit'):
+                commits.append(Commit())
+            commits[-1].add_line(line)
+        process.wait()
+
+        # Find a commit that added the entry.
+        res = []
+        for commit in commits:
+            if entry in commit.changelog_entries():
+                res.append(commit)
+        if len(res) != 1:
+            print('changelogs/unreleased/{}'.format(entry), file=ign_fh)
+            print(('    ignored because the changelog entry was added ' +
+                   'several times: {}').format(res), file=ign_fh)
+            continue
+
+        commit = res[0]
+
+        # If the commit was cherry picked to the base branch using
+        # `git cherry-pich -x <refspec>`?
+        commit_id = commit.commit_id()
+        if commit_id in base_commits['by_cherry_picked_from']:
+            base_commit = base_commits['by_cherry_picked_from'][commit_id]
+            print('changelogs/unreleased/{}'.format(entry), file=def_fh)
+            print('    {} cherry picked from {}'.format(base_commit, commit),
+                  file=def_fh)
+            continue
+
+        fuzzy_matched_by = []
+        ignored_by = None
+
+        # If there is a base branch commit with the same subject?
+        subject = commit.subject()
+        if subject in ignored_subjects:
+            ignored_by = 'subject {}'.format(subject)
+        elif subject in base_commits['by_subject']:
+            fuzzy_matched_by.append('subject (see commits {})'.format(
+                base_commits['by_subject'][subject]))
+
+        # If there is a base branch commit with the same changelog
+        # entry file name?
+        base_commit = base_commits['by_changelog_entry'].get(entry)
+        if base_commit:
+            fuzzy_matched_by.append(('changelog entry name ' +
+                                    '(see commit {})').format(base_commit))
+
+        if fuzzy_matched_by:
+            print('changelogs/unreleased/{}'.format(entry), file=fuz_fh)
+            for by in fuzzy_matched_by:
+                print('    fuzzy matched by {}'.format(by), file=fuz_fh)
+            continue
+        elif ignored_by:
+            print('changelogs/unreleased/{}'.format(entry), file=ign_fh)
+            print('    ignored by {}'.format(ignored_by), file=ign_fh)
+            continue
+
+        print('changelogs/unreleased/{}'.format(entry), file=nfd_fh)
+        url = 'https://github.com/tarantool/tarantool/commit/{}'.format(
+            commit.commit_id())
+        print('    see {}'.format(url), file=nfd_fh)
+
+    def_fh.close()
+    ign_fh.close()
+    fuz_fh.close()
+    nfd_fh.close()

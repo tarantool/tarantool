@@ -1,0 +1,6 @@
+# File format:
+#fun:*
+#src:*
+
+# This file is for address suppressions only.
+[address]

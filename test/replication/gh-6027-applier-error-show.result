@@ -1,0 +1,82 @@
+-- test-run result file version 2
+test_run = require('test_run').new()
+ | ---
+ | ...
+
+--
+-- gh-6027: on attempt to a commit transaction its original error was lost.
+--
+
+box.schema.user.grant('guest', 'super')
+ | ---
+ | ...
+s = box.schema.create_space('test')
+ | ---
+ | ...
+_ = s:create_index('pk')
+ | ---
+ | ...
+
+test_run:cmd('create server replica with rpl_master=default, '..                \
+             'script="replication/replica.lua"')
+ | ---
+ | - true
+ | ...
+test_run:cmd('start server replica')
+ | ---
+ | - true
+ | ...
+
+test_run:switch('replica')
+ | ---
+ | - true
+ | ...
+box.error.injection.set('ERRINJ_TXN_COMMIT_ASYNC', true)
+ | ---
+ | - ok
+ | ...
+
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+_ = s:replace{1}
+ | ---
+ | ...
+
+test_run:switch('replica')
+ | ---
+ | - true
+ | ...
+test_run:wait_upstream(1, {status = 'stopped'})
+ | ---
+ | - true
+ | ...
+-- Should be something about error injection.
+box.info.replication[1].upstream.message
+ | ---
+ | - Error injection 'txn commit async injection'
+ | ...
+
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+test_run:cmd('stop server replica')
+ | ---
+ | - true
+ | ...
+test_run:cmd('delete server replica')
+ | ---
+ | - true
+ | ...
+box.error.injection.set('ERRINJ_TXN_COMMIT_ASYNC', false)
+ | ---
+ | - ok
+ | ...
+s:drop()
+ | ---
+ | ...
+box.schema.user.revoke('guest', 'super')
+ | ---
+ | ...

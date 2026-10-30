@@ -1,0 +1,777 @@
+-- compat.lua -- module intended to solve compatibility problems in different
+-- parts of Tarantool. Introduced in gh-7000, see also gh-6912.
+
+local NEW = true
+local OLD = false
+local TIMEOUT_INFINITY = 100 * 365 * 86400
+
+local ffi = require('ffi')
+local tweaks = require('internal.tweaks')
+local tarantool = require('tarantool')
+
+ffi.cdef[[
+    /**
+     * Update the state of synchronous replication for system spaces from the
+     * compat action.
+     */
+    void
+    system_spaces_update_is_sync_state_from_compat(void)
+]]
+
+local options_format = {
+    default        = 'string',
+    brief          = 'string',
+    obsolete       = 'string/nil',
+    run_action_now = 'boolean/nil',
+    action         = 'function/nil',
+}
+
+local JSON_ESCAPE_BRIEF = [[
+Whether to escape the forward slash symbol '/' using a backslash in a
+json.encode() result. The old and the new behavior produce a result, which
+is compatible ith the JSON specification. However most of other JSON encoders
+don't escape the forward slash, so the new behavior is considered more safe.
+
+https://tarantool.io/compat/json_escape_forward_slash
+]]
+
+local YAML_PRETTY_MULTILINE_BRIEF = [[
+Whether to encode in block scalar style all multiline strings or ones
+containing "\n\n" substring. The new behavior makes all multiline string output
+as single text block which is handier for the reader, but may be incompatible
+with some existing applications that rely on the old style.
+
+https://tarantool.io/compat/yaml_pretty_multiline
+]]
+
+local FIBER_SLICE_DEFAULT_BRIEF = [[
+Sets the default value for the max fiber slice. The old value is infinity
+(no warnings or errors). The new value is {warn = 0.5, err = 1.0}.
+
+https://tarantool.io/compat/fiber_slice_default
+]]
+
+local FIBER_CHANNEL_GRACEFUL_CLOSE_BRIEF = [[
+Whether fiber channel should be marked read-only on close, instead of being
+destroyed. The new behavior allows user to mark the channel as read-only. This
+way if a message was in the buffer before close, it will remain accessible after
+close. The read-only channel will be closed automatically when the buffer
+becomes empty, or will be deleted by GC if all links to it are lost, as before.
+The new behavior can break code that relies on `ch:get()` returning `nil` after
+channel close.
+
+https://tarantool.io/compat/fiber_channel_close_mode
+]]
+
+local DATETIME_SETFN_TIMESTAMP_TYPE_CHECK_BRIEF = [[
+Whether to check timestamp type in datetime obj:set().
+The new behaviour requires timestamp to be a number for set()
+function as new() function requires. The old behaviour skips
+type check for timestamp in set().
+
+https://tarantool.io/compat/datetime_setfn_timestamp_type_check
+]]
+
+local DATETIME_APPLY_TIMEZONE_ACTION_BRIEF = [[
+Whether applying timezone alters the represented time of day or the timestamp.
+The new behavior makes setting a timezone for a datetime object change the time
+of day and preserve the timestamp. The old behavior makes providing a timezone
+for a datetime object affect the timestamp but preserve the represented time of
+day.
+
+https://tarantool.io/compat/datetime_apply_timezone_action
+]]
+
+local SQL_PRIV_BRIEF = [[
+Whether to enable access checks for SQL requests. The old behavior is to let
+any user execute an arbitrary SQL request over IPROTO. With the new behavior,
+only users that were granted the 'execute' privilege on 'sql' or 'universe'
+have access to SQL.
+
+https://tarantool.io/compat/sql_priv
+]]
+
+local SQL_SEQ_SCAN_DEFAULT_BRIEF = [[
+Whether seq_seq_scan session setting should be set to true or false during
+initialization or new session creation.
+
+https://tarantool.io/compat/sql_seq_scan_default
+]]
+
+local BOX_INFO_CLUSTER_MEANING_BRIEF = [[
+Whether box.info.cluster should show the current replicaset or the whole cluster
+with all its replicasets.
+
+https://tarantool.io/compat/box_info_cluster_meaning
+]]
+
+local BINARY_DATA_DECODING_BRIEF = [[
+Whether a binary data field should be stored in a varbinary object or a plain
+string when decoded in Lua.
+
+https://tarantool.io/compat/binary_data_decoding
+]]
+
+local BOX_TUPLE_NEW_VARARG_BRIEF = [[
+Whether `box.tuple.new` should interpret the argument list as an array of tuple
+fields (i.e., vararg) - this does not allow passing a tuple format as a second
+argument.
+
+https://tarantool.io/compat/box_tuple_new_vararg
+]]
+
+local BOX_SESSION_PUSH_DEPRECATION_BRIEF = [[
+Function `box.session.push` is deprecated. The new behavior is to raise
+an error on any attempt to use it.
+
+https://tarantool.io/compat/box_session_push_deprecation
+]]
+
+local C_FUNC_IPROTO_MULTIRETURN_BRIEF = [[
+Whether the results of the C stored function should be encoded with an
+additional msgpack array when returning them via iproto.
+
+https://tarantool.io/compat/c_func_iproto_multireturn
+]]
+
+local BOX_TUPLE_EXTENSION_BRIEF = [[
+Controls IPROTO_FEATURE_CALL_RET_TUPLE_EXTENSION and
+IPROTO_FEATURE_CALL_ARG_TUPLE_EXTENSION feature bits.
+
+https://tarantool.io/compat/box_tuple_extension
+]]
+
+local BOX_SPACE_MAX_BRIEF = [[
+Controls the max space id (box.schema.SPACE_MAX). The old limit is 2147483647.
+The new limit is 2147483646. The limit was decremented because the old value is
+used as an error indicator in the box C API.
+
+https://tarantool.io/compat/box_space_max
+]]
+
+local BOX_ERROR_UNPACK_TYPE_AND_CODE_BRIEF = [[
+Whether to show redundant fields in box.error.unpack(). The new behaviour
+is not to show 'base_type' and 'custom_type' fields. 'code' field is also not
+shown if it is 0. Note that 'base_type' is still accessible for error object.
+
+https://tarantool.io/compat/box_error_unpack_type_and_code
+]]
+
+local BOX_ERROR_SERIALIZE_VERBOSE = [[
+Controls the verbosity of box.error's serialization. Before, only the error
+message was serialized, omitting all other potentially useful fields. Now, a
+more verbose representation is used.
+
+https://tarantool.io/compat/box_error_serialize_verbose
+]]
+
+local BOX_CONSIDER_SYSTEM_SPACES_SYNCHRONOUS = [[
+Controls whether to consider system spaces synchronous when the
+synchronous queue is claimed, regardless of the user-provided `is_sync` option.
+Either enables synchronous replication for system spaces when the synchronous
+queue is claimed, overriding the user-provided 'is_sync' space option, or falls
+back to the user-provided 'is_sync' space option.
+
+https://tarantool.io/compat/box_consider_system_spaces_synchronous
+]]
+
+local WAL_CLEANUP_DELAY_DEPRECATION_BRIEF = [[
+Whether option 'wal_cleanup_delay' can be used. The old behavior is to log
+a deprecation warning when it's used, the new one - raise an error.
+If Tarantool participates in a cluster, xlogs needed for other replicas will
+be retained by persistent WAL GC.
+
+https://tarantool.io/compat/wal_cleanup_delay_deprecation
+]]
+
+local REPLICATION_SYNCHRO_TIMEOUT_COMPAT_BRIEF = [[
+Determines whether the replication_synchro_timeout option rolls back
+transactions or it only used to wait confirmation in promote/demote and
+gc-checkpointing.
+
+https://tarantool.io/compat/replication_synchro_timeout
+]]
+
+local BOX_RECOVERY_TRIGGERS_DEPRECATION_BRIEF = [[
+On recovery triggers are deprecated. The new behavior is to do not trigger
+space and transactional events during local recovery or join.
+
+https://tarantool.io/compat/box_recovery_triggers_deprecation
+]]
+
+local SKIP_REPLICATION_NAMES_BRIEF = [[
+Skip applying and validating instance and replicaset names during replication
+startup. The old behavior allows a Tarantool 3.x instance configured via the
+declarative config to join a Tarantool 2.11 replicaset whose snapshot may not
+contain names yet.
+
+https://tarantool.io/compat/skip_replication_names
+]]
+
+local BOX_BACKUP_DEFAULT_TTL_BRIEF = [[
+Default backup TTL values when it is not set explicitly in box.backup.start().
+]]
+
+-- Returns an action callback that toggles a tweak.
+local function tweak_action(tweak_name, old_tweak_value, new_tweak_value)
+    return function(is_new)
+        if is_new then
+            tweaks[tweak_name] = new_tweak_value
+        else
+            tweaks[tweak_name] = old_tweak_value
+        end
+    end
+end
+
+-- Create the tweak action once here and pass it to the closure below.
+local box_consider_system_spaces_synchronous_tweak_action =
+    tweak_action('box_consider_system_spaces_synchronous', false, true)
+
+-- Contains options descriptions in following format:
+-- * default  (string)
+-- * brief    (string)
+-- * obsolete (string or nil)
+-- * current  (boolean, true for 'new')
+-- * selected (boolean)
+-- * action   (function)
+local options = {
+    json_escape_forward_slash = {
+        default = 'new',
+        obsolete = nil,
+        brief = JSON_ESCAPE_BRIEF,
+        run_action_now = true,
+        action = tweak_action('json_escape_forward_slash', true, false),
+    },
+    yaml_pretty_multiline = {
+        default = 'new',
+        obsolete = nil,
+        brief = YAML_PRETTY_MULTILINE_BRIEF,
+        action = tweak_action('yaml_pretty_multiline', false, true),
+    },
+    fiber_slice_default = {
+        default = 'new',
+        obsolete = nil,
+        brief = FIBER_SLICE_DEFAULT_BRIEF,
+        action = function(is_new)
+            local slice = TIMEOUT_INFINITY
+            -- ASAN build is slow. Turn slice check off to suppress noisy
+            -- failures on exceeding slice limit in this case.
+            if is_new and not tarantool.build.asan then
+                slice = {warn = 0.5, err = 1.0}
+            end
+            require('fiber').set_max_slice(slice)
+        end,
+    },
+    fiber_channel_close_mode = {
+        default = 'new',
+        obsolete = nil,
+        brief = FIBER_CHANNEL_GRACEFUL_CLOSE_BRIEF,
+        action = tweak_action('fiber_channel_close_mode',
+                              'forceful', 'graceful'),
+    },
+    datetime_setfn_timestamp_type_check = {
+        default = 'old',
+        obsolete = nil,
+        brief = DATETIME_SETFN_TIMESTAMP_TYPE_CHECK_BRIEF,
+        action = tweak_action('datetime_setfn_timestamp_type_check',
+                              false, true),
+    },
+    datetime_apply_timezone_action = {
+        default = 'old',
+        obsolete = nil,
+        brief = DATETIME_APPLY_TIMEZONE_ACTION_BRIEF,
+        action = tweak_action('datetime_apply_timezone_preserves_timestamp',
+                              false, true),
+    },
+    sql_priv = {
+        default = 'new',
+        obsolete = nil,
+        brief = SQL_PRIV_BRIEF,
+        action = tweak_action('sql_access_check_is_enabled', false, true)
+    },
+    sql_seq_scan_default = {
+        default = 'new',
+        obsolete = nil,
+        brief = SQL_SEQ_SCAN_DEFAULT_BRIEF,
+        action = tweak_action('sql_seq_scan_default', true, false),
+    },
+    box_info_cluster_meaning = {
+        default = 'new',
+        obsolete = nil,
+        brief = BOX_INFO_CLUSTER_MEANING_BRIEF,
+        action = tweak_action('box_info_cluster_new_meaning', false, true),
+    },
+    binary_data_decoding = {
+        default = 'new',
+        obsolete = nil,
+        brief = BINARY_DATA_DECODING_BRIEF,
+        action = function(is_new)
+            tweaks.yaml_decode_binary_as_string = not is_new
+            tweaks.msgpack_decode_binary_as_string = not is_new
+        end,
+    },
+    box_tuple_new_vararg = {
+        default = 'new',
+        obsolete = nil,
+        brief = BOX_TUPLE_NEW_VARARG_BRIEF,
+        action = tweak_action('box_tuple_new_vararg', true, false),
+    },
+    box_session_push_deprecation = {
+        default = 'old',
+        obsolete = nil,
+        brief = BOX_SESSION_PUSH_DEPRECATION_BRIEF,
+        run_action_now = true,
+        action = tweak_action('box_session_push_is_disabled', false, true),
+    },
+    c_func_iproto_multireturn = {
+        default = 'new',
+        obsolete = nil,
+        brief = C_FUNC_IPROTO_MULTIRETURN_BRIEF,
+        run_action_now = true,
+        action = tweak_action('c_func_iproto_multireturn', false, true),
+    },
+    box_tuple_extension = {
+        default = 'new',
+        obsolete = nil,
+        brief = BOX_TUPLE_EXTENSION_BRIEF,
+        run_action_now = true,
+        action = tweak_action('box_tuple_extension', false, true)
+    },
+    box_space_max = {
+        default = 'new',
+        obsolete = nil,
+        brief = BOX_SPACE_MAX_BRIEF,
+        action = tweak_action('BOX_SPACE_MAX', 2147483647, 2147483646)
+    },
+    box_error_unpack_type_and_code = {
+        default = 'old',
+        obsolete = nil,
+        brief = BOX_ERROR_UNPACK_TYPE_AND_CODE_BRIEF,
+        action = tweak_action('box_error_unpack_type_and_code', true, false),
+    },
+    box_error_serialize_verbose = {
+        default = 'old',
+        obsolete = nil,
+        brief = BOX_ERROR_SERIALIZE_VERBOSE,
+        action = tweak_action('box_error_serialize_verbose', false, true),
+    },
+    box_consider_system_spaces_synchronous = {
+      default = 'old',
+      obsolete = nil,
+      brief = BOX_CONSIDER_SYSTEM_SPACES_SYNCHRONOUS,
+      action = function(is_new)
+            box_consider_system_spaces_synchronous_tweak_action(is_new)
+            ffi.C.system_spaces_update_is_sync_state_from_compat()
+      end
+    },
+    wal_cleanup_delay_deprecation = {
+        default = 'old',
+        obsolete = nil,
+        brief = WAL_CLEANUP_DELAY_DEPRECATION_BRIEF,
+        action = function() end,
+    },
+    replication_synchro_timeout = {
+        default = 'old',
+        obsolete = nil,
+        brief = REPLICATION_SYNCHRO_TIMEOUT_COMPAT_BRIEF,
+        action = tweak_action(
+            'replication_synchro_timeout_rollback_enabled', true, false),
+    },
+    box_recovery_triggers_deprecation = {
+        default = 'old',
+        obsolete = nil,
+        brief = BOX_RECOVERY_TRIGGERS_DEPRECATION_BRIEF,
+        action = tweak_action(
+            'box_recovery_triggers_disabled', false, true),
+    },
+    skip_replication_names = {
+        default = 'new',
+        obsolete = nil,
+        brief = SKIP_REPLICATION_NAMES_BRIEF,
+        action = function() end,
+    },
+    box_backup_default_ttl = {
+        default = 'old',
+        obsolete = nil,
+        brief = BOX_BACKUP_DEFAULT_TTL_BRIEF,
+        action = tweak_action(
+            'box_backup_default_ttl', TIMEOUT_INFINITY, 3600),
+    },
+}
+
+-- Array with option names in order of addition.
+local options_order = { }
+
+local help = [[
+Tarantool compatibility module.
+To get help, see the Tarantool manual at https://tarantool.io/compat
+Available commands:
+
+    compat.help()                   -- show this help
+    compat.<option_name>            -- list option info
+    compat.<option_name> = 'old'    -- set desired value to option, could be
+                                       'old', 'new', 'default'
+    compat{<option_name> = 'new'}   -- set listed options to desired values
+                                       ('old', 'new', 'default')
+    compat.dump()                   -- get Lua command that sets up different
+                                       compat with same options as current
+    compat.add_option()             -- add new option by providing a table with
+                                       name, default, brief, obsolete and action
+                                       function
+]]
+
+-- Returns table with all non-obsolete options from `options` and their values.
+local function serialize_compat()
+    -- The results of serialization should be ordered correctly.
+    -- The only feasible way for it is using indexed table with
+    -- values {option_name = val}.
+    local result = { }
+
+    for _, name in pairs(options_order) do
+        local option = options[name]
+        if option.selected and option.current == NEW and
+                not option.obsolete then
+            table.insert(result, {[name] = 'new'})
+        end
+    end
+    for _, name in pairs(options_order) do
+        local option = options[name]
+        if option.selected and option.current == OLD and
+                not option.obsolete then
+            table.insert(result, {[name] = 'old'})
+        end
+    end
+    for _, name in pairs(options_order) do
+        local option = options[name]
+        if not option.selected and not option.obsolete then
+            local val = option.current and 'new' or 'old'
+            table.insert(result, {[name] = ('default (%s)'):format(val)})
+        end
+    end
+
+    -- Result is an indexed table but this way user can interact with it as if
+    -- it was key-value.
+    result = setmetatable(result, {
+        __index = function(self, key)
+            for i = 1, #self do
+                if self[i][key] ~= nil then
+                    return self[i][key]
+                end
+            end
+        end
+    })
+
+    return result
+end
+
+-- Checks options correctness.
+local function verify_option(name, option)
+    if type(name) ~= 'string' then
+        local msg = 'Option name must be a string (%s provided)'
+        error(msg:format(type(name)))
+    end
+    for p, t in pairs(options_format) do
+        if not t:find(type(option[p])) then
+            local msg = 'Invalid option table for %s, bad %s (%s is expected)'
+            error(msg:format(name, p, t))
+        end
+    end
+    if option.default ~= 'new' and option.default ~= 'old' then
+        local msg = "Invalid option table for %s, bad default" ..
+                    " ('new'/'old' is expected)"
+        error(msg:format(name))
+    end
+    if not option.obsolete and option.action == nil then
+        local msg = "Invalid option table for %s, bad action" ..
+                    " (function is expected)"
+        error(msg:format(name))
+    end
+    if option.obsolete and option.default == 'old' then
+        error(('Obsolete option %s default is wrong.'):format(name))
+    end
+end
+
+-- Checks if operation is valid, sets value to an option and runs postaction.
+local function set_option(name, val)
+    local option = options[name]
+    if not option then
+        error(('Invalid option %s'):format(name))
+    end
+    local selected
+    if val == 'new' then
+        val = NEW
+        selected = true
+    elseif val == 'old' then
+        val = OLD
+        selected = true
+    elseif val == 'default' then
+        val = option.default == 'new'
+        selected = false
+    else
+        error(('Invalid argument %s in option %s'):format(val, name))
+    end
+    if option.obsolete and val == OLD then
+        error(('Chosen option %s is no longer available'):format(name))
+    end
+    if val ~= option.current then
+        option.action(val)
+    end
+    option.current = val
+    option.selected = selected
+end
+
+local compat = { }
+
+-- src/box/lua/config/applier/compat.lua needs information about
+-- default values.
+function compat._options()
+    return options
+end
+
+function compat.dump(mode)
+    -- dump() works in one of the following modes:
+    -- dump compat configuration as is with `default` if any
+    local ACT_NIL     = 0
+    -- dump compat configuration as is but replace `default` with
+    -- its value (new/old)
+    local ACT_CURRENT = 1
+    -- dump everything as `new`
+    local ACT_NEW     = 2
+    -- dump everything as `old`, besides obsolete, that could be only `new`
+    local ACT_OLD     = 3
+    -- dump everything as `default`
+    local ACT_DEFAULT = 4
+    local action
+    if mode == 'new' then
+        action = ACT_NEW
+    elseif mode == 'old' then
+        action = ACT_OLD
+    elseif mode == 'default' then
+        action = ACT_DEFAULT
+    elseif mode == 'current' then
+        action = ACT_CURRENT
+    elseif mode == nil then
+        action = ACT_NIL
+    else
+        error("usage: compat.dump('new'/'old'/'default'/'current'/nil)")
+    end
+    local result = [[require('compat')({]]
+    local max_key_len = 0
+    for _, key in pairs(options_order) do
+        max_key_len = (#key > max_key_len) and #key or max_key_len
+    end
+    for _, key in pairs(options_order) do
+        local val
+        local comment
+        if options[key].obsolete then
+            if action == ACT_NEW or action == ACT_OLD or
+                    action == ACT_CURRENT or
+                    (action == ACT_NIL and options[key].selected) then
+                val = "'new'"
+            else
+                val = "'default'"
+            end
+            comment = 'obsolete since ' .. options[key].obsolete
+        else
+            if action == ACT_CURRENT then
+                if options[key].selected and options[key].current == NEW or
+                        options[key].default == 'new' then
+                    val = "'new'"
+                else
+                    val = "'old'"
+                end
+            elseif action == ACT_DEFAULT or (action == ACT_NIL and
+                    not options[key].selected) then
+                val = "'default'"
+            elseif action == ACT_NEW or
+                    (action == ACT_NIL and options[key].current == NEW) then
+                val = "'new'"
+            else
+                val = "'old'"
+            end
+        end
+        -- Can't use '\t' due to gh-7681.
+        local form = '%s\n    %s%s = %s,'
+        result = form:format(result, key,
+                             string.rep(' ', max_key_len - #key), val)
+        if comment then
+            if (val ~= "'default'") then
+                -- For alignment.
+                result = result .. '    '
+            end
+            result = result .. ' -- ' .. comment
+        end
+    end
+    if not result:find('\n') then
+        return result .. '})'
+    else
+        -- Need double '\n' due to gh-3012.
+        return result .. '\n})\n\n'
+    end
+end
+
+-- option_def:
+-- * name           (string)
+-- * default        ('new'/'old')
+-- * brief          (string)
+-- * obsolete       (string/nil)
+-- * action         (function/nil)
+-- * run_action_now (boolean/nil)
+function compat.add_option(option_def)
+    if type(option_def) ~= 'table' then
+        error("usage: compat.add_option({name = '...', default = 'new'/'old'" ..
+              ", brief = '...', action = func, run_action_now = true/false})")
+    end
+    local name = option_def.name
+    verify_option(name, option_def)
+
+    local current = option_def.default == 'new' and NEW or OLD
+    -- If not hot reload, set `current` and `selected`.
+    if not options[name] then
+        options[name] = {
+            current = current,
+            selected = false
+        }
+        table.insert(options_order, name)
+    -- If hot reload but option is set to 'default', update `current`.
+    elseif not options[name].selected then
+        options[name].current = current
+    end
+    -- Else keep `current` and `selected` as is.
+
+    -- Copy all other fields.
+    local option = options[name]
+    option.brief    = option_def.brief
+    option.default  = option_def.default
+    option.obsolete = option_def.obsolete
+    option.action   = option_def.action
+
+    if not option.obsolete and option_def.run_action_now then
+        option.action(options[name].current)
+    end
+end
+
+function compat.help()
+    return help
+end
+
+function compat.preload()
+    for key, option in pairs(options) do
+        verify_option(key, option)
+        table.insert(options_order, key)
+        option.current = option.default == 'new'
+        option.selected = false
+    end
+    -- Preload should be run only once and is removed not to confuse users.
+    compat.preload = nil
+end
+
+function compat.postload()
+    for _key, option in pairs(options) do
+        if not option.obsolete and option.run_action_now then
+            option.action(option.current)
+        end
+        option.run_action_now = nil
+    end
+    -- Postload should be run only once and is removed not to confuse users.
+    compat.postload = nil
+end
+
+local compat_mt = { }
+
+function compat_mt.__call(_, list)
+    if type(list) ~= 'table' then
+        error("usage: compat({<option_name> = 'new'/'old'/'default'})")
+    end
+    for key, val in pairs(list) do
+        set_option(key, val)
+    end
+end
+
+function compat_mt.__newindex(_, key, val)
+    set_option(key, val)
+end
+
+local compat_option_methods = {}
+
+-- Returns the effective compat option value - 'old' or 'new'.
+local function option_value(option)
+    if option.current == 'default' then
+        return option.default
+    else
+        return option.current
+    end
+end
+
+-- Whether the effective value of the option is `new`.
+function compat_option_methods.is_new(option)
+    if type(option) ~= 'table' then
+        error('usage: compat.<option_name>:is_new()')
+    end
+    return option_value(option) == 'new'
+end
+
+-- Whether the effective value of the option is `old`.
+function compat_option_methods.is_old(option)
+    if type(option) ~= 'table' then
+        error('usage: compat.<option_name>:is_old()')
+    end
+    return option_value(option) == 'old'
+end
+
+local compat_option_mt = {
+    __index = compat_option_methods,
+}
+
+function compat_mt.__index(_, key)
+    if not options[key] then
+        error(('Invalid option %s'):format(key))
+    end
+    local result = {
+        brief = options[key].brief,
+        default = options[key].default,
+        obsolete = options[key].obsolete,
+    }
+
+    if not options[key].selected then
+        result.current = 'default'
+    elseif options[key].current == NEW then
+        result.current = 'new'
+    else
+        result.current = 'old'
+    end
+
+    return setmetatable(result, compat_option_mt)
+end
+
+compat_mt.__serialize = serialize_compat
+
+function compat_mt.__tostring()
+    -- YAML can't be required at the beginning as it isn't initialized by then.
+    return require('yaml').encode(serialize_compat())
+end
+
+function compat_mt.__autocomplete()
+    local res = { }
+    for key, option in pairs(options) do
+        if not option.obsolete then
+            res[key] = true
+        end
+    end
+    return res
+end
+
+
+-- Preload reads hardcoded into `options` table options, verifies
+-- them and sets other compat-specific values.
+compat.preload()
+-- Postload calls actions of hardcoded options if according
+-- `run_action_now` is `true`. Most of the actions call `require`
+-- but the required modules are unlikely to be loaded at compat
+-- initialization, so it may be needed to move this call somewhere
+-- else in the future.
+compat.postload()
+
+compat = setmetatable(compat, compat_mt)
+
+return compat

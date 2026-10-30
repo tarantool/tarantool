@@ -1,0 +1,962 @@
+test_run = require('test_run').new()
+---
+...
+engine = test_run:get_cfg('engine')
+---
+...
+test_run:cmd("push filter 'Failed to allocate [0-9]+' to 'Failed to allocate <NUM>'")
+---
+- true
+...
+test_run:cmd("push filter '"..engine.."_max_tuple_size' to '<ENGINE>_max_tuple_size'")
+---
+- true
+...
+-- https://github.com/tarantool/tarantool/issues/2667
+-- Allow to insert tuples bigger than `max_tuple_size'
+s = box.schema.space.create('test', { engine = engine })
+---
+...
+_ = s:create_index('primary')
+---
+...
+engine_max_tuple_size = engine ..'_max_tuple_size'
+---
+...
+engine_tuple_size = engine == 'memtx' and 16 or 32
+---
+...
+box.cfg{[engine_max_tuple_size] = 1024 * 1024}
+---
+...
+-- check max_tuple_size limit
+max_tuple_size = box.cfg[engine_max_tuple_size]
+---
+...
+_ = s:replace({1, string.rep('x', max_tuple_size)})
+---
+- error: 'Failed to allocate <NUM> bytes for tuple: tuple is too large. Check ''<ENGINE>_max_tuple_size''
+    configuration option.'
+...
+-- check max_tuple_size dynamic configuration
+box.cfg { [engine_max_tuple_size] = 2 * max_tuple_size }
+---
+...
+_ = s:replace({1, string.rep('x', max_tuple_size)})
+---
+...
+-- check tuple sie
+box.cfg { [engine_max_tuple_size] = engine_tuple_size + 2 }
+---
+...
+_ = s:replace({1})
+---
+...
+-- check large tuples allocated on malloc
+box.cfg { [engine_max_tuple_size] = 32 * 1024 * 1024 }
+---
+...
+_ = s:replace({1, string.rep('x', 32 * 1024 * 1024 - engine_tuple_size - 8)})
+---
+...
+-- decrease max_tuple_size limit
+box.cfg { [engine_max_tuple_size] = 1 * 1024 * 1024 }
+---
+...
+_ = s:replace({1, string.rep('x', 2 * 1024 * 1024 )})
+---
+- error: 'Failed to allocate <NUM> bytes for tuple: tuple is too large. Check ''<ENGINE>_max_tuple_size''
+    configuration option.'
+...
+_ = s:replace({1, string.rep('x', 1 * 1024 * 1024 - engine_tuple_size - 8)})
+---
+...
+-- gh-2698 Tarantool crashed on 4M tuple
+max_item_size = 0
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+for _, v in pairs(box.slab.stats()) do
+    max_item_size = math.max(max_item_size, v.item_size)
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+box.cfg { [engine_max_tuple_size] = max_item_size + engine_tuple_size + 8 }
+---
+...
+_ = box.space.test:replace{1, 1, string.rep('a', max_item_size)}
+---
+...
+-- reset to original value
+box.cfg { [engine_max_tuple_size] = max_tuple_size }
+---
+...
+s:drop();
+---
+...
+collectgarbage('collect') -- collect all large tuples
+---
+- 0
+...
+box.snapshot() -- discard xlogs with large tuples
+---
+- ok
+...
+test_run:cmd("clear filter")
+---
+- true
+...
+--
+-- gh-1014: tuple field names.
+--
+format = {}
+---
+...
+format[1] = {name = 'field1', type = 'unsigned'}
+---
+...
+format[2] = {name = 'field2', type = 'string'}
+---
+...
+format[3] = {name = 'field3', type = 'array'}
+---
+...
+format[4] = {name = 'field4', type = 'number'}
+---
+...
+format[5] = {name = 'field5', type = 'integer'}
+---
+...
+format[6] = {name = 'field6', type = 'scalar'}
+---
+...
+format[7] = {name = 'field7', type = 'map'}
+---
+...
+format[8] = {name = 'field8', type = 'any'}
+---
+...
+format[9] = {name = 'field9'}
+---
+...
+format[10] = {name = 'bsize'}
+---
+...
+format[11] = {name = 'totable'}
+---
+...
+format[12] = {name = 'longlonglonglonglonglongname'}
+---
+...
+s = box.schema.space.create('test', {engine = engine, format = format})
+---
+...
+pk = s:create_index('pk')
+---
+...
+t = {1, '2', {3, 3}, 4.4, -5, true, {key = 7}, 8, 9, 10, 11, 12}
+---
+...
+t = s:replace(t)
+---
+...
+t
+---
+- [1, '2', [3, 3], 4.4, -5, true, {'key': 7}, 8, 9, 10, 11, 12]
+...
+t.field1, t.field2, t.field3, t.field4, t.field5, t.field6, t.field7, t.field8, t.field9, t.bsize, t.totable
+---
+- 1
+- '2'
+- [3, 3]
+- 4.4
+- -5
+- true
+- {'key': 7}
+- 8
+- 9
+- 10
+- 11
+...
+t.longlonglonglonglonglongname
+---
+- 12
+...
+box.tuple.bsize(t)
+---
+- 29
+...
+box.tuple.totable(t)
+---
+- [1, '2', [3, 3], 4.4, -5, true, {'key': 7}, 8, 9, 10, 11, 12]
+...
+s:drop()
+---
+...
+--
+-- Increase collisions number and make juajit use second hash
+-- function.
+--
+format = {}
+---
+...
+for i = 1, 100 do format[i] = {name = "skwjhfjwhfwfhwkhfwkjh"..i.."avjnbknwkvbwekjf"} end
+---
+...
+s = box.schema.space.create('test', { engine = engine, format = format })
+---
+...
+p = s:create_index('pk')
+---
+...
+to_insert = {}
+---
+...
+for i = 1, 100 do to_insert[i] = i end
+---
+...
+t = s:replace(to_insert)
+---
+...
+format = nil
+---
+...
+name = nil
+---
+...
+s = nil
+---
+...
+p = nil
+---
+...
+to_insert = nil
+---
+...
+collectgarbage('collect')
+---
+- 0
+...
+-- Print many many strings (> 40 to reach max_collisions limit in luajit).
+t.skwjhfjwhfwfhwkhfwkjh01avjnbknwkvbwekjf
+---
+- null
+...
+t.skwjhfjwhfwfhwkhfwkjh02avjnbknwkvbwekjf
+---
+- null
+...
+t.skwjhfjwhfwfhwkhfwkjh03avjnbknwkvbwekjf
+---
+- null
+...
+t.skwjhfjwhfwfhwkhfwkjh04avjnbknwkvbwekjf
+---
+- null
+...
+t.skwjhfjwhfwfhwkhfwkjh05avjnbknwkvbwekjf
+---
+- null
+...
+t.skwjhfjwhfwfhwkhfwkjh06avjnbknwkvbwekjf
+---
+- null
+...
+t.skwjhfjwhfwfhwkhfwkjh07avjnbknwkvbwekjf
+---
+- null
+...
+t.skwjhfjwhfwfhwkhfwkjh08avjnbknwkvbwekjf
+---
+- null
+...
+t.skwjhfjwhfwfhwkhfwkjh09avjnbknwkvbwekjf
+---
+- null
+...
+t.skwjhfjwhfwfhwkhfwkjh10avjnbknwkvbwekjf
+---
+- 10
+...
+t.skwjhfjwhfwfhwkhfwkjh11avjnbknwkvbwekjf
+---
+- 11
+...
+t.skwjhfjwhfwfhwkhfwkjh12avjnbknwkvbwekjf
+---
+- 12
+...
+t.skwjhfjwhfwfhwkhfwkjh13avjnbknwkvbwekjf
+---
+- 13
+...
+t.skwjhfjwhfwfhwkhfwkjh14avjnbknwkvbwekjf
+---
+- 14
+...
+t.skwjhfjwhfwfhwkhfwkjh15avjnbknwkvbwekjf
+---
+- 15
+...
+t.skwjhfjwhfwfhwkhfwkjh16avjnbknwkvbwekjf
+---
+- 16
+...
+t.skwjhfjwhfwfhwkhfwkjh17avjnbknwkvbwekjf
+---
+- 17
+...
+t.skwjhfjwhfwfhwkhfwkjh18avjnbknwkvbwekjf
+---
+- 18
+...
+t.skwjhfjwhfwfhwkhfwkjh19avjnbknwkvbwekjf
+---
+- 19
+...
+t.skwjhfjwhfwfhwkhfwkjh20avjnbknwkvbwekjf
+---
+- 20
+...
+t.skwjhfjwhfwfhwkhfwkjh21avjnbknwkvbwekjf
+---
+- 21
+...
+t.skwjhfjwhfwfhwkhfwkjh22avjnbknwkvbwekjf
+---
+- 22
+...
+t.skwjhfjwhfwfhwkhfwkjh23avjnbknwkvbwekjf
+---
+- 23
+...
+t.skwjhfjwhfwfhwkhfwkjh24avjnbknwkvbwekjf
+---
+- 24
+...
+t.skwjhfjwhfwfhwkhfwkjh25avjnbknwkvbwekjf
+---
+- 25
+...
+t.skwjhfjwhfwfhwkhfwkjh26avjnbknwkvbwekjf
+---
+- 26
+...
+t.skwjhfjwhfwfhwkhfwkjh27avjnbknwkvbwekjf
+---
+- 27
+...
+t.skwjhfjwhfwfhwkhfwkjh28avjnbknwkvbwekjf
+---
+- 28
+...
+t.skwjhfjwhfwfhwkhfwkjh29avjnbknwkvbwekjf
+---
+- 29
+...
+t.skwjhfjwhfwfhwkhfwkjh30avjnbknwkvbwekjf
+---
+- 30
+...
+t.skwjhfjwhfwfhwkhfwkjh31avjnbknwkvbwekjf
+---
+- 31
+...
+t.skwjhfjwhfwfhwkhfwkjh32avjnbknwkvbwekjf
+---
+- 32
+...
+t.skwjhfjwhfwfhwkhfwkjh33avjnbknwkvbwekjf
+---
+- 33
+...
+t.skwjhfjwhfwfhwkhfwkjh34avjnbknwkvbwekjf
+---
+- 34
+...
+t.skwjhfjwhfwfhwkhfwkjh35avjnbknwkvbwekjf
+---
+- 35
+...
+t.skwjhfjwhfwfhwkhfwkjh36avjnbknwkvbwekjf
+---
+- 36
+...
+t.skwjhfjwhfwfhwkhfwkjh37avjnbknwkvbwekjf
+---
+- 37
+...
+t.skwjhfjwhfwfhwkhfwkjh38avjnbknwkvbwekjf
+---
+- 38
+...
+t.skwjhfjwhfwfhwkhfwkjh39avjnbknwkvbwekjf
+---
+- 39
+...
+t.skwjhfjwhfwfhwkhfwkjh40avjnbknwkvbwekjf
+---
+- 40
+...
+t.skwjhfjwhfwfhwkhfwkjh41avjnbknwkvbwekjf
+---
+- 41
+...
+t.skwjhfjwhfwfhwkhfwkjh42avjnbknwkvbwekjf
+---
+- 42
+...
+t.skwjhfjwhfwfhwkhfwkjh43avjnbknwkvbwekjf
+---
+- 43
+...
+box.space.test:drop()
+---
+...
+--
+-- gh-2773: correctly reset max tuple size on restart.
+--
+box.cfg{[engine_max_tuple_size] = 1024 * 1024 * 100}
+---
+...
+s = box.schema.space.create('test', {engine = engine})
+---
+...
+pk = s:create_index('pk')
+---
+...
+_ = s:replace({1, string.rep('*', 1024 * 1024)})
+---
+...
+_ = s:replace({2, string.rep('*', 1024 * 1024 * 2)})
+---
+...
+pk:count()
+---
+- 2
+...
+test_run:cmd('restart server default')
+engine = test_run:get_cfg('engine')
+---
+...
+s = box.space.test
+---
+...
+s:count()
+---
+- 2
+...
+s:drop()
+---
+...
+--
+-- gh-2821: tuple:tomap().
+--
+format = {}
+---
+...
+format[1] = {'field1', 'unsigned'}
+---
+...
+format[2] = {'field2', 'unsigned'}
+---
+...
+format[3] = {'field3', 'unsigned'}
+---
+...
+format[4] = {'field4', 'array'}
+---
+...
+s = box.schema.space.create('test', {format = format, engine = engine})
+---
+...
+pk = s:create_index('pk')
+---
+...
+t1 = s:replace{1, 2, 3, {'a', 'b', 'c'}}
+---
+...
+t1map = t1:tomap()
+---
+...
+function maplen(map) local count = 0 for _ in pairs(map) do count = count + 1 end return count end
+---
+...
+maplen(t1map), t1map.field1, t1map.field2, t1map.field3, t1map.field4
+---
+- 8
+- 1
+- 2
+- 3
+- ['a', 'b', 'c']
+...
+t1map[1], t1map[2], t1map[3], t1map[4]
+---
+- 1
+- 2
+- 3
+- ['a', 'b', 'c']
+...
+-- Fields with table type are stored once for name and for index.
+t1map[4] == t1map.field4
+---
+- true
+...
+t2 = s:replace{4, 5, 6, {'a', 'b', 'c'}, 'extra1'}
+---
+...
+t2map = t2:tomap()
+---
+...
+maplen(t2map), t2map.field1, t2map.field2, t2map.field3, t2map.field4
+---
+- 9
+- 4
+- 5
+- 6
+- ['a', 'b', 'c']
+...
+t1map[1], t1map[2], t1map[3], t2map[4], t2map[5]
+---
+- 1
+- 2
+- 3
+- ['a', 'b', 'c']
+- extra1
+...
+-- Use box.tuple.tomap alias.
+t3 = s:replace{7, 8, 9, {'a', 'b', 'c'}, 'extra1', 'extra2'}
+---
+...
+t3map = box.tuple.tomap(t3)
+---
+...
+maplen(t3map), t3map.field1, t3map.field2, t3map.field3, t3map.field4
+---
+- 10
+- 7
+- 8
+- 9
+- ['a', 'b', 'c']
+...
+t1map[1], t1map[2], t1map[3], t3map[4], t3map[5], t3map[6]
+---
+- 1
+- 2
+- 3
+- ['a', 'b', 'c']
+- extra1
+- extra2
+...
+-- Invalid arguments.
+t3.tomap('123')
+---
+- error: 'Invalid argument #1 (box.tuple expected, got string)'
+...
+box.tuple.tomap('456')
+---
+- error: 'Invalid argument #1 (box.tuple expected, got string)'
+...
+s:drop()
+---
+...
+-- No names, no format.
+s = box.schema.space.create('test', { engine = engine })
+---
+...
+pk = s:create_index('pk')
+---
+...
+t1 = s:replace{1, 2, 3}
+---
+...
+t1map = t1:tomap()
+---
+...
+maplen(t1map), t1map[1], t1map[2], t1map[3]
+---
+- 3
+- 1
+- 2
+- 3
+...
+s:drop()
+---
+...
+--
+-- gh-2821: tuple:tomap() names_only feature.
+--
+format = {}
+---
+...
+format[1] = {name = 'field1', type = 'unsigned' }
+---
+...
+format[2] = {name = 'field2', type = 'unsigned' }
+---
+...
+s = box.schema.create_space('test', {format = format})
+---
+...
+pk = s:create_index('pk')
+---
+...
+t = s:replace{100, 200, 300 }
+---
+...
+t:tomap({names_only = false})
+---
+- 1: 100
+  2: 200
+  3: 300
+  field1: 100
+  field2: 200
+...
+t:tomap({names_only = true})
+---
+- field1: 100
+  field2: 200
+...
+t:tomap({names_only = 'text'})
+---
+- error: 'Usage: tuple:tomap(opts)'
+...
+t:tomap({names_only = true}, {dummy = true})
+---
+- error: 'Usage: tuple:tomap(opts)'
+...
+t:tomap({})
+---
+- 1: 100
+  2: 200
+  3: 300
+  field1: 100
+  field2: 200
+...
+s:drop()
+---
+...
+s = box.schema.create_space('test')
+---
+...
+pk = s:create_index('pk')
+---
+...
+t = s:replace{1,2,3,4,5,6,7}
+---
+...
+t:tomap({names_only = true})
+---
+- []
+...
+s:drop()
+---
+...
+format = {}
+---
+...
+format[1] = {name = 'field1', type = 'unsigned'}
+---
+...
+format[2] = {name = 'field2', type = 'array'}
+---
+...
+format[3] = {name = 'field3', type = 'map'}
+---
+...
+format[4] = {name = 'field4', type = 'string' }
+---
+...
+format[5] = {name = "[2][6]['привет中国world']['中国a']", type = 'string'}
+---
+...
+format[6] = {name = '[1]', type = 'any'}
+---
+...
+s = box.schema.space.create('test', {format = format})
+---
+...
+pk = s:create_index('pk')
+---
+...
+field2 = {1, 2, 3, "4", {5,6,7}, {привет中国world={中国="привет"}, key="value1", value="key1"}}
+---
+...
+field3 = {[10] = 100, k1 = 100, k2 = {1,2,3}, k3 = { {a=1, b=2}, {c=3, d=4} }, [-1] = 200}
+---
+...
+t = s:replace{1, field2, field3, "123456", "yes, this", {key = 100}}
+---
+...
+t[1]
+---
+- 1
+...
+t[2]
+---
+- [1, 2, 3, '4', [5, 6, 7], {'привет中国world': {'中国': 'привет'}, 'key': 'value1', 'value': 'key1'}]
+...
+t[3]
+---
+- {'k1': 100, 'k3': [{'a': 1, 'b': 2}, {'c': 3, 'd': 4}], -1: 200, 10: 100, 'k2': [
+    1, 2, 3]}
+...
+t[4]
+---
+- '123456'
+...
+t[2][1]
+---
+- 1
+...
+t["[2][1]"]
+---
+- 1
+...
+t[2][5]
+---
+- [5, 6, 7]
+...
+t["[2][5]"]
+---
+- [5, 6, 7]
+...
+t["[2][5][1]"]
+---
+- 5
+...
+t["[2][5][2]"]
+---
+- 6
+...
+t["[2][5][3]"]
+---
+- 7
+...
+t["[2][6].key"]
+---
+- value1
+...
+t["[2][6].value"]
+---
+- key1
+...
+t["[2][6]['key']"]
+---
+- value1
+...
+t["[2][6]['value']"]
+---
+- key1
+...
+t[2][6].привет中国world.中国
+---
+- привет
+...
+t["[2][6].привет中国world"].中国
+---
+- привет
+...
+t["[2][6].привет中国world.中国"]
+---
+- привет
+...
+t["[2][6]['привет中国world']"]["中国"]
+---
+- привет
+...
+t["[2][6]['привет中国world']['中国']"]
+---
+- привет
+...
+t["[2][6]['привет中国world']['中国a']"]
+---
+- yes, this
+...
+t["[3].k3[2].c"]
+---
+- 3
+...
+t["[4]"]
+---
+- '123456'
+...
+t.field1
+---
+- 1
+...
+t.field2[5]
+---
+- [5, 6, 7]
+...
+t[".field1"]
+---
+- 1
+...
+t["field1"]
+---
+- 1
+...
+t["[3][10]"]
+---
+- 100
+...
+t["[1]"]
+---
+- {'key': 100}
+...
+t["['[1]'].key"]
+---
+- 100
+...
+-- Not found.
+t[0]
+---
+- null
+...
+t["[0]"]
+---
+- null
+...
+t["[1000]"]
+---
+- null
+...
+t.field1000
+---
+- null
+...
+t["not_found"]
+---
+- null
+...
+t["[2][5][10]"]
+---
+- null
+...
+t["[2][6].key100"]
+---
+- null
+...
+t["[2][0]"] -- 0-based index in array.
+---
+- null
+...
+t["[4][3]"] -- Can not index string.
+---
+- null
+...
+t["[4]['key']"]
+---
+- null
+...
+-- Not found 'a'. Return 'null' despite of syntax error on a
+-- next position.
+t["a.b.c d.e.f"]
+---
+- null
+...
+-- Sytax errors.
+t["[2].[5]"]
+---
+- null
+...
+t["[-1]"]
+---
+- null
+...
+t[".."]
+---
+- null
+...
+t["[["]
+---
+- null
+...
+t["]]"]
+---
+- null
+...
+t["{"]
+---
+- null
+...
+s:drop()
+---
+...
+--
+-- gh-3631: Wrong 'tomap' work with nullable fields
+--
+format = {}
+---
+...
+format[1] = {'first', 'unsigned'}
+---
+...
+format[2] = {'second', 'unsigned'}
+---
+...
+format[3] = {'third', 'unsigned'}
+---
+...
+format[4] = {'fourth', 'string', is_nullable = true}
+---
+...
+s = box.schema.space.create('test', {format = format, engine = engine})
+---
+...
+pk = s:create_index('primary', {parts = {1, 'unsigned'}})
+---
+...
+s:insert({1, 2, 3})
+---
+- [1, 2, 3]
+...
+tuple = s:get(1)
+---
+...
+tuple
+---
+- [1, 2, 3]
+...
+-- Should be NULL
+tuple.fourth
+---
+- null
+...
+-- Should have only three named fields
+tuple:tomap()
+---
+- 1: 1
+  2: 2
+  3: 3
+  third: 3
+  second: 2
+  first: 1
+...
+-- Should be NULL
+tuple:tomap().fourth
+---
+- null
+...
+-- Should be nil
+type(tuple:tomap().fourth)
+---
+- nil
+...
+s:drop()
+---
+...
+engine = nil
+---
+...
+test_run = nil
+---
+...

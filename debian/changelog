@@ -1,0 +1,1355 @@
+tarantool (2.8.2.0.gfc96d10f5-1) unstable; urgency=medium
+
+  * Introduced support for LJ_DUALNUM mode in luajit-gdb.py.
+  * The new method table.equals compares two tables by value with respect
+    to the __eq metamethod.
+  * The log module now supports symbolic representation of log levels.
+  * Descriptions of type mismatch error and inconsistent type error
+    have become more informative.
+  * Removed explicit cast from BOOLEAN to numeric types and vice versa.
+  * Removed explicit cast from VARBINARY to numeric types and vice versa.
+  * Fixed a bug due to which a string that is not NULL terminated
+    could not be cast to BOOLEAN, even if the conversion should
+    be successful according to the rules.
+  * fiber.wakeup() in Lua and fiber_wakeup() in C became NOP on
+    the currently running fiber.
+  * Various bugfixes, see GitHub release notes:
+    https://github.com/tarantool/tarantool/releases/tag/2.8.2
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Thu, 19 Aug 2021 18:00:00 +0300
+
+tarantool (2.7.3.0.gdddf926c3-1) unstable; urgency=medium
+
+  * Provide information about state of synchronous replication via
+    box.info.synchro interface.
+  * Introduced support for LJ_DUALNUM mode in luajit-gdb.py.
+  * The new method table.equals compares two tables by value with respect
+    to the __eq metamethod.
+  * Descriptions of type mismatch error and inconsistent type error
+    have become more informative.
+  * Removed explicit cast from BOOLEAN to numeric types and vice versa.
+  * Removed explicit cast from VARBINARY to numeric types and vice versa.
+  * Fixed a bug due to which a string that is not NULL terminated
+    could not be cast to BOOLEAN, even if the conversion should
+    be successful according to the rules.
+  * fiber.wakeup() in Lua and fiber_wakeup() in C became NOP on
+    the currently running fiber.
+  * Various bugfixes, see GitHub release notes:
+    https://github.com/tarantool/tarantool/releases/tag/2.7.3
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Thu, 19 Aug 2021 14:00:00 +0300
+
+tarantool (1.10.11.0.gf0b0e7ecf-1) stable; urgency=medium
+
+  * Introduced support for LJ_DUALNUM mode in luajit-gdb.py.
+  * fiber.wakeup() in Lua and fiber_wakeup() in C became
+  * NOP on the currently running fiber.
+  * Fixed memory leak on each box.on_commit() and box.on_rollback().
+  * Fixed invalid results produced by json module's encode function when it
+    was used from the Lua garbage collector.
+  * Fixed a bug when iterators became invalid after schema change.
+  * Fixed crash in case of reloading a compiled module when the
+    new module lacks some of functions which were present in the
+    former code.
+  * Fixed console client connection breakage if request times out.
+  * Added missing broadcast to net.box.future:discard() so that now
+    fibers waiting for a request result are woken up when the request
+    is discarded.
+  * Fix possible keys divergence during secondary index build which might
+    lead to missing tuples in it.
+  * Fix crash which may occur while switching read_only mode due to
+    duplicating transaction in tx writer list.
+  * Fixed a race between Vinyl garbage collection and compaction
+    resulting in broken vylog and recovery.
+  * Fix replication stopping occasionally with ER_INVALID_MSGPACK when
+    replica is under high load.
+  * Fixed optimization for single-char strings in IR_BUFPUT
+    assembly routine.
+  * Fixed slots alignment in lj-stack command output when
+    LJ_GC64 is enabled.
+  * Fixed dummy frame unwinding in lj-stack command.
+  * Fixed detection of inconsistent renames even in the presence
+    of sunk values.
+  * Fixed the order VM registers are allocated by LuaJIT frontend
+    in case of BC_ISGE and BC_ISGT.
+  * When error is raised during encoding call results,
+    auxiliary lightuserdata value is not removed from the main
+    Lua coroutine stack.
+  * Fixed Lua C API misuse, when the error is raised during call results
+    encoding on unprotected coroutine and expected to be catched
+    on the different one, that is protected.
+  * Fixed possibility crash in case when trigger removes itself.
+  * Fixed possibility crash in case when someone destroy trigger,
+    when it's yield.
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Thu, 19 Aug 2021 10:00:00 +0300
+
+tarantool (2.8.1.0.ge2a1ec0c2-1) unstable; urgency=medium
+
+  * Implement ability to run multiple iproto threads.
+  * Set box.cfg options with environment variables.
+  * Introduce box.ctl.promote() and the concept of manual elections.
+  * Lua memory profiler enhancements.
+  * Many other features and bugfixes, see GitHub release notes:
+    https://github.com/tarantool/tarantool/releases/tag/2.8.1
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Wed, 21 Apr 2021 18:00:00 +0300
+
+tarantool (2.7.2.0.g4d8c06890-1) unstable; urgency=medium
+
+  * Introduce the concept of WAL queue and a new configuration option:
+    wal_queue_max_size.
+  * Introduce box.ctl.promote() and the concept of manual elections.
+  * Updated CMake minimum required version to 3.1.
+  * Drop autotools dependencies.
+  * Stop publishing new binary packages for Debian Jessie.
+  * Bump built-in zstd version from v1.3.3 to v1.4.8.
+  * Enable smtp and smtps protocols in bundled libcurl.
+  * Ship libcurl headers to system path "${PREFIX}/include/tarantool"
+    in the case of libcurl included as bundled library or static build.
+  * Various bugfixes, see GitHub release notes:
+    https://github.com/tarantool/tarantool/releases/tag/2.7.2
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Wed, 21 Apr 2021 14:00:00 +0300
+
+tarantool (2.6.3.0.gcd487a2c5-1) unstable; urgency=medium
+
+  * Introduce the concept of WAL queue and a new configuration option:
+    wal_queue_max_size.
+  * Introduce box.ctl.promote() and the concept of manual elections.
+  * Updated CMake minimum required version to 3.1.
+  * Drop autotools dependencies.
+  * Stop publishing new binary packages for Debian Jessie.
+  * Bump built-in zstd version from v1.3.3 to v1.4.8.
+  * Enable smtp and smtps protocols in bundled libcurl.
+  * Ship libcurl headers to system path "${PREFIX}/include/tarantool"
+    in the case of libcurl included as bundled library or static build.
+  * Various bugfixes, see GitHub release notes:
+    https://github.com/tarantool/tarantool/releases/tag/2.6.3
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Wed, 21 Apr 2021 12:00:00 +0300
+
+tarantool (1.10.10.0.gaea7ae77a-1) stable; urgency=medium
+
+  * Updated CMake minimum required version in Tarantool
+    build infrastructure to 3.1.
+  * Stop publishing new binary packages for Debian Jessie.
+  * Backported -DENABLE_LTO=ON/OFF cmake option.
+  * Bump built-in zstd version from v1.3.3 to v1.4.8.
+  * libcurl symbols in the case of bundled libcurl are now exported.
+  * Enable smtp and smtps protocols in bundled libcurl.
+  * Ship libcurl headers to system path "${PREFIX}/include/tarantool"
+    in the case of libcurl included as bundled library or static build.
+  * Extensive usage of uri and uuid modules with debug log level could lead to
+    a crash or corrupted result of the functions from these modules.
+    The same could happen with some functions from the modules fio,
+    box.tuple, iconv.
+  * Fixed -e option, when tarantool always entered interactive mode
+    when stdin is a tty.
+  * Make recovering with force_recovery option delete newer than
+    snapshot vylog files.
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Wed, 21 Apr 2021 10:00:00 +0300
+
+tarantool (2.7.1.0.g3ac498c9f-1) unstable; urgency=medium
+
+  * LuaJIT memory profiler.
+  * Expression evaluation for replication_synchro_quorum.
+  * The ALTER TABLE ADD COLUMN statement.
+  * Many other features and bugfixes, see GitHub release notes:
+    https://github.com/tarantool/tarantool/releases/tag/2.7.1
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Wed, 30 Dec 2020 14:00:00 +0300
+
+tarantool (2.6.2.0.g34d504d7d-1) unstable; urgency=medium
+
+  * The new box.ctl.is_recovery_finished() function allows user
+    to determine whether memtx recovery is finished.
+  * It is now possible to specify synchro quorum as a function of
+    a number N of registered replicas.
+  * Show JSON tokens themselves instead of token names T_*
+    in the JSON decoder error messages.
+  * Show a decoding context in the JSON decoder error messages.
+  * Deploy packages for Debian Bullseye.
+  * Various bugfixes, see GitHub release notes:
+    https://github.com/tarantool/tarantool/releases/tag/2.6.2
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Wed, 30 Dec 2020 14:00:00 +0300
+
+tarantool (2.5.3.0.gf93e48013-1) unstable; urgency=medium
+
+  * The new box.ctl.is_recovery_finished() function allows user
+    to determine whether memtx recovery is finished.
+  * A lot of bugfixes, see GitHub release notes:
+    https://github.com/tarantool/tarantool/releases/tag/2.5.3
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Wed, 30 Dec 2020 12:00:00 +0300
+
+tarantool (1.10.9.0.g720ffdd23-1) stable; urgency=medium
+
+  * Deploy packages for Debian Bullseye.
+  * Don't start an 'example' instance after installing tarantool.
+  * fiber.cond:wait() now correctly throws an error when
+    a fiber is cancelled.
+  * Fixed a memory corruption issue.
+  * A dynamic module now gets correctly unloaded from memory in case
+    of an attempt to load a non-existing function from it.
+  * The fiber region (the box region) won't be invalidated on
+    a read-only transaction.
+  * Dispatching __call metamethod no longer causes address clashing.
+  * Fixed a false positive panic when yielding in debug hook.
+  * An attempt to use a net.box connection which is not established yet
+    now results in a correctly reported error.
+  * Fixed a hang which occured when tarantool ran a user script with
+    the -e option and this script exited with an error.
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Wed, 30 Dec 2020 10:00:00 +0300
+
+tarantool (2.6.1.0.gcfe0d1a55-1) unstable; urgency=medium
+
+  * Transactional manager for the memtx engine that allows yielding
+    in transactions.
+  * Raft-based automated failover mechanism for a single-leader replica set.
+  * Many other features and bugfixes, see GitHub release notes:
+    https://github.com/tarantool/tarantool/releases/tag/2.6.1
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Thu, 22 Oct 2020 18:00:00 +0300
+
+tarantool (2.5.2.0.g05730d326-1) unstable; urgency=medium
+
+  * New function space:alter(options).
+  * Exposed the box region, key_def and several other functions.
+  * A lot of bugfixes, see GitHub release notes:
+    https://github.com/tarantool/tarantool/releases/tag/2.5.2
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Thu, 22 Oct 2020 14:00:00 +0300
+
+tarantool (2.4.3.0.g5180d98f1-1) unstable; urgency=medium
+
+  * Exposed the box region, key_def and several other functions
+    in order to implement external tuple.keydef and tuple.merger
+    modules on top of them.
+  * Various improvements and bugfixes, see GitHub release notes:
+    https://github.com/tarantool/tarantool/releases/tag/2.4.3
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Thu, 22 Oct 2020 12:00:00 +0300
+
+tarantool (1.10.8.0.g2f18757b7-1) stable; urgency=medium
+
+  * Exposed the box region, key_def and several other functions in order
+    to implement external tuple.keydef and tuple.merger modules
+    on top of them.
+  * Fixed fibers switch-over to prevent JIT machinery misbehavior.
+  * Fixed fibers switch-over to prevent implicit GC disabling.
+  * Fixed unhandled Lua error that might lead to memory leaks and
+    inconsistencies in <space_object>:frommap(), <key_def_object>:compare(),
+    <merge_source>:select().
+  * Fixed the error occurring on loading luajit-gdb.py with Python2.
+  * Fixed potential lag on boot up procedure when system's password
+    database is slow in access.
+  * Get rid of typedef redefinitions for compatibility with C99.
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Thu, 22 Oct 2020 10:00:00 +0300
+
+tarantool (2.5.1.0.gc2d8c03ee-1) unstable; urgency=medium
+
+  * Synchronous replication (beta).
+  * Allow an anonymous replica follow another anonymous replica.
+  * Fixed numerous crashes in Vinyl.
+  * Make implicit cast rules for assignment operation more strict in SQL.
+  * Updated curl version to 7.71.
+  * Don't start 'example' instance after installing tarantool.
+  * Many other features and bugfixes, see GitHub release notes:
+    https://github.com/tarantool/tarantool/releases/tag/2.5.1
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Fri, 17 Jul 2020 18:00:00 +0300
+
+tarantool (2.4.2.0.gcccd89701-1) unstable; urgency=medium
+
+  * box.session.push() parameter sync is deprecated.
+  * Don't start 'example' instance after installing tarantool.
+  * Various bugfixes, see GitHub release notes:
+    https://github.com/tarantool/tarantool/releases/tag/2.4.2
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Fri, 17 Jul 2020 14:00:00 +0300
+
+tarantool (2.3.3.0.g5be85a37f-1) unstable; urgency=medium
+
+  * Various improvements and bugfixes, see GitHub release notes:
+    https://github.com/tarantool/tarantool/releases/tag/2.3.3
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Fri, 17 Jul 2020 12:00:00 +0300
+
+ tarantool (1.10.7.0.g554d439a5-1) stable; urgency=medium
+
+  * Fixed a bug in C module reloading.
+  * Fixed races and corner cases in box (re)configuration.
+  * Fixed check of index field map size which led to crash.
+  * Fixed wrong mpsgpack extension type in an error message at decoding.
+  * Fixed error while closing socket.tcp_server socket.
+  * Don't ruin rock name when freshly installing *.all.rock
+  * with dependencies.
+  * Fixed crash during compaction due to tuples with size exceeding
+    vinyl_max_tuple_size setting.
+  * Fixed crash during recovery of vinyl index due to the lack of file
+    descriptor.
+  * Fixed crash during executing upsert changing primary key
+    in debug mode.
+  * Fixed crash due to triggered dump process during secondary index
+    creation.
+  * Fixed crash/deadlock (depending on build type) during dump process
+    scheduling and concurrent DDL operation.
+  * Fixed crash during read of prepared but still not yet
+    not committed statement.
+  * Fixed squashing set and arithmetic upsert operations.
+  * Create missing folders for vinyl spaces and indexes if needed
+    to avoid confusing fails of tarantool started from backup.
+  * Fixed crash during squash of many (more than 4000) upserts modifying
+    the same key.
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Fri, 17 Jul 2020 10:00:00 +0300
+
+tarantool (2.4.1.0.g91d323782-1) unstable; urgency=medium
+
+  * UUID type was introduced.
+  * It is now possible to report stack of errors.
+  * Added popen built-in module.
+  * Create errors of custom type and transparent marshaling over net.box.
+  * Many other features and bugfixes, see GitHub release notes:
+    https://github.com/tarantool/tarantool/releases/tag/2.4.1
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Mon, 20 Apr 2020 18:00:00 +0300
+
+tarantool (2.3.2.0.gcb25c5473-1) unstable; urgency=medium
+
+  * fiber.storage is cleaned between requests.
+  * tuple/space/index:update()/upsert() were fixed not to turn
+    a value into an infinity when a float value was added to or
+    subtracted from a float column and exceeded the float value range
+  * Fix potential execution abort when operating the system runs
+    under heavy memory load.
+  * Make RTREE indexes handle the out of memory error.
+  * Fix the error message returned on using an already dropped sequence.
+  * Add cancellation guard to avoid WAL thread stuck.
+  * Fix execution abort when memtx_memory and vinyl_memory are set
+    to more than 4398046510080 bytes.
+  * Fix rebootstrap procedure not working in case replica itself is
+    listed in box.cfg.replication.
+  * Fix possible user password leaking via replication logs.
+  * Refactor vclock map to be exactly 4 bytes in size.
+  * Fix crash when the replication applier rollbacks a transaction.
+  * Local space operations are now counted in 0th vclock component.
+  * Gc consumers are now ordered by their vclocks and not by vclock
+    signatures.
+  * json:decode() doesn't spoil instance's options with per-call ones.
+  * Handle empty input for uri.format() properly.
+  * os.environ() is now changed when os.setenv() is called.
+  * netbox.self:call/eval() now returns the same types as
+    netbox_connection:call/eval.
+  * box.tuple.* namespace is cleaned up from private functions.
+  * tarantoolctl rocks search: fix the --all flag.
+  * tarantoolctl rocks remove: fix the --force flag.
+  * Fix box.stat() behavior: now it collects statistics on the
+    PREPARE and EXECUTE methods as expected.
+  * The inserted values are inserted in the order in which they are given
+    in case of SQL INSERT into space with autoincrement.
+  * When building Tarantool with bundled libcurl, link it with the c-ares
+    library by default.
+  * __pairs/__ipairs metamethods handling is removed.
+  * Introduce luajit-gdb.py extension with commands for inspecting
+    LuaJIT internals.
+  * Fix string to number conversion.
+  * "FFI sandwich"(*) detection is introduced.
+  * luaJIT_setmode call is prohibited while mcode execution.
+  * Fix assertion fault due to triggered dump process during
+    secondary index build.
+  * Fix crashes at attempts to use -e and -l command line options
+    concatenated with their values.
+  * Fix inability to upgrade from 2.1 if there was an automatically
+    generated sequence.
+  * Update libopenssl version to 1.1.1f since the previous one was EOLed.
+  * Fix static build (-DBUILD_STATIC=ON) when libunwind depends on liblzma.
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Mon, 20 Apr 2020 14:00:00 +0300
+
+tarantool (2.2.3.0.gb9c4c7c04-1) unstable; urgency=medium
+
+  * Various improvements and bugfixes, see GitHub release notes:
+    https://github.com/tarantool/tarantool/releases/tag/2.2.3
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Mon, 20 Apr 2020 12:00:00 +0300
+
+tarantool (1.10.6.0.g5372cd2fa-1) stable; urgency=medium
+
+  * fiber.storage is cleaned between requests.
+  * tuple/space/index:update()/upsert() were fixed not to turn a value
+    into an infinity when a float value was added to or subtracted from
+    a float column and exceeded the float value range.
+  * Make RTREE indexes handle the out of memory error.
+  * Add cancellation guard to avoid WAL thread stuck.
+  * Fix the rebootstrap procedure not working if the replica itself
+    is listed in box.cfg.replication.
+  * Fix possible user password leaking via replication logs.
+  * Local space operations are now counted in 0th vclock component.
+  * Gc consumers are now ordered by their vclocks and not by vclock
+    signatures.
+  * json: :decode() doesn't spoil instance's options with per-call ones.
+  * os.environ() is now changed when os.setenv() is called.
+  * netbox.self:call/eval() now returns the same types as
+    netbox_connection:call/eval.
+  * __pairs/__ipairs metamethods handling is removed.
+  * Introduce luajit-gdb.py extension with commands for inspecting
+    LuaJIT internals.
+  * Fix string to number conversion.
+  * "FFI sandwich" detection is introduced.
+  * luaJIT_setmode call is prohibited while mcode execution and leads
+    to the platform panic.
+  * Fix assertion fault due to triggered dump process during secondary
+    index build.
+  * Fix crashes at attempts to use -e and -l command line options
+    concatenated with their values.
+  * Update libopenssl version to 1.1.1f.
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Mon, 20 Apr 2020 10:00:00 +0300
+
+tarantool (1.10.5.0.g83a2ae919-1) stable; urgency=medium
+
+  * Exit gracefully when a main script throws an error.
+  * Enable __pairs and __ipairs metamethods from Lua 5.2.
+  * A lof of bugfixes, see GitHub release notes:
+    https://github.com/tarantool/tarantool/releases/tag/1.10.5
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Tue, 14 Jan 2020 10:00:00 +0300
+
+tarantool (2.3.1.0.g5a1a220ee-1) unstable; urgency=medium
+
+  * Field name and JSON path updates.
+  * Anonymous replica.
+  * New DOUBLE SQL type (and new 'double' box field type).
+  * Stored and indexed decimals (and new 'decimal' field type).
+  * fiber.top()
+  * Feed data from a memory during replica initial join.
+  * SQL prepared statements.
+  * Sessions settings service space.
+  * Many other features and bugfixes, see GitHub release notes:
+    https://github.com/tarantool/tarantool/releases/tag/2.3.1
+
+ -- Alexander Turenko <alexander.turenko@tarantool.org>  Tue, 31 Dec 2019 14:00:00 +0300
+
+tarantool (2.2.2.0.g0a577ff30-1) unstable; urgency=medium
+
+  * Drop rows_per_wal box.cfg() option in favor of wal_max_size.
+  * json and msgpack serializers now raise an error when a depth of
+    data nesting exceeds encode_max_depth option value.
+  * Show line and column in json.decode() errors.
+  * Exit gracefully when a main script throws an error.
+  * key_def: accept both field and fieldno in key_def.new(<...>).
+  * Enable __pairs and __ipairs metamethods from Lua 5.2.
+  * tarantoolctl: allow to start instances with delayed box.cfg{}.
+  * Dozens of bugfixes, see GitHub release notes:
+    https://github.com/tarantool/tarantool/releases/tag/2.2.2
+
+ -- Alexander Turenko <alexander.turenko@tarantool.org>  Tue, 31 Dec 2019 10:00:00 +0300
+
+tarantool (2.1.3.0.g38d7d6c5d-1) unstable; urgency=medium
+
+  * Various improvements and bugfixes, see GitHub release notes:
+    https://github.com/tarantool/tarantool/releases/tag/2.1.3
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Wed, 06 Nov 2019 10:00:00 +0300
+
+tarantool (1.10.4.0.g9dbcdba14-1) stable; urgency=medium
+
+  * Improve dump start/stop logging.
+  * Look up key in reader thread.
+  * Improve box.stat.net.
+  * Add idle to downstream status in box.info.
+  * Deprecate rows_per_wal in favor of wal_max_size.
+  * Print corrupted rows on decoding error.
+  * Add type of operation to space trigger parameters.
+  * Add debug.sourcefile() and debug.sourcedir() helpers to determine
+    the location of a current Lua source file.
+  * Add max_total_connections option in addition to total_connection
+    to allow more fine-grained tuning of libcurl connection cache.
+  * A lof of bugfixes, see GitHub release notes:
+    https://github.com/tarantool/tarantool/releases/tag/1.10.4
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Thu, 26 Sep 2019 10:00:00 +0300
+
+tarantool (2.2.1.0.g4138645e0-1) unstable; urgency=medium
+
+  * New fixed point type (DECIMAL) was introduced to Tarantool.
+  * Multikey index support.
+  * Now it is possible to make functions persistent.
+  * Functional indexes implemented.
+  * Partial core dumps, which are now on by default.
+  * Data definition statements, which do not yield, can now be used
+    in a transaction.
+  * It is now possible to set a sequence not only for the first part
+    of the index.
+  * Allow to call box.session.exists() and box.session.fd() without
+    any arguments.
+  * New function introduced to get index key from tuple.
+  * New protocol called SWIM implemented to keep a table
+    of cluster members.
+  * Provide type of operation inside before_replace() trigger.
+  * Remove yields from Vinyl DDL on commit triggers.
+  * Improved performance of SELECT-s on memtx spaces.
+  * Indexes of memtx spaces are now built in background fibers.
+  * Hand over key lookup in a page to vinyl reader thread.
+  * Replication applier now can apply transactions which were
+    concurrent on the master concurrently on replica.
+  * Transaction boundaries introduced to replication protocol.
+  * Tuple access by field name for net.box.
+  * It is now possible to set the output format to Lua instead of YAML
+    in the interactive console.
+  * Multiple new collations added.
+  * New function touch introduced to fio module.
+  * Merger for tuples streams added.
+  * Default collation strength is explicit tertiary now.
+  * Improve box.stat.net.
+  * Tarantool now uses luarocks 3.
+  * New module key_def introduced to Lua.
+  * SQL ALTER now allows to add a constraint.
+  * SQL CHECK constraints are also validated during DML operations
+    performed from Lua land.
+  * New SQL types VARBINARY, UNSIGNED and BOOLEAN.
+  * CREATE TABLE SQL statement (and all other data definition statements)
+    are now truly transactional.
+  * SQL now uses Tarantool diagnostics API to set errors.
+  * Multiple improvements to SQL type system to make it more consistent.
+  * Added aliases for LENGTH() from ANSI SQL.
+  * It is possible to use HAVING without GROUP BY in SQL.
+  * A lot of bugfixes, see GitHub release notes:
+    https://github.com/tarantool/tarantool/releases/tag/2.2.1
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Fri, 02 Aug 2019 10:00:00 +0300
+
+tarantool (2.1.2.0.g5e6821cbd-1) unstable; urgency=medium
+
+  * Index based on JSON path.
+  * In case of ENOSPC delete WALs not needed for recovery
+    from the last checkpoint.
+  * Add support for "tarantoolctl rocks pack" subcommand.
+  * string.rstrip and string.lstrip should accept symbols to strip.
+  * on shutdown trigger added.
+  * on_schema_init trigger added.
+  * snapshot daemon: limit the maximum disk size of maintained WALs.
+  * Permissions to create, alter and drop space.
+  * Replace box.sql.execute() with box.execute().
+  * SQL Type system was significantly refactored.
+  * Do not use SQL delete+insert for updates.
+  * Improve value comparison of different SQL types.
+  * Allow constraints to appear along with column definitions in SQL.
+  * Improve pragma index_info syntax.
+  * Dozens of bugfixes, see GitHub release notes:
+    https://github.com/tarantool/tarantool/releases/tag/2.1.2
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Fri, 05 Apr 2019 10:00:00 +0300
+
+tarantool (1.10.3.0.g0b7078a93-1) stable; urgency=medium
+
+  * Randomize vinyl index compaction.
+  * Throttle tx thread if compaction doesn't keep up with dumps.
+  * Do not apply run_count_per_level to the last level.
+  * Report the number of active iproto connections.
+  * Never keep a dead replica around if running out of disk space.
+  * Report join progress to the replica log.
+  * Expose snapshot status in box.info.gc().
+  * Show names of Lua functions in backtraces in fiber.info().
+  * Check if transaction opened.
+  * A lof of bugfixes, see GitHub release notes:
+    https://github.com/tarantool/tarantool/releases/tag/1.10.3
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Mon, 1 Apr 2019 10:00:00 +0300
+
+tarantool (2.1.1.0.g8a09adb46-1) unstable; urgency=medium
+
+  * Add function box.sql.execute() to query Tarantool database
+    using SQL statements.
+  * Added support for SQL collations by incorporating libICU
+    character set and collation library.
+  * IPROTO interface was extended to support SQL queries.
+  * net.box subsystem was extended to support SQL queries.
+  * Enabled ANALYZE statement to produce correct results,
+    necessary for efficient query plans.
+  * Enabled savepoints functionality. SAVEPOINT statement works w/o issues.
+  * Enabled ALTER TABLE … RENAME statement.
+  * Improved rules for identifier names: now fully consistent
+    with Lua frontend.
+  * Enabled support for triggers; trigger bodies now persist in Tarantool
+    snapshots and survive server restart.
+  * Significant performance improvements.
+  * Functions in SQL.
+  * Introduce new SQL wire protocol.
+  * Is nullable type attribute wanted by API in IPROTO.
+  * Add collation field to tuple format.
+  * Add string.fromhex() method.
+  * Select input language in tarantoolctl.
+  * Use Tarantool's structs for metadata during query compilation.
+  * Resolve names for VIEW right after its creation.
+  * Various SQL features and bugfixes, see GitHub release notes:
+    https://github.com/tarantool/tarantool/releases/tag/2.1.1
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Thu, 15 Nov 2018 10:00:00 +0300
+
+tarantool (1.10.2.0.gc0d8063b6-1) stable; urgency=medium
+
+  * Configurable syslog destination.
+  * Allow different nullability in indexes and format.
+  * Allow to back up any checkpoint.
+  * A way to detect that a Tarantool process was started or
+    restarted by tarantoolctl.
+  * `TARANTOOLCTL` and `TARANTOOL_RESTARTED` env vars.
+  * New configuration parameter net_msg_max to restrict
+    the number of allocated fibers;
+  * Automatic replication rebootstrap.
+  * Replica-local space.
+  * Display the connection status if the downstream gets
+    disconnected from the upstream.
+  * New option replication_skip_conflict.
+  * Remove old snapshots which are not needed by replicas.
+  * New function fiber.join().
+  * New option `names_only` in tuple:tomap().
+  * Support custom rock servers in tarantoolctl. 
+  * Expose on_commit/on_rollback triggers to Lua.
+  * New function box.is_in_txn() to check if a transaction is open.
+  * Tuple field access via a json path.
+  * New function space:frommap() to convert a map to a tuple instance
+    or to a table.
+  * New module utf8 that implements libicu's bindings for use in Lua.
+  * Support ALTER for non-empty vinyl spaces.
+  * Tuples stored in the vinyl cache are not shared among the indexes
+    of the same space.
+  * Keep a stack of UPSERTS in `vy_read_iterator`.
+  * New function `box.ctl.reset_stat()` to reset vinyl statistics.
+  * A lof of bugfixes, see GitHub release notes:
+    https://github.com/tarantool/tarantool/releases/tag/1.10.2
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Sat, 13 Oct 2018 10:00:00 +0300
+
+tarantool (1.9.2.0.g113ade24e-1) unstable; urgency=medium
+  * Dozens of bugfixes, see GitHub release notes:
+    https://github.com/tarantool/tarantool/releases/tag/1.9.1
+    https://github.com/tarantool/tarantool/releases/tag/1.9.2
+
+ -- Kirill Yukhin <kyukhin@tarantool.org>  Wed, 05 Sep 2018 10:00:00 +0300
+
+tarantool (1.9.0.4.g195d4462d-1) unstable; urgency=medium
+
+  * It is now possible to block/unblock users.
+  * New function `box.session.euid()` to return effective user.
+  * New 'super' role, with superuser access.
+  * `on_auth` trigger is now fired in case of both successful and
+    failed authentication.
+  * New replication configuration algorithm.
+  * After replication connect at startup, the server
+    does not start processing write requests before syncing up
+    with all connected peers.
+  * It is now possible to explicitly set instance and replica set
+    uuid via database configuration.
+  * `box.once()` no longer fails on a read-only replica but waits.
+  * `force_recovery` can now skip a corrupted xlog file.
+  * Improved replication monitoring.
+  * New 'BEFORE' triggers which can be used for conflict resolution
+    in master-master replication.
+  * http client now correctly parses cookies and supports
+    http+unix:// paths.
+  * `fio` rock now supports `file_exists()`, `rename()` works across
+    filesystems, and `read()` without arguments reads the whole file.
+  * `fio` rock errors now follow Tarantool function call conventions
+    and always return an error message in addition to the error flag.
+  * `digest` rock now supports pbkdf2 password hashing algorithm,
+    useful in PCI/DSS compliant applications.
+  * `box.info.memory()` provides a high-level overview of
+    server memory usage, including networking, Lua, transaction
+    and index memory.
+  * It is now possible to add missing tuple fields to an index.
+  * Lots of improvements in field type support when creating or
+    altering spaces and indexes.
+  * It is now possible to turn on `is_nullable` property on a field
+    even if the space is not empty.
+  * Several logging improvements. 
+  * It is now possible to make a unique vinyl index non-unique
+    without index rebuild.
+  * Improved vynil UPDATE, REPLACE and recovery performance in presence of
+    secondary keys.
+  * `space:len()` and `space:bsize()` now work for vinyl.
+  * Vinyl recovery speed has improved in presence of secondary keys.
+
+ -- Konstantin Osipov <kostja@tarantool.org>  Mon, 26 Feb 2018 10:00:00 +0300
+
+tarantool (1.7.6.0.g7b2945d6c-1) unstable; urgency=medium
+
+  * Hybrid schema-less + schema-full data model.
+  * Collation and Unicode Support.
+  * NULL values in unique and non-unique indexes.
+  * Sequences and a new implementation of auto_increment().
+  * Add gap locks in Vinyl transaction manager.
+  * on_connect/on_disconnect triggers for net.box.
+  * Structured logging in JSON format.
+  * Several Lua features and various bugfixes, see GitHub release notes
+    for details: https://github.com/tarantool/tarantool/releases/tag/1.7.6
+
+ -- Roman Tsisyk <roman@tarantool.org>  Tue, 07 Nov 2017 10:00:00 +0300
+
+tarantool (1.7.5.46.gd98815384-1) unstable; urgency=medium
+
+  * Stabilization of Vinyl storage engine.
+  * Improved MemTX TREE iterators.
+  * Better replication monitoring.
+  * WAL tracking for remote replicas on master.
+  * Automatic snapshots every hour.
+  * Lua API to create consistent backups.
+  * Hot code reload for stored C procedures.
+  * New built-in rocks: 'http.client', 'iconv' and 'pwd'.
+  * Lua 5.1 command line options.
+  * LuaRocks-based package manager.
+  * Stack traces support in fiber.info().
+  * New names for box.cfg() options.
+  * Hot standy mode is now off by default.
+  * Support for UNIX pipes in tarantoolctl.
+  * Non-blocking syslog logger.
+  * Improved systemd integration.
+  * Hundrends of bugs fixed, see GitHub release notes for details:
+    https://github.com/tarantool/tarantool/releases/tag/1.7.5
+
+ -- Roman Tsisyk <roman@tarantool.org>  Tue, 12 Sep 2017 14:00:00 +0300
+
+tarantool (1.7.4.47.g06ee320-1) unstable; urgency=medium
+
+  * Bump the minimum required version of tarantool-common.
+
+ -- Roman Tsisyk <roman@tarantool.org>  Fri, 10 Mar 2017 16:17:09 +0300
+
+tarantool (1.7.2.385.g952d79e-1) unstable; urgency=medium
+
+  * Add `tarantoolctl cat/play` commands and `xlog` Lua module.
+  * Add Lua library to manipulate environment variables.
+  * Allow DML requests from on_replace triggers.
+  * Allow UPSERT without operations.
+  * Improve support for the large number of active network clients.
+  * Fix race conditions during automatic cluster bootstrap.
+  * Fix calculation of periods in snapshot daemon.
+  * Fix handling of iterator type in space:pairs() and space:select().
+  * Fix CVE-2016-9036 and CVE-2016-9037.
+  * Dozens of bug fixes to Vinyl storage engine.
+  * Remove broken coredump() Lua function.
+
+ -- Roman Tsisyk <roman@tarantool.org>  Fri, 16 Dec 2016 19:03:31 +0300
+
+tarantool (1.7.2.314.gedffdc0-1) unstable; urgency=medium
+
+  * Fix "ld: Nonrepresentable section on output". Closes: #846773.
+
+ -- Roman Tsisyk <roman@tarantool.org>  Sun, 04 Dec 2016 09:38:02 +0300
+
+tarantool (1.7.2.135.gcdf16ed-1) unstable; urgency=medium
+
+  * Fix unowned symlink on example.lua after purge. Closes: #842073.
+  * Add conflict on tarantool-lts-dev. Closes: #842086.
+  * Bump debhelper compact version as suggested by lintian.
+
+ -- Roman Tsisyk <roman@tarantool.org>  Wed, 26 Oct 2016 14:12:52 +0300
+
+tarantool (1.7.2.29.g2ad1af9-1) unstable; urgency=medium
+
+  * Drop conflicts with tarantool-lts and tarantool-common-lts.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Tue, 11 Oct 2016 16:14:56 +0300
+
+tarantool (1.7.2.21.g7131b0c-1) unstable; urgency=medium
+
+  * Fix "tarantool.1: No such file or directory" on buildd
+
+ -- Roman Tsisyk <roman@tarantool.org>  Thu, 06 Oct 2016 18:06:35 +0300
+
+tarantool (1.7.2.19.g4c8bf56-1) unstable; urgency=medium
+
+  * Vinyl - a new write-optimized storage engine, allowing the amount of
+    data stored to exceed the amount of available RAM 10-100x times.
+  * A new binary protocol command for CALL, which no more restricts a function
+    to returning an array of tuples and allows returning an arbitrary
+    MsgPack/JSON result, including scalars, nil and void (nothing).
+  * New indexable data types: unsigned, integer, number and scalar.
+  * Automatic replication cluster bootstrap; it's now much easier to configure
+    a new replication cluster.
+  * memtx snapshots and xlog files are now compressed on the fly using the
+    fast ZStandard compression algorithm. Compression options are configured
+    automatically to get an optimal trade-off between CPU utilization and disk
+    throughput.
+  * fiber.cond() - a new synchronization mechanism for fibers.
+  * Tab-based autocompletion in the interactive console.
+  * A new implementation of net.box improving performance and solving
+    problems with the garbage collection of dead connections.
+  * Native systemd support alongside sysvinit.
+  * A ready-to-use 'example.lua' instance enable by default.
+  * Dozens of bugfixes:
+    https://github.com/tarantool/tarantool/issues?q=milestone%3A1.7.2+is%3Aclosed
+
+ -- Roman Tsisyk <roman@tarantool.org>  Thu, 06 Oct 2016 15:21:41 +0300
+
+tarantool (1.6.9.6.g660e882-1) unstable; urgency=medium
+
+  * Add dependency on network configuration files used by `socket` module
+
+ -- Roman Tsisyk <roman@tarantool.org>  Wed, 28 Sep 2016 14:23:42 +0300
+
+tarantool (1.6.9.1.g3a3f705-1) unstable; urgency=medium
+
+  * Tab-based autocompletion in the interactive console
+  * LUA_PATH and LUA_CPATH environment variables taken into account
+  * A new box.cfg { read_only = true } option
+  * Upgrade script for 1.6.4 -> 1.6.8 -> 1.6.9
+  * Bugs fixed:
+  https://github.com/tarantool/tarantool/issues?q=milestone%3A1.6.9+is%3Aclosed
+
+ -- Roman Tsisyk <roman@tarantool.org>  Mon, 26 Sep 2016 16:21:39 +0300
+
+tarantool (1.6.8.762.g15ed10e-1) unstable; urgency=medium
+
+  * Add support for OpenSSL 1.1 (FTBFS). Closes: #835798.
+
+ -- Roman Tsisyk <roman@tarantool.org>  Thu, 01 Sep 2016 09:34:24 +0300
+
+tarantool (1.6.8.740.g45fc77f-1) unstable; urgency=medium
+
+  * Don't link libbfd-*-system.so dynamically. Closes: #831361.
+
+ -- Roman Tsisyk <roman@tarantool.org>  Fri, 15 Jul 2016 14:39:40 +0300
+
+tarantool (1.6.8.525.ga571ac0-1) unstable; urgency=medium
+
+  * Full support for armhf and arm64 (aarch64) architectures
+  * Tuple comparator functions were optimized, providing up to 30% performance
+    boost when an index key consists of 2, 3 or more parts
+  * Tuple allocator changes give another 15% performance improvement
+  * Replication relay performance was improved by reducing the amount of data
+    directory re-scans
+  * A random delay was introduced into snapshot daemon, reducing the chance
+    that multiple instances take a snapshot at the same time
+  * Allow to remove servers with non-zero LSN from _cluster space
+  * net.box now automatically reloads space and index definitions
+  * The maximal number of indexes in space was increased to 128
+  * box.info.cluster.uuid can be used to retrieve cluster UUID
+  * box.once() now waits before the server enters RW mode
+  * Support for GCC 6.0
+  * Fix require() failed to find libraries with multiarch
+  * Bugs fixed:
+  https://github.com/tarantool/tarantool/issues?q=milestone%3A1.6.8+is%3Aclosed
+
+ -- Roman Tsisyk <roman@tarantool.org>  Thu, 25 Feb 2016 08:57:40 +0300
+
+tarantool (1.6.7.588.g76bbd9c-1) unstable; urgency=medium
+
+  * Fix `libiberty | bintuils-dev, binutils-dev` B-D
+  * Convert tarantool-common to architecture-independent package.
+  * Disable kfreebsd - produced binaries have always been broken and
+    the upstream is unable to fix it.
+  * Use Maintainer and Uploaders fields properly
+
+ -- Roman Tsisyk <roman@tarantool.org>  Sat, 16 Jan 2016 11:26:52 +0300
+
+tarantool (1.6.7.551.ga5bafc5-1) unstable; urgency=medium
+
+  * Add zlib1g-dev to B-D (FTBFS), closes: #808516.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 21 Dec 2015 12:46:41 +0300
+
+tarantool (1.6.7.541.g89c4578-1) unstable; urgency=medium
+
+  * New Debian snapshot for 1.6.7 stable release.
+   - New tarantool doesn't have 8K tuples problem, closes: #704720.
+   - New tarantool is built without Lua, closes: #655801.
+
+  Major changes:
+
+   - threaded architecture for checkpointing. Tarantool no longer
+     forks to create a snapshot, but uses a separate thread,
+     accessing data via a consistent read view. This eliminates all known
+     latency spikes caused by snapshotting.
+   - threaded architecture for network. Network I/O has finally
+     been moved to a separate thread, increasing single instance
+     performance by up to 50%.
+   - stored procedures in C/C++. Stored procedures in C/C++
+     provide speed (3-4 times, compared to a Lua version in
+     our measurements), as well as unlimited extensibility
+     power.
+   - new HASH index implementation which respects slab_alloc_arena
+     limit and uses significantly less memory.
+   - RTREE index support (Memtx engine).
+   - new 'upsert' command available in the binary protocol
+     and in stored functions.
+   - multi-master replication with support up to 30 peers.
+   - logger option now accepts a syntax for syslog output. Use uri-style
+     syntax for file, pipe or syslog log destination.
+   - new version of sophia engine, with support of compression and multipart
+     primary keys.
+   - jit.*, jit.dump, jit.util, jit.vmdef modules of LuaJIT 2.0 are now
+     available as built-ins.
+   - better documentation and examples.
+   - manifold performance improvements.
+   - bug fixes.
+
+  Incompatible changes:
+
+   - fiber.channel.broadcast() was removed since it wasn't used by
+     anyone and didn't work properly.
+   - tarantoolctl "reload" command renamed to "eval".
+   - panic_on_wal_error is on by default (gh-752)
+   - functions which create objects (users, spaces, or functions)
+     return an error if an object already exists. Use
+     {if_not_exists=true} clause in create functions.
+   - an update of the primary key was forbidden; use replace instead.
+
+   Package changes:
+
+   - Actualize debian/copyright
+   - Remove support for GNU hurd architecture (doesn't work).
+   - Don't use /var/lib/tarantool/started and /var/lib/tarantool/snapshot dirs.
+   - Drop irrelevant README.Debian.
+   - Remove old cron scripts.
+
+ -- Roman Tsisyk <roman@tarantool.org>  Mon, 14 Dec 2015 20:00:00 +0300
+
+tarantool (1.6.5.20.g51b2e0d-1) unstable; urgency=medium
+
+  * Remove tarantool-mysql-module, tarantool-pg-module and tarantool-modules.
+
+ -- Roman Tsisyk <roman@tarantool.org>  Tue, 28 Apr 2015 14:34:17 +0300
+
+tarantool (1.6.3.539.g211672f-1) unstable; urgency=medium
+
+  * Init infrastructure for tarantool 1.6.
+  * Update debian/copyright:
+     + cmake/luatest.cpp
+     + third_party/PMurHash.*
+     + third_party/lua-yaml/*
+     + third_party/sha1.*
+     + third_party/open_memstream.*
+  * Add lintian-oferrides: libyaml:
+    tarantool has patched version of the library.
+  * Rename -plugin* package to -module*
+  * Conflicts: tarantool 1.5 (it was renamed to tarantool-lts).
+  * NOSTRIP /usr/bin/tarantool binary: it uses symbols runtime.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 27 Oct 2014 14:33:07 +0300
+
+tarantool (1.5.3.53.ge2308d8-1) unstable; urgency=medium
+
+  * New Debian snapshot
+   + add sophia storage
+   + some fixes in box.net.box
+   + uses O_DIRECT options to create snapshots
+   + update documentation/manpagses
+   + memleak in tarantool client
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 19 Feb 2014 18:37:26 +0400
+
+tarantool (1.5.2.20.g5f5d924-1) unstable; urgency=low
+
+  * Rebuild for Debian/unstable (tarantar binary).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Sat, 21 Dec 2013 13:18:28 +0400
+
+tarantool (1.5.2.16.g18b8e4e-1) unstable; urgency=low
+
+  * New Debian snapshot.
+   - Drop legacy packages (libtarantool*).
+   - Drop tarantool-dbg.
+   - Don't strip tarantool (it uses debug symbols runtime).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 20 Dec 2013 15:44:11 +0400
+
+tarantool (1.5.1.302.gd906190-1) unstable; urgency=low
+
+  * New Debian snapshot.
+   - box.session.storage,
+   - bugfixes
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 09 Dec 2013 16:23:49 +0400
+
+tarantool (1.5.1.218.g1a69fd6-1) unstable; urgency=low
+
+  * New Debian snapshot
+   - patch for OpenVZ (disable MAP_SHARED mmap flag with OpenVZ).
+   - fix socket:readline(..., timeout) bug.
+   - suggests -dbg version of package.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Tue, 19 Nov 2013 16:17:23 +0400
+
+tarantool (1.5.1.150.g029f82f-1) unstable; urgency=low
+
+  * New Debian snapshot (fix memory corruption).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 25 Oct 2013 15:26:36 +0400
+
+tarantool (1.5.1.148.g6dddbc7-1) unstable; urgency=low
+
+  * New Debian snapshot.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 23 Oct 2013 13:46:46 +0400
+
+tarantool (1.5.1.84.g9f2e646-1) unstable; urgency=low
+
+  * Drop BSD dependencies in Debian/kFreeBSD (try to fix FTBFS with Debian/BSD).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 09 Sep 2013 15:52:39 +0400
+
+tarantool (1.5.1.82.ga064ebe-1) unstable; urgency=low
+
+  * Remove tarantool/config.h pointedly (try to fix FTBFS with Debian/kFreeBSD).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 09 Sep 2013 13:35:06 +0400
+
+tarantool (1.5.1.81.g4382f16-1) unstable; urgency=low
+
+  * Fix debian/rules clean section (cleanup CMake files).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Sun, 08 Sep 2013 23:05:29 +0400
+
+tarantool (1.5.1.80.gc84e35c-1) unstable; urgency=low
+
+  * New snapshot (try to fix FTBFS with Debian/kFreeBSD).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Sun, 08 Sep 2013 22:14:09 +0400
+
+tarantool (1.5.1.78.g2e82d26-1) unstable; urgency=low
+
+  * New snapshot. Integration upload.
+   - Add missing copyright holders, closes: #722059
+   - Drop non-free materials from tarbal, closes: #722060
+   - Fix memory leak in box.ipc.channel:put.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Sun, 08 Sep 2013 02:00:51 +0400
+
+tarantool (1.5.1.76.g5ed3fbe-1) unstable; urgency=low
+
+  * New snapshot.
+   - Fix memory leak in box.ipc.channel:put(v, 0)
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 05 Sep 2013 14:36:52 +0400
+
+tarantool (1.5.1.73.gd1b3db6-1) unstable; urgency=low
+
+  * New snapshot
+   - Fix crashes with broken snapshot.
+   - Cleanup debian/copyright (drop php-connector section).
+   - Drop empty TODO files from binary packages.
+   - debian/* relicensed as tarantool.
+   - tarantool-plugins has 'any' architecture: it depends on plugins
+     that contain ELF-files.
+   - Fix FTBFS with Debian/kFreeBSD, closes: #715358.
+   - Drop irrelevant debian/README.source.
+   - Add postgresql-plugin package.
+   - Add mysql-plugin package.
+   - Add -plugins package (Now it depends on other plugin. Then it will
+     contain some internal tarantool plugins).
+   - Remove non-free rfc4627.txt.
+   - Update debian/copyright.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 04 Sep 2013 12:45:34 +0400
+
+tarantool (1.4.9+20130611.2012-1) unstable; urgency=low
+
+  * New snapshot, fix crash with gcc-4.7.3.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Tue, 11 Jun 2013 20:12:22 +0400
+
+tarantool (1.4.9+20130608.2059-1) unstable; urgency=low
+
+  * New upstream release: move to C++ from ObjectC. Add box.cjson module.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Sat, 08 Jun 2013 20:59:30 +0400
+
+tarantool (1.4.9+20130415.1808-1) unstable; urgency=low
+
+  * New upstream release (fix disconnect bug).
+    https://bugs.launchpad.net/tarantool/+bug/1168076
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 15 Apr 2013 18:08:14 +0400
+
+tarantool (1.4.9-1) unstable; urgency=low
+
+  * New upstream release.
+   + Apply patch from Colin Watson <cjwatson@ubuntu.com>, closes: #703044,
+   + Fix VCS-link, closes: #681703
+   + Fix FTBFS (kfreebsd), patch from Steven Chamberlain <steven@pyro.eu.org>,
+     closes: 695541
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 10 Apr 2013 12:08:49 +0400
+
+tarantool (1.4.8+20130306.1415-1) unstable; urgency=low
+
+  * New snapshot (some fixes in iproto).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 06 Mar 2013 14:15:10 +0400
+
+tarantool (1.4.8+20130212.1728-1) unstable; urgency=low
+
+  * Rebuilt last snapshot for Debian.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Tue, 12 Feb 2013 17:27:48 +0400
+
+tarantool (1.4.8+20130212.1647-1) nowtaxi; urgency=low
+
+  * New snapshot (fix async I/O bugs).
+
+ -- Roman V. Nikolaev <rshadow@rambler.ru>  Tue, 12 Feb 2013 16:47:10 +0400
+
+tarantool (1.4.8+20130122.1705-1) unstable; urgency=low
+
+  * New snapshot (fix spam in tarantool.log).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Tue, 22 Jan 2013 17:05:18 +0400
+
+tarantool (1.4.8+20130122-1) unstable; urgency=low
+
+  * New snapshot (fix in box.session triggers).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Tue, 22 Jan 2013 16:40:25 +0400
+
+tarantool (1.4.8+20130110-1) unstable; urgency=low
+
+  * New snapshot (Implement box.session, on_connect and
+    on_disconnect triggers.)
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 10 Jan 2013 23:03:42 +0400
+
+tarantool (1.4.8+20130104-1) unstable; urgency=low
+
+  * New snapshot (segfault in tree iterator).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 04 Jan 2013 01:29:54 +0400
+
+tarantool (1.4.8+20121214-1) unstable; urgency=low
+
+  * New snapshot (fix segfault with box.ipc.channel).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 14 Dec 2012 16:39:02 +0400
+
+tarantool (1.4.8+20121207-1) unstable; urgency=low
+
+  * New snapshot (add box.time64 needed by queues).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 07 Dec 2012 14:45:38 +0400
+
+tarantool (1.4.8-1) unstable; urgency=low
+
+  * New tarantool release.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 23 Nov 2012 11:56:02 +0400
+
+tarantool (1.4.7+20121010.2202-1) unstable; urgency=low
+
+  * New snapshot (Don't exit on a trivial socket error).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 10 Oct 2012 22:01:58 +0400
+
+tarantool (1.4.7+20121010-1) unstable; urgency=low
+
+  * New snapshot.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 10 Oct 2012 17:22:26 +0400
+
+tarantool (1.4.7+20120918-1) unstable; urgency=low
+
+  * New snapshot (some fixes in lua:box.slab).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Tue, 18 Sep 2012 21:57:51 +0400
+
+tarantool (1.4.7+20120915-1) unstable; urgency=low
+
+  * New snapshot (enable box.info, box.slab, box.stat, etc)
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Sat, 15 Sep 2012 00:02:10 +0400
+
+tarantool (1.4.7+20120905-1) unstable; urgency=low
+
+  * New snapshot.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 05 Sep 2012 15:36:27 +0400
+
+tarantool (1.4.7+20120829-1) unstable; urgency=low
+
+  * New snapshot (some fixes, add box.uuid() and box.uuid_hex() functions).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 29 Aug 2012 16:46:58 +0400
+
+tarantool (1.4.7+20120820-1) unstable; urgency=low
+
+  * New snapshot (fixed tuple:transform crash).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 20 Aug 2012 21:42:21 +0400
+
+tarantool (1.4.7+20120817-1) unstable; urgency=low
+
+  * New upstream version.
+   + Add WAL rotate script.
+  * Add all contributors to debian/copyright (fix lintian warning).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 03 Aug 2012 12:09:14 +0400
+
+tarantool (1.4.7+20120714-1) unstable; urgency=low
+
+  * Fixed memcached space and some troubles in build system.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Sat, 14 Jul 2012 10:05:37 +0400
+
+tarantool (1.4.7-1) unstable; urgency=low
+
+  * New upstream stable version.
+    - can be built by gcc-4.7;
+    - new transaction processor;
+    - add libtarantoolrpl library (provides replication protocol);
+    - extract perl and php drivers to their own repositaries.
+    - etc
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 11 Jul 2012 10:06:52 +0400
+
+tarantool (1.4.6+20120629+2158-1) unstable; urgency=low
+
+  * Some fixes for Objective C 2.0.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 29 Jun 2012 21:58:42 +0400
+
+tarantool (1.4.6+20120629+2112-1) unstable; urgency=low
+
+  * Package is built by gcc-4.7.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 29 Jun 2012 21:11:30 +0400
+
+tarantool (1.4.6+20120629+2105-1) unstable; urgency=low
+
+  * Really fixed FTBFS with BSD (#679317).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 29 Jun 2012 21:05:21 +0400
+
+tarantool (1.4.6+20120629-1) unstable; urgency=low
+
+  * New upstream version: fixed FTBFS with Debian/kFreeBSD. closes: #679317.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 29 Jun 2012 17:26:03 +0400
+
+tarantool (1.4.6+20120626-1) unstable; urgency=low
+
+  * New upstream version.
+  * Add libtarantoolrpl package: (replication protocol).
+  * Fixed segfaults by adminport.
+  * Upstream added some checks for requests, closes: #672327.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Tue, 26 Jun 2012 15:30:02 +0400
+
+tarantool (1.4.6+20120524-1) unstable; urgency=low
+
+  * Fix version number.
+  * Fix tarantool_instance: user could not to define 'file_descriptors'
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 24 May 2012 12:57:27 +0400
+
+tarantool (1.4.5+20120522-1) unstable; urgency=low
+
+  * New git snapshot: upstream upgraded libtarantool.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Tue, 22 May 2012 22:55:07 +0400
+
+tarantool (1.4.5+20120510-1) unstable; urgency=low
+
+  * New git snapshot (it provides script_dir option).
+  * Add binutils-dev to B-D list (for debugging crashes, #672327).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 10 May 2012 10:23:28 +0400
+
+tarantool (1.4.5+20120503-2) unstable; urgency=low
+
+  * Add librt to linklist (fix FTBFS with Debian/kFreeBSD).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 04 May 2012 09:27:04 +0400
+
+tarantool (1.4.5+20120503-1) unstable; urgency=low
+
+  * New upstream snapshot.
+  * Add Priority for sources.
+  * Add libtarantool* packages that weren't be packaged earlier: upstream
+    renamed them, now we have no conflicts with the other debian packages.
+  * Add libncurses5-dev into Build-Depends.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 03 May 2012 17:35:18 +0400
+
+tarantool (1.4.4+20120127-1) unstable; urgency=low
+
+  * Merge with upstream.
+  * Package can purge not owned files, closes: #657132.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 27 Jan 2012 23:37:53 +0400
+
+tarantool (1.4.4+20120117-1) unstable; urgency=low
+
+  * Merge my changes with upstream.
+  * Disable tests after building process.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 16 Jan 2012 22:35:44 +0400
+
+tarantool (1.4.4+20120116-2) unstable; urgency=low
+
+  * Add rt into Debian/kFreeBSD likdepends.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 16 Jan 2012 16:54:17 +0400
+
+tarantool (1.4.4+20120116-1) unstable; urgency=low
+
+  * New git snapshot.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 16 Jan 2012 11:36:19 +0400
+
+tarantool (1.4.4+20111229+2-2) unstable; urgency=low
+
+  * use cd instead chdir, closes: 653611;
+  * use spaces instead '\t' symbol, closes: 653607;
+  * use readlink instead perl command, closes: 653613.
+  thanks to Norbert Kiesel <nkiesel@tbdnetworks.com> for all bugreports.
+  * add libmr-tarantool-perl to 'suggests' section of debian/control.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 29 Dec 2011 23:21:06 +0400
+
+tarantool (1.4.4+20111229+2-1) unstable; urgency=low
+
+  * Debian/kFreeBSD doesn't have proctitle.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 29 Dec 2011 17:18:51 +0400
+
+tarantool (1.4.4+20111229+1-1) unstable; urgency=low
+
+  * Try to patch build-system for Debian kFreeBSD.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 29 Dec 2011 13:41:48 +0400
+
+tarantool (1.4.4+20111229-1) unstable; urgency=low
+
+  * Fix test box/args.test.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 29 Dec 2011 08:49:34 +0400
+
+tarantool (1.4.4+20111228-3) unstable; urgency=low
+
+  * kFreeBSD: uses glibc, amd64 is x86 architecture.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 28 Dec 2011 23:38:12 +0400
+
+tarantool (1.4.4+20111228-2) unstable; urgency=low
+
+  * Specify architectures.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 28 Dec 2011 22:40:28 +0400
+
+tarantool (1.4.4+20111228-1) unstable; urgency=low
+
+  * Fix build system for kFreeBSD.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 28 Dec 2011 21:36:33 +0400
+
+tarantool (1.4.4-1) unstable; urgency=low
+
+  * Init debian release, closes: #652911.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Sun, 18 Dec 2011 11:35:37 +0400

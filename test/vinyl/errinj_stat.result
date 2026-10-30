@@ -1,0 +1,514 @@
+test_run = require('test_run').new()
+---
+...
+-- Since we store LSNs in data files, the data size may differ
+-- from run to run. Deploy a new server to make sure it will be
+-- the same so that we can check it.
+test_run:cmd('create server test with script = "vinyl/stat.lua"')
+---
+- true
+...
+test_run:cmd('start server test')
+---
+- true
+...
+test_run:cmd('switch test')
+---
+- true
+...
+-- Compressed data size depends on the zstd version so let's
+-- filter it out.
+test_run:cmd("push filter 'bytes_compressed: .*' to 'bytes_compressed: <bytes_compressed>'")
+---
+- true
+...
+fiber = require('fiber')
+---
+...
+errinj = box.error.injection
+---
+...
+--
+-- Check disk.compaction.queue stat.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+---
+...
+i = s:create_index('pk', {run_count_per_level = 2})
+---
+...
+function dump() for i = 1, 10 do s:replace{i} end box.snapshot() end
+---
+...
+dump()
+---
+...
+i:stat().disk.compaction.queue -- none
+---
+- bytes_compressed: <bytes_compressed>
+  pages: 0
+  rows: 0
+  bytes: 0
+...
+i:stat().disk.compaction.queue.bytes == box.stat.vinyl().scheduler.compaction_queue
+---
+- true
+...
+errinj.set('ERRINJ_VY_COMPACTION_DELAY', true)
+---
+- ok
+...
+dump()
+---
+...
+dump()
+---
+...
+i:stat().disk.compaction.queue -- 30 statements
+---
+- bytes_compressed: <bytes_compressed>
+  pages: 3
+  rows: 30
+  bytes: 411
+...
+i:stat().disk.compaction.queue.bytes == box.stat.vinyl().scheduler.compaction_queue
+---
+- true
+...
+dump()
+---
+...
+i:stat().disk.compaction.queue -- 40 statements
+---
+- bytes_compressed: <bytes_compressed>
+  pages: 4
+  rows: 40
+  bytes: 548
+...
+i:stat().disk.compaction.queue.bytes == box.stat.vinyl().scheduler.compaction_queue
+---
+- true
+...
+dump()
+---
+...
+i:stat().disk.compaction.queue -- 50 statements
+---
+- bytes_compressed: <bytes_compressed>
+  pages: 5
+  rows: 50
+  bytes: 685
+...
+i:stat().disk.compaction.queue.bytes == box.stat.vinyl().scheduler.compaction_queue
+---
+- true
+...
+box.stat.reset() -- doesn't affect queue size
+---
+...
+i:stat().disk.compaction.queue -- 50 statements
+---
+- bytes_compressed: <bytes_compressed>
+  pages: 5
+  rows: 50
+  bytes: 685
+...
+i:stat().disk.compaction.queue.bytes == box.stat.vinyl().scheduler.compaction_queue
+---
+- true
+...
+errinj.set('ERRINJ_VY_COMPACTION_DELAY', false)
+---
+- ok
+...
+while i:stat().disk.compaction.count < 2 do fiber.sleep(0.01) end
+---
+...
+i:stat().disk.compaction.queue -- none
+---
+- bytes_compressed: <bytes_compressed>
+  pages: 0
+  rows: 0
+  bytes: 0
+...
+s:drop()
+---
+...
+--
+-- Check task statistics.
+--
+box.stat.reset()
+---
+...
+s = box.schema.space.create('test', {engine = 'vinyl'})
+---
+...
+i = s:create_index('pk')
+---
+...
+errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', true)
+---
+- ok
+...
+s:replace{1}
+---
+- [1]
+...
+_ = fiber.create(function() box.snapshot() end)
+---
+...
+test_run:wait_cond(function() return box.stat.vinyl().scheduler.tasks_inprogress > 0 end)
+---
+- true
+...
+stat = box.stat.vinyl().scheduler
+---
+...
+stat.tasks_inprogress > 0
+---
+- true
+...
+stat.tasks_completed == 0
+---
+- true
+...
+stat.tasks_failed == 0
+---
+- true
+...
+box.stat.reset() -- doesn't affect tasks_inprogress
+---
+...
+box.stat.vinyl().scheduler.tasks_inprogress > 0
+---
+- true
+...
+errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', false)
+---
+- ok
+...
+test_run:wait_cond(function() return box.stat.vinyl().scheduler.tasks_completed > 0 end)
+---
+- true
+...
+test_run:wait_cond(function() return not box.info.gc().checkpoint_is_in_progress end)
+---
+- true
+...
+stat = box.stat.vinyl().scheduler
+---
+...
+stat.tasks_inprogress == 0
+---
+- true
+...
+stat.tasks_completed == 1
+---
+- true
+...
+stat.tasks_failed == 0
+---
+- true
+...
+errinj.set('ERRINJ_VY_RUN_WRITE', true)
+---
+- ok
+...
+s:replace{2}
+---
+- [2]
+...
+box.snapshot()
+---
+- error: Error injection 'vinyl dump'
+...
+stat = box.stat.vinyl().scheduler
+---
+...
+stat.tasks_completed == 1
+---
+- true
+...
+stat.tasks_failed > 0
+---
+- true
+...
+errinj.set('ERRINJ_VY_RUN_WRITE', false)
+---
+- ok
+...
+test_run:wait_cond(function() return box.stat.vinyl().scheduler.tasks_completed > 1 end)
+---
+- true
+...
+box.snapshot()
+---
+- ok
+...
+i:compact()
+---
+...
+test_run:wait_cond(function() return i:stat().disk.compaction.count > 0 end)
+---
+- true
+...
+stat = box.stat.vinyl().scheduler
+---
+...
+stat.tasks_inprogress == 0
+---
+- true
+...
+stat.tasks_completed == 3
+---
+- true
+...
+s:drop()
+---
+...
+--
+-- Check dump/compaction time accounting.
+--
+box.stat.reset()
+---
+...
+s = box.schema.space.create('test', {engine = 'vinyl'})
+---
+...
+i = s:create_index('pk')
+---
+...
+i:stat().disk.dump.time == 0
+---
+- true
+...
+i:stat().disk.compaction.time == 0
+---
+- true
+...
+box.stat.vinyl().scheduler.dump_time == 0
+---
+- true
+...
+box.stat.vinyl().scheduler.compaction_time == 0
+---
+- true
+...
+for i = 1, 100 do s:replace{i} end
+---
+...
+errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', true)
+---
+- ok
+...
+start_time = fiber.time()
+---
+...
+_ = fiber.create(function() box.snapshot() end)
+---
+...
+test_run:wait_cond(function() return box.stat.vinyl().scheduler.tasks_inprogress > 0 end)
+---
+- true
+...
+fiber.sleep(0.1)
+---
+...
+errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', false)
+---
+- ok
+...
+test_run:wait_cond(function() return box.stat.vinyl().scheduler.tasks_completed > 0 end)
+---
+- true
+...
+test_run:wait_cond(function() return not box.info.gc().checkpoint_is_in_progress end)
+---
+- true
+...
+i:stat().disk.dump.time >= 0.1
+---
+- true
+...
+i:stat().disk.dump.time <= fiber.time() - start_time
+---
+- true
+...
+i:stat().disk.compaction.time == 0
+---
+- true
+...
+box.stat.vinyl().scheduler.dump_time == i:stat().disk.dump.time
+---
+- true
+...
+box.stat.vinyl().scheduler.compaction_time == i:stat().disk.compaction.time
+---
+- true
+...
+for i = 1, 100, 10 do s:replace{i} end
+---
+...
+box.snapshot()
+---
+- ok
+...
+errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', true)
+---
+- ok
+...
+start_time = fiber.time()
+---
+...
+i:compact()
+---
+...
+test_run:wait_cond(function() return box.stat.vinyl().scheduler.tasks_inprogress > 0 end)
+---
+- true
+...
+fiber.sleep(0.1)
+---
+...
+errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', false)
+---
+- ok
+...
+test_run:wait_cond(function() return i:stat().disk.compaction.time > 0 end)
+---
+- true
+...
+i:stat().disk.compaction.time >= 0.1
+---
+- true
+...
+i:stat().disk.compaction.time <= fiber.time() - start_time
+---
+- true
+...
+box.stat.vinyl().scheduler.compaction_time == i:stat().disk.compaction.time
+---
+- true
+...
+box.stat.reset()
+---
+...
+i:stat().disk.dump.time == 0
+---
+- true
+...
+i:stat().disk.compaction.time == 0
+---
+- true
+...
+box.stat.vinyl().scheduler.dump_time == 0
+---
+- true
+...
+box.stat.vinyl().scheduler.compaction_time == 0
+---
+- true
+...
+s:drop()
+---
+...
+test_run:cmd("clear filter")
+---
+- true
+...
+test_run:cmd('switch default')
+---
+- true
+...
+test_run:cmd('stop server test')
+---
+- true
+...
+test_run:cmd('cleanup server test')
+---
+- true
+...
+test_run:cmd('delete server test')
+---
+- true
+...
+test_run:cmd("create server test with script='vinyl/low_quota.lua'")
+---
+- true
+...
+test_run:cmd("start server test with args='1048576'")
+---
+- true
+...
+test_run:cmd('switch test')
+---
+- true
+...
+fiber = require('fiber')
+---
+...
+errinj = box.error.injection
+---
+...
+--
+-- Check regulator.blocked_writers stat.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+---
+...
+_ = s:create_index('pk')
+---
+...
+box.stat.vinyl().regulator.blocked_writers == 0
+---
+- true
+...
+errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', true)
+---
+- ok
+...
+pad = string.rep('x', box.cfg.vinyl_memory * 9 / 10)
+---
+...
+_ = s:insert{0, pad}
+---
+...
+pad = string.rep('x', box.cfg.vinyl_memory * 2 / 10)
+---
+...
+for i = 1, 5 do fiber.create(function() s:insert{i, pad} end) end
+---
+...
+box.stat.vinyl().regulator.blocked_writers == 5
+---
+- true
+...
+errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', false)
+---
+- ok
+...
+test_run:wait_cond(function()                                               \
+    return box.stat.vinyl().regulator.blocked_writers == 0                  \
+end)
+---
+- true
+...
+s:drop()
+---
+...
+test_run:cmd('switch default')
+---
+- true
+...
+test_run:cmd("stop server test")
+---
+- true
+...
+test_run:cmd("cleanup server test")
+---
+- true
+...
+test_run:cmd('delete server test')
+---
+- true
+...

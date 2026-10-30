@@ -1,0 +1,4 @@
+/usr/bin/tarantool
+/usr/lib/*/tarantool
+/usr/share/tarantool
+/usr/share/man/man1/tarantool.1

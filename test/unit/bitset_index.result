@@ -1,0 +1,21 @@
+	*** test_size_and_count ***
+	*** test_size_and_count: done ***
+	*** test_resize ***
+	*** test_resize: done ***
+	*** test_insert_remove ***
+Generating test set... ok
+Inserting pairs... ok
+Checking keys... ok
+Removing random pairs... ok
+Checking keys... ok
+	*** test_insert_remove: done ***
+	*** test_empty_simple ***
+	*** test_empty_simple: done ***
+	*** test_all_simple ***
+	*** test_all_simple: done ***
+	*** test_all_set_simple ***
+	*** test_all_set_simple: done ***
+	*** test_any_set_simple ***
+	*** test_any_set_simple: done ***
+	*** test_equals_simple ***
+	*** test_equals_simple: done ***

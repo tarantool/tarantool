@@ -1,0 +1,482 @@
+errinj = box.error.injection
+---
+...
+-- Check a failed realloc in tree index.
+s = box.schema.space.create('tweedledum')
+---
+...
+index = s:create_index('primary', {type = 'tree'} )
+---
+...
+for i = 1,10 do s:insert{i, i, 'test' .. i} end
+---
+...
+res = {}
+---
+...
+for i = 1,10 do table.insert(res, s:get{i}) end
+---
+...
+res
+---
+- - [1, 1, 'test1']
+  - [2, 2, 'test2']
+  - [3, 3, 'test3']
+  - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [8, 8, 'test8']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+res = {}
+---
+...
+for _, t in s.index[0]:pairs() do table.insert(res, t) end
+---
+...
+res
+---
+- - [1, 1, 'test1']
+  - [2, 2, 'test2']
+  - [3, 3, 'test3']
+  - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [8, 8, 'test8']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+errinj.set("ERRINJ_INDEX_ALLOC", true)
+---
+- ok
+...
+res = {}
+---
+...
+for i = 1,10 do table.insert(res, s:get{i}) end
+---
+...
+res
+---
+- - [1, 1, 'test1']
+  - [2, 2, 'test2']
+  - [3, 3, 'test3']
+  - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [8, 8, 'test8']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+res = {}
+---
+...
+for _, t in s.index[0]:pairs() do table.insert(res, t) end
+---
+...
+res
+---
+- - [1, 1, 'test1']
+  - [2, 2, 'test2']
+  - [3, 3, 'test3']
+  - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [8, 8, 'test8']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+for i = 501,2500 do s:insert{i, i} end
+---
+- error: Failed to allocate 16384 bytes in mempool for new slab
+...
+s:delete{1} -- still can delete, it does not require extents if no read view
+---
+- [1, 1, 'test1']
+...
+res = {}
+---
+...
+for i = 1,10 do table.insert(res, (s:get{i})) end
+---
+...
+res
+---
+- - [2, 2, 'test2']
+  - [3, 3, 'test3']
+  - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [8, 8, 'test8']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+res = {}
+---
+...
+for i = 501,2500 do table.insert(res, (s:get{i})) end
+---
+...
+#res -- only could insert some of entries with the extents reserved previously
+---
+- 612
+...
+function check_iter_and_size(num) local count = 0 for _, t in s.index[0]:pairs() do count = count + 1 end return count == num and "ok" or "fail" end
+---
+...
+check_iter_and_size(621)
+---
+- ok
+...
+for i = 2501,3500 do s:insert{i, i} end
+---
+- error: Failed to allocate 16384 bytes in mempool for new slab
+...
+s:delete{2} -- still can delete, it does not require extents if no read view
+---
+- [2, 2, 'test2']
+...
+check_iter_and_size(620)
+---
+- ok
+...
+res = {}
+---
+...
+for i = 1,10 do table.insert(res, (s:get{i})) end
+---
+...
+res
+---
+- - [3, 3, 'test3']
+  - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [8, 8, 'test8']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+errinj.set("ERRINJ_INDEX_ALLOC", false)
+---
+- ok
+...
+for i = 4501,5500 do s:insert{i, i} end
+---
+...
+res = {}
+---
+...
+for i = 1,10 do table.insert(res, (s:get{i})) end
+---
+...
+res
+---
+- - [3, 3, 'test3']
+  - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [8, 8, 'test8']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+s:delete{8}
+---
+- [8, 8, 'test8']
+...
+res = {}
+---
+...
+for i = 1,10 do table.insert(res, (s:get{i})) end
+---
+...
+res
+---
+- - [3, 3, 'test3']
+  - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+res = {}
+---
+...
+for i = 5001,5010 do table.insert(res, (s:get{i})) end
+---
+...
+res
+---
+- - [5001, 5001]
+  - [5002, 5002]
+  - [5003, 5003]
+  - [5004, 5004]
+  - [5005, 5005]
+  - [5006, 5006]
+  - [5007, 5007]
+  - [5008, 5008]
+  - [5009, 5009]
+  - [5010, 5010]
+...
+s:drop()
+---
+...
+-----------------------------------
+-- Check a failed realloc in hash index.
+s = box.schema.space.create('tweedledum')
+---
+...
+index = s:create_index('primary', {type = 'hash'} )
+---
+...
+for i = 1,10 do s:insert{i, i, 'test' .. i} end
+---
+...
+res = {}
+---
+...
+for i = 1,10 do table.insert(res, s:get{i}) end
+---
+...
+res
+---
+- - [1, 1, 'test1']
+  - [2, 2, 'test2']
+  - [3, 3, 'test3']
+  - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [8, 8, 'test8']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+res = {}
+---
+...
+for _, t in s.index[0]:pairs() do table.insert(res, t) end
+---
+...
+res
+---
+- - [3, 3, 'test3']
+  - [7, 7, 'test7']
+  - [1, 1, 'test1']
+  - [10, 10, 'test10']
+  - [9, 9, 'test9']
+  - [2, 2, 'test2']
+  - [5, 5, 'test5']
+  - [8, 8, 'test8']
+  - [6, 6, 'test6']
+  - [4, 4, 'test4']
+...
+errinj.set("ERRINJ_INDEX_ALLOC", true)
+---
+- ok
+...
+res = {}
+---
+...
+for i = 1,10 do table.insert(res, s:get{i}) end
+---
+...
+res
+---
+- - [1, 1, 'test1']
+  - [2, 2, 'test2']
+  - [3, 3, 'test3']
+  - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [8, 8, 'test8']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+res = {}
+---
+...
+for _, t in s.index[0]:pairs() do table.insert(res, t) end
+---
+...
+res
+---
+- - [3, 3, 'test3']
+  - [7, 7, 'test7']
+  - [1, 1, 'test1']
+  - [10, 10, 'test10']
+  - [9, 9, 'test9']
+  - [2, 2, 'test2']
+  - [5, 5, 'test5']
+  - [8, 8, 'test8']
+  - [6, 6, 'test6']
+  - [4, 4, 'test4']
+...
+for i = 501,2500 do s:insert{i, i} end
+---
+- error: Failed to allocate 16384 bytes in mempool for new slab
+...
+s:delete{1} -- still can delete, it does not require extents if no read view
+---
+- [1, 1, 'test1']
+...
+res = {}
+---
+...
+for i = 1,10 do table.insert(res, (s:get{i})) end
+---
+...
+res
+---
+- - [2, 2, 'test2']
+  - [3, 3, 'test3']
+  - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [8, 8, 'test8']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+res = {}
+---
+...
+for i = 501,2500 do table.insert(res, (s:get{i})) end
+---
+...
+#res -- only could insert some of entries with the extents reserved previously
+---
+- 1014
+...
+check_iter_and_size(1023)
+---
+- ok
+...
+for i = 2501,3500 do s:insert{i, i} end
+---
+- error: Failed to allocate 16384 bytes in mempool for new slab
+...
+s:delete{2} -- still can delete, it does not require extents if no read view
+---
+- [2, 2, 'test2']
+...
+check_iter_and_size(1023)
+---
+- ok
+...
+res = {}
+---
+...
+for i = 1,10 do table.insert(res, (s:get{i})) end
+---
+...
+res
+---
+- - [3, 3, 'test3']
+  - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [8, 8, 'test8']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+for i = 3501,4500 do s:insert{i, i} end
+---
+- error: Failed to allocate 16384 bytes in mempool for new slab
+...
+s:delete{3} -- still can delete, it does not require extents if no read view
+---
+- [3, 3, 'test3']
+...
+check_iter_and_size(1023)
+---
+- ok
+...
+errinj.set("ERRINJ_INDEX_ALLOC", false)
+---
+- ok
+...
+for i = 4501,5500 do s:insert{i, i} end
+---
+...
+res = {}
+---
+...
+for i = 1,10 do table.insert(res, (s:get{i})) end
+---
+...
+res
+---
+- - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [8, 8, 'test8']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+s:delete{8}
+---
+- [8, 8, 'test8']
+...
+res = {}
+---
+...
+for i = 1,10 do table.insert(res, (s:get{i})) end
+---
+...
+res
+---
+- - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+res = {}
+---
+...
+for i = 5001,5010 do table.insert(res, (s:get{i})) end
+---
+...
+res
+---
+- - [5001, 5001]
+  - [5002, 5002]
+  - [5003, 5003]
+  - [5004, 5004]
+  - [5005, 5005]
+  - [5006, 5006]
+  - [5007, 5007]
+  - [5008, 5008]
+  - [5009, 5009]
+  - [5010, 5010]
+...
+errinj.set("ERRINJ_INDEX_OOM", true)
+---
+- ok
+...
+s:replace{3594, 3594}
+---
+- error: Failed to allocate 0 bytes in errinj for errinj
+...
+errinj.set("ERRINJ_INDEX_OOM", false)
+---
+- ok
+...
+s:drop()
+---
+...
+errinj = nil
+---
+...

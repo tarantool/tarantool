@@ -1,0 +1,350 @@
+#include "trivia/util.h"
+#include "vy_lsm.h"
+#include "vy_cache.h"
+#include "vy_run.h"
+#include "fiber.h"
+#include <bit/bit.h>
+#include <small/rlist.h>
+#include <crc32.h>
+#include <box/vy_point_lookup.h>
+#include "vy_iterators_helper.h"
+#include "vy_write_iterator.h"
+#include "identifier.h"
+#include "space_def.h"
+
+uint64_t schema_version;
+uint32_t space_cache_version;
+uint32_t prev_space_cache_version;
+struct space *prev_space;
+struct space *
+space_by_id_slow(uint32_t id) { return NULL; }
+struct vy_lsm *vy_lsm(struct index *index) { return NULL; }
+void index_delete(struct index *index) { unreachable(); }
+struct space_def *
+space_def_dup(const struct space_def *space_def) { return NULL; }
+void
+space_def_delete(struct space_def *space_def) {}
+struct txn;
+RLIST_HEAD(txns);
+void
+txn_send_to_read_view(struct txn *txn, int64_t psn) {}
+void
+txn_abort_with_conflict(struct txn *txn) {}
+
+static int
+write_run(struct vy_run *run, const char *dir_name,
+	  struct vy_lsm *lsm, struct vy_stmt_stream *wi)
+{
+	struct vy_run_writer writer;
+	if (vy_run_writer_create(&writer, run, dir_name,
+				 lsm->space_id, lsm->index_id,
+				 lsm->cmp_def, lsm->key_def,
+				 4096, 0.1, false) != 0)
+		goto fail;
+
+	if (wi->iface->start(wi) != 0)
+		goto fail_abort_writer;
+	int rc;
+	struct vy_entry entry = vy_entry_none();
+	while ((rc = wi->iface->next(wi, &entry)) == 0 && entry.stmt != NULL) {
+		rc = vy_run_writer_append_stmt(&writer, entry);
+		if (rc != 0)
+			break;
+	}
+	wi->iface->stop(wi);
+
+	if (rc == 0)
+		rc = vy_run_writer_commit(&writer);
+	if (rc != 0)
+		goto fail_abort_writer;
+
+	return 0;
+
+fail_abort_writer:
+	vy_run_writer_abort(&writer);
+fail:
+	return -1;
+}
+
+static void
+test_basic()
+{
+	header();
+	plan(14);
+
+	/** Suppress info messages from vy_run_writer. */
+	say_set_log_level(S_WARN);
+
+	const size_t QUOTA = 100 * 1024 * 1024;
+	int64_t generation = 0;
+	struct slab_cache *slab_cache = cord_slab_cache();
+
+	struct vy_lsm_env lsm_env;
+	vy_lsm_env_create(&lsm_env, ".", &generation, key_format, NULL, NULL);
+
+	struct vy_run_env run_env;
+	vy_run_env_create(&run_env, 0);
+
+	struct vy_cache_env cache_env;
+	vy_cache_env_create(&cache_env, slab_cache);
+	vy_cache_env_set_quota(&cache_env, QUOTA);
+
+	struct vy_cache cache;
+	uint32_t fields[] = { 0 };
+	uint32_t types[] = { FIELD_TYPE_UNSIGNED };
+	struct key_def *key_def = box_key_def_new(fields, types, 1);
+	isnt(key_def, NULL, "key_def is not NULL");
+
+	vy_cache_create(&cache, &cache_env, key_def, true);
+	struct tuple_format
+		*format = vy_simple_stmt_format_new(&stmt_env, &key_def, 1);
+	isnt(format, NULL, "tuple_format_new is not NULL");
+	tuple_format_ref(format);
+
+	struct index_opts index_opts = index_opts_default;
+	struct index_def *index_def =
+		index_def_new(512, 0, "primary", sizeof("primary") - 1,
+			      NULL, NULL, TREE,
+			      &index_opts, key_def, NULL);
+
+	struct space_def space_def;
+	memset(&space_def, 0, sizeof(space_def));
+	struct vy_lsm *pk = vy_lsm_new(&lsm_env, &cache_env, &mem_env,
+				       index_def, &space_def, format, NULL);
+	isnt(pk, NULL, "lsm is not NULL");
+
+	struct vy_range *range = vy_range_new(1, vy_entry_none(),
+					      vy_entry_none(), pk->cmp_def);
+
+	isnt(pk, NULL, "range is not NULL");
+	vy_lsm_add_range(pk, range);
+
+	char dir_tmpl[] = "./vy_point_test.XXXXXX";
+	char *dir_name = mkdtemp(dir_tmpl);
+	isnt(dir_name, NULL, "temp dir name is not NULL");
+	char path[PATH_MAX];
+	strcpy(path, dir_name);
+	strcat(path, "/512");
+	int rc = mkdir(path, 0777);
+	is(rc, 0, "temp dir create (2)");
+	strcat(path, "/0");
+	rc = mkdir(path, 0777);
+	is(rc, 0, "temp dir create (3)");
+
+	/* Filling the LSM tree with test data */
+	/* Prepare variants */
+	const size_t num_of_keys = 100;
+	bool in_mem1[num_of_keys]; /* UPSERT value += 1, lsn 4 */
+	bool in_mem2[num_of_keys]; /* UPSERT value += 2, lsn 3 */
+	bool in_run1[num_of_keys]; /* UPSERT value += 4, lsn 2 */
+	bool in_run2[num_of_keys]; /* UPSERT value += 8, lsn 1 */
+	bool in_cache[num_of_keys];
+	uint32_t expect[num_of_keys];
+	int64_t expect_lsn[num_of_keys];
+	for (size_t i = 0; i < num_of_keys; i++) {
+		in_mem1[i] = i & 1;
+		in_mem2[i] = i & 2;
+		in_run1[i] = i & 4;
+		in_run2[i] = i & 8;
+		in_cache[i] = i & 16;
+		expect[i] = (in_mem1[i] ? 1 : 0) + (in_mem2[i] ? 2 : 0) +
+			    (in_run1[i] ? 4 : 0) + (in_run2[i] ? 8 : 0);
+		expect_lsn[i] = expect[i] == 0 ? 0 : 5 - bit_ctz_u32(expect[i]);
+	}
+
+	for (size_t i = 0; i < num_of_keys; i++) {
+		if (!in_cache[i])
+			continue;
+		if (expect[i] != 0) {
+			struct vy_stmt_template tmpl_key =
+				STMT_TEMPLATE(0, SELECT, i);
+			struct vy_stmt_template tmpl_val =
+				STMT_TEMPLATE(expect_lsn[i], REPLACE, i, expect[i]);
+			vy_cache_insert_templates_chain(&cache, format,
+							&tmpl_val, 1, &tmpl_key,
+							ITER_EQ);
+		}
+	}
+
+	/* create second mem */
+	for (size_t i = 0; i < num_of_keys; i++) {
+		if (!in_mem2[i])
+			continue;
+		struct vy_stmt_template tmpl_val =
+			STMT_TEMPLATE(3, UPSERT, i, 2);
+		tmpl_val.upsert_field = 1;
+		tmpl_val.upsert_value = 2;
+		vy_mem_insert_template(pk->mem, &tmpl_val);
+	}
+
+	rc = vy_lsm_rotate_mem(pk);
+	is(rc, 0, "vy_lsm_rotate_mem");
+
+	/* create first mem */
+	for (size_t i = 0; i < num_of_keys; i++) {
+		if (!in_mem1[i])
+			continue;
+		struct vy_stmt_template tmpl_val =
+			STMT_TEMPLATE(4, UPSERT, i, 1);
+		tmpl_val.upsert_field = 1;
+		tmpl_val.upsert_value = 1;
+		vy_mem_insert_template(pk->mem, &tmpl_val);
+	}
+
+	/* create second run */
+	struct vy_mem *run_mem =
+		vy_mem_new(pk->mem->env, pk->cmp_def, pk->format,
+			   *pk->env->p_generation, 0);
+
+	for (size_t i = 0; i < num_of_keys; i++) {
+		if (!in_run2[i])
+			continue;
+		struct vy_stmt_template tmpl_val =
+			STMT_TEMPLATE(1, UPSERT, i, 8);
+		tmpl_val.upsert_field = 1;
+		tmpl_val.upsert_value = 8;
+		vy_mem_insert_template(run_mem, &tmpl_val);
+	}
+	struct vy_stmt_stream *write_stream;
+	write_stream = vy_write_iterator_new(pk->cmp_def, true, true,
+					     NULL, 0, NULL);
+	vy_write_iterator_new_mem(write_stream, run_mem, run_mem->format);
+	struct vy_run *run = vy_run_new(&run_env, 1);
+	isnt(run, NULL, "vy_run_new");
+
+	rc = write_run(run, dir_name, pk, write_stream);
+	is(rc, 0, "vy_run_write");
+
+	write_stream->iface->close(write_stream);
+	vy_mem_delete(run_mem);
+
+	vy_lsm_add_run(pk, run);
+	struct vy_slice *slice = vy_slice_new(1, run, vy_entry_none(),
+					      vy_entry_none(), pk->cmp_def);
+	vy_range_add_slice(range, slice);
+	vy_run_unref(run);
+
+	/* create first run */
+	run_mem = vy_mem_new(pk->mem->env, pk->cmp_def, pk->format,
+			     *pk->env->p_generation, 0);
+
+	for (size_t i = 0; i < num_of_keys; i++) {
+		if (!in_run1[i])
+			continue;
+		struct vy_stmt_template tmpl_val =
+			STMT_TEMPLATE(2, UPSERT, i, 4);
+		tmpl_val.upsert_field = 1;
+		tmpl_val.upsert_value = 4;
+		vy_mem_insert_template(run_mem, &tmpl_val);
+	}
+	write_stream = vy_write_iterator_new(pk->cmp_def, true, true,
+					     NULL, 0, NULL);
+	vy_write_iterator_new_mem(write_stream, run_mem, run_mem->format);
+	run = vy_run_new(&run_env, 2);
+	isnt(run, NULL, "vy_run_new");
+
+	rc = write_run(run, dir_name, pk, write_stream);
+	is(rc, 0, "vy_run_write");
+
+	write_stream->iface->close(write_stream);
+	vy_mem_delete(run_mem);
+
+	vy_lsm_add_run(pk, run);
+	slice = vy_slice_new(1, run, vy_entry_none(), vy_entry_none(),
+			     pk->cmp_def);
+	vy_range_add_slice(range, slice);
+	vy_run_unref(run);
+
+	/* Compare with expected */
+	bool results_ok = true;
+	bool has_errors = false;
+	for (int64_t vlsn = 0; vlsn <= 6; vlsn++) {
+		struct vy_read_view rv;
+		rv.vlsn = vlsn == 6 ? INT64_MAX : vlsn;
+		const struct vy_read_view *prv = &rv;
+
+		for (size_t i = 0; i < num_of_keys; i++) {
+			uint32_t expect = 0;
+			int64_t expect_lsn = 0;
+			if (in_run2[i] && vlsn >= 1) {
+				expect += 8;
+				expect_lsn = 1;
+			}
+			if (in_run1[i] && vlsn >= 2) {
+				expect += 4;
+				expect_lsn = 2;
+			}
+			if (in_mem2[i] && vlsn >= 3) {
+				expect += 2;
+				expect_lsn = 3;
+			}
+			if (in_mem1[i] && vlsn >= 4) {
+				expect += 1;
+				expect_lsn = 4;
+			}
+
+			struct vy_stmt_template tmpl_key =
+				STMT_TEMPLATE(0, SELECT, i);
+			struct vy_entry key = vy_new_simple_stmt(format, key_def,
+								 &tmpl_key);
+			struct vy_entry res;
+			rc = vy_point_lookup(pk, /*tx=*/NULL, &prv, key,
+					     /*keep_delete=*/false, &res);
+			tuple_unref(key.stmt);
+			if (rc != 0) {
+				has_errors = true;
+				continue;
+			}
+			if (expect == 0) {
+				/* No value expected. */
+				if (res.stmt != NULL)
+					results_ok = false;
+				continue;
+			} else {
+				if (res.stmt == NULL) {
+					results_ok = false;
+					continue;
+				}
+			}
+			uint32_t got = 0;
+			tuple_field_u32(res.stmt, 1, &got);
+			if (got != expect && expect_lsn != vy_stmt_lsn(res.stmt))
+				results_ok = false;
+			tuple_unref(res.stmt);
+		}
+	}
+
+	is(results_ok, true, "select results");
+	is(has_errors, false, "no errors happened");
+
+	vy_lsm_delete(pk);
+	index_def_delete(index_def);
+	tuple_format_unref(format);
+	vy_cache_destroy(&cache);
+	key_def_delete(key_def);
+	vy_cache_env_destroy(&cache_env);
+	vy_run_env_destroy(&run_env);
+	vy_lsm_env_destroy(&lsm_env);
+
+	strcpy(path, "rm -rf ");
+	strcat(path, dir_name);
+	system(path);
+
+	check_plan();
+	footer();
+}
+
+int
+main()
+{
+	plan(1);
+
+	vy_iterator_C_test_init(128 * 1024);
+	crc32_init();
+
+	test_basic();
+
+	vy_iterator_C_test_finish();
+
+	return check_plan();
+}

@@ -1,0 +1,342 @@
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+---
+...
+
+#
+# iproto packages test
+#
+
+
+# Test bug #899343 (server assertion failure on incorrect packet)
+
+# send the package with invalid length
+12
+# check that is server alive
+True
+
+#  Test gh-206 "Segfault if sending IPROTO package without `KEY` field"
+
+IPROTO_SELECT
+query [('IPROTO_CODE', 1)] [('IPROTO_SPACE_ID', 280)]
+True
+
+
+IPROTO_DELETE
+query [('IPROTO_CODE', 5)] [('IPROTO_SPACE_ID', 280)]
+True
+
+
+IPROTO_UPDATE
+query [('IPROTO_CODE', 4)] [('IPROTO_SPACE_ID', 280)]
+True
+query [('IPROTO_CODE', 4)] [('IPROTO_KEY', (1,)), ('IPROTO_SPACE_ID', 280)]
+True
+
+
+IPROTO_REPLACE
+query [('IPROTO_CODE', 3)] [('IPROTO_SPACE_ID', 280)]
+True
+
+
+IPROTO_CALL
+query [('IPROTO_CODE', 10)] []
+True
+query [('IPROTO_CODE', 10)] [('IPROTO_KEY', ('procname',))]
+True
+
+
+box.cfg.wal_mode
+---
+- write
+...
+space = box.schema.space.create('test', { id = 567 })
+---
+...
+index = space:create_index('primary', { type = 'hash' })
+---
+...
+box.schema.user.grant('guest', 'read,write', 'space', 'test')
+---
+...
+- [1, 'baobab']
+- [2, 'obbaba']
+- [1, 'baobab']
+- [3, 'occama']
+- [2, 'obbaba']
+- [4, 'ockham']
+- [1, 'baobab']
+- [2, 'obbaba']
+space:drop()
+---
+...
+space = box.schema.space.create('test')
+---
+...
+index = space:create_index('primary', { type = 'hash', parts = {1, 'string'}})
+---
+...
+STR 1
+--
+0xa1 => ok ok ok ok ok ok
+0xd901 => ok ok ok ok ok ok
+0xda0001 => ok ok ok ok ok ok
+0xdb00000001 => ok ok ok ok ok ok
+
+STR 31
+--
+0xbf => ok ok ok ok ok ok
+0xd91f => ok ok ok ok ok ok
+0xda001f => ok ok ok ok ok ok
+0xdb0000001f => ok ok ok ok ok ok
+
+STR 32
+--
+0xd920 => ok ok ok ok ok
+0xda0020 => ok ok ok ok ok
+0xdb00000020 => ok ok ok ok ok
+
+STR 255
+--
+0xd9ff => ok ok ok ok ok
+0xda00ff => ok ok ok ok ok
+0xdb000000ff => ok ok ok ok ok
+
+STR 256
+--
+0xda0100 => ok ok ok ok
+0xdb00000100 => ok ok ok ok
+
+STR 65535
+--
+0xdaffff => ok ok ok ok
+0xdb0000ffff => ok ok ok ok
+
+STR 65536
+--
+0xdb00010000 => ok ok ok
+
+Test of schema_id in iproto.
+Normal connect done w/o errors: True
+Got schema_id: True
+Zero-schema_id connect done w/o errors: True
+Same schema_id: True
+Normal connect done w/o errors: True
+Same schema_id: True
+Wrong schema_id leads to error: True
+Same schema_id: True
+space2 = box.schema.create_space('test2')
+---
+...
+Schema changed -> error: True
+Got another schema_id: True
+Sync ok
+Sync on error is ok
+space:drop()
+---
+...
+space2:drop()
+---
+...
+box.space._cluster:delete{2} ~= nil
+---
+- true
+...
+space = box.schema.create_space('gh1280', { engine = 'vinyl' })
+---
+...
+index = space:create_index('primary')
+---
+...
+space:insert({1})
+---
+- [1]
+...
+space:insert({2, 'Music'})
+---
+- [2, 'Music']
+...
+space:insert({3, 'Length', 93})
+---
+- [3, 'Length', 93]
+...
+space:drop()
+---
+...
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+---
+...
+
+# Test bugs gh-272, gh-1654 if the packet was incorrect, respond with
+# an error code and do not close connection
+
+sync=0, Invalid MsgPack - packet header
+sync=1234, Missing mandatory field 'SPACE_ID' in request
+sync=5678, Read access to space '_user' is denied for user 'guest'
+space = box.schema.space.create('test_index_base', { id = 568 })
+---
+...
+index = space:create_index('primary', { type = 'hash' })
+---
+...
+box.schema.user.grant('guest', 'read,write', 'space', 'test_index_base')
+---
+...
+- [1, 0, 0, 0]
+- [1, 0, 1, -1]
+- [1, 0, 2, -2]
+function kek() return 'kek' end
+---
+...
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+---
+...
+Sync:  100
+Retcode:  ['kek']
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+---
+...
+space:drop()
+---
+...
+
+#
+# gh-6253 IPROTO_ID
+#
+
+# Invalid version
+Invalid MsgPack - request body
+# Invalid features
+Invalid MsgPack - request body
+# Invalid auth_type
+Invalid MsgPack - request body
+# Empty request body
+version=10, features=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12], auth_type=chap-sha1
+# Unknown version and features
+version=10, features=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12], auth_type=chap-sha1
+# Unknown request key
+version=10, features=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12], auth_type=chap-sha1
+
+#
+# gh-6257 Watchers
+#
+
+# Missing key
+error: Missing mandatory field 'EVENT_KEY' in request
+# Invalid key type
+error: Invalid MsgPack - packet body
+# Watch key 'foo', sync=1
+# Receive event
+key='foo', value=None, sync=1
+# Watch key 'bar', sync=2
+# Receive event
+key='bar', value=None, sync=2
+# Unwatch key 'bar'
+# Watch key 'bar', sync=3
+# Receive event
+key='bar', value=None, sync=3
+box.broadcast('foo', {1, 2, 3})
+---
+...
+# Receive event
+   =>  Failed to recv response
+<no event received>
+# Watch key 'foo', sync=4
+# Receive event
+key='foo', value=[1, 2, 3], sync=4
+# Watch key 'bar', sync=5
+box.broadcast('bar', 123)
+---
+...
+# Receive event
+key='bar', value=123, sync=5
+box.broadcast('bar', 456)
+---
+...
+# Unwatch key 'bar'
+# Receive event
+   =>  Failed to recv response
+<no event received>
+box.broadcast('foo', nil)
+---
+...
+box.broadcast('bar', nil)
+---
+...
+
+#
+# gh-6493 IPROTO_WATCH_ONCE
+#
+
+# Schema version
+sync=1001
+Error on invalid schema_id: True
+Got schema_id: True
+sync=1002
+Success on valid schema_id: True
+Same schema_id: True
+# Streaming unsupported
+sync=1003, error: Unable to process WATCH_ONCE request in stream
+# Invalid key
+sync=1004, error: Missing mandatory field 'EVENT_KEY' in request
+sync=1005, error: Invalid MsgPack - packet body
+# Missing key
+sync=1006, ok
+Data: []
+ Existing key
+box.broadcast('foo', {1, 2, 3})
+---
+...
+sync=1007, ok
+Data: [[1, 2, 3]]
+box.broadcast('foo', nil)
+---
+...
+
+#
+# gh-7639 Pagination
+#
+
+space = box.schema.space.create('test', { id = 567 })
+---
+...
+index = space:create_index('primary', { type = 'tree' })
+---
+...
+box.schema.user.grant('guest', 'read,write', 'space', 'test')
+---
+...
+Simple pagination with after_pos
+Page 1
+- [1, 1]
+- [2, 1]
+Page 2
+- [3, 1]
+- [4, 1]
+Page 3
+- [5, 1]
+- [6, 1]
+Page 4
+- [7, 1]
+- [8, 1]
+Page 5
+- [9, 1]
+- [10, 1]
+Page 6
+
+Position after last iteration must does not present in response: True
+Simple pagination with after_tuple
+Page 1
+- [1, 1]
+- [2, 1]
+Page 2
+- [3, 1]
+- [4, 1]
+Page 3
+- [5, 1]
+- [6, 1]
+Page 4
+- [7, 1]
+- [8, 1]
+Page 5
+- [9, 1]
+- [10, 1]

@@ -1,0 +1,200 @@
+-- test-run result file version 2
+
+-- write data recover from latest snapshot
+env = require('test_run')
+ | ---
+ | ...
+test_run = env.new()
+ | ---
+ | ...
+
+test_run:cmd('create server test with script="box/insert_during_recovery.lua"')
+ | ---
+ | - true
+ | ...
+test_run:cmd('start server test with args="none"')
+ | ---
+ | - true
+ | ...
+test_run:cmd('switch test')
+ | ---
+ | - true
+ | ...
+s1 = box.schema.space.create('temp', {temporary=true})
+ | ---
+ | ...
+i1 = s1:create_index('test')
+ | ---
+ | ...
+s2 = box.schema.space.create('loc', {is_local=true})
+ | ---
+ | ...
+i2 = s2:create_index('test')
+ | ---
+ | ...
+box.snapshot()
+ | ---
+ | - ok
+ | ...
+
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+test_run:cmd('stop server test')
+ | ---
+ | - true
+ | ...
+test_run:cmd('start server test with args="replace" with crash_expected=True')
+ | ---
+ | - false
+ | ...
+test_run:cmd('start server test with args="insert" with crash_expected=True')
+ | ---
+ | - false
+ | ...
+test_run:cmd('start server test with args="upsert" with crash_expected=True')
+ | ---
+ | - false
+ | ...
+test_run:cmd('start server test with args="replace is_recovery_finished"')
+ | ---
+ | - true
+ | ...
+test_run:cmd('switch test')
+ | ---
+ | - true
+ | ...
+box.space.temp:select()
+ | ---
+ | - []
+ | ...
+box.space.loc:select()
+ | ---
+ | - []
+ | ...
+-- Creating a new space and index invokes on_replace trigger in _index space,
+-- which inserts tuples in temp and loc spaces (see gh-5304-insert_during_recovery.lua)!
+s0 = box.schema.space.create('test')
+ | ---
+ | ...
+i0 = s0:create_index('test')
+ | ---
+ | ...
+box.space.temp:select()
+ | ---
+ | - - [1]
+ | ...
+box.space.loc:select()
+ | ---
+ | - - [1]
+ | ...
+s0:drop()
+ | ---
+ | ...
+
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+test_run:cmd('stop server test')
+ | ---
+ | - true
+ | ...
+test_run:cmd('start server test with args="insert is_recovery_finished"')
+ | ---
+ | - true
+ | ...
+test_run:cmd('switch test')
+ | ---
+ | - true
+ | ...
+box.space.temp:select()
+ | ---
+ | - []
+ | ...
+box.space.loc:select()
+ | ---
+ | - - [1]
+ | ...
+-- Creating a new space and index invoke on_replace trigger in _index space.
+-- Here we get error during insert tuple in loc space, because the tuple
+-- with the same primary key is already in the loc space
+s0 = box.schema.space.create('test')
+ | ---
+ | ...
+i0 = s0:create_index('test')
+ | ---
+ | - error: Duplicate key exists in unique index "test" in space "loc" with old tuple
+ |     - [1] and new tuple - [1]
+ | ...
+box.space.temp:select()
+ | ---
+ | - []
+ | ...
+box.space.loc:select()
+ | ---
+ | - - [1]
+ | ...
+s0:drop()
+ | ---
+ | ...
+
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+test_run:cmd('stop server test')
+ | ---
+ | - true
+ | ...
+test_run:cmd('start server test with args="upsert is_recovery_finished"')
+ | ---
+ | - true
+ | ...
+test_run:cmd('switch test')
+ | ---
+ | - true
+ | ...
+box.space.temp:select()
+ | ---
+ | - []
+ | ...
+box.space.loc:select()
+ | ---
+ | - - [1]
+ | ...
+s0 = box.schema.space.create('test')
+ | ---
+ | ...
+i0 = s0:create_index('test')
+ | ---
+ | ...
+box.space.temp:select()
+ | ---
+ | - - [1]
+ | ...
+box.space.loc:select()
+ | ---
+ | - - [1]
+ | ...
+s0:drop()
+ | ---
+ | ...
+
+test_run:cmd('switch default')
+ | ---
+ | - true
+ | ...
+test_run:cmd('stop server test')
+ | ---
+ | - true
+ | ...
+test_run:cmd('cleanup server test')
+ | ---
+ | - true
+ | ...
+test_run:cmd('delete server test')
+ | ---
+ | - true
+ | ...

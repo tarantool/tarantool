@@ -1,0 +1,14 @@
+fiber = require'fiber'
+ch = fiber.channel(2)
+
+--issue #928
+space = box.schema.space.create('test_trunc')
+_ = space:create_index('pk')
+_ = box.space.test_trunc:create_index('i1', {type = 'hash', parts = {2, 'STR'}})
+_ = box.space.test_trunc:create_index('i2', {type = 'hash', parts = {2, 'STR'}})
+
+function test_trunc() space:truncate() ch:put(true) end
+
+_ = {fiber.create(test_trunc), fiber.create(test_trunc)}
+_ = {ch:get(), ch:get()}
+space:drop()

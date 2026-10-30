@@ -1,0 +1,22 @@
+# find Termcap includes and library
+#
+# TERMCAP_FOUND
+# TERMCAP_LIBRARY
+# TERMCAP_INCLUDE_DIR
+
+if(BUILD_STATIC)
+    set(TERMCAP_STATIC libtermcap.a)
+else()
+    set(TERMCAP_STATIC termcap)
+endif()
+
+FIND_LIBRARY(TERMCAP_LIBRARY NAMES ${TERMCAP_STATIC})
+FIND_PATH(TERMCAP_INCLUDE_DIR NAMES termcap.h)
+
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(Termcap
+    REQUIRED_VARS TERMCAP_INCLUDE_DIR TERMCAP_LIBRARY)
+set(TERMCAP_INCLUDE_DIRS ${TERMCAP_INCLUDE_DIR})
+set(TERMCAP_LIBRARIES ${TERMCAP_LIBRARY})
+
+mark_as_advanced(TERMCAP_LIBRARIES TERMCAP_INCLUDE_DIRS)

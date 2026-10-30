@@ -1,0 +1,19 @@
+credentials:
+  users:
+    replicator:
+      password: 'topsecret'
+      roles: [replication]
+    client:
+      password: 'secret'
+      roles: [super]
+
+groups:
+  group-001:
+    replicasets:
+      replicaset-001:
+        instances:
+          instance-001:
+            database:
+              mode: 'rw'
+          instance-002: {}
+          instance-003: {}

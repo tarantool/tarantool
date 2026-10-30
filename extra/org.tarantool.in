@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>StandardOutPath</key>
+    <string>/var/log/tarantool.log</string>
+    <key>StandardErrorPath</key>
+    <string>/var/log/tarantool.log</string>
+    <key>WorkingDirectory</key>
+    <string>@CMAKE_INSTALL_PREFIX@</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+	<string>@CMAKE_INSTALL_PREFIX@/bin:/bin:/sbin:/opt/bin</string>
+    </dict>
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <key>Label</key>
+    <string>@DARWIN_PACKAGE_ID@.@CPACK_PACKAGE_VENDOR@.tarantool</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>tarantool</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>

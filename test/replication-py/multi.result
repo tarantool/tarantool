@@ -1,0 +1,63 @@
+fiber = require('fiber')
+---
+...
+box.schema.user.grant('guest', 'replication')
+---
+...
+box.schema.user.grant('guest', 'execute', 'universe')
+---
+...
+----------------------------------------------------------------------
+Bootstrap replicas
+----------------------------------------------------------------------
+done
+----------------------------------------------------------------------
+Make a full mesh
+----------------------------------------------------------------------
+server 1 connected
+server 1 connected
+server 1 connected
+server 2 connected
+server 2 connected
+server 2 connected
+server 3 connected
+server 3 connected
+server 3 connected
+done
+----------------------------------------------------------------------
+Test inserts
+----------------------------------------------------------------------
+Create a test space
+_ = box.schema.space.create('test')
+---
+...
+_ = box.space.test:create_index('primary')
+---
+...
+server 1 is ok
+server 2 is ok
+server 3 is ok
+
+Insert records
+inserted 60 records
+
+Synchronize
+server 1 done
+server 2 done
+server 3 done
+done
+
+Check data
+server 1 is ok
+server 2 is ok
+server 3 is ok
+Done
+
+
+----------------------------------------------------------------------
+Cleanup
+----------------------------------------------------------------------
+server 1 done
+server 2 done
+server 3 done
+

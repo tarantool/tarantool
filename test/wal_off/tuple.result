@@ -1,0 +1,67 @@
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+test_run:cmd('restart server default with cleanup=1')
+-- 
+-- Test various tuple bugs which do not require a write ahead log.
+-- 
+-- -------------------------------------------------------
+-- gh-372 Assertion with a function that inserts increasingly
+-- large tables
+-- -------------------------------------------------------
+tester = box.schema.space.create('tester')
+---
+...
+index = tester:create_index('primary',{})
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+function tuple_max()
+    local n = 'a'
+    while true do
+        n = n..n
+        local status, reason = pcall(tester.insert, tester, {#n, n})
+        if not status then
+            return #n, reason
+        end
+        collectgarbage('collect')
+    end
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+n, reason = tuple_max()
+---
+...
+n
+---
+- 1048576
+...
+n + 32 >= box.cfg.memtx_max_tuple_size
+---
+- true
+...
+reason
+---
+- 'Failed to allocate 1048597 bytes for tuple: tuple is too large. Check ''memtx_max_tuple_size''
+  configuration option.'
+...
+tester:drop()
+---
+...
+tuple_max = nil
+---
+...
+collectgarbage('collect')
+---
+- 0
+...

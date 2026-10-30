@@ -1,0 +1,385 @@
+#ifndef TARANTOOL_BOX_SCHEMA_DEF_H_INCLUDED
+#define TARANTOOL_BOX_SCHEMA_DEF_H_INCLUDED
+/*
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
+ *
+ * Redistribution and use in source and binary forms, with or
+ * without modification, are permitted provided that the following
+ * conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above
+ *    copyright notice, this list of conditions and the
+ *    following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above
+ *    copyright notice, this list of conditions and the following
+ *    disclaimer in the documentation and/or other materials
+ *    provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+ * <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+ * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+#include "trivia/util.h"
+#include "version.h"
+#include <stdbool.h>
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+enum {
+	BOX_ENGINE_MAX = 3, /* + 1 to the actual number of engines */
+	BOX_FUNCTION_MAX = 32000,
+	BOX_INDEX_MAX = 128,
+	BOX_NAME_MAX = 65000,
+	BOX_INVALID_NAME_MAX = 64,
+	ENGINE_NAME_MAX = 16,
+	FIELD_TYPE_NAME_MAX = 16,
+	GRANT_NAME_MAX = 16,
+	BOX_FIELD_MAX = INT32_MAX,
+	BOX_USER_MAX = 32,
+	/**
+	 * A fairly arbitrary limit which is still necessary
+	 * to keep tuple_format object small.
+	 */
+	BOX_INDEX_FIELD_MAX = INT16_MAX,
+	/** Yet another arbitrary limit which simply needs to
+	 * exist.
+	 */
+	BOX_INDEX_PART_MAX = UINT8_MAX,
+	/**
+	 * Start of the range of default temporary space ids.
+	 * By default they get ids from a special range to avoid conflicts with
+	 * spaces which could arrive via replication. But the user is free to
+	 * choose an id from outside this range.
+	 */
+	BOX_SPACE_ID_TEMPORARY_MIN = (1 << 30),
+};
+static_assert(BOX_INVALID_NAME_MAX <= BOX_NAME_MAX,
+	      "invalid name max is less than name max");
+
+/** \cond public */
+
+/**
+ * List of system space definitions in the following format:
+ * (name, identifier, is_sync),
+ * where is_sync determines whether synchronous replication is enabled for this
+ * system space when the synchronous queue is claimed. If is_sync is false, a
+ * reason must be supplied after the space definition comment.
+ */
+#define SYSTEM_SPACES(_) /* (name, id, is_sync) */ \
+	/** Space id of _vinyl_deferred_delete. Local space. */ \
+	_(VINYL_DEFERRED_DELETE, 257, false) \
+	/** Space id of _schema. */ \
+	_(SCHEMA, 272, true) \
+	/** Space id of _collation. */ \
+	_(COLLATION, 276, true) \
+	/** Space id of _vcollation. */ \
+	_(VCOLLATION, 277, true) \
+	/** Space id of _space. */ \
+	_(SPACE, 280, true) \
+	/** Space id of _vspace view. */ \
+	_(VSPACE, 281, true) \
+	/** Space id of _sequence. */ \
+	_(SEQUENCE, 284, true) \
+	/** Space id of _sequence_data. Synchronized by space operations. */ \
+	_(SEQUENCE_DATA, 285, false) \
+	/** Space id of _vsequence view. */ \
+	_(VSEQUENCE, 286, true) \
+	/** Space id of _index. */ \
+	_(INDEX, 288, true) \
+	/** Space id of _vindex view. */ \
+	_(VINDEX, 289, true) \
+	/** Space id of _func. */ \
+	_(FUNC, 296, true) \
+	/** Space id of _vfunc view. */ \
+	_(VFUNC, 297, true) \
+	/** Space id of _user. */ \
+	_(USER, 304, true) \
+	/** Space id of _vuser view. */ \
+	_(VUSER, 305, true) \
+	/** Space id of _priv. */ \
+	_(PRIV, 312, true) \
+	/** Space id of _vpriv view. */ \
+	_(VPRIV, 313, true) \
+	/** Space id of _cluster. */ \
+	_(CLUSTER, 320, true) \
+	/** Space id of _trigger. */ \
+	_(TRIGGER, 328, true) \
+	/** Space id of _truncate. */ \
+	_(TRUNCATE, 330, true) \
+	/** Space id of _space_sequence. */ \
+	_(SPACE_SEQUENCE, 340, true) \
+	/** Space id of _vspace_sequence. */ \
+	_(VSPACE_SEQUENCE, 341, true) \
+	/** Space id of _fk_constraint. */ \
+	_(FK_CONSTRAINT, 356, true) \
+	/** Space id of _ck_contraint. */ \
+	_(CK_CONSTRAINT, 364, true) \
+	/** Space id of _func_index. */ \
+	_(FUNC_INDEX, 372, true) \
+	/** Space id of _session_settings. */ \
+	_(SESSION_SETTINGS, 380, true) \
+	/** Space id of _gc_consumers. */ \
+	_(GC_CONSUMERS, 388, false) \
+	/** Space id of _recovery_point. */ \
+	_(RECOVERY_POINT, 396, true) \
+
+/** System space identifier definition. */
+#define SYSTEM_SPACE_MEMBER(name, id, ...) BOX_ ## name ## _ID = id,
+
+enum {
+	/** Start of the reserved range of system spaces. */
+	BOX_SYSTEM_ID_MIN = 256,
+	SYSTEM_SPACES(SYSTEM_SPACE_MEMBER)
+	/** End of the reserved range of system spaces. */
+	BOX_SYSTEM_ID_MAX = 511,
+	BOX_ID_NIL = 2147483647
+};
+/** \endcond public */
+
+/** Max possible space id. */
+extern uint64_t BOX_SPACE_MAX;
+
+/** _space fields. */
+enum {
+	BOX_SPACE_FIELD_ID = 0,
+	BOX_SPACE_FIELD_UID = 1,
+	BOX_SPACE_FIELD_NAME = 2,
+	BOX_SPACE_FIELD_ENGINE = 3,
+	BOX_SPACE_FIELD_FIELD_COUNT = 4,
+	BOX_SPACE_FIELD_OPTS = 5,
+	BOX_SPACE_FIELD_FORMAT = 6,
+	box_space_field_MAX = 7,
+};
+
+/** _index fields. */
+enum {
+	BOX_INDEX_FIELD_SPACE_ID = 0,
+	BOX_INDEX_FIELD_ID = 1,
+	BOX_INDEX_FIELD_NAME = 2,
+	BOX_INDEX_FIELD_TYPE = 3,
+	BOX_INDEX_FIELD_OPTS = 4,
+	BOX_INDEX_FIELD_IS_UNIQUE_165 = 4,
+	BOX_INDEX_FIELD_PARTS = 5,
+	BOX_INDEX_FIELD_PART_COUNT_165 = 5,
+	BOX_INDEX_FIELD_PARTS_165 = 6,
+};
+
+/** _user fields. */
+enum {
+	BOX_USER_FIELD_ID = 0,
+	BOX_USER_FIELD_UID = 1,
+	BOX_USER_FIELD_NAME = 2,
+	BOX_USER_FIELD_TYPE = 3,
+	BOX_USER_FIELD_AUTH = 4,
+	BOX_USER_FIELD_AUTH_HISTORY = 5,
+	BOX_USER_FIELD_LAST_MODIFIED = 6,
+};
+
+/** _priv fields. */
+enum {
+	BOX_PRIV_FIELD_ID = 0,
+	BOX_PRIV_FIELD_UID = 1,
+	BOX_PRIV_FIELD_OBJECT_TYPE = 2,
+	BOX_PRIV_FIELD_OBJECT_ID = 3,
+	BOX_PRIV_FIELD_ACCESS = 4,
+};
+
+/** _func fields. */
+enum {
+	BOX_FUNC_FIELD_ID = 0,
+	BOX_FUNC_FIELD_UID = 1,
+	BOX_FUNC_FIELD_NAME = 2,
+	BOX_FUNC_FIELD_SETUID = 3,
+	BOX_FUNC_FIELD_LANGUAGE = 4,
+	BOX_FUNC_FIELD_BODY = 5,
+	BOX_FUNC_FIELD_ROUTINE_TYPE = 6,
+	BOX_FUNC_FIELD_PARAM_LIST = 7,
+	BOX_FUNC_FIELD_RETURNS = 8,
+	BOX_FUNC_FIELD_AGGREGATE = 9,
+	BOX_FUNC_FIELD_SQL_DATA_ACCESS = 10,
+	BOX_FUNC_FIELD_IS_DETERMINISTIC = 11,
+	BOX_FUNC_FIELD_IS_SANDBOXED = 12,
+	BOX_FUNC_FIELD_IS_NULL_CALL = 13,
+	BOX_FUNC_FIELD_EXPORTS = 14,
+	BOX_FUNC_FIELD_OPTS = 15,
+	BOX_FUNC_FIELD_COMMENT = 16,
+	BOX_FUNC_FIELD_CREATED = 17,
+	BOX_FUNC_FIELD_LAST_ALTERED = 18,
+	BOX_FUNC_FIELD_TRIGGER = 19,
+	box_func_field_MAX = 20,
+};
+
+/** _collation fields. */
+enum {
+	BOX_COLLATION_FIELD_ID = 0,
+	BOX_COLLATION_FIELD_NAME = 1,
+	BOX_COLLATION_FIELD_UID = 2,
+	BOX_COLLATION_FIELD_TYPE = 3,
+	BOX_COLLATION_FIELD_LOCALE = 4,
+	BOX_COLLATION_FIELD_OPTIONS = 5,
+};
+
+/** _schema fields. */
+enum {
+	BOX_SCHEMA_FIELD_KEY = 0,
+	BOX_SCHEMA_FIELD_VALUE = 1,
+};
+
+/** _gc_consumers fields. */
+enum {
+	BOX_GC_CONSUMERS_FIELD_UUID = 0,
+	BOX_GC_CONSUMERS_FIELD_VCLOCK = 1,
+	BOX_GC_CONSUMERS_FIELD_OPTS = 2,
+};
+
+/** _cluster fields. */
+enum {
+	BOX_CLUSTER_FIELD_ID = 0,
+	BOX_CLUSTER_FIELD_UUID = 1,
+	BOX_CLUSTER_FIELD_NAME = 2,
+};
+
+/** _truncate fields. */
+enum {
+	BOX_TRUNCATE_FIELD_SPACE_ID = 0,
+	BOX_TRUNCATE_FIELD_COUNT = 1,
+};
+
+/** _sequence fields. */
+enum {
+	BOX_SEQUENCE_FIELD_ID = 0,
+	BOX_SEQUENCE_FIELD_UID = 1,
+	BOX_SEQUENCE_FIELD_NAME = 2,
+	BOX_SEQUENCE_FIELD_STEP = 3,
+	BOX_SEQUENCE_FIELD_MIN = 4,
+	BOX_SEQUENCE_FIELD_MAX = 5,
+	BOX_SEQUENCE_FIELD_START = 6,
+	BOX_SEQUENCE_FIELD_CACHE = 7,
+	BOX_SEQUENCE_FIELD_CYCLE = 8,
+};
+
+/** _sequence_data fields. */
+enum {
+	BOX_SEQUENCE_DATA_FIELD_ID = 0,
+	BOX_SEQUENCE_DATA_FIELD_VALUE = 1,
+};
+
+/** _space_seq fields. */
+enum {
+	BOX_SPACE_SEQUENCE_FIELD_ID = 0,
+	BOX_SPACE_SEQUENCE_FIELD_SEQUENCE_ID = 1,
+	BOX_SPACE_SEQUENCE_FIELD_IS_GENERATED = 2,
+	BOX_SPACE_SEQUENCE_FIELD_FIELDNO = 3,
+	BOX_SPACE_SEQUENCE_FIELD_PATH = 4,
+};
+
+/** _trigger fields. */
+enum {
+	BOX_TRIGGER_FIELD_NAME = 0,
+	BOX_TRIGGER_FIELD_SPACE_ID = 1,
+	BOX_TRIGGER_FIELD_OPTS = 2,
+};
+
+/** _fk_constraint fields. */
+enum {
+	BOX_FK_CONSTRAINT_FIELD_NAME = 0,
+	BOX_FK_CONSTRAINT_FIELD_CHILD_ID = 1,
+	BOX_FK_CONSTRAINT_FIELD_PARENT_ID = 2,
+	BOX_FK_CONSTRAINT_FIELD_DEFERRED = 3,
+	BOX_FK_CONSTRAINT_FIELD_MATCH = 4,
+	BOX_FK_CONSTRAINT_FIELD_ON_DELETE = 5,
+	BOX_FK_CONSTRAINT_FIELD_ON_UPDATE = 6,
+	BOX_FK_CONSTRAINT_FIELD_CHILD_COLS = 7,
+	BOX_FK_CONSTRAINT_FIELD_PARENT_COLS = 8,
+};
+
+/** _ck_constraint fields. */
+enum {
+	BOX_CK_CONSTRAINT_FIELD_SPACE_ID = 0,
+	BOX_CK_CONSTRAINT_FIELD_NAME = 1,
+	BOX_CK_CONSTRAINT_FIELD_DEFERRED = 2,
+	BOX_CK_CONSTRAINT_FIELD_LANGUAGE = 3,
+	BOX_CK_CONSTRAINT_FIELD_CODE = 4,
+	BOX_CK_CONSTRAINT_FIELD_IS_ENABLED = 5,
+};
+
+/** _func_index fields. */
+enum {
+	BOX_FUNC_INDEX_FIELD_SPACE_ID = 0,
+	BOX_FUNC_INDEX_FIELD_INDEX_ID = 1,
+	BOX_FUNC_INDEX_FUNCTION_ID = 2,
+};
+
+/** _session_settings fields. */
+enum {
+	BOX_SESSION_SETTINGS_FIELD_NAME = 0,
+	BOX_SESSION_SETTINGS_FIELD_VALUE = 1,
+};
+
+/*
+ * Different objects which can be subject to access
+ * control.
+ *
+ * Use 0 for unknown to use the same index consistently
+ * even when there are more object types in the future.
+ */
+enum schema_object_type {
+	SC_UNKNOWN = 0,
+	SC_UNIVERSE,
+	SC_LUA_CALL,
+	SC_LUA_EVAL,
+	SC_SQL,
+	SC_SPACE,
+	SC_FUNCTION,
+	SC_USER,
+	SC_ROLE,
+	SC_SEQUENCE,
+	SC_COLLATION,
+	schema_object_type_MAX,
+};
+
+/** SQL Storage engine. */
+enum sql_storage_engine {
+    SQL_STORAGE_ENGINE_MEMTX = 0,
+    SQL_STORAGE_ENGINE_VINYL = 1,
+    sql_storage_engine_MAX = 2
+};
+
+extern const char *sql_storage_engine_strs[];
+
+enum schema_object_type
+schema_object_type(const char *name);
+
+const char *
+schema_object_name(enum schema_object_type type);
+
+/**
+ * Check that the space id corresponds to a system space, which means that is
+ * has a special meaning for tarantool and has predefined insert/remove
+ * triggers.
+ */
+static inline bool
+space_id_is_system(uint32_t space_id)
+{
+	return space_id > BOX_SYSTEM_ID_MIN &&
+	       space_id < BOX_SYSTEM_ID_MAX;
+}
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
+
+#endif /* TARANTOOL_BOX_SCHEMA_DEF_H_INCLUDED */

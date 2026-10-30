@@ -1,0 +1,218 @@
+1..11
+    1..40
+	*** test_compare ***
+    ok 1 - compare (), () => 0
+    ok 2 - compare (), () => 0
+    ok 3 - compare (), (10) => -1
+    ok 4 - compare (10), () => 1
+    ok 5 - compare (0), (0) => 0
+    ok 6 - compare (0), (0) => 0
+    ok 7 - compare (1), (1) => 0
+    ok 8 - compare (1), (1) => 0
+    ok 9 - compare (1), (2) => -1
+    ok 10 - compare (2), (1) => 1
+    ok 11 - compare (), (10, 1, 0) => -1
+    ok 12 - compare (10, 1, 0), () => 1
+    ok 13 - compare (5), (10, 1, 0) => -1
+    ok 14 - compare (10, 1, 0), (5) => 1
+    ok 15 - compare (10), (10, 1, 0) => -1
+    ok 16 - compare (10, 1, 0), (10) => 1
+    ok 17 - compare (15), (10, 1, 0) => 2147483647
+    ok 18 - compare (10, 1, 0), (15) => 2147483647
+    ok 19 - compare (10, 1, 0), (10, 1, 1) => -1
+    ok 20 - compare (10, 1, 1), (10, 1, 0) => 1
+    ok 21 - compare (10, 1, 0), (10, 2, 0) => -1
+    ok 22 - compare (10, 2, 0), (10, 1, 0) => 1
+    ok 23 - compare (10, 1, 0), (10, 1, 0) => 0
+    ok 24 - compare (10, 1, 0), (10, 1, 0) => 0
+    ok 25 - compare (10, 0, 1), (10, 1, 0) => 2147483647
+    ok 26 - compare (10, 1, 0), (10, 0, 1) => 2147483647
+    ok 27 - compare (10, 2, 1), (10, 1, 2) => 2147483647
+    ok 28 - compare (10, 1, 2), (10, 2, 1) => 2147483647
+    ok 29 - compare (10, 0, 1), (11, 0, 0) => 2147483647
+    ok 30 - compare (11, 0, 0), (10, 0, 1) => 2147483647
+    ok 31 - compare (10, 0, 5), (5, 0, 10) => 2147483647
+    ok 32 - compare (5, 0, 10), (10, 0, 5) => 2147483647
+    ok 33 - compare (10, 10, 10), (10, 10, 10) => 0
+    ok 34 - compare (10, 10, 10), (10, 10, 10) => 0
+    ok 35 - compare (10, 10, 10), (10, 10, 10, 1) => -1
+    ok 36 - compare (10, 10, 10, 1), (10, 10, 10) => 1
+    ok 37 - compare (10, 10, 10), (10, 10, 10, 1, 2, 3) => -1
+    ok 38 - compare (10, 10, 10, 1, 2, 3), (10, 10, 10) => 1
+    ok 39 - compare (0, 0, 0), (10, 0, 0, 0, 0) => -1
+    ok 40 - compare (10, 0, 0, 0, 0), (0, 0, 0) => 1
+	*** test_compare: done ***
+ok 1 - subtests
+    1..36
+	*** test_isearch ***
+    ok 1 - query #1
+    ok 2 - query #2
+    ok 3 - query #3
+    ok 4 - query #4
+    ok 5 - query #5
+    ok 6 - query #6
+    ok 7 - query #7
+    ok 8 - query #8
+    ok 9 - query #9
+    ok 10 - query #10
+    ok 11 - query #11
+    ok 12 - query #12
+    ok 13 - query #13
+    ok 14 - query #14
+    ok 15 - query #15
+    ok 16 - query #16
+    ok 17 - query #17
+    ok 18 - query #18
+    ok 19 - query #19
+    ok 20 - query #20
+    ok 21 - query #21
+    ok 22 - query #22
+    ok 23 - query #23
+    ok 24 - query #24
+    ok 25 - query #25
+    ok 26 - query #26
+    ok 27 - query #27
+    ok 28 - query #28
+    ok 29 - query #29
+    ok 30 - query #30
+    ok 31 - query #31
+    ok 32 - query #32
+    ok 33 - query #33
+    ok 34 - query #34
+    ok 35 - query #35
+    ok 36 - query #36
+	*** test_isearch: done ***
+ok 2 - subtests
+    1..8
+	*** test_tostring ***
+    ok 1 - tostring () => {}
+    ok 2 - tostring (-1, -1, -1) => {}
+    ok 3 - tostring (1) => {0: 1}
+    ok 4 - tostring (1, 2) => {0: 1, 1: 2}
+    ok 5 - tostring (10, 15, 20) => {0: 10, 1: 15, 2: 20}
+    ok 6 - tostring (10, -1, 15, -1, 20) => {0: 10, 2: 15, 4: 20}
+    ok 7 - tostring (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15) => {1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9, 10: 10, 11: 11, 12: 12, 13: 13, 14: 14, 15: 15}
+    ok 8 - tostring (9223372054775000, 9223372054775001, 9223372054775002, 9223372054775003, 9223372054775004, 9223372054775005, 9223372054775006, 9223372054775007, 9223372054775008, 9223372054775009, 9223372054775010, 9223372054775011, 9223372054775012, 9223372054775013, 9223372054775014, 9223372054775015) => {0: 9223372054775000, 1: 9223372054775001, 2: 9223372054775002, 3: 9223372054775003, 4: 9223372054775004, 5: 9223372054775005, 6: 9223372054775006, 7: 9223372054775007, 8: 9223372054775008, 9: 9223372054775009, 10: 9223372054775010, 11: 9223372054775011, 12: 9223372054775012, 13: 9223372054775013, 14: 9223372054775014, 15: 9223372054775015}
+	*** test_tostring: done ***
+ok 3 - subtests
+    1..12
+	*** test_fromstring ***
+    ok 1 - fromstring {} => ()
+    ok 2 - fromstring  	 	 { 	 	 } 	 	  => ()
+    ok 3 - fromstring {0: 10} => (10)
+    ok 4 - fromstring {0: 10,} => (10)
+    ok 5 - fromstring {	 0	 :	  10	 ,	 } => (10)
+    ok 6 - fromstring {0: 10, 1: 15, 3: 20} => (10, 15, -1, 20)
+    ok 7 - fromstring {2: 20, 0: 10, 4: 30} => (10, -1, 20, -1, 30)
+    ok 8 - fromstring {4: 30, 2: 20} => (-1, -1, 20, -1, 30)
+    ok 9 - fromstring {4: 30, 2: 20,} => (-1, -1, 20, -1, 30)
+    ok 10 - fromstring {0: 4294967295} => (4294967295)
+    ok 11 - fromstring {0: 4294967296} => (4294967296)
+    ok 12 - fromstring {0: 9223372036854775807} => (9223372036854775807)
+	*** test_fromstring: done ***
+ok 4 - subtests
+    1..32
+	*** test_fromstring_invalid ***
+    ok 1 - fromstring "" => 1
+    ok 2 - fromstring " " => 2
+    ok 3 - fromstring "	 	 	 " => 7
+    ok 4 - fromstring "}" => 1
+    ok 5 - fromstring "1: 10" => 1
+    ok 6 - fromstring "abcde" => 1
+    ok 7 - fromstring "12345" => 1
+    ok 8 - fromstring "" => 1
+    ok 9 - fromstring "{" => 2
+    ok 10 - fromstring "{1	 " => 5
+    ok 11 - fromstring "{1:	 " => 6
+    ok 12 - fromstring "{1:10" => 6
+    ok 13 - fromstring "{1:10	 " => 8
+    ok 14 - fromstring "{1:10," => 7
+    ok 15 - fromstring "{1:10,	 	 " => 11
+    ok 16 - fromstring "{1:10 2:20" => 7
+    ok 17 - fromstring "{1:10,," => 7
+    ok 18 - fromstring "{1:10, 10,}" => 10
+    ok 19 - fromstring "{1:-1}" => 4
+    ok 20 - fromstring "{-1:1}" => 2
+    ok 21 - fromstring "{128:1}" => 5
+    ok 22 - fromstring "{1:abcde}" => 4
+    ok 23 - fromstring "{abcde:1}" => 2
+    ok 24 - fromstring "{1:1.1}" => 5
+    ok 25 - fromstring "{1.1:1}" => 3
+    ok 26 - fromstring "{4294967296:1}" => 12
+    ok 27 - fromstring "{1:9223372036854775808}" => 23
+    ok 28 - fromstring "{1:18446744073709551616}" => 24
+    ok 29 - fromstring "{1:18446744073709551616}" => 24
+    ok 30 - fromstring "{1:340282366920938463463374607431768211456}" => 43
+    ok 31 - fromstring "{1:10, 1:20}" => 12
+    ok 32 - fromstring "{1:20, 1:10}" => 12
+	*** test_fromstring_invalid: done ***
+ok 5 - subtests
+    1..3
+	*** test_snprint ***
+    ok 1 - from string
+    ok 2 - snprint
+    ok 3 - correct
+	*** test_snprint: done ***
+ok 6 - subtests
+    1..6
+	*** test_minmax ***
+    ok 1 - max_ignore0 between {0: 1, 1: 17, 2: 3} and {0: 10, 1: 5, 2: 7} is {0: 1, 1: 17, 2: 7}
+    ok 2 - min_ignore0 between {0: 10, 1: 17, 2: 3} and {0: 1, 1: 5, 2: 7} is {0: 10, 1: 5, 2: 3}
+    ok 3 - max_ignore0 between {1: 1, 2: 1, 3: 1} and {1: 100, 2: 100, 31: 100} is {1: 100, 2: 100, 3: 1, 31: 100}
+    ok 4 - min_ignore0 between {1: 1, 2: 1, 3: 1} and {1: 100, 2: 100, 31: 100} is {1:1, 2: 1}
+    ok 5 - max between {0: 1, 1: 17, 2: 3} and {0: 10, 1: 5, 2: 7} is {0: 10, 1: 17, 2: 7}
+    ok 6 - min between {0: 10, 1: 17, 2: 3} and {0: 1, 1: 5, 2: 7} is {0: 1, 1: 5, 2: 3}
+	*** test_minmax: done ***
+ok 7 - subtests
+    1..7
+	*** test_mp ***
+    ok 1 - Case must pass successfully
+    ok 2 - Case must pass successfully
+    ok 3 - Case must pass successfully
+    ok 4 - Case must pass successfully
+    ok 5 - Case must pass successfully
+    ok 6 - Case must pass successfully
+    ok 7 - Case must pass successfully
+	*** test_mp: done ***
+ok 8 - subtests
+    1..8
+	*** test_mp_invalid ***
+    ok 1 - Decoder must fail
+    ok 2 - Decoder must fail
+    ok 3 - Decoder must fail
+    ok 4 - Decoder must fail
+    ok 5 - Decoder must fail
+    ok 6 - Decoder must fail
+    ok 7 - Decoder must fail
+    ok 8 - Decoder must fail
+	*** test_mp_invalid: done ***
+ok 9 - subtests
+    1..11
+	*** test_nth_element ***
+    ok 1 - vclock_nth_element "{0: 1, 2: 3, 5: 7, 10: 3}", 2 => 3
+    ok 2 - vclock_nth_element "{1: 4, 3: 2, 4: 8, 8: 6, 9: 7}", 3 => 7
+    ok 3 - vclock_nth_element "{0: 10, 1: 11, 3: 12, 7: 13, 9: 14}", 1 => 11
+    ok 4 - vclock_nth_element "{2: 5, 4: 6, 6: 7, 8: 8, 10: 9}", 3 => 8
+    ok 5 - vclock_nth_element "{1: 9, 3: 1, 5: 2, 7: 3, 11: 4}", 2 => 3
+    ok 6 - vclock_nth_element "{0: 0, 2: 2, 4: 4, 6: 6, 8: 8, 10: 10}", 5 => 10
+    ok 7 - vclock_nth_element "{1: 3, 2: 6, 3: 9, 4: 12, 5: 15}", 3 => 12
+    ok 8 - vclock_nth_element "{0: 10, 2: 20, 4: 30, 6: 40, 8: 50}", 2 => 30
+    ok 9 - vclock_nth_element "{1: 2, 3: 4, 5: 6, 7: 8, 9: 10}", 4 => 10
+    ok 10 - vclock_nth_element "{2: 1, 4: 2, 6: 3, 8: 4, 10: 5}", 1 => 2
+    ok 11 - vclock_nth_element "{2: 5, 4: 6, 6: 7, 8: 8, 10: 9}", 5 => -1
+	*** test_nth_element: done ***
+ok 10 - subtests
+    1..10
+	*** test_count_ge ***
+    ok 1 - vclock_count_ge "{0: 1, 2: 3, 5: 7, 10: 3}", 3 => 3
+    ok 2 - vclock_count_ge "{1: 4, 3: 2, 4: 8, 8: 6, 9: 7}", 5 => 3
+    ok 3 - vclock_count_ge "{0: 10, 1: 11, 3: 12, 7: 13, 9: 14}", 11 => 4
+    ok 4 - vclock_count_ge "{2: 5, 4: 6, 6: 7, 8: 8, 10: 9}", 6 => 4
+    ok 5 - vclock_count_ge "{1: 9, 3: 1, 5: 2, 7: 3, 11: 4}", 4 => 2
+    ok 6 - vclock_count_ge "{0: 0, 2: 2, 4: 4, 6: 6, 8: 8, 10: 10}", 5 => 3
+    ok 7 - vclock_count_ge "{1: 3, 2: 6, 3: 9, 4: 12, 5: 15}", 7 => 3
+    ok 8 - vclock_count_ge "{0: 10, 2: 20, 4: 30, 6: 40, 8: 50}", 25 => 3
+    ok 9 - vclock_count_ge "{1: 2, 3: 4, 5: 6, 7: 8, 9: 10}", 5 => 3
+    ok 10 - vclock_count_ge "{2: 1, 4: 2, 6: 3, 8: 4, 10: 5}", 3 => 3
+	*** test_count_ge: done ***
+ok 11 - subtests

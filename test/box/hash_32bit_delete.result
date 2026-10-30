@@ -1,0 +1,70 @@
+-- test-run result file version 2
+-------------------------------------------------------------------------------
+-- 32-bit hash insert fields tests
+-------------------------------------------------------------------------------
+hash = box.schema.space.create('tweedledum')
+ | ---
+ | ...
+tmp = hash:create_index('primary', { type = 'hash', parts = {1, 'unsigned'}, unique = true })
+ | ---
+ | ...
+
+-- Insert valid fields
+hash:insert{0, 'value1 v1.0', 'value2 v1.0'}
+ | ---
+ | - [0, 'value1 v1.0', 'value2 v1.0']
+ | ...
+hash:insert{1, 'value1 v1.0', 'value2 v1.0'}
+ | ---
+ | - [1, 'value1 v1.0', 'value2 v1.0']
+ | ...
+hash:insert{2, 'value1 v1.0', 'value2 v1.0'}
+ | ---
+ | - [2, 'value1 v1.0', 'value2 v1.0']
+ | ...
+hash:insert{3, 'value1 v1.0', 'value2 v1.0'}
+ | ---
+ | - [3, 'value1 v1.0', 'value2 v1.0']
+ | ...
+
+-------------------------------------------------------------------------------
+-- 32-bit hash delete fields test
+-------------------------------------------------------------------------------
+
+-- delete by valid keys
+hash:delete{0}
+ | ---
+ | - [0, 'value1 v1.0', 'value2 v1.0']
+ | ...
+hash:delete{1}
+ | ---
+ | - [1, 'value1 v1.0', 'value2 v1.0']
+ | ...
+hash:delete{2}
+ | ---
+ | - [2, 'value1 v1.0', 'value2 v1.0']
+ | ...
+hash:delete{3}
+ | ---
+ | - [3, 'value1 v1.0', 'value2 v1.0']
+ | ...
+hash:delete{4}
+ | ---
+ | ...
+hash:delete{5}
+ | ---
+ | ...
+
+-- delete by invalid keys
+hash:delete{'invalid key'}
+ | ---
+ | - error: 'Supplied key type of part 0 does not match index part type: expected unsigned'
+ | ...
+hash:delete{1, 2}
+ | ---
+ | - error: Invalid key part count in an exact match (expected 1, got 2)
+ | ...
+
+hash:drop()
+ | ---
+ | ...

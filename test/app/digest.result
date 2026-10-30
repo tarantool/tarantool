@@ -1,0 +1,816 @@
+test_run = require('test_run').new()
+---
+...
+test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua:<line>\"]: '")
+---
+- true
+...
+fiber = require('fiber')
+---
+...
+digest = require('digest')
+---
+...
+type(digest)
+---
+- table
+...
+--
+-- Invalid arguments
+--
+digest.md4()
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: digest.md4(string)'
+...
+digest.md5()
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: digest.md5(string)'
+...
+digest.sha1()
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: digest.sha1(string)'
+...
+digest.sha224()
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: digest.sha224(string)'
+...
+digest.sha256()
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: digest.sha256(string)'
+...
+digest.sha384()
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: digest.sha384(string)'
+...
+digest.sha512()
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: digest.sha512(string)'
+...
+digest.md4_hex()
+---
+- error: 'Usage: digest.md4_hex(string)'
+...
+digest.md5_hex()
+---
+- error: 'Usage: digest.md5_hex(string)'
+...
+digest.sha1_hex()
+---
+- error: 'Usage: digest.sha1_hex(string)'
+...
+digest.sha224_hex()
+---
+- error: 'Usage: digest.sha224_hex(string)'
+...
+digest.sha256_hex()
+---
+- error: 'Usage: digest.sha256_hex(string)'
+...
+digest.sha384_hex()
+---
+- error: 'Usage: digest.sha384_hex(string)'
+...
+digest.sha512_hex()
+---
+- error: 'Usage: digest.sha512_hex(string)'
+...
+--
+-- gh-1561: Bad checksum on non-string types
+--
+digest.md4(12345LL)
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: digest.md4(string)'
+...
+digest.md5(12345LL)
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: digest.md5(string)'
+...
+digest.sha1(12345LL)
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: digest.sha1(string)'
+...
+digest.sha224(12345LL)
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: digest.sha224(string)'
+...
+digest.sha256(12345LL)
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: digest.sha256(string)'
+...
+digest.sha384(12345LL)
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: digest.sha384(string)'
+...
+digest.sha512(12345LL)
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: digest.sha512(string)'
+...
+--
+-- Empty string
+--
+string.hex(digest.md4(''))
+---
+- 31d6cfe0d16ae931b73c59d7e0c089c0
+...
+string.hex(digest.md5(''))
+---
+- d41d8cd98f00b204e9800998ecf8427e
+...
+string.hex(digest.sha1(''))
+---
+- da39a3ee5e6b4b0d3255bfef95601890afd80709
+...
+string.hex(digest.sha224(''))
+---
+- d14a028c2a3a2bc9476102bb288234c415a2b01f828ea62ac5b3e42f
+...
+string.hex(digest.sha256(''))
+---
+- e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+...
+string.hex(digest.sha384(''))
+---
+- 38b060a751ac96384cd9327eb1b1e36a21fdb71114be07434c0cc7bf63f6e1da274edebfe76f65fbd51ad2f14898b95b
+...
+string.hex(digest.sha512(''))
+---
+- cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e
+...
+digest.md4_hex('')
+---
+- 31d6cfe0d16ae931b73c59d7e0c089c0
+...
+digest.md5_hex('')
+---
+- d41d8cd98f00b204e9800998ecf8427e
+...
+digest.sha1_hex('')
+---
+- da39a3ee5e6b4b0d3255bfef95601890afd80709
+...
+digest.sha224_hex('')
+---
+- d14a028c2a3a2bc9476102bb288234c415a2b01f828ea62ac5b3e42f
+...
+digest.sha256_hex('')
+---
+- e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+...
+digest.sha384_hex('')
+---
+- 38b060a751ac96384cd9327eb1b1e36a21fdb71114be07434c0cc7bf63f6e1da274edebfe76f65fbd51ad2f14898b95b
+...
+digest.sha512_hex('')
+---
+- cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e
+...
+--
+-- Non-empty string
+--
+string.hex(digest.md4('tarantool'))
+---
+- c7eb52e6ded7ce718ee8da48d9de5c49
+...
+string.hex(digest.md5('tarantool'))
+---
+- 9c6985632370720e4ef67330e363c3fb
+...
+string.hex(digest.sha1('tarantool'))
+---
+- d20eecfa907999ff9fbbb342a9724483ecf6c7de
+...
+string.hex(digest.sha224('tarantool'))
+---
+- 8335450c7f4645b860007d45fd82566965ff296cbb486b042e4f216d
+...
+string.hex(digest.sha256('tarantool'))
+---
+- d93aa3c19c10cfe575d18ed19694d513dd0b36bcee53934ff454fba6d2afc42d
+...
+string.hex(digest.sha384('tarantool'))
+---
+- ca28b1c556b81c94c341e7088621620764b455e00a3b45f902ead1e5479556d02bbfb626b74fd60a21844345583bad8b
+...
+string.hex(digest.sha512('tarantool'))
+---
+- dd802cfa84de2f65779fc9845432f2f3e1b29415fae41d36d7d9051044bd4e4bb8c7b1bcf96d0487741f1a8944b4c4895677bb934f36131c699381a07f9bcdba
+...
+digest.md4_hex('tarantool')
+---
+- c7eb52e6ded7ce718ee8da48d9de5c49
+...
+digest.md5_hex('tarantool')
+---
+- 9c6985632370720e4ef67330e363c3fb
+...
+digest.sha1_hex('tarantool')
+---
+- d20eecfa907999ff9fbbb342a9724483ecf6c7de
+...
+digest.sha224_hex('tarantool')
+---
+- 8335450c7f4645b860007d45fd82566965ff296cbb486b042e4f216d
+...
+digest.sha256_hex('tarantool')
+---
+- d93aa3c19c10cfe575d18ed19694d513dd0b36bcee53934ff454fba6d2afc42d
+...
+digest.sha384_hex('tarantool')
+---
+- ca28b1c556b81c94c341e7088621620764b455e00a3b45f902ead1e5479556d02bbfb626b74fd60a21844345583bad8b
+...
+digest.sha512_hex('tarantool')
+---
+- dd802cfa84de2f65779fc9845432f2f3e1b29415fae41d36d7d9051044bd4e4bb8c7b1bcf96d0487741f1a8944b4c4895677bb934f36131c699381a07f9bcdba
+...
+digest.md5_hex(123)
+---
+- error: 'Usage: digest.md5_hex(string)'
+...
+digest.md5_hex('123')
+---
+- 202cb962ac59075b964b07152d234b70
+...
+digest.md5_hex(true)
+---
+- error: 'Usage: digest.md5_hex(string)'
+...
+digest.md5_hex('true')
+---
+- b326b5062b2f0e69046810717534cb09
+...
+digest.md5_hex(nil)
+---
+- error: 'Usage: digest.md5_hex(string)'
+...
+digest.md5_hex()
+---
+- error: 'Usage: digest.md5_hex(string)'
+...
+digest.crc32()
+---
+- error: 'Usage: digest.crc32(string)'
+...
+digest.crc32_update(4294967295, '')
+---
+- 4294967295
+...
+digest.crc32('abc')
+---
+- 3384066120
+...
+digest.crc32_update(4294967295, 'abc')
+---
+- 3384066120
+...
+digest.crc32('abccde')
+---
+- 3628146660
+...
+digest.crc32_update(digest.crc32('abc'), 'cde')
+---
+- 3628146660
+...
+crc = digest.crc32.new()
+---
+...
+crc:update('abc')
+---
+...
+crc2 = crc:copy()
+---
+...
+crc:update('cde')
+---
+...
+crc:result() == digest.crc32('abccde')
+---
+- true
+...
+crc2:update('def')
+---
+...
+crc2:result() == digest.crc32('abcdef')
+---
+- true
+...
+crc, crc2 = nil, nil
+---
+...
+digest.base64_encode('12345')
+---
+- MTIzNDU=
+...
+digest.base64_decode('MTIzNDU=')
+---
+- '12345'
+...
+digest.base64_encode('asdfl asdf adfa zxc vzxcvz llll')
+---
+- YXNkZmwgYXNkZiBhZGZhIHp4YyB2enhjdnogbGxsbA==
+...
+digest.base64_decode('YXNkZmwgYXNkZiBhZGZhIHp4YyB2enhjdnogbGxsbA==')
+---
+- asdfl asdf adfa zxc vzxcvz llll
+...
+digest.base64_encode('11 00 11 00 abcdef ABCDEF 00 11 00 11')
+---
+- MTEgMDAgMTEgMDAgYWJjZGVmIEFCQ0RFRiAwMCAxMSAwMCAxMQ==
+...
+digest.base64_decode('MTEgMDAgMTEgMDAgYWJjZGVmIEFCQ0RFRiAwMCAxMSAwMCAxMQ==')
+---
+- 11 00 11 00 abcdef ABCDEF 00 11 00 11
+...
+s = string.rep('a', 54 * 2) -- two lines in base64
+---
+...
+b = digest.base64_encode(s)
+---
+...
+b
+---
+- |
+  YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFh
+  YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFh
+...
+digest.base64_decode(b) == s
+---
+- true
+...
+digest.base64_decode(nil)
+---
+- error: 'Usage: digest.base64_decode(string)'
+...
+digest.base64_encode(nil)
+---
+- error: 'Usage: digest.base64_encode(string[, table])'
+...
+digest.base64_encode(123)
+---
+- error: 'Usage: digest.base64_encode(string[, table])'
+...
+digest.base64_decode(123)
+---
+- error: 'Usage: digest.base64_decode(string)'
+...
+digest.guava('hello', 0)
+---
+- error: state should be a number
+...
+digest.guava(1, 'nope_')
+---
+- error: buckets should be a number
+...
+digest.guava(10863919174838991, 11)
+---
+- 8
+...
+digest.guava(2016238256797177309, 11)
+---
+- 7
+...
+digest.guava(1673758223894951030, 11)
+---
+- 7
+...
+digest.urandom()
+---
+- error: 'Usage: digest.urandom(len)'
+...
+#digest.urandom(0)
+---
+- 0
+...
+#digest.urandom(1)
+---
+- 1
+...
+#digest.urandom(16)
+---
+- 16
+...
+digest.murmur('1234')
+---
+- 1859914009
+...
+mur = digest.murmur.new{seed=13}
+---
+...
+nulldigest = mur:result()
+---
+...
+mur:update('1234')
+---
+...
+mur:result()
+---
+- 1859914009
+...
+mur_new = mur:copy()
+---
+...
+mur_new:update('1234')
+---
+...
+mur_new:result() ~= mur:result()
+---
+- true
+...
+mur:clear()
+---
+...
+nulldigest == mur:result()
+---
+- true
+...
+mur = digest.murmur.new{seed=14}
+---
+...
+mur:update('1234')
+---
+...
+mur:result()
+---
+- 1689834281
+...
+mur, mur_new, nulldigest = nil, nil, nil
+---
+...
+string.hex(digest.aes256cbc.encrypt('test123', 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbh'))
+---
+- ca73b4a934eb4cb369366dc6ad39e39e
+...
+digest.aes256cbc.decrypt(digest.aes256cbc.encrypt('test123', 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbh'), 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbh')
+---
+- test123
+...
+digest.aes256cbc.decrypt(digest.aes256cbc.encrypt('test123', 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbh'), 'nosspasspasspasspasspasspasspass', 'iv12tras8712cvbh')
+---
+- error: 'OpenSSL error: bad decrypt'
+...
+--
+-- Test base64 options. (gh-2479, gh-2478, gh-2777).
+--
+b = digest.base64_encode('123', { urlsafe = true })
+---
+...
+b
+---
+- MTIz
+...
+digest.base64_decode(b)
+---
+- '123'
+...
+b = digest.base64_encode('1234567', { urlsafe = true })
+---
+...
+b
+---
+- MTIzNDU2Nw
+...
+digest.base64_decode(b)
+---
+- '1234567'
+...
+b = digest.base64_encode('12345678', { urlsafe = true })
+---
+...
+b
+---
+- MTIzNDU2Nzg
+...
+digest.base64_decode(b)
+---
+- '12345678'
+...
+b = digest.base64_encode('1234567', { nopad = true })
+---
+...
+b
+---
+- MTIzNDU2Nw
+...
+digest.base64_decode(b)
+---
+- '1234567'
+...
+b = digest.base64_encode(string.rep('a', 100), { nowrap = true })
+---
+...
+b
+---
+- YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYQ==
+...
+digest.base64_decode(b)
+---
+- aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+...
+--
+-- gh-3358: any option makes base64 work like urlsafe.
+--
+s = digest.base64_encode('?>>>', {nowrap = true})
+---
+...
+-- Check for '+' - it is not urlsafe.
+s:find('+') ~= nil
+---
+- true
+...
+s = digest.base64_encode('?>>>', {nopad = true})
+---
+...
+s:find('+') ~= nil
+---
+- true
+...
+string.hex(digest.pbkdf2("password", "salt", 4096, 32))
+---
+- c5e478d59288c841aa530db6845c4c8d962893a001ce4e11a4963873aa98134a
+...
+digest.pbkdf2_hex("password", "salt", 4096, 32)
+---
+- c5e478d59288c841aa530db6845c4c8d962893a001ce4e11a4963873aa98134a
+...
+digest.pbkdf2_hex("password", "salt")
+---
+- 0394a2ede332c9a13eb82e9b24631604c31df978b4e2f0fbd2c549944f9d79a536ceea9b92c6170cbbf0153ef33a4ff57321e17b7a5fadc33f7023ddd325da4744753b6d61571dcba34ae96099068cea39a07a4303263cf3749b5fbc93222946a3987f75f2d6aeea024acc4f95a0d6e7141cdb0b1f12065030ac169507f91b32
+...
+s, err = pcall(digest.pbkdf2, 12, "salt")
+---
+...
+s
+---
+- false
+...
+err:match("Usage")
+---
+- Usage
+...
+s, err = pcall(digest.pbkdf2_hex, 12, "salt")
+---
+...
+s
+---
+- false
+...
+err:match("Usage")
+---
+- Usage
+...
+s, err = pcall(digest.pbkdf2_hex, "password", "salt", "lol", "lol")
+---
+...
+s
+---
+- false
+...
+err:match("number")
+---
+- number
+...
+-- gh-3396: fiber-safe pbkdf2
+res = {}
+---
+...
+sentry = fiber.channel()
+---
+...
+_ = test_run:cmd("setopt delimiter ';'")
+---
+...
+function test_pbkdf2()
+    local digest = require('digest')
+    for i = 1, 10 do
+        table.insert(res, digest.pbkdf2('', 'salt', 100, 32):hex())
+    end
+    sentry:put(fiber.id())
+end;
+---
+...
+_ = test_run:cmd("setopt delimiter ''");
+---
+...
+_ = fiber.create(test_pbkdf2)
+---
+...
+_ = fiber.create(test_pbkdf2)
+---
+...
+_ = sentry:get()
+---
+...
+_ = sentry:get()
+---
+...
+res
+---
+- - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+...
+--
+-- gh-2003 xxHash.
+--
+xxhash32 = digest.xxhash32.new()
+---
+...
+xxhash32:result()
+---
+- 46947589
+...
+xxhash64 = digest.xxhash64.new()
+---
+...
+xxhash64:result()
+---
+- 17241709254077376921ULL
+...
+-- New takes seed optionally.
+digest.xxhash32.new(1):result()
+---
+- 187479954
+...
+digest.xxhash64.new(1):result()
+---
+- 15397730242686860875ULL
+...
+-- String is expected as input value.
+digest.xxhash32(1)
+---
+- error: 'Usage: digest.xxhash32(string[, unsigned number])'
+...
+digest.xxhash64(1)
+---
+- error: 'Usage: digest.xxhash64(string[, unsigned number])'
+...
+digest.xxhash32.new():update(1)
+---
+- error: 'Usage: xxhash32:update(string)'
+...
+digest.xxhash64.new():update(1)
+---
+- error: 'Usage: xxhash64:update(string)'
+...
+-- Seed is an optional second argument (default = 0).
+digest.xxhash32('12345')
+---
+- 3003995828
+...
+digest.xxhash32('12345', 0)
+---
+- 3003995828
+...
+digest.xxhash32('12345', 1)
+---
+- 2544060598
+...
+xxhash32:result()
+---
+- 46947589
+...
+xxhash32:clear(1)
+---
+...
+xxhash32:result()
+---
+- 187479954
+...
+xxhash32:update('123')
+---
+...
+xxhash32:result()
+---
+- 2569538424
+...
+xxhash32:update('45')
+---
+...
+xxhash32:result()
+---
+- 2544060598
+...
+xxhash32:clear()
+---
+...
+xxhash32:result()
+---
+- 46947589
+...
+xxhash32_copy = xxhash32:copy()
+---
+...
+xxhash32_copy:result()
+---
+- 46947589
+...
+xxhash32_copy ~= xxhash32
+---
+- true
+...
+xxhash32_copy:clear(1ULL)
+---
+...
+xxhash32_copy:result()
+---
+- 187479954
+...
+xxhash32 = nil
+---
+...
+xxhash32_copy = nil
+---
+...
+-- Seed is an optional second argument (default = 0).
+digest.xxhash64('12345')
+---
+- 14335752410685132726ULL
+...
+digest.xxhash64('12345', 0)
+---
+- 14335752410685132726ULL
+...
+digest.xxhash64('12345', 1)
+---
+- 10037897083593476069ULL
+...
+xxhash64:result()
+---
+- 17241709254077376921ULL
+...
+xxhash64:clear(1)
+---
+...
+xxhash64:result()
+---
+- 15397730242686860875ULL
+...
+xxhash64:update('123')
+---
+...
+xxhash64:result()
+---
+- 5440451180712653975ULL
+...
+xxhash64:update('45')
+---
+...
+xxhash64:result()
+---
+- 10037897083593476069ULL
+...
+xxhash64:clear()
+---
+...
+xxhash64:result()
+---
+- 17241709254077376921ULL
+...
+xxhash64_copy = xxhash64:copy()
+---
+...
+xxhash64_copy:result()
+---
+- 17241709254077376921ULL
+...
+xxhash64_copy ~= xxhash64
+---
+- true
+...
+xxhash64_copy:clear(1ULL)
+---
+...
+xxhash64_copy:result()
+---
+- 15397730242686860875ULL
+...
+xxhash64 = nil
+---
+...
+xxhash64_copy = nil
+---
+...
+test_run:cmd("clear filter")
+---
+- true
+...
+digest = nil
+---
+...

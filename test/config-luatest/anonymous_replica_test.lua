@@ -1,0 +1,388 @@
+local t = require('luatest')
+local cbuilder = require('luatest.cbuilder')
+local cluster = require('luatest.cluster')
+local textutils = require('internal.config.utils.textutils')
+
+local g = t.group()
+
+-- Verify that an anonymous replica can be started and joined to
+-- a replicaset.
+--
+-- This test excludes the `replication.peers` autoconstruction
+-- logic by defining the option on its own. This automatic
+-- construction is verified in a separate test case.
+g.test_basic = function()
+    -- One master, two replicas, two anonymous replicas.
+    local config = cbuilder:new()
+        :set_replicaset_option('replication.peers', {
+            'replicator:secret@unix/:./instance-001.iproto',
+            'replicator:secret@unix/:./instance-002.iproto',
+            'replicator:secret@unix/:./instance-003.iproto',
+        })
+        :add_instance('instance-001', {
+            database = {
+                mode = 'rw',
+            },
+        })
+        :add_instance('instance-002', {})
+        :add_instance('instance-003', {})
+        :add_instance('instance-004', {
+            replication = {
+                anon = true,
+            },
+        })
+        :add_instance('instance-005', {
+            replication = {
+                anon = true,
+            },
+        })
+        :config()
+
+    local cluster = cluster:new(config)
+    cluster:start()
+
+    -- Verify that all the instances are healthy.
+    cluster:each(function(server)
+        server:exec(function()
+            t.assert_equals(box.info.status, 'running')
+        end)
+    end)
+
+    -- Verify that the anonymous replicas are actually anonymous.
+    cluster['instance-004']:exec(function()
+        t.assert_equals(box.info.id, 0)
+    end)
+    cluster['instance-005']:exec(function()
+        t.assert_equals(box.info.id, 0)
+    end)
+end
+
+-- Verify that an anonymous replica is not used as an upstream for
+-- other instances of the same replicaset.
+g.test_no_anonymous_upstream = function()
+    -- One master, two replicas, two anonymous replicas.
+    --
+    -- NB: It is the same as config in `test_basic`, but has no
+    -- `replication.peers` option.
+    local config = cbuilder:new()
+        :add_instance('instance-001', {
+            database = {
+                mode = 'rw',
+            },
+        })
+        :add_instance('instance-002', {})
+        :add_instance('instance-003', {})
+        :add_instance('instance-004', {
+            replication = {
+                anon = true,
+            },
+        })
+        :add_instance('instance-005', {
+            replication = {
+                anon = true,
+            },
+        })
+        :config()
+
+    local cluster = cluster:new(config)
+    cluster:start()
+
+     -- Verify that the anonymous replicas are actually anonymous.
+    cluster['instance-004']:exec(function()
+        t.assert_equals(box.info.id, 0)
+    end)
+    cluster['instance-005']:exec(function()
+        t.assert_equals(box.info.id, 0)
+    end)
+
+    -- Verify box.cfg.replication on all instances.
+    --
+    -- NB: We can check box.info.replication as well, but it just
+    -- adds extra code and doesn't improve coverage of upstream
+    -- list construction logic.
+    cluster:each(function(server)
+        server:exec(function()
+            t.assert_equals(box.cfg.replication, {
+                {
+                    login = 'replicator',
+                    password = 'secret',
+                    uri = 'unix/:./instance-001.iproto',
+                },
+                {
+                    login = 'replicator',
+                    password = 'secret',
+                    uri = 'unix/:./instance-002.iproto',
+                },
+                {
+                    login = 'replicator',
+                    password = 'secret',
+                    uri = 'unix/:./instance-003.iproto',
+                },
+                -- No instance-{004,005}, because they're
+                -- anonymous replicas.
+            })
+        end)
+    end)
+end
+
+-- Verify that anonymous replicas are skipped when choosing a
+-- bootstrap leader in the `failover: supervised` mode.
+g.test_supervised_mode_bootstrap_leader_not_anon = function()
+    -- `failover: supervised` assigns a first non-anonymous
+    -- instance as a bootstrap leader. The order is alphabetical.
+    local config = cbuilder:new()
+        :set_replicaset_option('replication.failover', 'supervised')
+        :add_instance('instance-001', {
+            replication = {
+                anon = true,
+            },
+        })
+        :add_instance('instance-002', {})
+        :add_instance('instance-003', {})
+        :add_instance('instance-004', {})
+        :add_instance('instance-005', {
+            replication = {
+                anon = true,
+            },
+        })
+        :config()
+
+    local cluster = cluster:new(config)
+    cluster:start()
+
+    -- Verify that instance-001 (anonymous replica) is
+    -- successfully started. An attempt to make it writable (to
+    -- use as a bootstrap leader) would lead to a startup error.
+    t.helpers.retrying({timeout = 60}, function()
+        cluster['instance-001']:exec(function()
+            t.assert_equals(box.info.status, 'running')
+        end)
+    end)
+
+    -- Verify that instance-002 is the bootstrap leader.
+    --
+    -- NB: An instance with box.info.id = 1 is a bootstrap leader.
+    cluster['instance-002']:exec(function()
+        t.assert_equals(box.info.id, 1)
+    end)
+end
+
+-- Verify that a replicaset with all the instances configured as
+-- anonymous replicas refuse to start with a meaningful error
+-- message.
+g.test_all_anonymous = function()
+    local config = cbuilder:new()
+        :add_instance('instance-001', {
+            replication = {
+                anon = true,
+            },
+        })
+        :add_instance('instance-002', {
+            replication = {
+                anon = true,
+            },
+        })
+        :add_instance('instance-003', {
+            replication = {
+                anon = true,
+            },
+        })
+        :config()
+
+    cluster:startup_error(config, textutils.toline([[
+        All the instances of replicaset "replicaset-001" of group "group-001"
+        are configured as anonymous replicas; it effectively means that the
+        whole replicaset is read-only; moreover, it means that default
+        replication.peers construction logic will create empty upstream list
+        and each instance is de-facto isolated: neither is connected to any
+        other; this configuration is forbidden, because it looks like there
+        is no meaningful use case
+    ]]))
+end
+
+-- Verify that an anonymous replica can't be configured in
+-- read-write mode.
+--
+-- The whole replicaset refuses to start if this misconfiguration
+-- is found.
+--
+-- replication.failover: off
+g.test_anonymous_replica_rw_mode = function()
+    local config = cbuilder:new()
+        :add_instance('instance-001', {
+            database = {
+                mode = 'rw',
+            },
+        })
+        :add_instance('instance-002', {})
+        :add_instance('instance-003', {})
+        :add_instance('instance-004', {
+            database = {
+                mode = 'rw',
+            },
+            replication = {
+                anon = true,
+            },
+        })
+        :config()
+
+    cluster:startup_error(config, textutils.toline([[
+        database.mode = "rw" is set for instance "instance-004" of replicaset
+        "replicaset-001" of group "group-001", but this option cannot be used
+        together with replication.anon = true
+    ]]))
+end
+
+-- Verify that an anonymous replica can't be assigned as a leader.
+--
+-- The whole replicaset refuses to start if this misconfiguration
+-- is found.
+--
+-- replication.failover: manual
+g.test_anonymous_replica_leader = function()
+    local config = cbuilder:new()
+        :set_replicaset_option('replication.failover', 'manual')
+        :set_replicaset_option('leader', 'instance-004')
+        :add_instance('instance-001', {})
+        :add_instance('instance-002', {})
+        :add_instance('instance-003', {})
+        :add_instance('instance-004', {
+            replication = {
+                anon = true,
+            },
+        })
+        :config()
+
+    cluster:startup_error(config, textutils.toline([[
+        replication.anon = true is set for instance "instance-004" of replicaset
+        "replicaset-001" of group "group-001" that is configured as a leader; a
+        leader can not be an anonymous replica
+    ]]))
+end
+
+-- Verify that an anonymous replica can't be configured with
+-- replication.election_mode parameter other than null or "off".
+--
+-- The whole replicaset refuses to start if this misconfiguration
+-- is found.
+--
+-- replication.failover: election
+g.test_anonymous_replica_election_mode_other_than_off = function()
+    local error_t = textutils.toline([[
+        replication.election_mode = %q is set for instance "instance-004" of
+        replicaset "replicaset-001" of group "group-001", but this option cannot
+        be used together with replication.anon = true; consider setting
+        replication.election_mode = "off" explicitly for this instance
+    ]])
+
+    for _, election_mode in ipairs({'candidate', 'voter', 'manual'}) do
+        local config = cbuilder:new()
+            :set_replicaset_option('replication.failover', 'election')
+            :add_instance('instance-001', {})
+            :add_instance('instance-002', {})
+            :add_instance('instance-003', {})
+            :add_instance('instance-004', {
+                replication = {
+                    anon = true,
+                    election_mode = election_mode,
+                },
+            })
+            :config()
+
+        cluster:startup_error(config, error_t:format(election_mode))
+    end
+end
+
+-- Verify that the election mode defaults to 'off' for an
+-- anonymous replica in a replicaset with election failover.
+g.test_anonymous_replica_election_mode_off = function()
+    -- Three non-anonymous instances, two anonymous replicas.
+    --
+    -- The replicaset is in `failover: election` mode.
+    local config = cbuilder:new()
+        :set_replicaset_option('replication.failover', 'election')
+        :add_instance('instance-001', {})
+        :add_instance('instance-002', {})
+        :add_instance('instance-003', {})
+        :add_instance('instance-004', {
+            replication = {
+                anon = true,
+            },
+        })
+        :add_instance('instance-005', {
+            replication = {
+                anon = true,
+            },
+        })
+        :config()
+
+    local cluster = cluster:new(config)
+    cluster:start()
+
+    local function verify_election_mode_candidate()
+        t.assert_equals(box.cfg.election_mode, 'candidate')
+    end
+
+    local function verify_election_mode_off()
+        t.assert_equals(box.cfg.election_mode, 'off')
+    end
+
+    -- Verify that non-anonymous instances have election mode
+    -- 'candidate', while anonymous replicas are 'off'.
+    cluster['instance-001']:exec(verify_election_mode_candidate)
+    cluster['instance-002']:exec(verify_election_mode_candidate)
+    cluster['instance-003']:exec(verify_election_mode_candidate)
+    cluster['instance-004']:exec(verify_election_mode_off)
+    cluster['instance-005']:exec(verify_election_mode_off)
+end
+
+-- Verify that an anonymous replica can join a replicaset that has
+-- all the instances in read-only mode.
+g.test_join_anonymous_replica_to_all_ro_replicaset = function()
+    local config = cbuilder:new()
+        :set_replicaset_option('replication.failover', 'manual')
+        :set_replicaset_option('leader', 'instance-001')
+        :add_instance('instance-001', {})
+        :add_instance('instance-002', {})
+        :add_instance('instance-003', {})
+        :config()
+
+    -- Bootstrap the replicaset.
+    local cluster = cluster:new(config)
+    cluster:start()
+
+    -- Unset the leader -- make all the instances read-only.
+    local new_config = cbuilder:new(config)
+        :set_replicaset_option('leader', nil)
+        :config()
+    cluster:reload(new_config)
+
+    -- Verify that the instances actually enter read-only mode.
+    cluster:each(function(server)
+        server:exec(function()
+            t.assert_equals(box.info.ro, true)
+        end)
+    end)
+
+    -- Add a new anonymous replica into the config and reflect it
+    -- in the cluster object. Start the replica.
+    local new_config_2 = cbuilder:new(new_config)
+        :add_instance('instance-004', {
+            replication = {
+                anon = true,
+            },
+        })
+        :config()
+    cluster:sync(new_config_2)
+    cluster:start_instance('instance-004')
+
+    -- Verify that the new instance is an anonymous replica and
+    -- that it is synchronized with instance-{001,002,003}.
+    t.helpers.retrying({timeout = 60}, function()
+        cluster['instance-004']:exec(function()
+            t.assert_equals(box.info.id, 0)
+            t.assert_equals(box.info.status, 'running')
+            t.assert_equals(box.space._cluster:count(), 3)
+        end)
+    end)
+end

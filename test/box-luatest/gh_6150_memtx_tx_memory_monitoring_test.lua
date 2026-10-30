@@ -1,0 +1,597 @@
+local server = require('luatest.server')
+local t = require('luatest')
+
+local g = t.group()
+
+-- Sizes of objects from transaction manager.
+-- Please update them, if you changed the relevant structures.
+local SIZE_OF_STMT = 136
+-- Size of story with one link (for spaces with 1 index).
+local SIZE_OF_STORY = 216
+-- Size of the links of each additional index in a story.
+local SIZE_OF_STORY_INDEX_LINKS = 96
+-- Size of an additional (not inline) story link of a multikey index.
+local SIZE_OF_STORY_LINK = 80
+-- Size of a deleted story list entry.
+local SIZE_OF_DEL_STORY_LINK = 24
+-- Size of tuple with 2 number fields
+local SIZE_OF_TUPLE = 9
+-- Size of xrow for tuples with 2 number fields
+local SIZE_OF_XROW = 179
+-- Size of xrow for tuples with a number field and a 3-number array field
+local SIZE_OF_MULTIKEY_XROW = 182
+-- Size of rollback info.
+local SIZE_OF_UNDO = 16
+-- Tracker can allocate additional memory, be careful!
+local SIZE_OF_READ_TRACKER = 48
+local SIZE_OF_POINT_TRACKER = 80
+local SIZE_OF_INPLACE_GAP_TRACKER = 56
+local SIZE_OF_NEARBY_GAP_TRACKER = 88
+
+local current_stat = {}
+
+local function table_apply_change(table, related_changes)
+    for k, v in pairs(related_changes) do
+        if type(v) ~= 'table' then
+            table[k] = table[k] + v
+        else
+            table_apply_change(table[k], v)
+        end
+    end
+end
+
+local function table_values_are_zeros(table)
+    for _, v in pairs(table) do
+        if type(v) ~= 'table' then
+            if v ~= 0 then
+                return false
+            end
+        else
+            if not table_values_are_zeros(v) then
+                return false
+            end
+        end
+    end
+    return true
+end
+
+local function tx_gc(server, steps, related_changes)
+    server:eval('box.internal.memtx_tx_gc(' .. steps .. ')')
+    if related_changes then
+        table_apply_change(current_stat, related_changes)
+    end
+    t.assert_equals(server:eval('return box.stat.memtx.tx()'), current_stat)
+end
+
+local function tx_step(server, txn_name, op, related_changes)
+    server:eval(txn_name ..  '("' .. op .. '")')
+    if related_changes then
+        table_apply_change(current_stat, related_changes)
+    end
+    t.assert_equals(server:eval('return box.stat.memtx.tx()'), current_stat)
+end
+
+g.before_each(function()
+    g.server = server:new{
+        alias   = 'default',
+        box_cfg = {memtx_use_mvcc_engine = true}
+    }
+    g.server:start()
+
+    g.server:eval('txn_proxy = require("test.box.lua.txn_proxy")')
+    g.server:eval('s = box.schema.space.create("test")')
+    g.server:eval('s:create_index("pk")')
+    -- Clear txm before test
+    g.server:eval('box.internal.memtx_tx_gc(100)')
+    -- CREATING CURRENT STAT
+    current_stat = g.server:eval('return box.stat.memtx.tx()')
+    -- Check if txm use no memory
+    t.assert(table_values_are_zeros(current_stat))
+end)
+
+g.after_each(function()
+    -- Check if there is no memory occupied by txm
+    g.server:drop()
+end)
+
+g.test_simple = function()
+    g.server:eval('tx1 = txn_proxy.new()')
+    g.server:eval('tx2 = txn_proxy.new()')
+    g.server:eval('tx1:begin()')
+    g.server:eval('tx2:begin()')
+    local diff = {
+        ["txn"] = {
+            ["statements"] = {
+                ["avg"] = math.floor(SIZE_OF_STMT / 2),
+                ["total"] = SIZE_OF_STMT,
+                ["max"] = SIZE_OF_STMT,
+            },
+            ["system"] = {
+                ["total"] = SIZE_OF_XROW + SIZE_OF_UNDO,
+                ["max"] = SIZE_OF_XROW + SIZE_OF_UNDO,
+                ["avg"] = math.floor((SIZE_OF_XROW + SIZE_OF_UNDO) / 2),
+            }
+        },
+        ["mvcc"] = {
+            ["tuples"] = {
+                ["used"] = {
+                    ["stories"] = {
+                        ["total"] = SIZE_OF_STORY,
+                        ["count"] = 1,
+                    }
+                }
+            }
+        }
+    }
+    tx_step(g.server, 'tx1', "s:replace{1, 1}", diff)
+    diff = {
+        ["txn"] = {
+            ["statements"] = {
+                ["avg"] = math.floor(SIZE_OF_STMT / 2),
+                ["total"] = SIZE_OF_STMT,
+            },
+            ["system"] = {
+                ["total"] = SIZE_OF_XROW + SIZE_OF_UNDO,
+                ["avg"] = math.floor((SIZE_OF_XROW +
+                                      SIZE_OF_UNDO) / 2) + 1,
+            }
+        },
+        ["mvcc"] = {
+            ["tuples"] = {
+                ["used"] = {
+                    ["stories"] = {
+                        ["total"] = SIZE_OF_STORY,
+                        ["count"] = 1,
+                    },
+                    ["retained"] = {
+                        ["total"] = SIZE_OF_TUPLE,
+                        ["count"] = 1,
+                    },
+                }
+            }
+        }
+    }
+    tx_step(g.server, 'tx2', "s:replace{1, 2}", diff)
+    diff = {
+        ["txn"] = {
+            ["statements"] = {
+                ["total"] = SIZE_OF_STMT,
+                ["avg"] = math.floor(SIZE_OF_STMT / 2),
+                ["max"] = SIZE_OF_STMT,
+            },
+            ["system"] = {
+                ["total"] = SIZE_OF_XROW + SIZE_OF_UNDO,
+                ["avg"] = math.floor((SIZE_OF_XROW + SIZE_OF_UNDO) / 2),
+                ["max"] = SIZE_OF_XROW + SIZE_OF_UNDO,
+            }
+        },
+        ["mvcc"] = {
+            ["tuples"] = {
+                ["used"] = {
+                    ["stories"] = {
+                        ["total"] = SIZE_OF_STORY,
+                        ["count"] = 1,
+                    },
+                }
+            }
+        }
+    }
+    tx_step(g.server, 'tx2', "s:replace{2, 2}", diff)
+    tx_gc(g.server, 100, nil)
+    t.assert_equals(g.server:eval('return tx2:commit()'), '')
+    diff = {
+        ["txn"] = {
+            ["statements"] = {
+                ["total"] = -2 * SIZE_OF_STMT,
+                ["avg"] = -1 * math.floor(SIZE_OF_STMT / 2),
+                ["max"] = -1 * SIZE_OF_STMT,
+            },
+            ["system"] = {
+                ["total"] = -2 * (SIZE_OF_XROW + SIZE_OF_UNDO),
+                ["avg"] = -1 * math.floor((SIZE_OF_XROW +
+                                           SIZE_OF_UNDO) / 2),
+                ["max"] = -1 * (SIZE_OF_XROW + SIZE_OF_UNDO),
+            }
+        },
+        ["mvcc"] = {
+            ["trackers"] = {
+                ["max"] = SIZE_OF_DEL_STORY_LINK,
+                ["avg"] = SIZE_OF_DEL_STORY_LINK,
+                ["total"] = SIZE_OF_DEL_STORY_LINK,
+            },
+            ["tuples"] = {
+                ["used"] = {
+                    ["stories"] = {
+                        ["total"] = -1 * SIZE_OF_STORY,
+                        ["count"] = -1,
+                    },
+                }
+            }
+        }
+    }
+    tx_gc(g.server, 10, diff)
+    t.assert_equals(g.server:eval('return tx1:commit()'), '')
+    diff = {
+        ["txn"] = {
+            ["statements"] = {
+                ["total"] = -1 * SIZE_OF_STMT,
+                ["avg"] = -1 * SIZE_OF_STMT,
+                ["max"] = -1 * SIZE_OF_STMT,
+            },
+            ["system"] = {
+                ["total"] = -1 * (SIZE_OF_XROW + SIZE_OF_UNDO),
+                ["avg"] = -1 * (SIZE_OF_XROW + SIZE_OF_UNDO),
+                ["max"] = -1 * (SIZE_OF_XROW + SIZE_OF_UNDO),
+            },
+        },
+        ["mvcc"] = {
+            ["trackers"] = {
+                ["total"] = -SIZE_OF_DEL_STORY_LINK,
+                ["avg"] = -SIZE_OF_DEL_STORY_LINK,
+                ["max"] = -SIZE_OF_DEL_STORY_LINK,
+            },
+            ["tuples"] = {
+                ["used"] = {
+                    ["stories"] = {
+                        ["total"] = -2 * SIZE_OF_STORY,
+                        ["count"] = -2,
+                    },
+                    ["retained"] = {
+                        ["total"] = -1 * SIZE_OF_TUPLE,
+                        ["count"] = -1,
+                    },
+                }
+            }
+        }
+    }
+    tx_gc(g.server, 100, diff)
+    t.assert(table_values_are_zeros(current_stat))
+end
+
+local function test_multikey(index_opts)
+    g.server:exec(function(index_opts)
+        box.space.test:create_index('mk', index_opts)
+    end, {index_opts})
+    g.server:eval('box.internal.memtx_tx_gc(100)')
+    current_stat = g.server:eval('return box.stat.memtx.tx()')
+    t.assert(table_values_are_zeros(current_stat))
+    g.server:eval('tx1 = txn_proxy.new()')
+    g.server:eval('tx1:begin()')
+    -- The story has an inline link for the first entry of each index, the
+    -- other two multikey entries get separately allocated links.
+    local size_of_story = SIZE_OF_STORY + SIZE_OF_STORY_INDEX_LINKS +
+                          2 * SIZE_OF_STORY_LINK
+    local diff = {
+        ["txn"] = {
+            ["statements"] = {
+                ["total"] = SIZE_OF_STMT,
+                ["avg"] = SIZE_OF_STMT,
+                ["max"] = SIZE_OF_STMT,
+            },
+            ["system"] = {
+                ["total"] = SIZE_OF_MULTIKEY_XROW + SIZE_OF_UNDO,
+                ["avg"] = SIZE_OF_MULTIKEY_XROW + SIZE_OF_UNDO,
+                ["max"] = SIZE_OF_MULTIKEY_XROW + SIZE_OF_UNDO,
+            }
+        },
+        ["mvcc"] = {
+            ["tuples"] = {
+                ["used"] = {
+                    ["stories"] = {
+                        ["total"] = size_of_story,
+                        ["count"] = 1,
+                    }
+                }
+            }
+        }
+    }
+    tx_step(g.server, 'tx1', "s:replace{1, {1, 2, 3}}", diff)
+    t.assert_equals(g.server:eval('return tx1:commit()'), '')
+    diff = {
+        ["txn"] = {
+            ["statements"] = {
+                ["total"] = -1 * SIZE_OF_STMT,
+                ["avg"] = -1 * SIZE_OF_STMT,
+                ["max"] = -1 * SIZE_OF_STMT,
+            },
+            ["system"] = {
+                ["total"] = -1 * (SIZE_OF_MULTIKEY_XROW + SIZE_OF_UNDO),
+                ["avg"] = -1 * (SIZE_OF_MULTIKEY_XROW + SIZE_OF_UNDO),
+                ["max"] = -1 * (SIZE_OF_MULTIKEY_XROW + SIZE_OF_UNDO),
+            }
+        },
+        ["mvcc"] = {
+            ["tuples"] = {
+                ["used"] = {
+                    ["stories"] = {
+                        ["total"] = -1 * size_of_story,
+                        ["count"] = -1,
+                    }
+                }
+            }
+        }
+    }
+    tx_gc(g.server, 100, diff)
+    t.assert(table_values_are_zeros(current_stat))
+end
+
+g.test_multikey = function()
+    test_multikey({parts = {{field = 2, path = '[*]'}}, unique = false})
+end
+
+g.test_func_multikey = function()
+    g.server:exec(function()
+        box.schema.func.create('f', {
+            body = [[
+                function(tuple)
+                    local keys = {}
+                    for _, k in ipairs(tuple[2]) do
+                        table.insert(keys, {k})
+                    end
+                    return keys
+                end
+            ]],
+            is_deterministic = true,
+            is_sandboxed = true,
+            opts = {is_multikey = true},
+        })
+    end)
+    test_multikey({parts = {{1, 'unsigned'}}, func = 'f', unique = false})
+end
+
+g.test_read_view = function()
+    g.server:eval('tx1 = txn_proxy.new()')
+    g.server:eval('tx2 = txn_proxy.new()')
+    g.server:eval('tx1:begin()')
+    g.server:eval('tx2:begin()')
+    g.server:eval('s:replace{1, 1}')
+    g.server:eval('s:replace{2, 1}')
+    g.server:eval('box.internal.memtx_tx_gc(10)')
+    t.assert(table_values_are_zeros(g.server:eval('return box.stat.memtx.tx()')))
+    g.server:eval('tx1("s:get(1)")')
+    g.server:eval('tx2("s:replace{1, 2}")')
+    g.server:eval('tx2("s:replace{2, 2}")')
+    g.server:eval('tx2:commit()')
+    local diff = {
+        ["mvcc"] = {
+            ["trackers"] = {
+                ["max"] = SIZE_OF_READ_TRACKER,
+                ["avg"] = SIZE_OF_READ_TRACKER,
+                ["total"] = SIZE_OF_READ_TRACKER,
+            },
+            ["tuples"] = {
+                ["read_view"] = {
+                    ["stories"] = {
+                        ["total"] = 3 * SIZE_OF_STORY,
+                        ["count"] = 3,
+                    },
+                    ["retained"] = {
+                        ["total"] = SIZE_OF_TUPLE,
+                        ["count"] = 1,
+                    },
+                },
+                ["used"] = {
+                    ["stories"] = {
+                        ["total"] = SIZE_OF_STORY,
+                        ["count"] = 1,
+                    },
+                    ["retained"] = {
+                        ["total"] = SIZE_OF_TUPLE,
+                        ["count"] = 1,
+                    },
+                },
+            },
+        }
+    }
+    tx_gc(g.server, 10, diff)
+end
+
+g.test_read_view_with_empty_space = function()
+    g.server:eval('tx1 = txn_proxy.new()')
+    g.server:eval('tx2 = txn_proxy.new()')
+    g.server:eval('tx1:begin()')
+    g.server:eval('tx2:begin()')
+    g.server:eval('s:replace{1, 1}')
+    g.server:eval('s:replace{2, 1}')
+    g.server:eval('box.internal.memtx_tx_gc(10)')
+    t.assert(table_values_are_zeros(g.server:eval('return box.stat.memtx.tx()')))
+    g.server:eval('tx1("s:get(1)")')
+    g.server:eval('tx2("s:delete(1)")')
+    g.server:eval('tx2("s:delete(2)")')
+    g.server:eval('tx2:commit()')
+    local diff = {
+        ["mvcc"] = {
+            ["trackers"] = {
+                ["max"] = SIZE_OF_READ_TRACKER,
+                ["avg"] = SIZE_OF_READ_TRACKER,
+                ["total"] = SIZE_OF_READ_TRACKER,
+            },
+            ["tuples"] = {
+                ["read_view"] = {
+                    ["stories"] = {
+                        ["total"] = SIZE_OF_STORY,
+                        ["count"] = 1,
+                    },
+                    ["retained"] = {
+                        ["total"] = SIZE_OF_TUPLE,
+                        ["count"] = 1,
+                    },
+                },
+                ["used"] = {
+                    ["stories"] = {
+                        ["total"] = SIZE_OF_STORY,
+                        ["count"] = 1,
+                    },
+                    ["retained"] = {
+                        ["total"] = SIZE_OF_TUPLE,
+                        ["count"] = 1,
+                    },
+                },
+            },
+        }
+    }
+    tx_gc(g.server, 10, diff)
+end
+
+g.test_tracker = function()
+    g.server:eval('s.index.pk:alter({parts={{field = 1, type = "unsigned"}, {field = 2, type = "unsigned"}}})')
+    g.server:eval('s:replace{1, 0}')
+    g.server:eval('s:replace{3, 2}')
+    g.server:eval('s:replace{2, 0}')
+    g.server:eval('tx1 = txn_proxy.new()')
+    g.server:eval('tx1:begin()')
+    g.server:eval('tx1("s:select{2}")')
+    local trackers_used = 2 * SIZE_OF_NEARBY_GAP_TRACKER + SIZE_OF_READ_TRACKER
+    local diff = {
+        ["mvcc"] = {
+            ["trackers"] = {
+                ["max"] = trackers_used,
+                ["avg"] = trackers_used,
+                ["total"] = trackers_used,
+            },
+            ["tuples"] = {
+                ["used"] = {
+                    ["stories"] = {
+                        ["total"] = SIZE_OF_STORY,
+                        ["count"] = 1,
+                    },
+                },
+                ["tracking"] = {
+                    ["stories"] = {
+                        ["total"] = SIZE_OF_STORY,
+                        ["count"] = 1,
+                    },
+                },
+            },
+        },
+    }
+    tx_gc(g.server, 10, diff)
+end
+
+g.test_conflict = function()
+    g.server:eval('tx1 = txn_proxy.new()')
+    g.server:eval('tx2 = txn_proxy.new()')
+    g.server:eval('box.internal.memtx_tx_gc(10)')
+    local stat = g.server:eval('return box.stat.memtx.tx()')
+    t.assert(table_values_are_zeros(stat))
+
+    -- Test that monitoring shows hole point tracker.
+    g.server:eval('tx1:begin()')
+    g.server:eval('tx2:begin()')
+    g.server:eval('tx1("s:get(1)")')
+    g.server:eval("box.internal.memtx_tx_gc(10)")
+    local trackers_used = SIZE_OF_POINT_TRACKER
+    local diff = {
+        ["txn"] = {
+            ["statements"] = {
+                ["max"] = 0,
+                ["avg"] = 0,
+                ["total"] = 0,
+            },
+            ["system"] = {
+                ["max"] = 0,
+                ["avg"] = 0,
+                ["total"] = 0,
+            },
+        },
+        ["mvcc"] = {
+            ["trackers"] = {
+                ["max"] = trackers_used,
+                ["avg"] = math.floor(trackers_used / 2),
+                ["total"] = trackers_used,
+            },
+            ["conflicts"] = {
+                ["max"] = 0,
+                ["avg"] = 0,
+                ["total"] = 0,
+            },
+            ["tuples"] = {
+                ["used"] = {
+                    ["stories"] = {
+                        ["total"] = 0,
+                        ["count"] = 0,
+                    },
+                },
+            },
+        },
+    }
+    tx_gc(g.server, 10, diff)
+
+    -- Test that hole point tracker was replaced by gap read tracker.
+    g.server:eval('tx2("s:replace{1, 2}")')
+    g.server:eval("box.internal.memtx_tx_gc(10)")
+    -- Note that we have subtract the previous value of trackers_used
+    -- because point trackers are freed and we need negative diff for them.
+    trackers_used = SIZE_OF_INPLACE_GAP_TRACKER - trackers_used
+    local diff = {
+        ["txn"] = {
+            ["statements"] = {
+                ["max"] = SIZE_OF_STMT,
+                ["avg"] = math.floor(SIZE_OF_STMT / 2),
+                ["total"] = SIZE_OF_STMT,
+            },
+            ["system"] = {
+                ["max"] = SIZE_OF_XROW + SIZE_OF_UNDO,
+                ["avg"] = math.floor((SIZE_OF_XROW + SIZE_OF_UNDO) / 2),
+                ["total"] = SIZE_OF_XROW + SIZE_OF_UNDO,
+            },
+        },
+        ["mvcc"] = {
+            ["trackers"] = {
+                ["max"] = trackers_used,
+                ["avg"] = math.floor(trackers_used / 2),
+                ["total"] = trackers_used,
+            },
+            ["conflicts"] = {
+                ["max"] = 0,
+                ["avg"] = 0,
+                ["total"] = 0,
+            },
+            ["tuples"] = {
+                ["used"] = {
+                    ["stories"] = {
+                        ["total"] = SIZE_OF_STORY,
+                        ["count"] = 1,
+                    },
+                },
+            },
+        },
+    }
+    tx_gc(g.server, 10, diff)
+end
+
+g.test_user_data = function()
+    g.server:eval('ffi = require("ffi")')
+    g.server:eval('ffi.cdef("void *box_txn_alloc(size_t size);")')
+    g.server:eval('tx = txn_proxy.new()')
+    g.server:eval('tx:begin()')
+    local alloc_size = 100
+    local diff = {
+        ["txn"] = {
+            ["user"] = {
+                ["total"] = alloc_size,
+                ["avg"] = alloc_size,
+                ["max"] = alloc_size,
+            },
+        },
+    }
+    tx_step(g.server, 'tx', 'ffi.C.box_txn_alloc(' .. alloc_size .. ')', diff)
+    t.assert_equals(g.server:eval('return tx:commit()'), '')
+    diff = {
+        ["txn"] = {
+            ["user"] = {
+                ["total"] = -1 * alloc_size,
+                ["avg"] = -1 * alloc_size,
+                ["max"] = -1 * alloc_size,
+            },
+        },
+    }
+    tx_gc(g.server, 1, diff)
+end
+
+g.test_gh_8448_box_stat_memtx_func = function()
+    g.server:exec(function()
+        t.assert_type(box.stat.memtx.tx, 'function')
+        t.assert_equals(box.stat.memtx().tx, box.stat.memtx.tx())
+    end)
+end

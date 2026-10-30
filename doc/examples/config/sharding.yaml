@@ -1,0 +1,91 @@
+# See the vshard documentation for proper usage of vshard. The basic scenario
+# with this configuration is described below.
+#
+# After the replicasets have been booted, but before using sharding, you need to
+# create spaces that will contain the data and define functions to work with
+# these spaces on the master storages. For example:
+#
+# format = {{'id', 'unsigned'}, {'bucket_id', 'unsigned'}}
+# s = box.schema.space.create('test', {format = format})
+# s:create_index('id', {parts = {'id'}})
+# s:create_index('bucket_id', {parts = {'bucket_id'}, unique = false})
+
+# function get(id) return box.space.test:get(id) end
+# box.schema.func.create('get')
+# box.schema.role.grant('public', 'execute', 'function', 'get')
+
+# function put(id, b_id) box.space.test:insert({id, b_id}) return true end
+# box.schema.func.create('put')
+# box.schema.role.grant('public', 'execute', 'function', 'put')
+#
+# After this you need to call vshard.router.bootstrap() on router.
+#
+# To insert following function can be used on router after bootstrap:
+# vshard.router.call(bucket_id, 'write', 'put', {id, bucket_id})
+#
+# To get data following function can be used on router after bootstrap:
+# vshard.router.call(bucket_id, 'read', 'get', {id})
+
+config:
+  context:
+    replicator_password:
+      from: file
+      file: secrets/replicator_password.txt
+      rstrip: true
+    storage_password:
+      from: file
+      file: secrets/storage_password.txt
+      rstrip: true
+
+credentials:
+  users:
+    replicator:
+      password: '{{ context.replicator_password }}'
+      roles: [replication]
+    storage:
+      password: '{{ context.storage_password }}'
+      # The default 'sharding' role is required by storage users. It has all the
+      # necessary privileges for sharding.
+      roles: [sharding]
+
+iproto:
+  listen:
+  - uri: 'unix/:./{{ instance_name }}.iproto'
+  # If a login is not specified, 'guest' is used. If a login is specified and a
+  # user with that name is described in credentials.users, then the user should
+  # have the default 'sharding' role. If a login is specified and the user is
+  # not described in credentials.users, the user's existence and privileges will
+  # be checked when the vshard storage is started.
+  advertise:
+    peer:
+      login: 'replicator'
+    sharding:
+      login: 'storage'
+
+sharding:
+  bucket_count: 10000
+
+groups:
+  storages:
+    replication:
+      failover: manual
+    sharding:
+      roles: [storage]
+    replicasets:
+      storages-001:
+        leader: storage-001
+        instances:
+          storage-001: {}
+          storage-002: {}
+      storages-002:
+        leader: storage-004
+        instances:
+          storage-003: {}
+          storage-004: {}
+  routers:
+    replicasets:
+      routers-001:
+        sharding:
+          roles: [router]
+        instances:
+          router-001: {}

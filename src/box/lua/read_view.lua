@@ -1,0 +1,907 @@
+local fun = require('fun')
+local utils = require('internal.utils')
+
+local fiber = require('fiber')
+local threads = require('threads')
+
+local check_index_arg = box.internal.check_index_arg
+local check_param = utils.check_param
+local check_param_table = utils.check_param_table
+local check_primary_index = box.internal.check_primary_index
+local check_iterator_type = box.internal.check_iterator_type
+local check_select_opts = box.internal.check_select_opts
+local check_pairs_opts = box.internal.check_pairs_opts
+local check_space_arg = box.internal.check_space_arg
+
+local tuple_bless = box.internal.tuple.bless
+local tuple_encode = box.internal.tuple.encode
+
+local buffer = require('buffer')
+local cord_ibuf_take = buffer.internal.cord_ibuf_take
+local cord_ibuf_put = buffer.internal.cord_ibuf_put
+
+local msgpackffi = require('msgpackffi')
+
+local ffi = require('ffi')
+ffi.cdef([[
+    struct index_read_view_iterator { char pad[80]; };
+    int box_index_read_view_tuple_position(
+            struct space_read_view_handle *space, uint32_t index_id,
+            const char *tuple, const char *tuple_end,
+            const char **packed_pos, const char **packed_pos_end);
+    int box_index_read_view_get(
+            struct space_read_view_handle *space, uint32_t index_id,
+            const char *key, const char *key_end, struct tuple **result);
+    int box_index_read_view_count(
+            struct space_read_view_handle *space, uint32_t index_id,
+            int iterator, const char *key, const char *key_end);
+    int box_index_read_view_quantile(
+            struct space_read_view_handle *space, uint32_t index_id,
+            double level, const char *begin_key, const char *begin_key_end,
+            const char *end_key, const char *end_key_end,
+            const char **quantile_key, const char **quantile_key_end);
+    int box_index_read_view_select(
+            struct space_read_view_handle *space, uint32_t index_id,
+            int iterator, uint32_t offset, uint32_t limit,
+            const char *key, const char *key_end,
+            const char **packed_pos, const char **packed_pos_end,
+            bool update_pos, struct port *port);
+    int box_index_read_view_create_iterator_with_offset(
+            struct space_read_view_handle *space, uint32_t index_id,
+            int iterator, const char *key, const char *key_end,
+            const char *packed_pos, const char *packed_pos_end,
+            uint32_t offset, struct index_read_view_iterator *it);
+    int box_index_read_view_iterator_next(struct index_read_view_iterator *it,
+                                          struct space_read_view_handle *space,
+                                          struct tuple **result);
+    void box_index_read_view_iterator_destroy(
+            struct index_read_view_iterator *it);
+]])
+local builtin = ffi.C
+
+-- Static objects used by the FFI API to store results.
+local ptuple = ffi.new('struct tuple *[1]')
+local port = ffi.new('struct port')
+local port_c = ffi.cast('struct port_c *', port)
+local iterator_pos = ffi.new('const char *[1]')
+local iterator_pos_end = ffi.new('const char *[1]')
+
+local internal = box.internal.read_view
+
+-- box.read_view.open() options template.
+local READ_VIEW_OPTIONS_TEMPLATE = {
+    name = 'string',
+    id = 'number',
+}
+
+-- box.read_view.info() options template.
+local READ_VIEW_INFO_TEMPLATE = {
+    refs = 'boolean',
+}
+
+local function check_read_view_arg(rv, method, level)
+    if type(rv) ~= 'table' then
+        local fmt = 'Use read_view:%s(...) instead of read_view.%s(...)'
+        box.error(box.error.ILLEGAL_PARAMS,
+                  string.format(fmt, method, method), level + 1)
+    end
+end
+
+-- Helper function that returns a copy of the given object with private fields
+-- (fields whose names start with an underscore) filtered out. It is used for
+-- object serialization.
+local function filter_private_fields(t)
+    local ret = {}
+    for k, v in pairs(t) do
+        assert(type(k) == 'string')
+        if not k:startswith('_') then
+            ret[k] = v
+        end
+    end
+    return ret
+end
+
+local read_view_space_list_mt = {
+    -- Returns a table of spaces keyed by space name with system spaces
+    -- (spaces whose names start with an underscore) filtered out.
+    __serialize = function(self)
+        local ret = {}
+        for k, space in pairs(self) do
+            if type(k) == 'string' and not k:startswith('_') then
+                ret[k] = {
+                    id = space.id,
+                }
+            end
+        end
+        return ret
+    end
+}
+
+local read_view_space_methods = {}
+local read_view_space_mt = {
+    __index = read_view_space_methods,
+}
+
+local read_view_index_methods_common = {}
+local read_view_index_mt_base = {
+    __serialize = filter_private_fields,
+}
+
+local read_view_index_methods_luac = {}
+local read_view_index_mt_luac = {
+    __index = read_view_index_methods_luac,
+}
+
+local read_view_index_methods_ffi = {}
+local read_view_index_mt_ffi = {
+    __index = read_view_index_methods_ffi,
+}
+
+for k, v in pairs(read_view_index_mt_base) do
+    read_view_index_mt_luac[k] = v
+    read_view_index_mt_ffi[k] = v
+end
+
+local read_view_methods = {}
+local read_view_properties = {
+    -- System read views are closed asynchronously so we have to query
+    -- the status.
+    status = function(self)
+        if self._status ~= nil then
+            return self._status
+        elseif internal.exists(self.id) then
+            return 'open'
+        else
+            return 'closed'
+        end
+    end
+}
+
+local read_view_mt = {
+    __index = function(self, key)
+        if rawget(self, key) ~= nil then
+            return rawget(self, key)
+        elseif read_view_properties[key] ~= nil then
+            return read_view_properties[key](self)
+        elseif read_view_methods[key] ~= nil then
+            return read_view_methods[key]
+        end
+    end,
+    __autocomplete = function(self)
+        -- Make sure that everything that can be returned by __index is
+        -- auto-completed in console. Replace property callbacks with scalars
+        -- so that they are auto-completed as data members, not as methods.
+        return fun.tomap(fun.chain(fun.map(function(k) return k, true end,
+                                           fun.iter(read_view_properties)),
+                                   fun.iter(read_view_methods)))
+    end,
+}
+
+--
+-- Table of open read views: id -> read view object.
+--
+-- We use weak ref, because we don't want to pin a read view object after
+-- the user drops the last reference to it.
+--
+local read_view_registry = setmetatable({}, {__mode = 'v'})
+
+--
+-- Sets a metatable for a new read view object and adds it to the registry so
+-- that it can be returned by box.read_view.list().
+--
+local function register_read_view(rv)
+    assert(rv.id ~= nil)
+    assert(getmetatable(rv) == nil)
+    setmetatable(rv, read_view_mt)
+    read_view_registry[rv.id] = rv
+    return rv
+end
+
+box.read_view = {}
+
+--
+-- Returns an array of all read views opened in the current thread,
+-- sorted by id, ascending.
+--
+-- Since read view ids grow incrementally and never wrap around,
+-- the most recent read view will always be last.
+--
+function box.read_view.list()
+    local list = {}
+    if fiber._internal.cord_is_main then
+        -- Use internal.list in the main thread to include system read views
+        -- into the listing.
+        for _, rv in ipairs(internal.list()) do
+            local registered_rv = read_view_registry[rv.id]
+            if registered_rv == nil then
+                -- This is a new read view object that hasn't been used from
+                -- Lua yet. Add it to the registry for the next listing to
+                -- return the same object.
+                registered_rv = register_read_view(rv)
+            end
+            table.insert(list, registered_rv)
+        end
+    else
+        for _, rv in pairs(read_view_registry) do
+            table.insert(list, rv)
+        end
+    end
+    table.sort(list, function(rv1, rv2) return rv1.id < rv2.id end)
+    return list
+end
+
+--
+-- Returns a path used to acquire a reference to a read view in a thread.
+--
+local function thread_ref_path()
+    local info = threads.info()
+    return {'thread', info.group_name, info.thread_id}
+end
+
+--
+-- Returns a path used to acquire a reference to a read view in a fiber.
+--
+local function fiber_ref_path()
+    return {'fiber', fiber.id()}
+end
+
+--
+-- Wrapper around internal.close() that, if called in an application thread,
+-- sends a request to release the read view to the main thread.
+--
+local function read_view_close(crv, warn)
+    local id = internal.close(crv, warn)
+    if id ~= nil then
+        assert(not fiber._internal.cord_is_main)
+        -- threads.call() yields while we can't yield in this function
+        -- because it may be called by the garbage collector.
+        fiber.new(threads.call, 'tx', 'box.internal.read_view.release',
+                  {id, thread_ref_path()})
+    end
+end
+
+local function read_view_gc(crv)
+    read_view_close(crv, true)
+end
+
+--
+-- Opens a new or reuses an existing read view.
+--
+-- Takes an optional argument that contains a table of read view options.
+-- Returns a read view object on success. On error, raises an exception.
+--
+-- Available options:
+--  - 'name' - new read view name
+--  - 'id' - id of the read view to reuse
+--
+-- Notes:
+--  - 'name' and 'id' can't be used together.
+--  - 'name' may be omitted, in which case it defaults to 'unknown'.
+--  - A new read view may be created only in the main thread.
+--  - Reusing a read view may cause a fiber yield.
+--
+function box.read_view.open(opts)
+    opts = opts or {}
+    check_param_table(opts, READ_VIEW_OPTIONS_TEMPLATE, 2)
+    if opts.id ~= nil and opts.name ~= nil then
+        box.error(box.error.ILLEGAL_PARAMS, "options parameter 'name' " ..
+                  "should not be used with 'id'", 2)
+    end
+    local rv
+    if opts.id ~= nil then
+        -- If the read view is already in the thread-local registry and
+        -- it has an active handle, there's no need to create a new one.
+        rv = read_view_registry[opts.id]
+        if rv ~= nil and rv.status == 'open' and rv._crv ~= nil then
+            return rv
+        end
+        -- Ask the main thread to pin the read view with the given id
+        -- and create a local handle for it.
+        local ret = utils.call_at(2, threads.call, 'tx',
+                                  'box.internal.read_view.acquire',
+                                  {opts.id, thread_ref_path()})
+        -- We should never get here when called from the main thread because
+        -- the read view registry maintained by the main thread is supposed to
+        -- store all usable read views.
+        assert(not fiber._internal.cord_is_main)
+        local ptr = ret[1][1]
+        local ok
+        ok, ret = pcall(internal.reuse, ptr)
+        if not ok then
+            -- Don't forget to unpin the read view on error.
+            threads.call('tx', 'box.internal.read_view.release',
+                         {opts.id, thread_ref_path()})
+            box.error(ret, 2)
+        end
+        rv = ret
+    else
+        if not fiber._internal.cord_is_main then
+            box.error(box.error.UNSUPPORTED, 'Application thread',
+                      'creating a new read view', 2)
+        end
+        rv = internal.open(opts.name or 'unknown')
+    end
+    setmetatable(rv.space, read_view_space_list_mt)
+    for space_id, space in pairs(rv.space) do
+        if type(space_id) == 'number' then
+            setmetatable(space, read_view_space_mt)
+            for index_id, index in pairs(space.index) do
+                if type(index_id) == 'number' then
+                    if index._ffi then
+                        setmetatable(index, read_view_index_mt_ffi)
+                    else
+                        setmetatable(index, read_view_index_mt_luac)
+                    end
+                    -- Keep a reference to the read view to make sure
+                    -- it won't go away while the index is in use.
+                    index._rv = rv
+                end
+            end
+        end
+    end
+    -- Each read view reference is identified by path {key1, key2, ...} in
+    -- the _refs table. At the leaf sub-table of each path a reference counter
+    -- is stored under the key _count so that the same reference path may be
+    -- taken multiple times.
+    rv._refs = {}
+    rv._status = 'open'
+    ffi.gc(rv._crv, read_view_gc)
+    return register_read_view(rv)
+end
+
+--
+-- Returns a read view info table:
+--  - 'id' - unique read view identifier.
+--  - 'name' - read view name.
+--  - 'is_system' - true if the read view is used for system purposes.
+--  - 'timestamp' - fiber.clock() at the time of read view open.
+--  - 'vclock' - box.info.vclock at the time of read view open.
+--  - 'signature' - box.info.signature at the time of read view open.
+--  - 'status' - 'open', 'closed', or 'close_pending'.
+--
+-- If opts.refs is true, adds 'refs' key to the info table that stores
+-- a list of references taken for this read view.
+--
+function read_view_methods:info(opts)
+    check_read_view_arg(self, 'info', 2)
+    opts = opts or {}
+    check_param_table(opts, READ_VIEW_INFO_TEMPLATE, 2)
+    local info = {
+        id = self.id,
+        name = self.name,
+        is_system = self.is_system,
+        timestamp = self.timestamp,
+        vclock = self.vclock,
+        signature = self.signature,
+        status = self.status,
+    }
+    if opts.refs then
+        info.refs = self:_refs_info()
+    end
+    return info
+end
+
+read_view_mt.__serialize = read_view_methods.info
+
+function read_view_methods:_with_tail(status, ...)
+    self:_release(fiber_ref_path())
+    if not status then
+        local err = ...
+        error(err, 0)
+    end
+    return ...
+end
+
+--
+-- Calls a function ensuring that the read view isn't closed until the function
+-- returns. The function is passed the read view object followed by the passed
+-- arguments.
+--
+function read_view_methods:with(func, ...)
+    check_read_view_arg(self, 'with', 2)
+    check_param(func, 'function object', 'function', 2)
+    if self.status ~= 'open' then
+        box.error(box.error.READ_VIEW_CLOSED, 2)
+    end
+    if self._crv == nil then
+        -- System read view. Can't be used.
+        box.error(box.error.READ_VIEW_BUSY, 2)
+    end
+    self:_acquire(fiber_ref_path())
+    return self:_with_tail(pcall(func, self, ...))
+end
+
+--
+-- If the given read view was created with box.read_view.open(), the function
+-- closes it. Any attempt to use the read view afterwards will raise an error.
+-- Otherwise, it's unsafe to close this read view, because it may be used from
+-- the C code so in this case this function does nothing and raises an error.
+--
+function read_view_methods:close()
+    check_read_view_arg(self, 'close', 2)
+    if self.status ~= 'open' then
+        box.error(box.error.READ_VIEW_CLOSED, 2)
+    end
+    if self._crv == nil then
+        -- System read view. Can't be closed.
+        box.error(box.error.READ_VIEW_BUSY, 2)
+    end
+    if next(self._refs) == nil then
+        self:_do_close()
+    else
+        self._status = 'close_pending'
+    end
+end
+
+function read_view_methods:_do_close()
+    assert(self.status ~= 'closed')
+    assert(self._crv ~= nil)
+    for _, space in pairs(self.space) do
+        for _, index in pairs(space.index) do
+            -- Reset cdata because it's going to be invalidated by 'close'.
+            -- From now on, FFI methods will assume that the read view is
+            -- closed.
+            index._cspace = nil
+        end
+    end
+    read_view_close(self._crv)
+    ffi.gc(self._crv, nil)
+    self._crv = nil
+    self._status = 'closed'
+end
+
+--
+-- Map: id -> referenced read view.
+--
+-- Used to prevent the garbage collector from deleting read views referenced
+-- in other threads.
+--
+local referenced_read_views = {}
+
+--
+-- Acquires a reference to this read view.
+--
+-- A referenced read view isn't closed immediately. Instead, its status is
+-- changed to 'close_pending' and remains so until the last reference to it
+-- is gone, after which it's closed for real.
+--
+function read_view_methods:_acquire(path)
+    assert(self.status == 'open')
+    assert(self._crv ~= nil)
+    if next(self._refs) == nil then
+        referenced_read_views[self.id] = self
+    else
+        assert(referenced_read_views[self.id] == self)
+    end
+    local ref = self._refs
+    for _, key in ipairs(path) do
+        if ref[key] == nil then
+            ref[key] = {}
+        end
+        ref = ref[key]
+    end
+    if ref._count ~= nil then
+        ref._count = ref._count + 1
+    else
+        ref._count = 1
+    end
+end
+
+--
+-- Releases a reference to this read view.
+--
+-- If the read view was closed (its status is 'close_pending'), it will be
+-- deleted as soon as the last reference to it is gone.
+--
+function read_view_methods:_release(path)
+    assert(self.status ~= 'closed')
+    assert(self._crv ~= nil)
+    local ref_path = {}
+    local ref = self._refs
+    for _, key in ipairs(path) do
+        table.insert(ref_path, ref)
+        assert(ref[key] ~= nil)
+        ref = ref[key]
+    end
+    assert(ref._count > 0)
+    ref._count = ref._count - 1
+    if ref._count == 0 then
+        ref._count = nil
+    end
+    for i = #path, 1, -1 do
+        local key = path[i]
+        if next(ref_path[i][key]) ~= nil then
+            break
+        end
+        ref_path[i][key] = nil
+    end
+    if next(self._refs) == nil then
+        referenced_read_views[self.id] = nil
+        if self.status == 'close_pending' then
+            self:_do_close()
+        end
+    end
+end
+
+--
+-- Returns a list of references taken for this read view.
+--
+-- Assumes there are two types of references: fiber and thread.
+--
+function read_view_methods:_refs_info()
+    local info = {}
+    for group_name, group_refs in pairs(self._refs.thread or {}) do
+        for thread_id in pairs(group_refs) do
+            table.insert(info, {
+                type = 'thread',
+                group_name = group_name,
+                thread_id = thread_id
+            })
+        end
+    end
+    for fid in pairs(self._refs.fiber or {}) do
+        table.insert(info, {
+            type = 'fiber',
+            fid = fid,
+        })
+    end
+    return info
+end
+
+if fiber._internal.cord_is_main then
+    -- Acquires a reference to a read view in the main thread.
+    -- Returns a pointer to the referenced read view.
+    threads.export('box.internal.read_view.acquire', function(id, path)
+        local rv = read_view_registry[id]
+        -- System read views are added to the Lua registry on demand so
+        -- to raise a proper error on an attempt to acquire a reference
+        -- to a system read view, we also check the C registry.
+        if internal.exists(id) and (rv == nil or rv._crv == nil) then
+            box.error(box.error.READ_VIEW_BUSY)
+        end
+        if rv == nil or rv.status ~= 'open' then
+            box.error(box.error.NO_SUCH_READ_VIEW)
+        end
+        rv:_acquire(path)
+        return rv._ptr
+    end)
+    -- Releases a reference to a read view in the main thread.
+    threads.export('box.internal.read_view.release', function(id, path)
+        local rv = read_view_registry[id]
+        assert(rv ~= nil)
+        rv:_release(path)
+    end)
+end
+
+--
+-- Helper function that normalizes a key passed by the user:
+--
+--   nil -> {}
+--   table, tuple -> unchanged
+--   scalar -> {scalar}
+--
+local function keify(key)
+    if key == nil then
+        return {}
+    elseif type(key) == "table" or box.tuple.is(key) then
+        return key
+    else
+        return {key}
+    end
+end
+
+--
+-- Checks if the given index read view is open.
+--
+local function check_index_read_view_is_open(index)
+    if index._cspace == nil then
+        box.error(box.error.READ_VIEW_CLOSED, 3)
+    end
+end
+
+--
+-- Sets iterator_pos and iterator_pos_end to a user-supplied position.
+--
+-- The input position may be nil, string, table, or tuple. If the input
+-- position is given as string, iterator_pos is set to point to its data,
+-- otherwise the iterator_pos data is allocated from the fiber region.
+--
+-- The ibuf is used to encode a position given as table or tuple.
+--
+-- Returns true on success. On failure, sets box.error and returns false.
+--
+local function iterator_pos_set(index, pos, ibuf)
+    if pos == nil then
+        iterator_pos[0] = nil
+        iterator_pos_end[0] = nil
+        return true
+    elseif type(pos) == 'string' then
+        iterator_pos[0] = pos
+        iterator_pos_end[0] = iterator_pos[0] + #pos
+        return true
+    else
+        ibuf.rpos = ibuf.wpos
+        local tuple, tuple_end = tuple_encode(ibuf, pos)
+        return builtin.box_index_read_view_tuple_position(
+                index._cspace, index.id, tuple, tuple_end,
+                iterator_pos, iterator_pos_end) == 0
+    end
+end
+
+--
+-- Gets a tuple by key from an index read view.
+-- The index must be unique and the key must be full.
+-- Returns a tuple. If not found, returns nil.
+--
+function read_view_index_methods_luac:get(key)
+    check_index_arg(self, 'get', 2)
+    check_index_read_view_is_open(self)
+    key = keify(key)
+    return internal.index_get(self._cspace, self.id, key)
+end
+
+function read_view_index_methods_ffi:get(key)
+    check_index_arg(self, 'get', 2)
+    check_index_read_view_is_open(self)
+    local ibuf = cord_ibuf_take()
+    local raw_key, raw_key_end = tuple_encode(ibuf, key)
+    local ok = builtin.box_index_read_view_get(
+            self._cspace, self.id, raw_key, raw_key_end, ptuple) == 0
+    cord_ibuf_put(ibuf)
+    if not ok then
+        box.error(box.error.last(), 2)
+    elseif ptuple[0] ~= nil then
+        return tuple_bless(ptuple[0])
+    end
+end
+
+--
+-- Counts tuples matching a key in an index read view.
+--
+-- 'opts' is a table of count options:
+--  - 'iterator' - iterator type (for example, 'ge', 'eq', 'lt').
+--     Default: 'all' for empty key, 'eq' for other keys.
+--
+-- Returns a number.
+--
+function read_view_index_methods_luac:count(key, opts)
+    check_index_arg(self, 'count', 2)
+    check_index_read_view_is_open(self)
+    key = keify(key)
+    local itype = check_iterator_type(opts, #key == 0, 2)
+    return internal.index_count(self._cspace, self.id, itype, key)
+end
+
+function read_view_index_methods_ffi:count(key, opts)
+    check_index_arg(self, 'count', 2)
+    check_index_read_view_is_open(self)
+    local ibuf = cord_ibuf_take()
+    local raw_key, raw_key_end = tuple_encode(ibuf, key)
+    local key_is_nil = raw_key + 1 >= raw_key_end
+    local itype = check_iterator_type(opts, key_is_nil, 2)
+    local count = builtin.box_index_read_view_count(self._cspace, self.id,
+                                                    itype, raw_key, raw_key_end)
+    cord_ibuf_put(ibuf)
+    if count < 0 then
+        box.error(box.error.last(), 2)
+    end
+    return count
+end
+
+--
+-- Selects tuples matching a key from an index read view.
+--
+-- 'opts' is a table of select options:
+--  - 'iterator' - iterator type (for example, 'ge', 'eq', 'lt').
+--     Default: 'all' for empty key, 'eq' for other keys.
+--  - 'offset' - how many tuples to skip. Default: 0.
+--  - 'limit' - max number of tuples to return. Default: unlimited.
+--
+-- Returns an array of tuples (may be empty).
+--
+function read_view_index_methods_luac:select(key, opts)
+    check_index_arg(self, 'select', 2)
+    check_index_read_view_is_open(self)
+    key = keify(key)
+    local key_is_nil = #key == 0
+    local iterator, offset, limit, after, fetch_pos =
+        check_select_opts(opts, key_is_nil, 2)
+    return internal.index_select(self._cspace, self.id, iterator,
+                                 offset, limit, key, after, fetch_pos)
+end
+
+function read_view_index_methods_ffi:select(key, opts)
+    check_index_arg(self, 'select', 2)
+    check_index_read_view_is_open(self)
+    local region_svp = builtin.box_region_used()
+    local ibuf = cord_ibuf_take()
+    local raw_key, raw_key_end = tuple_encode(ibuf, key)
+    local key_is_nil = raw_key + 1 >= raw_key_end
+    local iterator, offset, limit, after, fetch_pos =
+        check_select_opts(opts, key_is_nil, 2)
+    local ok = iterator_pos_set(self, after, ibuf)
+    if ok then
+        ok = builtin.box_index_read_view_select(
+                self._cspace, self.id, iterator, offset, limit,
+                raw_key, raw_key_end, iterator_pos, iterator_pos_end,
+                fetch_pos, port) == 0
+    end
+    local pos
+    if ok and fetch_pos and iterator_pos[0] ~= nil then
+        pos = ffi.string(iterator_pos[0], iterator_pos_end[0] - iterator_pos[0])
+    end
+    cord_ibuf_put(ibuf)
+    builtin.box_region_truncate(region_svp)
+    if not ok then
+        box.error(box.error.last(), 2)
+    end
+    local ret = {}
+    local entry = port_c.first
+    for i = 1, tonumber(port_c.size) do
+        ret[i] = tuple_bless(entry.tuple)
+        entry = entry.next
+    end
+    builtin.port_destroy(port);
+    return ret, pos
+end
+
+local function iterator_next_luac(it)
+    check_index_read_view_is_open(it.index)
+    return it.impl:next()
+end
+
+--
+-- Creates an iterator over an index read view, given key and iterator type.
+-- Returns a 'gen, param, state' triplet, suitable for a 'for' loop.
+--
+function read_view_index_methods_luac:pairs(key, opts)
+    check_index_arg(self, 'pairs', 2)
+    check_index_read_view_is_open(self)
+    key = keify(key)
+    local key_is_nil = #key == 0
+    local iterator, after, offset = check_pairs_opts(opts, key_is_nil, 2)
+    local it = internal.index_iterator(self._cspace, self.id, iterator,
+                                       key, after, offset)
+    return iterator_next_luac, {
+        -- Keep references to the index and the search key to make sure
+        -- they won't go away while the iterator is in use.
+        index = self,
+        key = key,
+        impl = it,
+    }
+end
+
+local function iterator_next_ffi(it, count)
+    check_index_read_view_is_open(it.index)
+    if builtin.box_index_read_view_iterator_next(
+            it.cdata, it.index._cspace, ptuple) ~= 0 then
+        box.error(box.error.last(), 2)
+    elseif ptuple[0] ~= nil then
+        return count + 1, tuple_bless(ptuple[0])
+    end
+end
+
+function read_view_index_methods_ffi:pairs(key, opts)
+    check_index_arg(self, 'pairs', 2)
+    check_index_read_view_is_open(self)
+    local region_svp = builtin.box_region_used()
+    local ibuf = cord_ibuf_take()
+    local raw_key, raw_key_end = tuple_encode(ibuf, key)
+    local key_is_nil = raw_key + 1 >= raw_key_end
+    local iterator, after, offset = check_pairs_opts(opts, key_is_nil, 2)
+    local ok = iterator_pos_set(self, after, ibuf)
+    local cdata, key_buf
+    if ok then
+        -- A cdata iterator object assumes that the search key won't be deleted
+        -- while the iterator is in use so we have to keep a reference to it in
+        -- Lua.
+        key_buf = ffi.string(raw_key, raw_key_end - raw_key)
+        raw_key = ffi.cast('const char *', key_buf)
+        raw_key_end = raw_key + #key_buf
+        cdata = ffi.new('struct index_read_view_iterator')
+        ok = builtin.box_index_read_view_create_iterator_with_offset(
+                self._cspace, self.id, iterator, raw_key, raw_key_end,
+                iterator_pos[0], iterator_pos_end[0], offset, cdata) == 0
+    end
+    cord_ibuf_put(ibuf)
+    builtin.box_region_truncate(region_svp)
+    if not ok then
+        box.error(box.error.last(), 2)
+    end
+    ffi.gc(cdata, builtin.box_index_read_view_iterator_destroy)
+    return iterator_next_ffi, {
+        index = self,
+        key_buf = key_buf,
+        cdata = cdata,
+    }, 0
+end
+
+function read_view_index_methods_common:quantile(level, begin_key, end_key)
+    check_index_arg(self, 'quantile', 2)
+    check_index_read_view_is_open(self)
+    if level == nil then
+        box.error(box.error.ILLEGAL_PARAMS,
+                  'Usage: index:quantile(level[, begin_key, end_key])', 2)
+    end
+    if type(level) ~= 'number' then
+        box.error(box.error.ILLEGAL_PARAMS, 'level must be a number', 2)
+    end
+    -- Encode the keys on cord ibuf. Note, since the ibuf may be
+    -- reallocated when we encode end_key, we can't use the pointers
+    -- returned by tuple_encode(begin_key), so we set its pointers after
+    -- all allocations are done.
+    local ibuf = cord_ibuf_take()
+    tuple_encode(ibuf, begin_key, 2)
+    local end_key, end_key_end = tuple_encode(ibuf, end_key, 2)
+    begin_key = ibuf.rpos
+    local begin_key_end = end_key
+    -- Call the C API function.
+    local quantile_key = ffi.new('const char *[1]')
+    local quantile_key_end = ffi.new('const char *[1]')
+    local region_svp = builtin.box_region_used()
+    local ok = builtin.box_index_read_view_quantile(
+            self._cspace, self.id, level, begin_key, begin_key_end,
+            end_key, end_key_end, quantile_key, quantile_key_end) == 0
+    cord_ibuf_put(ibuf)
+    if not ok then
+        box.error(box.error.last(), 2)
+    end
+    -- Decode the result and clean up the region.
+    local result
+    if quantile_key[0] ~= nil then
+        local ptr
+        result, ptr = msgpackffi.decode_unchecked(quantile_key[0])
+        assert(ptr == quantile_key_end[0])
+    else
+        result = nil
+    end
+    builtin.box_region_truncate(region_svp)
+    return result
+end
+
+function read_view_index_methods_common:tuple_pos(tuple)
+    check_index_arg(self, 'tuple_pos', 2)
+    check_index_read_view_is_open(self)
+    local region_svp = builtin.box_region_used()
+    local ibuf = cord_ibuf_take()
+    local data, data_end = tuple_encode(ibuf, tuple)
+    local ok = builtin.box_index_read_view_tuple_position(
+            self._cspace, self.id, data, data_end,
+            iterator_pos, iterator_pos_end) == 0
+    cord_ibuf_put(ibuf)
+    if not ok then
+        box.error(box.error.last(), 2)
+    end
+    local ret = ffi.string(iterator_pos[0],
+                           iterator_pos_end[0] - iterator_pos[0])
+    builtin.box_region_truncate(region_svp)
+    return ret
+end
+
+function read_view_index_methods_common:offset_of(key, opts)
+    check_index_arg(self, 'offset_of', 2)
+    check_index_read_view_is_open(self)
+    key = keify(key)
+    local itype = check_iterator_type(opts, #key == 0, 2)
+    if itype == box.index.EQ then
+        itype = box.index.GE
+    elseif itype == box.index.REQ then
+        itype = box.index.LE
+    end
+    return self:count() - self:count(key, itype)
+end
+
+for k, v in pairs(read_view_index_methods_common) do
+    read_view_index_methods_luac[k] = v
+    read_view_index_methods_ffi[k] = v
+end
+
+-- Shortcuts: space:foo(...) -> space.index[0]:foo(...)
+local shortcuts = {'get', 'count', 'select', 'pairs', 'offset_of', 'quantile'}
+for _, method in pairs(shortcuts) do
+    read_view_space_methods[method] = function(space, ...)
+        check_space_arg(space, method, 2)
+        local index = check_primary_index(space, 2)
+        return index[method](index, ...)
+    end
+end

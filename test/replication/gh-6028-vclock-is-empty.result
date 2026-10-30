@@ -1,0 +1,60 @@
+-- test-run result file version 2
+test_run = require('test_run').new()
+ | ---
+ | ...
+
+box.schema.user.grant('guest', 'replication')
+ | ---
+ | ...
+s = box.schema.create_space('test')
+ | ---
+ | ...
+_ = s:create_index('pk')
+ | ---
+ | ...
+
+
+-- Case 1
+test_run:cmd('create server replica with rpl_master=default,\
+              script="replication/gh-6028-replica.lua"')
+ | ---
+ | - true
+ | ...
+test_run:cmd('start server replica')
+ | ---
+ | - true
+ | ...
+
+test_run:cmd('stop server replica')
+ | ---
+ | - true
+ | ...
+s:insert{1}
+ | ---
+ | - [1]
+ | ...
+
+
+-- Case 2
+test_run:cmd('start server replica')
+ | ---
+ | - true
+ | ...
+s:insert{2}
+ | ---
+ | - [2]
+ | ...
+
+
+test_run:cmd('stop server replica')
+ | ---
+ | - true
+ | ...
+test_run:cmd('cleanup server replica')
+ | ---
+ | - true
+ | ...
+test_run:cmd('delete server replica')
+ | ---
+ | - true
+ | ...

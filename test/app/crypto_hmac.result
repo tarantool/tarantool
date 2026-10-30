@@ -1,0 +1,151 @@
+test_run = require('test_run').new()
+---
+...
+test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua:<line>\"]: '")
+---
+- true
+...
+crypto = require('crypto')
+---
+...
+type(crypto)
+---
+- table
+...
+--
+-- Invalid arguments
+--
+crypto.hmac.md4()
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: hmac.md4(key, string)'
+...
+crypto.hmac.md5()
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: hmac.md5(key, string)'
+...
+crypto.hmac.sha1()
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: hmac.sha1(key, string)'
+...
+crypto.hmac.sha224()
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: hmac.sha224(key, string)'
+...
+crypto.hmac.sha256()
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: hmac.sha256(key, string)'
+...
+crypto.hmac.sha384()
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: hmac.sha384(key, string)'
+...
+crypto.hmac.sha512()
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: hmac.sha512(key, string)'
+...
+crypto.hmac.nodigest
+---
+- error: '[string "return crypto.hmac.nodigest "]:1: HMAC method "nodigest" is not
+    supported'
+...
+string.hex(crypto.hmac.sha1('012345678', 'fred'))
+---
+- 1f7e412628fb199d116a0f5cf87bec4c575e9f77
+...
+key = '012345678'
+---
+...
+message = 'fred'
+---
+...
+crypto.hmac.sha1(key, nil)
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: hmac.sha1(key, string)'
+...
+crypto.hmac.sha1(nil, message)
+---
+- error: 'builtin/crypto.lua:<line>"]: Key should be specified for HMAC operations'
+...
+crypto.hmac.sha1(nil, nil)
+---
+- error: 'builtin/crypto.lua:<line>"]: Usage: hmac.sha1(key, string)'
+...
+string.hex(crypto.hmac.md4(key, message))
+---
+- 3bad9d35341c7d3ba2c977dafcc2a58a
+...
+string.hex(crypto.hmac.md5(key, message))
+---
+- b39169b5f7102b7ec17e1d11e34a833f
+...
+string.hex(crypto.hmac.sha1(key, message))
+---
+- 1f7e412628fb199d116a0f5cf87bec4c575e9f77
+...
+string.hex(crypto.hmac.sha224(key, message))
+---
+- 263cef5ac2110ea21d10a29a0c220b737c9b113bb18fa2d290126e77
+...
+string.hex(crypto.hmac.sha256(key, message))
+---
+- 70805213071adda962cfa5860185e228ad7e914d65773524e3db3f6fce805714
+...
+string.hex(crypto.hmac.sha384(key, message))
+---
+- d4b0bbcd5d6b8b2bdd023c5402149845754b1948ec119bcb6ef9dba890aa24fab75f5d7b61f9251648bef8958f501f06
+...
+string.hex(crypto.hmac.sha512(key, message))
+---
+- 4383cbfba7fd6e92ed5e61816a8ab6693e1aaf00a803462670e67ad768f367416067adc244c21ae8967ddade1c8fe3d0f30a235e3f236e8eb9f22affe41bcf3a
+...
+--
+-- Incremental update
+--
+hmac_sha1 = crypto.hmac.sha1.new(key)
+---
+...
+hmac_sha1:update('abc')
+---
+...
+hmac_sha1:update('cde')
+---
+...
+hmac_sha1:result() == crypto.hmac.sha1(key, 'abccde')
+---
+- true
+...
+--
+-- Empty string
+--
+string.hex(crypto.hmac.md4(key, ''))
+---
+- 267b5c053b7b821e394ddb5dc6e4ba17
+...
+string.hex(crypto.hmac.md5(key, ''))
+---
+- 74882c5f0dd0f1557b0f723eb3790e3e
+...
+string.hex(crypto.hmac.sha1(key, ''))
+---
+- 78cf62fe89dc5056dfce770be4e4366675295826
+...
+string.hex(crypto.hmac.sha224(key, ''))
+---
+- 582e66bf603e975639fc2124c4b32b45b99bff9b5e985b0d5d0df1a1
+...
+string.hex(crypto.hmac.sha256(key, ''))
+---
+- 949798370e8eb691d90b0d1651df97bdfc0b71933acdad8ef3f2c9e3c610fad4
+...
+string.hex(crypto.hmac.sha384(key, ''))
+---
+- cfb13ff8da91abf2a4ce4f7e8a3bc2bb2a3c2a0539ecba04248c77cac8097d40f126d0805ac1c3a98ffa1a624ed52968
+...
+string.hex(crypto.hmac.sha512(key, ''))
+---
+- caa5c3aa5a194f3d45df5da04ef5f1a1dfb645d7753b8f053c8da1ff6b6ec7dd1721e9a4cf9c46311b36b0a6a39807bbf35ed31568e78c77ef4e80d0d0fbeadf
+...
+test_run:cmd("clear filter")
+---
+- true
+...

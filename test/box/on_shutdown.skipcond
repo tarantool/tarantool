@@ -1,0 +1,7 @@
+import os
+
+# Disabled at ASAN build due to issue #4360.
+if os.getenv("ASAN") == 'ON':
+    self.skip = 1
+
+# vim: set ft=python:

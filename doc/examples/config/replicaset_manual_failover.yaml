@@ -1,0 +1,42 @@
+config:
+  context:
+    replicator_password:
+      from: file
+      file: secrets/replicator_password.txt
+      rstrip: true
+    client_password:
+      from: file
+      file: secrets/client_password.txt
+      rstrip: true
+
+credentials:
+  users:
+    replicator:
+      password: '{{ context.replicator_password }}'
+      roles: [replication]
+    client:
+      password: '{{ context.client_password }}'
+      roles: [super]
+
+iproto:
+  listen:
+  - uri: 'unix/:./{{ instance_name }}.iproto'
+  advertise:
+    peer:
+      login: 'replicator'
+
+log:
+  to: file
+
+replication:
+  failover: manual
+
+groups:
+  group-001:
+    replicasets:
+      replicaset-001:
+        leader: instance-001
+        instances:
+          instance-001: {}
+          instance-002: {}
+          instance-003: {}

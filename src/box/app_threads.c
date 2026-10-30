@@ -1,0 +1,166 @@
+/*
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Copyright 2010-2026, Tarantool AUTHORS, please see AUTHORS file.
+ */
+#include "app_threads.h"
+
+#include <assert.h>
+#include <limits.h>
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+#include "box.h"
+#include "coio_task.h"
+#include "cord_buf.h"
+#include "call.h"
+#include "diag.h"
+#include "event.h"
+#include "fiber.h"
+#include "fiber_pool.h"
+#include "mp_box_ctx.h"
+#include "msgpuck.h"
+#include "port.h"
+#include "say.h"
+#include "schema_def.h"
+#include "tarantool_ev.h"
+#include "trivia/util.h"
+#include "tt_static.h"
+#include "tuple.h"
+#include "user_def.h"
+#include "xrow.h"
+
+#include "lua/app_threads.h"
+
+int app_thread_count;
+__thread int app_thread_id = -1;
+
+/** Array of application threads. */
+static struct cord *app_thread_cords;
+
+static int
+app_thread_f(va_list ap)
+{
+	app_thread_id = (intptr_t)va_arg(ap, void *);
+	assert(app_thread_id >= 1 && app_thread_id <= app_thread_count);
+	fiber_set_system(fiber(), true);
+	coio_enable();
+	event_init();
+	tuple_init();
+	app_thread_lua_init();
+	struct fiber_pool fiber_pool;
+	fiber_pool_create(&fiber_pool, cord_name(cord()), INT_MAX,
+			  box_fiber_pool_idle_timeout);
+	while (!fiber_is_cancelled())
+		fiber_yield();
+	if (fiber_shutdown(box_shutdown_timeout) != 0) {
+		diag_log();
+		panic("cannot gracefully shutdown client fibers");
+	}
+	fiber_pool_shutdown(&fiber_pool);
+	app_thread_lua_free();
+	box_lua_call_runtime_priv_reset();
+	tuple_free();
+	event_free();
+	cord_buf_free();
+	return 0;
+}
+
+void
+app_threads_start(int thread_count)
+{
+	assert(cord_is_main());
+	assert(app_thread_id == -1);
+	assert(app_thread_count == 0);
+	assert(app_thread_cords == NULL);
+	assert(thread_count >= 0 && thread_count <= APP_THREADS_MAX);
+	app_thread_id = 0;
+	if (thread_count == 0)
+		return;
+	app_thread_count = thread_count;
+	app_thread_cords = xcalloc(thread_count, sizeof(*app_thread_cords));
+	for (int i = 0; i < app_thread_count; ++i) {
+		struct cord *cord = &app_thread_cords[i];
+		char name[16];
+		/* Sic: ids start with 1 because id 0 is reserved for tx. */
+		snprintf(name, sizeof(name), "app%d", i + 1);
+		if (cord_costart(cord, name, app_thread_f,
+				 (void *)(intptr_t)(i + 1)) != 0)
+			panic_syserror("failed to start application thread");
+	}
+}
+
+void
+app_threads_stop(void)
+{
+	assert(cord_is_main());
+	assert(app_thread_id == 0);
+	for (int i = 0; i < app_thread_count; i++) {
+		struct cord *cord = &app_thread_cords[i];
+		cord_cancel(cord);
+		if (cord_join(cord) != 0)
+			panic_syserror("failed to join application thread");
+	}
+	free(app_thread_cords);
+	app_thread_cords = NULL;
+	app_thread_count = 0;
+}
+
+int
+app_thread_process_call(struct call_request *request, struct port *port)
+{
+	const char *name = request->name;
+	uint32_t name_len = mp_decode_strl(&name);
+	struct runtime_credentials *runtime_cr =
+			fiber()->storage.runtime_credentials;
+	const char *uname = runtime_cr->user_name != NULL ?
+			    runtime_cr->user_name : "guest";
+	uint32_t uname_len = strlen(uname);
+	if (strcmp(uname, "admin") != 0 &&
+	    !box_lua_call_runtime_priv_is_granted(uname, uname_len,
+						  name, name_len)) {
+		diag_set(AccessDeniedError, priv_name(PRIV_X),
+			 schema_object_name(SC_FUNCTION),
+			 tt_cstr(name, name_len), uname);
+		return -1;
+	}
+	struct mp_box_ctx ctx;
+	if (mp_box_ctx_create(&ctx, NULL, request->tuple_formats) != 0)
+		return -1;
+	struct port args;
+	port_msgpack_create_with_ctx(&args, request->args,
+				     request->args_end - request->args,
+				     (struct mp_ctx *)&ctx);
+	int rc = app_thread_lua_call(name, name_len, &args, port);
+	port_msgpack_destroy(&args);
+	return rc;
+}
+
+int
+app_thread_process_eval(struct call_request *request, struct port *port)
+{
+	struct runtime_credentials *runtime_cr =
+			fiber()->storage.runtime_credentials;
+	const char *uname = runtime_cr->user_name != NULL ?
+			    runtime_cr->user_name : "guest";
+	if (strcmp(uname, "admin") != 0) {
+		diag_set(AccessDeniedError, priv_name(PRIV_X),
+			 schema_object_name(SC_UNIVERSE), "", uname);
+		return -1;
+	}
+	const char *expr = request->expr;
+	uint32_t expr_len = mp_decode_strl(&expr);
+	struct mp_box_ctx ctx;
+	if (mp_box_ctx_create(&ctx, NULL, request->tuple_formats) != 0)
+		return -1;
+	struct port args;
+	port_msgpack_create_with_ctx(&args, request->args,
+				     request->args_end - request->args,
+				     (struct mp_ctx *)&ctx);
+	int rc = app_thread_lua_eval(expr, expr_len, &args, port);
+	port_msgpack_destroy(&args);
+	return rc;
+}

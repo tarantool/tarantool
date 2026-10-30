@@ -1,0 +1,17 @@
+-- test-run result file version 2
+-- gh-1467: invalid iterator type
+
+space = box.schema.space.create('test')
+ | ---
+ | ...
+index = space:create_index('primary', { type = 'hash' })
+ | ---
+ | ...
+space:select({1}, {iterator = 'BITS_ALL_SET' } )
+ | ---
+ | - error: Index 'primary' (HASH) of space 'test' (memtx) does not support requested
+ |     iterator type
+ | ...
+space:drop()
+ | ---
+ | ...

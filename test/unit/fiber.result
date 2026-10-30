@@ -1,0 +1,50 @@
+	*** fiber_name_test ***
+# name of a new fiber: main.
+
+# set new fiber name: Horace.
+
+# fiber name is truncated: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.
+
+	*** fiber_name_test: done ***
+	*** fiber_join_test ***
+# exception propagated
+# cancel dead has started
+# by this time the fiber should be dead already
+# Can change the joinability in safe cases.
+	*** fiber_join_test: done ***
+	*** fiber_stack_test ***
+# normal-stack fiber not crashed
+# big-stack fiber not crashed
+	*** fiber_stack_test: done ***
+	*** fiber_wakeup_self_test ***
+	*** fiber_wakeup_self_test: done ***
+	*** fiber_wakeup_dead_test ***
+	*** fiber_wakeup_dead_test: done ***
+	*** fiber_dead_while_in_cache_test ***
+	*** fiber_dead_while_in_cache_test: done ***
+	*** fiber_flags_respect_test ***
+	*** fiber_flags_respect_test: done ***
+	*** fiber_wait_on_deadline_test ***
+	*** fiber_wait_on_deadline_test: done ***
+	*** cord_cojoin_test ***
+	*** cord_cojoin_test: done ***
+	*** cord_cojoin_cancel_test ***
+	*** cord_cojoin_cancel_test: done ***
+	*** cord_cancel_test ***
+	*** cord_cancel_test: done ***
+	*** fiber_test_defaults ***
+	*** fiber_test_defaults: done ***
+	*** fiber_test_leak ***
+	*** fiber_test_leak: done ***
+	*** fiber_test_leak ***
+	*** fiber_test_leak: done ***
+	*** fiber_test_client_fiber_count ***
+	*** fiber_test_client_fiber_count: done ***
+	*** fiber_test_set_system ***
+	*** fiber_test_set_system: done ***
+	*** fiber_test_set_managed_shutdown ***
+	*** fiber_test_set_managed_shutdown: done ***
+	*** fiber_test_shutdown: done ***
+	*** fiber_test_shutdown ***
+	*** cord_no_user_thread_rename ***
+	*** cord_no_user_thread_rename: done ***

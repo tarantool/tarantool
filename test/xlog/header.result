@@ -1,0 +1,155 @@
+test_run = require('test_run').new()
+---
+...
+test_run:cmd('restart server default with cleanup=1')
+fio = require('fio')
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+function dump_header(path)
+    local f = io.open(path)
+    local header = {}
+    while true do
+        local line = f:read()
+        if line == "" then break end
+        table.insert(header, line)
+    end
+    f:close()
+    return header
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+test_run:cmd("push filter '"..box.info.uuid.."' to '<instance_uuid>'")
+---
+- true
+...
+test_run:cmd("push filter '".._TARANTOOL.."' to '<version>'")
+---
+- true
+...
+checkpoint_lsn = box.info.lsn
+---
+...
+-- SNAP files
+snap_name = string.format("%020d.snap", checkpoint_lsn)
+---
+...
+dump_header(fio.pathjoin(box.cfg.memtx_dir, snap_name))
+---
+- - SNAP
+  - '0.13'
+  - 'Version: <version>'
+  - 'Instance: <instance_uuid>'
+  - 'VClock: {}'
+...
+-- XLOG files
+box.space._schema:insert({"layout_test"})
+---
+- ['layout_test']
+...
+xlog_name = string.format("%020d.xlog", checkpoint_lsn)
+---
+...
+dump_header(fio.pathjoin(box.cfg.wal_dir, xlog_name))
+---
+- - XLOG
+  - '0.13'
+  - 'Version: <version>'
+  - 'Instance: <instance_uuid>'
+  - 'VClock: {}'
+...
+box.space._schema:delete({"layout_test"})
+---
+- ['layout_test']
+...
+box.snapshot()
+---
+- ok
+...
+checkpoint_lsn = box.info.lsn
+---
+...
+-- SNAP files
+snap_name = string.format("%020d.snap", checkpoint_lsn)
+---
+...
+dump_header(fio.pathjoin(box.cfg.memtx_dir, snap_name))
+---
+- - SNAP
+  - '0.13'
+  - 'Version: <version>'
+  - 'Instance: <instance_uuid>'
+  - 'VClock: {1: 2}'
+...
+-- XLOG files
+box.space._schema:insert({"layout_test"})
+---
+- ['layout_test']
+...
+xlog_name = string.format("%020d.xlog", checkpoint_lsn)
+---
+...
+dump_header(fio.pathjoin(box.cfg.wal_dir, xlog_name))
+---
+- - XLOG
+  - '0.13'
+  - 'Version: <version>'
+  - 'Instance: <instance_uuid>'
+  - 'VClock: {1: 2}'
+  - 'PrevVClock: {}'
+...
+box.space._schema:delete({"layout_test"})
+---
+- ['layout_test']
+...
+box.snapshot()
+---
+- ok
+...
+checkpoint_lsn = box.info.lsn
+---
+...
+-- SNAP files
+snap_name = string.format("%020d.snap", checkpoint_lsn)
+---
+...
+dump_header(fio.pathjoin(box.cfg.memtx_dir, snap_name))
+---
+- - SNAP
+  - '0.13'
+  - 'Version: <version>'
+  - 'Instance: <instance_uuid>'
+  - 'VClock: {1: 4}'
+...
+-- XLOG files
+box.space._schema:insert({"layout_test"})
+---
+- ['layout_test']
+...
+xlog_name = string.format("%020d.xlog", checkpoint_lsn)
+---
+...
+dump_header(fio.pathjoin(box.cfg.wal_dir, xlog_name))
+---
+- - XLOG
+  - '0.13'
+  - 'Version: <version>'
+  - 'Instance: <instance_uuid>'
+  - 'VClock: {1: 4}'
+  - 'PrevVClock: {1: 2}'
+...
+box.space._schema:delete({"layout_test"})
+---
+- ['layout_test']
+...
+test_run:cmd("clear filter")
+---
+- true
+...

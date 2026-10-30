@@ -1,0 +1,56 @@
+-- test-run result file version 2
+-- There was a bug in the netbox module related to access
+-- to previously released memory. To understand the essence
+-- of error, you need to understand how GC works in Lua:
+-- - GC checks the reachability of objects in Lua in one cycle
+--   and cleans out those that were unreachable
+-- - Lua GC object is an entity whose memory is managed by the GC,
+--   for example: table, function, userdata, cdata.
+--   In our case it's cdata object, with struct error payload
+-- - ffi.gc allows us to clean up Lua GC object payload at the time
+--   of deleting the GC object.
+-- - Finalizer in ffi.gc is hung on the Lua GC object
+
+-- So after ffi.cast in our case first err object becomes unreachable.
+-- It will be cleaned after some time and if finalizer hangs on it,
+-- payload will also be cleaned. So payload in new err object
+-- (struct error in our case) becomes invalid.
+
+env = require('test_run')
+ | ---
+ | ...
+netbox = require('net.box')
+ | ---
+ | ...
+test_run = env.new()
+ | ---
+ | ...
+box.schema.user.grant('guest', 'super')
+ | ---
+ | ...
+
+c = netbox.connect(box.cfg.listen)
+ | ---
+ | ...
+collectgarbage()
+ | ---
+ | - 0
+ | ...
+ok, res = pcall(c.call, c, 'box.error', {123})
+ | ---
+ | ...
+box.error.clear()
+ | ---
+ | ...
+collectgarbage()
+ | ---
+ | - 0
+ | ...
+res.type
+ | ---
+ | - ClientError
+ | ...
+box.schema.user.revoke('guest', 'super')
+ | ---
+ | ...
+

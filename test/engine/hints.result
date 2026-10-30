@@ -1,0 +1,195 @@
+--
+-- gh-3961: Introduce tuple comparison hints
+-- We must to enshure that hints don't broke
+-- tuple comparison.
+--
+ffi = require('ffi')
+---
+...
+test_run = require('test_run')
+---
+...
+inspector = test_run.new()
+---
+...
+engine = inspector:get_cfg('engine')
+---
+...
+inspector:cmd("setopt delimiter ';'");
+---
+- true
+...
+function insert_values(type)
+        local x = 54
+        while (x < 64) do
+                local val = ffi.new(type, (2LLU^x)-1)
+                s:replace({val})
+                x = x + 1
+        end
+end;
+---
+...
+inspector:cmd("setopt delimiter ''");
+---
+- true
+...
+-- Test that hints does not violate the correct order of
+-- big numeric fields.
+s = box.schema.space.create('test', {engine = engine})
+---
+...
+i1 = s:create_index('i1', {parts = {1, 'unsigned'}})
+---
+...
+insert_values('uint64_t')
+---
+...
+s:select()
+---
+- - [18014398509481983]
+  - [36028797018963967]
+  - [72057594037927935]
+  - [144115188075855871]
+  - [288230376151711743]
+  - [576460752303423487]
+  - [1152921504606846975]
+  - [2305843009213693951]
+  - [4611686018427387903]
+  - [9223372036854775807]
+...
+i1:alter{parts = {1, 'integer'}}
+---
+...
+insert_values('int64_t')
+---
+...
+s:select()
+---
+- - [18014398509481983]
+  - [36028797018963967]
+  - [72057594037927935]
+  - [144115188075855871]
+  - [288230376151711743]
+  - [576460752303423487]
+  - [1152921504606846975]
+  - [2305843009213693951]
+  - [4611686018427387903]
+  - [9223372036854775807]
+...
+i1:alter{parts = {1, 'number'}}
+---
+...
+insert_values('double')
+---
+...
+s:select()
+---
+- - [18014398509481983]
+  - [18014398509481984]
+  - [36028797018963967]
+  - [36028797018963968]
+  - [72057594037927935]
+  - [72057594037927936]
+  - [144115188075855871]
+  - [144115188075855872]
+  - [288230376151711743]
+  - [288230376151711744]
+  - [576460752303423487]
+  - [576460752303423488]
+  - [1152921504606846975]
+  - [1152921504606846976]
+  - [2305843009213693951]
+  - [2305843009213693952]
+  - [4611686018427387903]
+  - [4611686018427387904]
+  - [9223372036854775807]
+  - [9223372036854775808]
+...
+s:drop()
+---
+...
+-- Test that the use of hint(s) does not violate alter between
+-- scalar and string.
+s = box.schema.space.create('test', {engine = engine})
+---
+...
+i1 = s:create_index('i1', {parts = {1, 'string'}})
+---
+...
+s:insert({"bbb"})
+---
+- ['bbb']
+...
+s:insert({"ccc"})
+---
+- ['ccc']
+...
+i1:alter{parts = {1, 'scalar'}}
+---
+...
+s:insert({"aaa"})
+---
+- ['aaa']
+...
+s:insert({"ddd"})
+---
+- ['ddd']
+...
+s:select()
+---
+- - ['aaa']
+  - ['bbb']
+  - ['ccc']
+  - ['ddd']
+...
+s:drop()
+---
+...
+-- Test that hints does not violate the correct order of
+-- numeric fields (on alter).
+s = box.schema.space.create('test', {engine = engine})
+---
+...
+i1 = s:create_index('i1', {parts = {1, 'unsigned'}})
+---
+...
+s:insert({11})
+---
+- [11]
+...
+i1:alter{parts = {1, 'integer'}}
+---
+...
+s:insert({-22})
+---
+- [-22]
+...
+i1:alter{parts = {1, 'number'}}
+---
+...
+s:insert({-33.33})
+---
+- [-33.33]
+...
+i1:alter{parts = {1, 'scalar'}}
+---
+...
+s:insert({44.44})
+---
+- [44.44]
+...
+s:insert({"Hello world"})
+---
+- ['Hello world']
+...
+s:select()
+---
+- - [-33.33]
+  - [-22]
+  - [11]
+  - [44.44]
+  - ['Hello world']
+...
+s:drop()
+---
+...

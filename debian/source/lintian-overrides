@@ -1,0 +1,6 @@
+# This override can be removed after Ubuntu Xenial support is dropped
+# and debian/control Build-Depends Ubuntu Xenial workaround 
+# 'base-files (<< 9.9) | debhelper (>= 10)' is replaced with strict
+# 'debhelper (>= 10)' condition.
+tarantool source: package-needs-versioned-debhelper-build-depends 10
+tarantool source: newer-standards-version *

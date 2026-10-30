@@ -1,0 +1,1625 @@
+fio = require 'fio'
+---
+...
+ffi = require 'ffi'
+---
+...
+fiber = require 'fiber'
+---
+...
+buffer = require 'buffer'
+---
+...
+log = require 'log'
+---
+...
+test_run = require('test_run').new()
+---
+...
+-- umask
+type(fio.umask(0))
+---
+- number
+...
+fio.umask()
+---
+- 0
+...
+-- pathjoin
+st, err = pcall(fio.basename, nil, nil)
+---
+...
+st
+---
+- false
+...
+err:match("basename") ~= nil
+---
+- true
+...
+fio.pathjoin('abc', 'cde')
+---
+- abc/cde
+...
+fio.pathjoin('/', 'abc')
+---
+- /abc
+...
+fio.pathjoin('abc/', '/cde')
+---
+- abc/cde
+...
+fio.pathjoin('/', '/cde')
+---
+- /cde
+...
+fio.pathjoin('/a', '/')
+---
+- /a
+...
+fio.pathjoin('abc', 'awdeq///qweqwqwe///', "//asda//")
+---
+- abc/awdeq/qweqwqwe/asda
+...
+-- basename
+st, err = pcall(fio.basename, nil)
+---
+...
+st
+---
+- false
+...
+err:match("basename") ~= nil
+---
+- true
+...
+fio.basename('/')
+---
+- 
+...
+fio.basename('abc')
+---
+- abc
+...
+fio.basename('abc.cde', '.cde')
+---
+- abc
+...
+fio.basename('abc^cde', '.cde')
+---
+- abc^cde
+...
+fio.basename('/path/to/file.cde', '.cde')
+---
+- file
+...
+-- other tests
+tmpdir = fio.tempdir()
+---
+...
+file1 = fio.pathjoin(tmpdir, 'file.1')
+---
+...
+file2 = fio.pathjoin(tmpdir, 'file.2')
+---
+...
+file3 = fio.pathjoin(tmpdir, 'file.3')
+---
+...
+file4 = fio.pathjoin(tmpdir, 'file.4')
+---
+...
+st, err = pcall(fio.open, nil)
+---
+...
+st
+---
+- false
+...
+err:match("open") ~= nil
+---
+- true
+...
+fh1 = fio.open(file1, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0777', 8))
+---
+...
+fh1 ~= nil
+---
+- true
+...
+f1s = fh1:stat()
+---
+...
+f1s.size
+---
+- 0
+...
+f1s.is_reg()
+---
+- error: 'usage: stat:is_reg()'
+...
+f1s:is_reg()
+---
+- true
+...
+f1s:is_dir()
+---
+- false
+...
+f1s:is_link()
+---
+- false
+...
+f1s:is_sock()
+---
+- false
+...
+f1s:is_fifo()
+---
+- false
+...
+f1s:is_chr()
+---
+- false
+...
+f1s:is_blk()
+---
+- false
+...
+fh1:seek(121)
+---
+- 121
+...
+fh1:stat().size
+---
+- 0
+...
+fh1:write(nil)
+---
+- true
+...
+fh1:write("Hello, world")
+---
+- true
+...
+fh1:stat().size
+---
+- 136
+...
+fh1:fsync()
+---
+- true
+...
+fh1:fdatasync()
+---
+- true
+...
+fio.sync()
+---
+- true
+...
+fh1:pread(512, 121)
+---
+- nilHello, world
+...
+fh1:pread(5, 121)
+---
+- nilHe
+...
+fh1:write("; Ehllo, again")
+---
+- true
+...
+fh1:seek(121)
+---
+- 121
+...
+fh1:read(13)
+---
+- nilHello, wor
+...
+fh1:read(512)
+---
+- ld; Ehllo, again
+...
+fh1:pread(512, 14 + 121)
+---
+- d; Ehllo, again
+...
+fh1:pwrite("He", 14 + 121)
+---
+- true
+...
+fh1:pread(512, 14 + 121)
+---
+- He Ehllo, again
+...
+{ fh1:stat().size, fio.stat(file1).size }
+---
+- - 150
+  - 150
+...
+fh1:seek(121)
+---
+- 121
+...
+fh1:read(512)
+---
+- nilHello, worlHe Ehllo, again
+...
+fio.link(nil, nil)
+---
+- error: 'Usage: fio.link(target, linkpath)'
+...
+fio.link(file1, file2)
+---
+- true
+...
+fio.glob(nil)
+---
+- error: 'Usage: fio.glob(pattern)'
+...
+glob = fio.glob(fio.pathjoin(tmpdir, '*'))
+---
+...
+#glob
+---
+- 2
+...
+{ string.match(glob[1], '^.*/(.*)'), string.match(glob[2], '^.*/(.*)') }
+---
+- - file.1
+  - file.2
+...
+fio.stat(file1).inode == fio.stat(file2).inode
+---
+- true
+...
+fh3 = fio.open(file3, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0x1FD)
+---
+...
+fh1:stat().inode ~= fh3:stat().inode
+---
+- true
+...
+0775
+---
+- 775
+...
+bit.band(fh3:stat().mode, 0x1FF) == 0x1FD
+---
+- true
+...
+fh3:write("abc")
+---
+- true
+...
+fio.rename(nil, nil)
+---
+- error: 'Usage: fio.rename(oldpath, newpath)'
+...
+fio.rename(file3, file4)
+---
+- true
+...
+fio.symlink(nil, nil)
+---
+- error: 'Usage: fio.symlink(target, linkpath)'
+...
+fio.symlink(file4, file3)
+---
+- true
+...
+fio.stat(nil)
+---
+- error: 'Usage: fio.stat(pathname)'
+...
+fio.stat(file3).size
+---
+- 3
+...
+fio.lstat(file3).size ~= fio.stat(file3).size
+---
+- true
+...
+fio.lstat(file3).mode ~= fio.stat(file3).mode
+---
+- true
+...
+fio.basename(fio.readlink(file3))
+---
+- file.4
+...
+bit.band(fio.stat(file4).mode, 0x1FF) == 0x1FD
+---
+- true
+...
+fio.chmod(nil, 0x1F8)
+---
+- error: 'Usage: fio.chmod(pathname, mode)'
+...
+fio.chmod(file4, 0x1F8) -- 0x770
+---
+- true
+...
+bit.band(fh3:stat().mode, 0x1FF) == 0x1F8
+---
+- true
+...
+bit.band(fio.stat(file4).mode, 0x1FF) == 0x1F8
+---
+- true
+...
+dir1 = fio.pathjoin(tmpdir, 'dir1')
+---
+...
+dir2 = fio.pathjoin(tmpdir, 'dir2')
+---
+...
+fio.mkdir(nil)
+---
+- error: Usage fio.mkdir(pathname[, mode])
+...
+fio.mkdir(dir1) -- standard mode
+---
+- true
+...
+fio.mkdir(dir2, 1) -- custom mode
+---
+- true
+...
+string.format('%04o', bit.band(fio.stat(dir1).mode, 0x1FF))
+---
+- '0777'
+...
+string.format('%04o', bit.band(fio.stat(dir2).mode, 0x1FF))
+---
+- '0001'
+...
+-- cleanup directories
+{ fh1:close(), fh3:close() }
+---
+- - true
+  - true
+...
+fh1:close()
+---
+- false
+- 'fio: Bad file descriptor'
+...
+fh3:close()
+---
+- false
+- 'fio: Bad file descriptor'
+...
+fio.rmdir(nil)
+---
+- error: 'Usage: fio.rmdir(pathname)'
+...
+fio.rmdir(dir1)
+---
+- true
+...
+fio.rmdir(dir2)
+---
+- true
+...
+{ fio.unlink(file1), fio.unlink(file2), fio.unlink(file3), fio.unlink(file4) }
+---
+- - true
+  - true
+  - true
+  - true
+...
+{ fio.unlink(file1), fio.unlink(file2), fio.unlink(file3), fio.unlink(file4) }
+---
+- - false
+  - false
+  - false
+  - false
+  - 'fio: No such file or directory'
+...
+-- gh-3258 rmtree should remove directories with files
+fio.mktree('tmp2/tmp3/tmp4')
+---
+- true
+...
+fh = fio.open('tmp2/tmp3/tmp4/tmp.txt', {'O_RDWR', 'O_CREAT'})
+---
+...
+fh:close()
+---
+- true
+...
+fio.rmtree('tmp2')
+---
+- true
+...
+fio.stat('tmp2')
+---
+- null
+- 'fio: No such file or directory'
+...
+fio.rmdir(tmpdir)
+---
+- true
+...
+fio.rmdir(tmpdir)
+---
+- false
+- 'fio: No such file or directory'
+...
+fio.unlink()
+---
+- error: 'Usage: fio.unlink(pathname)'
+...
+fio.unlink(nil)
+---
+- error: 'Usage: fio.unlink(pathname)'
+...
+-- gh-7981 use 0666 if mode omitted in open with O_CREAT
+fh4 = fio.open('newfile', {'O_RDWR','O_CREAT','O_EXCL'})
+---
+...
+bit.band(fh4:stat().mode, tonumber('7777', 8)) == \
+    bit.band(tonumber('666', 8), bit.bnot(fio.umask()))
+---
+- true
+...
+fh4:close()
+---
+- true
+...
+fio.unlink('newfile')
+---
+- true
+...
+-- dirname
+st, err = pcall(fio.dirname, nil)
+---
+...
+st
+---
+- false
+...
+err:match("dirname") ~= nil
+---
+- true
+...
+fio.dirname('abc')
+---
+- .
+...
+fio.dirname('/abc')
+---
+- /
+...
+fio.dirname('/abc/cde')
+---
+- /abc
+...
+fio.dirname('/abc/cde/')
+---
+- /abc
+...
+fio.dirname('/')
+---
+- /
+...
+-- abspath
+st, err = pcall(fio.abspath, nil)
+---
+...
+st
+---
+- false
+...
+err:match("abspath") ~= nil
+---
+- true
+...
+fio.abspath("/")
+---
+- /
+...
+fio.abspath("/tmp")
+---
+- /tmp
+...
+fio.abspath("/tmp/test/../")
+---
+- /tmp
+...
+fio.abspath("/tmp/test/../abc")
+---
+- /tmp/abc
+...
+fio.abspath("/tmp/./test")
+---
+- /tmp/test
+...
+fio.abspath("/tmp///test//abc")
+---
+- /tmp/test/abc
+...
+fio.abspath("/../")
+---
+- /
+...
+fio.abspath("/../tmp")
+---
+- /tmp
+...
+type(string.find(fio.abspath("tmp"), "tmp"))
+---
+- number
+...
+-- chdir
+old_cwd = fio.cwd()
+---
+...
+st, err = pcall(fio.chdir, nil)
+---
+...
+st
+---
+- false
+...
+err:match("chdir") ~= nil
+---
+- true
+...
+st, err = pcall(fio.chdir, 42)
+---
+...
+st
+---
+- false
+...
+err:match("chdir") ~= nil
+---
+- true
+...
+fio.chdir('/no/such/file/or/directory')
+---
+- false
+...
+fio.chdir('/')
+---
+- true
+...
+fio.cwd()
+---
+- /
+...
+fio.chdir(old_cwd)
+---
+- true
+...
+fio.cwd() == old_cwd
+---
+- true
+...
+-- listdir
+tmpdir = fio.tempdir()
+---
+...
+dir3 = fio.pathjoin(tmpdir, "dir3")
+---
+...
+st, err = pcall(fio.mkdir, nil)
+---
+...
+st
+---
+- false
+...
+err:match("mkdir") ~= nil
+---
+- true
+...
+fio.mkdir(dir3)
+---
+- true
+...
+fio.mkdir(fio.pathjoin(dir3, "1"))
+---
+- true
+...
+fio.mkdir(fio.pathjoin(dir3, "2"))
+---
+- true
+...
+fio.mkdir(fio.pathjoin(dir3, "3"))
+---
+- true
+...
+fio.listdir("/no/such/directory/")
+---
+- null
+- 'can''t listdir /no/such/directory/: fio: No such file or directory'
+...
+ls = fio.listdir(dir3)
+---
+...
+table.sort(ls, function(a, b) return tonumber(a) < tonumber(b) end)
+---
+...
+ls
+---
+- - '1'
+  - '2'
+  - '3'
+...
+-- rmtree
+fio.stat(dir3) ~= nil
+---
+- true
+...
+fio.rmtree(dir3)
+---
+- true
+...
+fio.stat(dir3) == nil
+---
+- true
+...
+st, err = fio.rmtree(dir3)
+---
+...
+st
+---
+- null
+...
+err:match("No such") ~= nil
+---
+- true
+...
+-- mktree
+tmp1 = fio.pathjoin(tmpdir, "1")
+---
+...
+tmp2 = fio.pathjoin(tmp1, "2")
+---
+...
+tree = fio.pathjoin(tmp2, "3")
+---
+...
+tree2 = fio.pathjoin(tmpdir, "4")
+---
+...
+st, err = pcall(fio.mktree, nil)
+---
+...
+st
+---
+- false
+...
+err:match("mktree") ~= nil
+---
+- true
+...
+fio.mktree(tree)
+---
+- true
+...
+fio.stat(tree) ~= nil
+---
+- true
+...
+fio.stat(tmp2) ~= nil
+---
+- true
+...
+fio.mktree(tree2, tonumber('0777', 8))
+---
+- true
+...
+-- check mktree error reporting
+--
+-- The test is skipped for the super user, because it has ability
+-- to perform any file access despite file permissions.
+uid = ffi.C.getuid()
+---
+...
+tmp3 = fio.pathjoin(tmpdir, '5')
+---
+...
+fio.mkdir(tmp3)
+---
+- true
+...
+fio.chmod(tmp3, tonumber('500', 8))
+---
+- true
+...
+tree123 = fio.pathjoin(tmp3, '1/2/3')
+---
+...
+st, err = fio.mktree(tree123)
+---
+...
+uid == 0 or st == false
+---
+- true
+...
+uid == 0 or err:match('Permission denied') ~= nil
+---
+- true
+...
+tree4 = fio.pathjoin(tmp3, '4')
+---
+...
+st, err = fio.mktree(tree4)
+---
+...
+uid == 0 or st == false
+---
+- true
+...
+uid == 0 or err:match('Permission denied') ~= nil
+---
+- true
+...
+-- copy and copytree
+file1 = fio.pathjoin(tmp1, 'file.1')
+---
+...
+file2 = fio.pathjoin(tmp2, 'file.2')
+---
+...
+file3 = fio.pathjoin(tree, 'file.3')
+---
+...
+file4 = fio.pathjoin(tree, 'file.4')
+---
+...
+file5 = fio.pathjoin(tree, 'file.5')
+---
+...
+file6 = fio.pathjoin(tree, 'file.6')
+---
+...
+file7 = fio.pathjoin(tree, 'file.7')
+---
+...
+file8 = fio.pathjoin(tree, 'file.8')
+---
+...
+fh1 = fio.open(file1, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0777', 8))
+---
+...
+fh1:write("gogo")
+---
+- true
+...
+fh1:close()
+---
+- true
+...
+fh1 = fio.open(file2, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0777', 8))
+---
+...
+fh1:write("lolo")
+---
+- true
+...
+fh1:close()
+---
+- true
+...
+fio.symlink(file1, file3)
+---
+- true
+...
+fio.copyfile(file1, tmp2)
+---
+- true
+...
+fio.stat(fio.pathjoin(tmp2, "file.1")) ~= nil
+---
+- true
+...
+--- test copyfile to operate with one byte transfer
+errinj = box.error.injection
+---
+...
+errinj.set('ERRINJ_COIO_SENDFILE_CHUNK', 1)
+---
+- ok
+...
+fio.copyfile(file1, file4)
+---
+- true
+...
+fio.stat(file1, file4) ~= nil
+---
+- true
+...
+errinj.set('ERRINJ_COIO_SENDFILE_CHUNK', -1)
+---
+- ok
+...
+--- test the destination file is truncated
+fh5 = fio.open(file5, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0644', 8))
+---
+...
+fh5:write("template data")
+---
+- true
+...
+fh5:close()
+---
+- true
+...
+fh6 = fio.open(file6, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0644', 8))
+---
+...
+fh6:write("to be truncated")
+---
+- true
+...
+fio.copyfile(file5, file6)
+---
+- true
+...
+fh6:seek(0)
+---
+- 0
+...
+fh6:read()
+---
+- template data
+...
+fh6:close()
+---
+- true
+...
+--
+-- gh-4651: Test partial write/pwrite via one byte transfer.
+--
+fh7 = fio.open(file7, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0644', 8))
+---
+...
+errinj.set('ERRINJ_COIO_WRITE_CHUNK', true)
+---
+- ok
+...
+fh7:write("one byte transfer, write")
+---
+- true
+...
+errinj.set('ERRINJ_COIO_WRITE_CHUNK', false)
+---
+- ok
+...
+fh7:seek(0)
+---
+- 0
+...
+fh7:read()
+---
+- one byte transfer, write
+...
+fh7:close()
+---
+- true
+...
+fh8 = fio.open(file8, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0644', 8))
+---
+...
+errinj.set('ERRINJ_COIO_WRITE_CHUNK', true)
+---
+- ok
+...
+fh8:pwrite("one byte transfer, ", 0)
+---
+- true
+...
+fh8:seek(0)
+---
+- 0
+...
+fh8:read()
+---
+- 'one byte transfer, '
+...
+fh8:pwrite("pwrite", 19)
+---
+- true
+...
+errinj.set('ERRINJ_COIO_WRITE_CHUNK', false)
+---
+- ok
+...
+fh8:seek(0)
+---
+- 0
+...
+fh8:read()
+---
+- one byte transfer, pwrite
+...
+fh8:close()
+---
+- true
+...
+res, err = fio.copyfile(fio.pathjoin(tmp1, 'not_exists.txt'), tmp1)
+---
+...
+res
+---
+- false
+...
+err:match("failed to copy") ~= nil
+---
+- true
+...
+newdir = fio.pathjoin(tmpdir, "newdir")
+---
+...
+fio.copytree(fio.pathjoin(tmpdir, "1"), newdir)
+---
+- true
+...
+fio.stat(fio.pathjoin(newdir, "file.1")) ~= nil
+---
+- true
+...
+fio.stat(fio.pathjoin(newdir, "2", "file.2")) ~= nil
+---
+- true
+...
+fio.stat(fio.pathjoin(newdir, "2", "3", "file.3")) ~= nil
+---
+- true
+...
+fio.readlink(fio.pathjoin(newdir, "2", "3", "file.3")) == file1
+---
+- true
+...
+fio.rmtree(tmpdir)
+---
+- true
+...
+fio.copytree("/no/such/dir", "/some/where")
+---
+- false
+- Directory /no/such/dir does not exist
+...
+-- ibuf read/write
+buf = buffer.ibuf()
+---
+...
+tmpdir = fio.tempdir()
+---
+...
+tmpfile = fio.pathjoin(tmpdir, "test1")
+---
+...
+fh = fio.open(tmpfile, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0777', 8))
+---
+...
+fh:write('helloworld!')
+---
+- true
+...
+fh:seek(0)
+---
+- 0
+...
+fh:read()
+---
+- helloworld!
+...
+fh:close()
+---
+- true
+...
+fh:read()
+---
+- null
+- 'fio: Bad file descriptor'
+...
+fio.unlink(tmpfile)
+---
+- true
+...
+tmpfile = fio.pathjoin(tmpdir, "test")
+---
+...
+fh = fio.open(tmpfile, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0777', 8))
+---
+...
+fh:write('helloworld!')
+---
+- true
+...
+fh:seek(0)
+---
+- 0
+...
+len = fh:read(buf:reserve(12))
+---
+...
+ffi.string(buf:alloc(len), len)
+---
+- helloworld!
+...
+fh:seek(0)
+---
+- 0
+...
+len = fh:read(buf:reserve(5), 5)
+---
+...
+ffi.string(buf:alloc(len), len)
+---
+- hello
+...
+len = fh:read(buf:reserve(5), 5)
+---
+...
+ffi.string(buf:alloc(len), len)
+---
+- world
+...
+len = fh:read(buf:reserve(5), 5)
+---
+...
+ffi.string(buf:alloc(len), len)
+---
+- '!'
+...
+buf:reset()
+---
+...
+len = fh:pread(buf:reserve(5), 5, 5)
+---
+...
+ffi.string(buf:alloc(len), len)
+---
+- world
+...
+len = fh:pread(buf:reserve(5), 5)
+---
+...
+ffi.string(buf:alloc(len), len)
+---
+- hello
+...
+fh:seek(0)
+---
+- 0
+...
+fh:write(buf.rpos, buf:size())
+---
+- true
+...
+fh:seek(0)
+---
+- 0
+...
+fh:read(64)
+---
+- worldhello!
+...
+fh:pwrite(buf:read(5), 5, 5)
+---
+- true
+...
+fh:pwrite(buf:read(5), 5)
+---
+- true
+...
+fh:seek(0)
+---
+- 0
+...
+fh:read(64)
+---
+- helloworld!
+...
+buf:recycle()
+---
+...
+fh:close()
+---
+- true
+...
+-- test utime
+test_run:cmd("push filter '(.builtin/.*.lua):[0-9]+' to '\\1'")
+---
+- true
+...
+fh = fio.open('newfile', {'O_RDWR','O_CREAT'})
+---
+...
+current_time = math.floor(fiber.time())
+---
+...
+fiber_time = fiber.time
+---
+...
+fiber.time = function() return current_time end
+---
+...
+fio.utime('newfile', 0, 0)
+---
+- true
+...
+fh:stat().atime == 0
+---
+- true
+...
+fh:stat().mtime == 0
+---
+- true
+...
+fio.utime('newfile', 1, 2)
+---
+- true
+...
+fh:stat().atime == 1
+---
+- true
+...
+fh:stat().mtime == 2
+---
+- true
+...
+fio.utime('newfile', 3)
+---
+- true
+...
+fh:stat().atime == 3
+---
+- true
+...
+fh:stat().mtime == 3
+---
+- true
+...
+fio.utime('newfile')
+---
+- true
+...
+fh:stat().atime == current_time
+---
+- true
+...
+fh:stat().mtime == current_time
+---
+- true
+...
+fio.utime(nil)
+---
+- error: 'builtin/fio.lua: Usage: fio.utime(filepath[, atime[, mtime]])'
+...
+fio.utime('newfile', 'string')
+---
+- error: 'builtin/fio.lua: fio.utime: atime should be a number'
+...
+fio.utime('newfile', 1, 'string')
+---
+- error: 'builtin/fio.lua: fio.utime: mtime should be a number'
+...
+fh:close()
+---
+- true
+...
+fio.unlink('newfile')
+---
+- true
+...
+fh = nil
+---
+...
+current_time = nil
+---
+...
+fiber.time = fiber_time
+---
+...
+fiber_time = nil
+---
+...
+-- gh-2924
+-- fio.path.exists lexists is_file, etc
+--
+fio.path.is_file(tmpfile)
+---
+- true
+...
+fio.path.is_dir(tmpfile)
+---
+- false
+...
+fio.path.is_link(tmpfile)
+---
+- false
+...
+fio.path.exists(tmpfile)
+---
+- true
+...
+fio.path.lexists(tmpfile)
+---
+- true
+...
+non_existing_file = "/no/such/file"
+---
+...
+fio.path.is_file(non_existing_file)
+---
+- false
+...
+fio.path.is_dir(non_existing_file)
+---
+- false
+...
+fio.path.is_link(non_existing_file)
+---
+- false
+...
+fio.path.exists(non_existing_file)
+---
+- false
+...
+fio.path.lexists(non_existing_file)
+---
+- false
+...
+fio.path.is_file(tmpdir)
+---
+- false
+...
+fio.path.is_dir(tmpdir)
+---
+- true
+...
+fio.path.is_link(tmpdir)
+---
+- false
+...
+fio.path.exists(tmpdir)
+---
+- true
+...
+fio.path.lexists(tmpdir)
+---
+- true
+...
+link = fio.pathjoin(tmpdir, "link")
+---
+...
+fio.symlink(tmpfile, link)
+---
+- true
+...
+fio.path.is_file(link)
+---
+- true
+...
+fio.path.is_dir(link)
+---
+- false
+...
+fio.path.is_link(link)
+---
+- true
+...
+fio.path.exists(link)
+---
+- true
+...
+fio.path.lexists(link)
+---
+- true
+...
+fio.unlink(link)
+---
+- true
+...
+fio.symlink(non_existing_file, link)
+---
+- true
+...
+fio.path.is_file(link)
+---
+- false
+...
+fio.path.is_dir(link)
+---
+- false
+...
+fio.path.is_link(link)
+---
+- true
+...
+fio.path.exists(link)
+---
+- false
+...
+fio.path.lexists(link)
+---
+- true
+...
+fio.unlink(link)
+---
+- true
+...
+fio.symlink(tmpdir, link)
+---
+- true
+...
+fio.path.is_file(link)
+---
+- false
+...
+fio.path.is_dir(link)
+---
+- true
+...
+fio.path.is_link(link)
+---
+- true
+...
+fio.path.exists(link)
+---
+- true
+...
+fio.path.lexists(link)
+---
+- true
+...
+fio.unlink(link)
+---
+- true
+...
+fio.unlink(tmpfile)
+---
+- true
+...
+fio.rmdir(tmpdir)
+---
+- true
+...
+--
+-- gh-3580: Check that error messages are descriptive enough.
+--
+fh1:seek(nil, 'a')
+---
+- error: 'builtin/fio.lua: fio.seek(): unknown whence: a'
+...
+fio.open(nil)
+---
+- error: 'builtin/fio.lua: Usage: fio.open(path[, flags[, mode]])'
+...
+fio.open(tmp1, {'A'}, tonumber('0777', 8))
+---
+- error: 'builtin/fio.lua: fio.open(): unknown flag: A'
+...
+fio.open(tmp1, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, {'A'})
+---
+- error: 'builtin/fio.lua: fio.open(): unknown mode: A'
+...
+fio.pathjoin(nil)
+---
+- error: 'fio.pathjoin(): undefined path part 1'
+...
+fio.pathjoin('abc', nil)
+---
+- error: 'fio.pathjoin(): undefined path part 2'
+...
+fio.pathjoin('abc', 'cde', nil)
+---
+- error: 'fio.pathjoin(): undefined path part 3'
+...
+fio.basename(nil)
+---
+- error: 'builtin/fio.lua: Usage: fio.basename(path[, suffix])'
+...
+fio.abspath(nil)
+---
+- error: 'Usage: fio.abspath(path)'
+...
+fio.chdir(1)
+---
+- error: 'builtin/fio.lua: Usage: fio.chdir(path)'
+...
+fio.listdir(1)
+---
+- error: 'builtin/fio.lua: Usage: fio.listdir(path)'
+...
+fio.mktree(1)
+---
+- error: 'builtin/fio.lua: Usage: fio.mktree(path[, mode])'
+...
+fio.rmtree(1)
+---
+- error: 'builtin/fio.lua: Usage: fio.rmtree(path)'
+...
+fio.copytree(nil, nil)
+---
+- error: 'builtin/fio.lua: Usage: fio.copytree(from, to)'
+...
+fio.copytree(nil, nil)
+---
+- error: 'builtin/fio.lua: Usage: fio.copytree(from, to)'
+...
+test_run:cmd("clear filter")
+---
+- true
+...
+--
+-- gh-4439: mktree error handling fix - creation of existing file/directory
+--
+fio.mktree('/dev/null')
+---
+- false
+- 'Error creating directory /dev/null: File exists'
+...
+fio.mktree('/dev/null/dir')
+---
+- false
+- 'Error creating directory /dev/null: File exists'
+...
+--
+-- gh-4794: fio.tempdir() should use $TMPDIR.
+--
+cwd = fio.cwd()
+---
+...
+old_tmpdir = os.getenv('TMPDIR')
+---
+...
+tmpdir = cwd..'/tmp-.dot.-'
+---
+...
+fio.mkdir(tmpdir)
+---
+- true
+...
+os.setenv('TMPDIR', tmpdir)
+---
+...
+dir = fio.tempdir()
+---
+...
+dir:startswith(tmpdir) or log.error({dir, tmpdir})
+---
+- true
+...
+fio.stat(dir) ~= nil or log.error(fio.stat(dir))
+---
+- true
+...
+tmpdir = cwd..'/tmp2'
+---
+...
+os.setenv('TMPDIR', tmpdir)
+---
+...
+fio.tempdir()
+---
+- null
+- 'fio: No such file or directory'
+...
+os.setenv('TMPDIR', nil)
+---
+...
+dir = fio.tempdir()
+---
+...
+dir:startswith('/tmp') or dir
+---
+- true
+...
+tmpdir = cwd..'/'..string.rep('t', 5000)
+---
+...
+os.setenv('TMPDIR', tmpdir)
+---
+...
+fio.tempdir()
+---
+- null
+- 'fio: Cannot allocate memory'
+...
+tmpdir = nil
+---
+...
+os.setenv('TMPDIR', old_tmpdir)
+---
+...
+--
+-- read() and pread() should not use a shared buffer so as not to clash with
+-- other fibers during yield.
+--
+rights = tonumber('0777', 8)
+---
+...
+flags = {'O_RDWR', 'O_TRUNC', 'O_CREAT'}
+---
+...
+tmpdir = fio.tempdir()
+---
+...
+file1 = fio.pathjoin(tmpdir, 'file1')
+---
+...
+file2 = fio.pathjoin(tmpdir, 'file2')
+---
+...
+fd1 = fio.open(file1, flags, rights)
+---
+...
+fd2 = fio.open(file2, flags, rights)
+---
+...
+fd1:write('1'), fd1:seek(0)
+---
+- true
+- 0
+...
+fd2:write('2'), fd2:seek(0)
+---
+- true
+- 0
+...
+res1, res2 = nil
+---
+...
+do                                                                              \
+    fiber.new(function() res1 = fd1:read() end)                                 \
+    fiber.new(function() res2 = fd2:read() end)                                 \
+end
+---
+...
+_ = test_run:wait_cond(function() return res1 and res2 end)
+---
+...
+assert(res1 == '1')
+---
+- true
+...
+assert(res2 == '2')
+---
+- true
+...
+--
+-- The same with pread().
+--
+res1, res2 = nil
+---
+...
+do                                                                              \
+    fiber.new(function() res1 = fd1:pread(1, 0) end)                            \
+    fiber.new(function() res2 = fd2:pread(1, 0) end)                            \
+end
+---
+...
+_ = test_run:wait_cond(function() return res1 and res2 end)
+---
+...
+assert(res1 == '1')
+---
+- true
+...
+assert(res2 == '2')
+---
+- true
+...
+fd1:close()
+---
+- true
+...
+fd2:close()
+---
+- true
+...
+fio.rmtree(tmpdir)
+---
+- true
+...
