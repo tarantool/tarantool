@@ -33,7 +33,7 @@ g.test_box_info = function(cg)
         })
         local expected = {}
         for _, k in ipairs({
-            'package', 'version', 'id', 'uuid', 'name',
+            'package', 'version', 'schema_version', 'id', 'uuid', 'name',
             'replicaset', 'cluster',
         }) do
             t.assert_is_not(main_box_info[k], nil)
@@ -66,6 +66,21 @@ g.test_box_info = function(cg)
     box_info.name = 'test_instance'
     box_info.replicaset.name = 'test_replicaset'
     box_info.cluster.name = 'test_cluster'
+    cg.server:exec(function(box_info)
+        t.helpers.retrying({}, function()
+            t.assert_equals(box.info(), box_info)
+        end)
+    end, {box_info}, {_thread_id = 1})
+    --
+    -- Create a space and check that the schema version is updated in
+    -- application threads.
+    --
+    local schema_version = cg.server:exec(function()
+        box.schema.space.create('test')
+        return box.info.schema_version
+    end)
+    t.assert_gt(schema_version, box_info.schema_version)
+    box_info.schema_version = schema_version
     cg.server:exec(function(box_info)
         t.helpers.retrying({}, function()
             t.assert_equals(box.info(), box_info)

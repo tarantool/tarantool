@@ -267,6 +267,7 @@ local function box_info_init()
     local box_info = {
         package = tarantool.package,
         version = tarantool.version,
+        schema_version = 0,
         id = box.NULL,
         uuid = uuid.NULL,
         name = box.NULL,
@@ -299,11 +300,15 @@ local function box_info_init()
         box_info.cluster.name = v.cluster_name
         on_box_info_update:broadcast()
     end)
+    threads_conn:watch('box.schema', function(_k, v)
+        box_info.schema_version = v.version
+        on_box_info_update:broadcast()
+    end)
     -- Wait until box.info is initialized so that code executed in application
     -- threads can read it right after box.cfg() is done. Note, we have to keep
     -- the watcher since instance, replicaset, and cluster names can be set
     -- after recovery.
-    while box_info.id == box.NULL do
+    while box_info.id == box.NULL or box_info.schema_version == 0 do
         on_box_info_update:wait()
     end
 end
