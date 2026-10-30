@@ -169,6 +169,7 @@ def main():
             "common": {
                 "csv_options": {
                     "delimiter": ",",
+                    "quote_char": "'",
                 },
                 "time_column": "_time",
                 "attributes": ["commit"],
