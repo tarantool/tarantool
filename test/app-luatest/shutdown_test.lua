@@ -14,6 +14,7 @@ g.before_each(function(cg)
     cg.server:exec(function()
         local fiber = require('fiber')
         local socket = require('socket')
+        local uri = require('uri')
         rawset(_G, 'delay_shutdown', true)
         rawset(_G, 'delay_shutdown_cond', fiber.cond())
         rawset(_G, 'delay_shutdown', function()
@@ -24,8 +25,9 @@ g.before_each(function(cg)
         -- Wait until we refuse to connect which means iproto shutdown trigger
         -- is finished and new connections should not be possible.
         rawset(_G, 'wait_iproto_shutdown', function()
+            local u = uri.parse(box.cfg.listen)
             t.helpers.retrying({}, function()
-                local sock, err = socket.tcp_connect(box.cfg.listen)
+                local sock, err = socket.tcp_connect(u.host, u.service)
                 if err == nil then
                     sock:close()
                     error('still ok')
