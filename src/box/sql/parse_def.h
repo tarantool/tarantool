@@ -177,6 +177,10 @@ struct sql_parser_context {
 	uint32_t line;
 	/** Currently parsed position in line. */
 	uint32_t pos;
+	/** Start of the token currently passed to the parser. */
+	const char *token_start;
+	/** End of the token passed to the parser before the current one. */
+	const char *prev_token_end;
 	/** Flag to show if a syntax error happened. */
 	bool is_aborted;
 };
