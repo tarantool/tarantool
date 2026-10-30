@@ -30,7 +30,6 @@
 #     metrics: [drop_while]
 #     csv_options:
 #       delimiter: ','
-#       quote_char: "'"
 #
 # The data in CSV files and YAML config are suitable for using
 # with by Apache Otava [1], that performs statistical analysis of
@@ -91,7 +90,7 @@ def influx_download_stat(
 def create_csv_report(csv_iterator, csv_path):
     csv_file = open(csv_path, "w", newline="")
     writer = csv.writer(csv_file, dialect="excel", delimiter=",",
-                        quotechar="'", quoting=csv.QUOTE_MINIMAL)
+                        quoting=csv.QUOTE_MINIMAL)
     header = next(csv_iterator)
     # The method `.index` raises, when field `_time` is not found.
     time_idx = header.index("_time")
