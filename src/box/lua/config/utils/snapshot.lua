@@ -1,6 +1,7 @@
 local fio = require('fio')
 local xlog = require('xlog')
 local instance_config = require('internal.config.instance_config')
+local workdir = require('internal.config.utils.workdir')
 local minifio = require('internal.minifio')
 
 local snapshot_path = nil
@@ -24,26 +25,11 @@ local function effective_snapshot_dir(iconfig)
         return snap_dir
     end
 
-    -- We assume that the startup working directory is the current
-    -- working directory. IOW, that this function is called before
-    -- first box.cfg() call. Let's verify it.
-    assert(type(box.cfg) == 'function')
-
-    -- If the snapshot directory is not absolute, it is relative
-    -- to the working directory.
-    --
-    -- Determine an absolute path to the configured working
-    -- directory considering that it may be relative to the
-    -- working directory at the startup moment.
-    local work_dir = instance_config:get(iconfig, 'process.work_dir')
-    if work_dir == nil then
-        work_dir = '.'
-    end
-    -- Lexical normalization would change the target of symlink/.. .
-    if not work_dir:startswith('/') then
-        work_dir = fio.cwd() .. '/' .. work_dir
-    end
-    return minifio.normalize_missing_parents(work_dir .. '/' .. snap_dir)
+    -- Absence is not cached: another lookup may happen after entry,
+    -- but still before box.cfg(). Only rebase before entry.
+    local work_dir = instance_config:base_dir(iconfig)
+    local base_dir = work_dir ~= nil and workdir.resolve(work_dir) or fio.cwd()
+    return minifio.normalize_missing_parents(base_dir .. '/' .. snap_dir)
 end
 
 -- Determine whether the instance will be recovered from an existing
