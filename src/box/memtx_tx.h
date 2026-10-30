@@ -169,8 +169,6 @@ memtx_tx_manager_free();
 /**
  * Transaction providing DDL changes is disallowed to yield after
  * modifications of internal caches (i.e. after ALTER operation finishes).
- *
- * NB: can trigger story garbage collection.
  */
 void
 memtx_tx_acquire_ddl(struct txn *tx);
@@ -197,8 +195,6 @@ memtx_tx_send_to_read_view(struct txn *txn, int64_t psn);
  * state.
  * Follows signature of @sa memtx_space_replace_all_keys.
  *
- * NB: can trigger story garbage collection.
- *
  * @param space	    the space to which the statement is applied.
  * @param old_tuple the tuple that should be removed (can be NULL).
  * @param new_tuple the tuple that should be inserted (can be NULL).
@@ -218,8 +214,6 @@ memtx_tx_add_stmt(struct space *space, struct tuple *old_tuple,
  * It's just make the statement invisible to all.
  * Prepared statements could be also removed, but for consistency all latter
  * prepared statement must be also rolled back.
- *
- * NB: can trigger story garbage collection.
  *
  * @param stmt current statement.
  */
@@ -255,8 +249,6 @@ memtx_tx_prepare_finalize_slow(struct txn *txn);
  * Finish preparing of a transaction.
  * Must be called for entire transaction after `memtx_tx_history_rollback_stmt`
  * was called for each transaction statement.
- *
- * NB: can trigger story garbage collection.
  */
 static inline void
 memtx_tx_prepare_finalize(struct txn *txn)
@@ -294,8 +286,6 @@ memtx_tx_track_point_slow(struct txn *txn, struct index *index,
  * The key is expected to be full, that is has part count equal to part
  * count in unique cmp_key of the index.
  *
- * NB: can trigger story garbage collection.
- *
  * @return 0 on success, -1 on memory error.
  */
 static inline void
@@ -325,8 +315,6 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
  * This function must be used for ordered indexes, such as TREE, for queries
  * when iteration type is not EQ or when the key is not full (otherwise
  * it's faster to use memtx_tx_track_point).
- *
- * NB: can trigger story garbage collection.
  */
 static inline void
 memtx_tx_track_gap(struct txn *txn, struct space *space, struct index *index,
@@ -355,8 +343,6 @@ memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
  * space by @a key and iterator @a type. This function must be used for queries
  * that count tuples in indexes (for example, index:size or index:count).
  *
- * NB: can trigger story garbage collection.
- *
  * @return the amount of invisible tuples counted.
  */
 static inline uint32_t
@@ -375,8 +361,6 @@ memtx_tx_track_count(struct txn *txn, struct space *space,
  * space by @a key and iterator @a type @a until a tuple. This function must be
  * used when all tuples matching the key and iterator until the given one are
  * skipped by a transaction without reading (e. g. select with offset).
- *
- * NB: can trigger story garbage collection.
  *
  * @return the amount of invisible tuples counted.
  *
@@ -405,8 +389,6 @@ memtx_tx_track_full_scan_slow(struct txn *txn, struct index *index);
  * from @a space.
  * This function must be used for unordered indexes, such as HASH, for queries
  * when iteration type is ALL.
- *
- * NB: can trigger story garbage collection.
  *
  * @return 0 on success, -1 on memory error.
  */
