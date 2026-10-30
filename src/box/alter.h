@@ -30,6 +30,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <stdint.h>
 #include "trigger.h"
 
 extern struct trigger before_replace_schema;
@@ -50,5 +51,17 @@ extern struct trigger on_replace_sequence_data;
 extern struct trigger on_replace_space_sequence;
 extern struct trigger on_replace_trigger;
 extern struct trigger on_replace_func_index;
+
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
+/** Return the mask of replica IDs reserved by pending _cluster inserts. */
+uint32_t
+cluster_get_reserved_ids(void);
+
+#if defined(__cplusplus)
+}
+#endif
 
 #endif /* INCLUDES_TARANTOOL_BOX_ALTER_H */

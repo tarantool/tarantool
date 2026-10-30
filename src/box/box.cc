@@ -36,6 +36,7 @@
 #include <spawn.h>
 
 #include "box/allocator.h"
+#include "alter.h"
 #include "lua/utils.h"
 #include "fiber_pool.h"
 #include <say.h>
@@ -4460,16 +4461,36 @@ box_register_replica(const struct tt_uuid *uuid,
 	/*
 	 * Find required changes.
 	 */
+	struct space *space = space_cache_find_xc(BOX_CLUSTER_ID);
+	struct index *index = index_find(space, 1);
+	if (index == NULL)
+		diag_raise();
+	char key[UUID_STR_LEN + 2];
+	mp_encode_str(key, tt_uuid_str(uuid), UUID_STR_LEN);
+	struct tuple *tuple;
+	if (index_get(index, key, 1, &tuple) != 0)
+		diag_raise();
+	uint32_t replica_id;
 	bool need_name = false;
 	bool need_id = false;
-	if (replica == NULL) {
+	if (tuple == NULL) {
 		need_name = *name != 0;
 		need_id = true;
 	} else {
-		need_name = strcmp(replica->name, name) != 0;
-		need_id = replica->id == REPLICA_ID_NIL;
+		const char *field = tuple_field(tuple, BOX_CLUSTER_FIELD_NAME);
+		uint32_t name_len = 0;
+		const char *old_name = "";
+		if (field != NULL && mp_typeof(*field) != MP_NIL)
+			old_name = tuple_field_str(
+				tuple, BOX_CLUSTER_FIELD_NAME, &name_len);
+		if (tuple_field_u32(tuple, BOX_CLUSTER_FIELD_ID,
+				    &replica_id) != 0 || old_name == NULL)
+			diag_raise();
+		need_name = strlen(name) != name_len ||
+			    memcmp(name, old_name, name_len) != 0;
 	}
-	if (!need_name && !need_id)
+	if (!need_name && !need_id && replica != NULL &&
+	    replica->id == replica_id && strcmp(replica->name, name) == 0)
 		return;
 	/*
 	 * Apply the changes.
@@ -4479,27 +4500,31 @@ box_register_replica(const struct tt_uuid *uuid,
 		int rc;
 		if (*name == 0) {
 			rc = boxk(IPROTO_UPDATE, BOX_CLUSTER_ID,
-				  "[%u][[%s%dNIL]]", (unsigned)replica->id, "=",
+				  "[%u][[%s%dNIL]]", (unsigned)replica_id, "=",
 				  BOX_CLUSTER_FIELD_NAME);
 		} else {
 			rc = boxk(IPROTO_UPDATE, BOX_CLUSTER_ID,
-				  "[%u][[%s%d%s]]", (unsigned)replica->id, "=",
+				  "[%u][[%s%d%s]]", (unsigned)replica_id, "=",
 				  BOX_CLUSTER_FIELD_NAME, name);
 		}
 		if (rc != 0)
 			diag_raise();
 		return;
 	}
-	struct replica *other = replica_by_name(name);
-	if (other != NULL && other != replica) {
+	struct tuple *other;
+	if (schema_find_replica_by_name(name, REPLICA_ID_NIL, &other) != 0)
+		diag_raise();
+	if (other != NULL) {
+		if (tuple_field_u32(other, BOX_CLUSTER_FIELD_ID,
+				    &replica_id) != 0)
+			diag_raise();
 		if (boxk(IPROTO_UPDATE, BOX_CLUSTER_ID, "[%u][[%s%d%s]]",
-			 (unsigned)other->id, "=", BOX_CLUSTER_FIELD_UUID,
+			 (unsigned)replica_id, "=", BOX_CLUSTER_FIELD_UUID,
 			 tt_uuid_str(uuid)) != 0)
 			diag_raise();
 		return;
 	}
-	uint32_t replica_id;
-	if (replica_find_new_id(&replica_id) != 0)
+	if (replica_find_new_id(&replica_id, cluster_get_reserved_ids()) != 0)
 		diag_raise();
 	box_insert_replica_record(replica_id, uuid, name);
 }
@@ -4883,7 +4908,7 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	     strcmp(replica->name, req.instance_name) != 0)) {
 		struct replica *other = replica_by_name(req.instance_name);
 		if (other != NULL && other != replica &&
-		    replica_has_connections(other)) {
+		    replica_has_alive_connections(other)) {
 			tnt_raise(ClientError, ER_INSTANCE_NAME_DUPLICATE,
 				  node_name_str(req.instance_name),
 				  tt_uuid_str(&other->uuid));
@@ -5021,6 +5046,28 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 		tnt_raise(ClientError, ER_TOO_EARLY_SUBSCRIBE,
 			  tt_uuid_str(&req.instance_uuid));
 	}
+	if (!req.is_anon) {
+		struct space *space = space_cache_find_xc(BOX_CLUSTER_ID);
+		struct index *index = index_find(space, 0);
+		if (index == NULL)
+			diag_raise();
+		char key[5];
+		mp_encode_uint(key, replica->id);
+		struct tuple *tuple;
+		if (index_get(index, key, 1, &tuple) != 0)
+			diag_raise();
+		/* A pending deletion may still need this replica's ACK. */
+		if (tuple != NULL) {
+			struct tt_uuid uuid;
+			int rc = tuple_field_uuid(
+				tuple, BOX_CLUSTER_FIELD_UUID, &uuid);
+			if (rc != 0)
+				diag_raise();
+			if (!tt_uuid_is_equal(&uuid, &req.instance_uuid))
+				tnt_raise(ClientError, ER_TOO_EARLY_SUBSCRIBE,
+					  tt_uuid_str(&req.instance_uuid));
+		}
+	}
 	/*
 	 * Replica name mismatch is not considered a critical error. It can
 	 * happen if rename happened and then the replica reconnected. It won't
@@ -5090,6 +5137,10 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 		coio_write_xrow(io, &row);
 		sent_raft_term = raft_req.term;
 	}
+	/* The replica may have been unregistered while we yielded. */
+	if (!replica->anon && replica->id == REPLICA_ID_NIL)
+		tnt_raise(ClientError, ER_TOO_EARLY_SUBSCRIBE,
+			  tt_uuid_str(&req.instance_uuid));
 	/*
 	 * Process SUBSCRIBE request via replication relay
 	 * Send current recovery vector clock as a marker

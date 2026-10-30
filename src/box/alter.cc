@@ -4619,12 +4619,19 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 	return 0;
 }
 
-/** Unregister the replica affected by the change. */
-static int
-on_replace_cluster_clear_id(struct trigger *trigger, void *event)
+/** Replica IDs reserved until their _cluster inserts commit or roll back. */
+static uint32_t cluster_reserved_ids;
+
+uint32_t
+cluster_get_reserved_ids(void)
 {
-	struct replica *replica = (struct replica *)trigger->data;
-	struct txn_stmt *stmt = (struct txn_stmt *)event;
+	return cluster_reserved_ids;
+}
+
+/** Unregister the replica affected by the change. */
+static void
+on_replace_cluster_clear_id(struct replica *replica, struct txn_stmt *stmt)
+{
 	(void)stmt;
 	if (replica->id == instance_id) {
 		assert(stmt->row->replica_id != 0 ||
@@ -4644,7 +4651,6 @@ on_replace_cluster_clear_id(struct trigger *trigger, void *event)
 		}
 	}
 	replica_clear_id(replica);
-	return 0;
 }
 
 /** Update the synchronous replication quorum. */
@@ -4688,51 +4694,96 @@ replica_def_new_from_tuple(struct tuple *tuple, struct region *region)
 	return def;
 }
 
-/** Add an instance on commit/rollback. */
-static int
-on_replace_cluster_add_replica(struct trigger *trigger, void * /* event */)
+/** A registration change to apply on commit. */
+struct cluster_change {
+	/** Registration before the statement, or NULL for an insert. */
+	const struct replica_def *old_def;
+	/** Registration after the statement, or NULL for a delete. */
+	const struct replica_def *new_def;
+	/** Statement that owns the change. */
+	struct txn_stmt *stmt;
+	/** Commit handler. */
+	struct trigger on_commit;
+};
+
+/** Check later changes in reverse order for the old UUID's registration. */
+static bool
+cluster_uuid_is_reregistered(const struct cluster_change *change)
 {
-	const struct replica_def *def = (typeof(def))trigger->data;
-	struct replica *r = replicaset_add(def->id, &def->uuid);
-	replica_set_name(r, def->name);
-	return 0;
+	const struct tt_uuid *uuid = &change->old_def->uuid;
+	struct trigger *trigger;
+	rlist_foreach_entry(trigger, &change->stmt->txn->on_commit, link) {
+		if (trigger == &change->on_commit)
+			break;
+		if (trigger->run != change->on_commit.run)
+			continue;
+		struct cluster_change *next = (typeof(next))trigger->data;
+		if (next->new_def != NULL &&
+		    tt_uuid_is_equal(&next->new_def->uuid, uuid))
+			return true;
+		if (next->old_def != NULL &&
+		    tt_uuid_is_equal(&next->old_def->uuid, uuid))
+			return false;
+	}
+	return false;
 }
 
-/** Set instance name on commit/rollback. */
+/** Apply a committed _cluster change to the replica registry. */
 static int
-on_replace_cluster_set_name(struct trigger *trigger, void * /* event */)
+on_commit_cluster(struct trigger *trigger, void * /* event */)
 {
-	const struct replica_def *def = (typeof(def))trigger->data;
-	struct replica *replica = replica_by_id(def->id);
+	struct cluster_change *change = (typeof(change))trigger->data;
+	const struct replica_def *old_def = change->old_def;
+	const struct replica_def *new_def = change->new_def;
+	if (old_def != NULL) {
+		struct replica *replica = replica_by_uuid(&old_def->uuid);
+		assert(replica != NULL && replica->id == old_def->id);
+		if (new_def != NULL &&
+		    tt_uuid_is_equal(&old_def->uuid, &new_def->uuid)) {
+			replica_set_name(replica, new_def->name);
+			return 0;
+		}
+		on_replace_cluster_clear_id(replica, change->stmt);
+	}
+	if (new_def == NULL)
+		return 0;
+	struct replica *replica = replica_by_uuid(&new_def->uuid);
 	if (replica == NULL)
-		panic("Couldn't find a replica in _cluster in txn trigger");
-	const struct replica *other = replica_by_name(def->name);
-	if (replica == other)
-		return 0;
-	/*
-	 * The old name shouldn't be possible to be occupied. It would mean some
-	 * other _cluster txn took it and then yielded, allowing this trigger to
-	 * run. But _cluster txns are rolled back on yield. So this other txn
-	 * would be rolled back before this trigger. Hence this situation is not
-	 * reachable.
-	 */
-	if (other != NULL)
-		panic("Duplicate replica name managed to slip through txns");
-	replica_set_name(replica, def->name);
+		replica = replicaset_add(new_def->id, &new_def->uuid);
+	else
+		replica_set_id(replica, new_def->id);
+	replica_set_name(replica, new_def->name);
+	if (old_def != NULL) {
+		struct replica *old = replica_by_uuid(&old_def->uuid);
+		if (old != NULL && !cluster_uuid_is_reregistered(change))
+			replica_rebind_stopped_applier(old, replica);
+	}
+	if (old_def == NULL)
+		cluster_reserved_ids &= ~(1U << new_def->id);
 	return 0;
 }
 
-/** Set instance name on _cluster update. */
+/** Cancel a deferred change when its statement is rolled back. */
 static int
-on_replace_dd_cluster_set_name(struct replica *replica, const char *new_name,
-			       struct txn_stmt *stmt)
+on_rollback_cluster(struct trigger *trigger, void * /* event */)
 {
-	assert(replica->id != REPLICA_ID_NIL);
-	if (strcmp(replica->name, new_name) == 0)
+	struct cluster_change *change = (typeof(change))trigger->data;
+	if (change->old_def == NULL)
+		cluster_reserved_ids &= ~(1U << change->new_def->id);
+	trigger_clear(&change->on_commit);
+	return 0;
+}
+
+/** Validate an instance name change. */
+static int
+cluster_check_name_change(const struct replica_def *old_def,
+			  const struct replica_def *new_def)
+{
+	if (old_def != NULL && strcmp(old_def->name, new_def->name) == 0)
 		return 0;
-	if (tt_uuid_is_equal(&replica->uuid, &INSTANCE_UUID) &&
+	if (tt_uuid_is_equal(&new_def->uuid, &INSTANCE_UUID) &&
 	    box_is_configured() && *INSTANCE_NAME != 0 &&
-	    strcmp(new_name, INSTANCE_NAME) != 0) {
+	    strcmp(new_def->name, INSTANCE_NAME) != 0) {
 		if (!box_is_force_recovery) {
 			diag_set(ClientError, ER_UNSUPPORTED, "Tarantool",
 				 "replica rename or name drop");
@@ -4740,96 +4791,50 @@ on_replace_dd_cluster_set_name(struct replica *replica, const char *new_name,
 		}
 		say_info("replica rename allowed due to 'force_recovery'");
 	}
-	const struct replica *other = replica_by_name(new_name);
+	struct tuple *other;
+	if (schema_find_replica_by_name(new_def->name, new_def->id, &other) != 0)
+		return -1;
 	if (other != NULL) {
+		struct tt_uuid uuid;
+		if (tuple_field_uuid(other, BOX_CLUSTER_FIELD_UUID, &uuid) != 0)
+			return -1;
 		diag_set(ClientError, ER_INSTANCE_NAME_DUPLICATE,
-			 node_name_str(new_name), tt_uuid_str(&other->uuid));
+			 node_name_str(new_def->name), tt_uuid_str(&uuid));
 		return -1;
 	}
-	struct replica_def *def = xregion_alloc_object(
-		&in_txn()->region, typeof(*def));
-	memset(def, 0, sizeof(*def));
-	def->id = replica->id;
-	strlcpy(def->name, replica->name, NODE_NAME_SIZE_MAX);
-	struct trigger *on_rollback = txn_alter_trigger_new(
-		on_replace_cluster_set_name, (void *)def);
-	if (on_rollback == NULL)
-		return -1;
-	txn_stmt_on_rollback(stmt, on_rollback);
-	/*
-	 * Set the new name now so as newer transactions couldn't take it too
-	 * while this one is going to WAL.
-	 */
-	replica_set_name(replica, new_name);
 	return 0;
 }
 
-/** Set instance UUID on _cluster update. */
+/** Validate an instance UUID change. */
 static int
-on_replace_dd_cluster_set_uuid(struct replica *replica,
-			       const struct replica_def *new_def,
-			       struct txn_stmt *stmt)
+cluster_check_uuid_change(const struct replica_def *old_def,
+			  const struct replica_def *new_def)
 {
-	struct replica *old_replica = replica;
-	if (replica_has_connections(old_replica)) {
+	struct replica *old_replica = replica_by_uuid(&old_def->uuid);
+	if (old_replica != NULL && replica_has_alive_connections(old_replica)) {
 		diag_set(ClientError, ER_UNSUPPORTED, "Replica",
 			 "UUID update when the old replica is still here");
 		return -1;
 	}
-	if (*old_replica->name == 0) {
+	if (*old_def->name == 0) {
 		diag_set(ClientError, ER_UNSUPPORTED, "Replica without a name",
 			 "UUID update");
 		return -1;
 	}
-	struct replica *new_replica = replica_by_uuid(&new_def->uuid);
-	if (new_replica != NULL && new_replica->id != REPLICA_ID_NIL) {
-		diag_set(ClientError, ER_UNSUPPORTED, "Replica",
-			 "UUID update when the new UUID is already registered");
-		return -1;
-	}
-	if (strcmp(new_def->name, replica->name) != 0) {
+	if (strcmp(new_def->name, old_def->name) != 0) {
 		diag_set(ClientError, ER_UNSUPPORTED, "Replica",
 			 "UUID and name update together");
 		return -1;
 	}
-	struct trigger *on_rollback_drop_new = txn_alter_trigger_new(
-		on_replace_cluster_clear_id, NULL);
-	struct trigger *on_rollback_add_old = txn_alter_trigger_new(
-		on_replace_cluster_add_replica, NULL);
-	if (on_rollback_drop_new == NULL || on_rollback_add_old == NULL)
-		return -1;
-	struct replica_def *old_def = xregion_alloc_object(
-		&in_txn()->region, typeof(*old_def));
-	memset(old_def, 0, sizeof(*old_def));
-	old_def->id = old_replica->id;
-	strlcpy(old_def->name, old_replica->name, NODE_NAME_SIZE_MAX);
-	old_def->uuid = old_replica->uuid;
-
-	replica_clear_id(old_replica);
-	if (replica_by_uuid(&old_def->uuid) != NULL)
-		panic("Replica with old UUID wasn't deleted");
-	if (new_replica == NULL)
-		new_replica = replicaset_add(new_def->id, &new_def->uuid);
-	else
-		replica_set_id(new_replica, new_def->id);
-	replica_set_name(new_replica, old_def->name);
-	on_rollback_drop_new->data = new_replica;
-	on_rollback_add_old->data = old_def;
-	txn_stmt_on_rollback(stmt, on_rollback_drop_new);
-	txn_stmt_on_rollback(stmt, on_rollback_add_old);
 	return 0;
 }
 
 /** _cluster update - both old and new tuples are present. */
 static int
 on_replace_dd_cluster_update(const struct replica_def *old_def,
-			     const struct replica_def *new_def,
-			     struct txn_stmt *stmt)
+			     const struct replica_def *new_def)
 {
 	assert(new_def->id == old_def->id);
-	struct replica *replica = replica_by_id(new_def->id);
-	if (replica == NULL)
-		panic("Found a _cluster tuple not having a replica");
 	if (!tt_uuid_is_equal(&new_def->uuid, &old_def->uuid)) {
 		if (tt_uuid_is_equal(&old_def->uuid, &INSTANCE_UUID)) {
 			diag_set(ClientError, ER_UNSUPPORTED, "Replica",
@@ -4842,69 +4847,25 @@ on_replace_dd_cluster_update(const struct replica_def *old_def,
 		 * don't drop consumer on recovery.
 		 */
 		if (recovery_state == FINISHED_RECOVERY &&
-		    gc_erase_consumer(&replica->uuid) != 0)
+		    gc_erase_consumer(&old_def->uuid) != 0)
 			return -1;
-		if (on_replace_dd_cluster_set_uuid(replica, new_def, stmt) != 0)
-			return -1;
-		/* The replica was re-created. */
-		replica = replica_by_id(new_def->id);
+		return cluster_check_uuid_change(old_def, new_def);
 	}
-	return on_replace_dd_cluster_set_name(replica, new_def->name, stmt);
+	return cluster_check_name_change(old_def, new_def);
 }
 
 /** _cluster insert - only a new tuple is present. */
 static int
-on_replace_dd_cluster_insert(const struct replica_def *new_def,
-			     struct txn_stmt *stmt)
+on_replace_dd_cluster_insert(const struct replica_def *new_def)
 {
-	struct replica *replica = replica_by_id(new_def->id);
-	/*
-	 * With read-views enabled there might be already a replica whose
-	 * registration is in progress in another transaction. With the same
-	 * replica ID.
-	 */
-	if (replica != NULL) {
+	if (replica_by_id(new_def->id) != NULL ||
+	    (cluster_reserved_ids & (1U << new_def->id)) != 0) {
 		const char *msg = tt_sprintf(
-			"more than 1 replica with the same ID %u: "
-			"new uuid - %s, old uuid - %s", new_def->id,
-			tt_uuid_str(&new_def->uuid),
-			tt_uuid_str(&replica->uuid));
+			"more than 1 replica with the same ID %u", new_def->id);
 		diag_set(ClientError, ER_UNSUPPORTED, "Tarantool", msg);
 		return -1;
 	}
-	replica = replica_by_name(new_def->name);
-	if (replica != NULL) {
-		diag_set(ClientError, ER_INSTANCE_NAME_DUPLICATE,
-			 node_name_str(new_def->name),
-			 tt_uuid_str(&replica->uuid));
-		return -1;
-	}
-	/*
-	 * Update the quorum only after commit. Otherwise the replica would have
-	 * to ack its own insertion.
-	 */
-	struct trigger *on_commit = txn_alter_trigger_new(
-		on_replace_cluster_update_quorum, NULL);
-	if (on_commit == NULL)
-		return -1;
-	txn_stmt_on_commit(stmt, on_commit);
-	struct trigger *on_rollback = txn_alter_trigger_new(
-		on_replace_cluster_clear_id, NULL);
-	if (on_rollback == NULL)
-		return -1;
-	/*
-	 * Register the replica before commit so as to occupy the replica ID
-	 * now. While WAL write is in progress, new replicas might come, they
-	 * should see the ID is already in use.
-	 */
-	replica = replica_by_uuid(&new_def->uuid);
-	if (replica != NULL)
-		replica_set_id(replica, new_def->id);
-	else
-		replica = replicaset_add(new_def->id, &new_def->uuid);
-	on_rollback->data = replica;
-	txn_stmt_on_rollback(stmt, on_rollback);
-	return on_replace_dd_cluster_set_name(replica, new_def->name, stmt);
+	return cluster_check_name_change(NULL, new_def);
 }
 
 /** _cluster delete - only the old tuple is present. */
@@ -4917,28 +4878,12 @@ on_replace_dd_cluster_delete(const struct replica_def *old_def,
 	 * the master or doing recovery (i.e., after we already applied the
 	 * deletion from the master).
 	 */
-	if (old_def->id == instance_id && stmt->row->replica_id == 0 &&
+	if (tt_uuid_is_equal(&old_def->uuid, &INSTANCE_UUID) &&
+	    stmt->row->replica_id == 0 &&
 	    recovery_state == FINISHED_RECOVERY) {
 		diag_set(ClientError, ER_LOCAL_INSTANCE_ID_IS_READ_ONLY,
 			 (unsigned)old_def->id);
 		return -1;
-	}
-	struct replica *replica = replica_by_id(old_def->id);
-	if (replica == NULL) {
-		/*
-		 * Impossible, but it is important not to leave undefined
-		 * behaviour if there is a bug. Too sensitive subsystem is
-		 * affected.
-		 */
-		panic("Tried to unregister a replica not stored in "
-		      "replica_by_id map, id is %u, uuid is %s",
-		      old_def->id, tt_uuid_str(&old_def->uuid));
-	}
-	if (!tt_uuid_is_equal(&replica->uuid, &old_def->uuid)) {
-		panic("Tried to unregister a replica with id %u, but its uuid "
-		      "is different from stored internally: in space - %s, "
-		      "internally - %s", old_def->id,
-		      tt_uuid_str(&old_def->uuid), tt_uuid_str(&replica->uuid));
 	}
 	/*
 	 * Unregister gc consumer of the replica. No-op on recovery because
@@ -4948,23 +4893,8 @@ on_replace_dd_cluster_delete(const struct replica_def *old_def,
 	 * consumers are local.
 	 */
 	if (recovery_state == FINISHED_RECOVERY &&
-	    gc_erase_consumer(&replica->uuid) != 0)
+	    gc_erase_consumer(&old_def->uuid) != 0)
 		return -1;
-	/*
-	 * Unregister only after commit. Otherwise if the transaction would be
-	 * rolled back, there might be already another replica taken the freed
-	 * ID.
-	 */
-	struct trigger *on_commit = txn_alter_trigger_new(
-		on_replace_cluster_clear_id, replica);
-	if (on_commit == NULL)
-		return -1;
-	txn_stmt_on_commit(stmt, on_commit);
-	on_commit = txn_alter_trigger_new(
-		on_replace_cluster_update_quorum, replica);
-	if (on_commit == NULL)
-		return -1;
-	txn_stmt_on_commit(stmt, on_commit);
 	return 0;
 }
 
@@ -4988,14 +4918,45 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 		if (old_def == NULL)
 			return -1;
 	}
+	int rc;
 	if (new_def != NULL) {
 		if (old_def != NULL)
-			return on_replace_dd_cluster_update(old_def, new_def,
-							    stmt);
-		return on_replace_dd_cluster_insert(new_def, stmt);
+			rc = on_replace_dd_cluster_update(old_def, new_def);
+		else
+			rc = on_replace_dd_cluster_insert(new_def);
+	} else {
+		assert(old_def != NULL);
+		rc = on_replace_dd_cluster_delete(old_def, stmt);
 	}
-	assert(old_def != NULL);
-	return on_replace_dd_cluster_delete(old_def, stmt);
+	if (rc != 0)
+		return -1;
+	if (old_def == NULL || new_def == NULL) {
+		struct trigger *on_commit = txn_alter_trigger_new(
+			on_replace_cluster_update_quorum, NULL);
+		if (on_commit == NULL)
+			return -1;
+		/*
+		 * Statement triggers run after all registration changes,
+		 * so the quorum sees the final replica count.
+		 */
+		txn_stmt_on_commit(stmt, on_commit);
+	}
+	struct cluster_change *change = xregion_alloc_object(
+		&stmt->txn->region, typeof(*change));
+	change->old_def = old_def;
+	change->new_def = new_def;
+	change->stmt = stmt;
+	trigger_create(&change->on_commit, on_commit_cluster, change, NULL);
+	struct trigger *on_rollback = txn_alter_trigger_new(
+		on_rollback_cluster, change);
+	if (on_rollback == NULL)
+		return -1;
+	txn_stmt_on_rollback(stmt, on_rollback);
+	/* Preserve execution order, including nested before_replace changes. */
+	txn_on_commit(stmt->txn, &change->on_commit);
+	if (old_def == NULL)
+		cluster_reserved_ids |= 1U << new_def->id;
+	return 0;
 }
 
 /* }}} cluster configuration */
