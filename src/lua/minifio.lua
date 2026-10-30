@@ -11,6 +11,7 @@ local minifio = require('internal.minifio')
 -- List them to ease searching by a function name.
 assert(type(minifio.cwd) == 'function')
 assert(type(minifio.dirname) == 'function')
+assert(type(minifio.lexists) == 'function')
 assert(type(minifio.script) == 'function')
 
 function minifio.pathjoin(...)
@@ -90,5 +91,25 @@ minifio.expose_from_fio = {
     pathjoin = minifio.pathjoin,
     abspath = minifio.abspath,
 }
+
+-- Initial configuration can use missing/../wd before directory creation.
+-- Unlike abspath(), preserve existing symlink/.. traversal and do not
+-- mistake lookup errors other than ENOENT for missing entries.
+function minifio.normalize_missing_parents(path)
+    assert(path:sub(1, 1) == '/')
+    if not path:find('..', 1, true) then
+        return path
+    end
+    local parts = {}
+    for part in path:gmatch('[^/]+') do
+        if part == '..' and #parts > 0 and
+           minifio.lexists('/' .. table.concat(parts, '/')) == false then
+            table.remove(parts)
+        elseif part ~= '.' then
+            table.insert(parts, part)
+        end
+    end
+    return '/' .. table.concat(parts, '/')
+end
 
 return minifio
