@@ -29,8 +29,10 @@ local function load_lua(file)
 end
 
 local function traverse_path(path)
+    -- Keep the root's filesystem target, including symlink/.. .
+    -- Only ancestor traversal uses lexical normalization.
+    local paths = { minifio.normalize_missing_parents(path) }
     path = minifio.abspath(path)
-    local paths = { path }
 
     while path ~= '/' do
         path = minifio.dirname(path)
