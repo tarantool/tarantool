@@ -93,3 +93,88 @@ g.test_pinned_searchroot = function()
     t.assert_equals(res.exit_code, 0, res.stderr)
     t.assert_str_contains(res.stdout, 'mymod is loaded')
 end
+
+g.test_snapshot_missing_parents = function(g)
+    for _, kind in ipairs({'workdir', 'symlink', 'unset'}) do
+        local dir = treegen.prepare_directory({}, {})
+        local config = table.deepcopy(helpers.simple_config)
+        local work_dir = 'missing'
+        local expected_dir = dir .. '/missing'
+        local snap_dir = '../snap'
+        config.snapshot = {dir = 'snap'}
+        if kind == 'unset' then
+            work_dir = nil
+            expected_dir = dir
+            snap_dir = 'missing/../snap'
+        elseif kind == 'symlink' then
+            treegen.write_file(dir, 'target/child/.keep', '')
+            t.assert(fio.symlink('target/child', dir .. '/link'))
+            work_dir = nil
+            expected_dir = dir
+            snap_dir = 'link/../snap'
+            config.snapshot.dir = 'target/snap'
+            -- A lexical collapse of link/.. must not discover this file.
+            treegen.write_file(dir, 'snap/00000000000000000000.snap', 'invalid')
+        end
+        treegen.write_file(dir, 'config.yaml', yaml.encode(config))
+        g.server = server:new({alias = 'instance-001', chdir = dir,
+                               config_file = 'config.yaml'})
+        g.server:start()
+        g.server:exec(function()
+            local s = box.schema.space.create('test')
+            s:create_index('pk')
+            s:insert({1, 'recovered'})
+            box.snapshot()
+        end)
+        g.server:stop()
+        t.assert_not(fio.path.exists(dir .. '/missing'))
+        if kind == 'workdir' then
+            t.assert_not(fio.path.exists(expected_dir))
+        end
+        config.process = {work_dir = work_dir}
+        config.snapshot.dir = snap_dir
+        config.groups['group-001'].replicasets['replicaset-001']
+            .instances['instance-001'].isolated = true
+        config.app = {file = dir .. '/main.lua'}
+        treegen.write_file(dir, 'main.lua', [[
+            -- --- #tarantool.metadata.v1
+            -- early_load: true
+            -- ...
+            if type(box.cfg) == 'function' then
+                -- Initial validation must find the snapshot before this.
+                -- Storage later traverses the unnormalized snapshot.dir.
+                if os.getenv('CREATE_MISSING_PARENT') == 'true' then
+                    local fio = require('fio')
+                    assert(not fio.path.lexists('missing'))
+                    assert(fio.mkdir('missing'))
+                end
+                return
+            end
+            if rawget(_G, 'reloading') then
+                return
+            end
+            _G.reloading = true
+            local config = require('config')
+            assert(require('fio').cwd() == os.getenv('EXPECTED_WORKDIR'))
+            assert(box.space.test:get(1)[2] == 'recovered')
+            require('fiber').new(function()
+                config:wait_status({'ready', 'check_warnings'})
+                config:reload()
+                assert(box.space.test:get(1)[2] == 'recovered')
+                print('snapshot with missing parents recovered')
+                os.exit(0)
+            end)
+        ]])
+        treegen.write_file(dir, 'config.yaml', yaml.encode(config))
+        local res = justrun.tarantool(dir, {
+            EXPECTED_WORKDIR = expected_dir,
+            CREATE_MISSING_PARENT = tostring(kind == 'unset'),
+        },
+            {'--name', 'instance-001', '--config', 'config.yaml'},
+            {nojson = true, stderr = true})
+        t.assert_equals(res.exit_code, 0, res.stderr)
+        t.assert_str_contains(res.stdout,
+                              'snapshot with missing parents recovered')
+        g.server = nil
+    end
+end
