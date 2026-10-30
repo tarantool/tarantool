@@ -34,6 +34,8 @@ box.schema.space.create('test', {
     field_count = params.field_count,
 })
 
+require('internal.tweaks').read_view_throttle_interval = 0
+
 local start_time = {
     time = clock.time(),
     proc = clock.proc(),
