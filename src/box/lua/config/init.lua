@@ -9,6 +9,7 @@ local tarantool = require('tarantool')
 local textutils = require('internal.config.utils.textutils')
 local log = require('internal.config.utils.log')
 local ssl_certificate = require('internal.ssl_certificate')
+local loaders = require('internal.loaders')
 
 -- Tarantool Enterprise Edition has its own additions
 -- for config module.
@@ -90,16 +91,10 @@ local function set_searchroot(iconfig, vars)
     -- `package.setsearchroot()` is a public API and the root can
     -- be pinned manually (e.g. luatest pins it for the test
     -- servers it spawns). An unset root falls back to the
-    -- current directory. Respect non-default values and don't
-    -- override.
-    --
-    -- A root explicitly pinned to the current directory is
-    -- indistinguishable from an unset one and is overridden here.
-    -- It is going to be resolved when a chdir to process.work_dir
-    -- is performed at this point instead of the search root
-    -- change, see gh-13086.
-    local searchroot = package.searchroot()
-    if searchroot ~= fio.cwd() then
+    -- current directory. Respect explicit pins, including a pin
+    -- equal to the current directory.
+    local searchroot = loaders.get_searchroot()
+    if searchroot ~= nil then
         log.verbose('the module search root is not set: it is already ' ..
                     'pinned to %q', searchroot)
         return

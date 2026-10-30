@@ -94,6 +94,46 @@ g.test_pinned_searchroot = function()
     t.assert_str_contains(res.stdout, 'mymod is loaded')
 end
 
+g.test_searchroot_pinned_to_startup_dir = function()
+    local dir = treegen.prepare_directory({}, {})
+    local vshard = [[
+        return {
+            consts = {VERSION = %q},
+            router = {
+                cfg = function() end,
+                info = function() return {bucket = {unknown = 0}} end,
+            },
+        }
+    ]]
+    treegen.write_file(dir, '.rocks/share/tarantool/vshard/init.lua',
+                       vshard:format('0.1.41'))
+    treegen.write_file(dir, 'wd/.rocks/share/tarantool/vshard/init.lua',
+                       vshard:format('0.1.30'))
+    treegen.write_file(dir, '.rocks/share/tarantool/mymod.lua',
+                       'return "startup"')
+    treegen.write_file(dir, 'wd/.rocks/share/tarantool/mymod.lua',
+                       'return "workdir"')
+    treegen.write_file(dir, 'wd/main.lua', [[
+        assert(require('mymod') == 'startup')
+        assert(require('config'):get('sharding.rebalancer_bucket_send_timeout')
+               == 15768000000)
+        print('startup pin is preserved')
+        os.exit(0)
+    ]])
+    local config = table.deepcopy(helpers.simple_config)
+    config.process = {work_dir = 'wd'}
+    config.app = {file = 'main.lua'}
+    config.sharding = {roles = {'router'}}
+    treegen.write_file(dir, 'config.yaml', yaml.encode(config))
+    local res = justrun.tarantool(dir, {LUA_PATH = ''}, {
+        '-e', 'package.setsearchroot(require("fio").cwd())',
+        '--name', 'instance-001', '--config', 'config.yaml',
+    }, {nojson = true, stderr = true, quote_args = true,
+        setsearchroot = false})
+    t.assert_equals(res.exit_code, 0, res.stderr)
+    t.assert_str_contains(res.stdout, 'startup pin is preserved')
+end
+
 g.test_snapshot_missing_parents = function(g)
     for _, kind in ipairs({'workdir', 'symlink', 'unset'}) do
         local dir = treegen.prepare_directory({}, {})
