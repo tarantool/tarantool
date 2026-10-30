@@ -2424,8 +2424,6 @@ memtx_tx_handle_counted_write(struct space *space, struct index *index,
 
 /**
  * Record in TX manager that a transaction @txn have read a @tuple in @space.
- *
- * NB: can trigger story garbage collection.
  */
 static void
 memtx_tx_track_read(struct txn *txn, struct space *space, struct tuple *tuple);
@@ -4232,8 +4230,6 @@ memtx_tx_track_read_story(struct txn *txn, struct space *space,
 
 /**
  * Record in TX manager that a transaction @txn have read a @tuple in @space.
- *
- * NB: can trigger story garbage collection.
  */
 static void
 memtx_tx_track_read(struct txn *txn, struct space *space, struct tuple *tuple)
