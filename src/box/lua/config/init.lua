@@ -10,6 +10,7 @@ local textutils = require('internal.config.utils.textutils')
 local log = require('internal.config.utils.log')
 local ssl_certificate = require('internal.ssl_certificate')
 local loaders = require('internal.loaders')
+local workdir = require('internal.config.utils.workdir')
 
 -- Tarantool Enterprise Edition has its own additions
 -- for config module.
@@ -58,41 +59,15 @@ local function filter_out_private_fields(t)
     return res
 end
 
--- Point the module search root to process.work_dir.
---
--- The first box.cfg() call changes the current working directory
--- to process.work_dir and modules installed into it (for
--- example, into the .rocks subdirectory) become resolvable,
--- because the module search is relative to the current directory
--- by default.
---
--- However, modules are needed before box.cfg(): roles and an
--- application marked with the early_load tag and their metadata
--- scan, and the schema defaults that depend on an installed
--- module version (see the vshard_since annotation), which are
--- evaluated when the configdata object is constructed. Set the
--- search root as soon as the working directory is known to make
--- modules installed into it resolvable before the chdir occurs.
---
--- This is a stopgap that covers the module search only. It is
--- planned to enter process.work_dir right at this point instead,
--- so that everything before box.cfg() works as if the process was
--- started in the working directory, see gh-13086.
-local function set_searchroot(iconfig, vars)
-    if type(box.cfg) ~= 'function' then
-        -- box.cfg() is already called, the current working
-        -- directory is process.work_dir. Nothing to do.
+-- Defaults need workdir-installed modules before directory entry.
+-- Do not replace explicit pins, including a pin equal to startup cwd.
+local function set_searchroot(work_dir, vars)
+    if workdir.is_prepared() then
         return
     end
-    local work_dir = instance_config:get(iconfig, 'process.work_dir')
     if work_dir == nil then
         return
     end
-    -- `package.setsearchroot()` is a public API and the root can
-    -- be pinned manually (e.g. luatest pins it for the test
-    -- servers it spawns). An unset root falls back to the
-    -- current directory. Respect explicit pins, including a pin
-    -- equal to the current directory.
     local searchroot = loaders.get_searchroot()
     if searchroot ~= nil then
         log.verbose('the module search root is not set: it is already ' ..
@@ -115,9 +90,28 @@ local function set_searchroot(iconfig, vars)
     end
     -- A relative process.work_dir is interpreted against the
     -- startup working directory, which is not changed yet.
-    work_dir = fio.abspath(work_dir)
+    work_dir = workdir.resolve(work_dir)
     package.setsearchroot(work_dir)
     log.verbose('set the module search root to %q', work_dir)
+    return loaders.get_searchroot()
+end
+
+local function with_searchroot(work_dir, vars, func, ...)
+    local temporary_root = set_searchroot(work_dir, vars)
+    if temporary_root == nil then
+        return func(...)
+    end
+    -- The search root is process-global, not fiber-local. Restore
+    -- the unset state even when validation fails, unless module code
+    -- has replaced the temporary root with an explicit pin.
+    local ok, res = pcall(func, ...)
+    if loaders.get_searchroot() == temporary_root then
+        package.setsearchroot(box.NULL)
+    end
+    if not ok then
+        error(res, 0)
+    end
+    return res
 end
 
 -- }}} Helpers
@@ -545,12 +539,12 @@ function methods._store(self, iconfig, cconfig, source_info)
         ]]):format(action, self._instance_name, source_info_str), 0)
     end
 
-    set_searchroot(iconfig, {
+    local work_dir = instance_config:get(iconfig, 'process.work_dir')
+    self._configdata = with_searchroot(work_dir, {
         instance_name = self._instance_name,
         replicaset_name = found.replicaset_name,
         group_name = found.group_name,
-    })
-    self._configdata = configdata.new(iconfig, cconfig, self._instance_name)
+    }, configdata.new, iconfig, cconfig, self._instance_name)
 end
 
 -- Invoke the appliers depending on the phase. The first phase
@@ -628,8 +622,8 @@ function methods._startup_impl(self, instance_name, config_file)
 
     self._status = 'startup_in_progress'
     self._instance_name = instance_name
-    -- box.cfg() changes a current working directory that
-    -- invalidates relative paths.
+    workdir.initialize()
+    -- Entering process.work_dir invalidates relative paths.
     --
     -- Let's calculate an absolute path to access the file later
     -- on :reload().
@@ -647,6 +641,8 @@ function methods._startup_impl(self, instance_name, config_file)
     --
     -- This phase may take a long time due to recovery.
     self:_store(self:_collect({sync_source = 'all'}))
+    workdir.prepare(self._configdata:get('process.work_dir',
+                                       {use_default = true}))
     local needs_retry = self:_apply_on_startup({phase = 1})
 
     -- Startup phase 2/2.

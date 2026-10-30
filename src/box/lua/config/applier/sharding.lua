@@ -52,13 +52,9 @@ end
 -- reported as fast as possible.
 --
 -- It can't be done even earlier, on the configuration validation
--- stage, for two reasons. First, the validation is performed
--- before the module search root is pointed to process.work_dir
--- (the work_dir is not known yet), so a module installed into the
--- working directory is not resolvable at that point. Second, the
--- same schema validates cluster configurations as a whole, while
--- the module is only needed on instances that have a sharding
--- role.
+-- stage: the same schema validates cluster configurations as a
+-- whole, while the module is only needed on instances that have
+-- a sharding role.
 local function check_vshard(config)
     local configdata = config._configdata
     local is_storage, is_router = get_vshard_roles(configdata)
