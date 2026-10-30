@@ -9,6 +9,8 @@ local malloc = ffi.C.malloc
 local free = ffi.C.free
 
 local t = require('luatest')
+local treegen = require('luatest.treegen')
+local justrun = require('luatest.justrun')
 local g = t.group()
 
 local ALLOC_SIZE = 10 * 1000 * 1000
@@ -66,28 +68,52 @@ end
 g.test_malloc_small = function()
     skip_if_unsupported()
 
-    local p = {}
     local count = 10000
     local size = ALLOC_SIZE / count
     t.assert_ge(size, 100)
 
-    local info1 = box.malloc.info()
-    for i = 1, count do
-        p[i] = malloc(size)
-        if p[i] == nil then
-            break
+    -- Run the allocations in a child process that has glibc's per-thread
+    -- cache (tcache) disabled: it can be disabled only at process start.
+    -- With the cache, glibc returns none of the freed memory to the system
+    -- in the given test case.
+    local dir = treegen.prepare_directory({}, {})
+    treegen.write_file(dir, 'main.lua', string.dump(function()
+        local ffi = require('ffi')
+        local json = require('json')
+        ffi.cdef([[
+            void *malloc(size_t size);
+            void free(void *p);
+        ]])
+        local malloc = ffi.C.malloc
+        local free = ffi.C.free
+
+        local p = {}
+        local count = tonumber(arg[1])
+        local size = tonumber(arg[2])
+
+        local info1 = box.malloc.info()
+        for i = 1, count do
+            p[i] = malloc(size)
+            assert(p[i] ~= nil)
         end
-    end
-    t.assert_equals(#p, count)
-    local info2 = box.malloc.info()
-    for i = 1, count, 2 do
-        free(p[i])
-    end
-    local info3 = box.malloc.info()
-    for i = 2, count, 2 do
-        free(p[i])
-    end
-    local info4 = box.malloc.info()
+        local info2 = box.malloc.info()
+        for i = 1, count, 2 do
+            free(p[i])
+        end
+        local info3 = box.malloc.info()
+        for i = 2, count, 2 do
+            free(p[i])
+        end
+        local info4 = box.malloc.info()
+
+        for _, info in ipairs({info1, info2, info3, info4}) do
+            print(json.encode(info))
+        end
+    end))
+    local env = {GLIBC_TUNABLES = 'glibc.malloc.tcache_count=0'}
+    local res = justrun.tarantool(dir, env, {'main.lua', count, size})
+    t.assert_equals(res.exit_code, 0)
+    local info1, info2, info3, info4 = unpack(res.stdout)
 
     check_malloc_info(info1)
     check_malloc_info(info2)
