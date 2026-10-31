@@ -35,6 +35,7 @@
 #include <openssl/crypto.h>
 #include <openssl/evp.h>
 #include <openssl/err.h>
+#include <openssl/sha.h>
 #include <openssl/ssl.h>
 #include <openssl/hmac.h>
 
@@ -473,4 +474,115 @@ const char *
 crypto_X509_get_default_cert_file_env(void)
 {
 	return X509_get_default_cert_file_env();
+}
+
+static unsigned char*
+sha256_calc_digest(const unsigned char *text, size_t len)
+{
+	unsigned char *hash = OPENSSL_malloc(SHA256_DIGEST_LENGTH);
+	if (hash == NULL) {
+		diag_set(OutOfMemory, SHA256_DIGEST_LENGTH, "OPENSSL_malloc",
+			 "hash");
+		return NULL;
+	}
+
+	EVP_MD_CTX *ctx = EVP_MD_CTX_new();
+	if (ctx == NULL) {
+		diag_set_OpenSSL();
+		goto err;
+	}
+	if (EVP_DigestInit_ex(ctx, EVP_sha256(), NULL) == 0) {
+		diag_set_OpenSSL();
+		goto err;
+	}
+	if (EVP_DigestUpdate(ctx, text, len) == 0) {
+		diag_set_OpenSSL();
+		goto err;
+	}
+	if (EVP_DigestFinal_ex(ctx, hash, NULL) == 0) {
+		diag_set_OpenSSL();
+		goto err;
+	}
+
+	EVP_MD_CTX_free(ctx);
+	return hash;
+
+err:
+	EVP_MD_CTX_free(ctx);
+	OPENSSL_free(hash);
+	return NULL;
+}
+
+int
+crypto_RSA_PSS_verify(const unsigned char *text, size_t text_len,
+		      const unsigned char *pub_key, size_t key_len,
+		      const unsigned char *sig, size_t sig_len)
+{
+	OSSL_LIB_CTX *libctx = NULL;
+	EVP_PKEY *pkey = NULL;
+	EVP_PKEY_CTX *ctx = NULL;
+	EVP_MD *md = NULL;
+	bool result = false;
+	unsigned char *digest = sha256_calc_digest(text, text_len);
+	if (digest == NULL) {
+		goto end;
+	}
+
+	BIO *key_bio = BIO_new_mem_buf(pub_key, key_len);
+	if (key_bio == NULL) {
+		diag_set_OpenSSL();
+		goto end;
+	}
+	pkey = PEM_read_bio_PUBKEY(key_bio, NULL, NULL, NULL);
+	BIO_free(key_bio);
+	if (pkey == NULL) {
+		diag_set_OpenSSL();
+		goto end;
+	}
+
+	md = EVP_MD_fetch(libctx, "SHA256", NULL);
+	if (md == NULL) {
+		diag_set_OpenSSL();
+		goto end;
+	}
+
+	ctx = EVP_PKEY_CTX_new_from_pkey(libctx, pkey, NULL);
+	if (ctx == NULL) {
+		diag_set_OpenSSL();
+		goto end;
+	}
+
+	if (EVP_PKEY_verify_init(ctx) == 0) {
+		diag_set_OpenSSL();
+		goto end;
+	}
+
+	if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PSS_PADDING) == 0) {
+		diag_set_OpenSSL();
+		goto end;
+	}
+
+	if (EVP_PKEY_CTX_set_rsa_pss_saltlen(ctx, 32) == 0) {
+		diag_set_OpenSSL();
+		goto end;
+	}
+
+	if (EVP_PKEY_CTX_set_signature_md(ctx, md) == 0) {
+		diag_set_OpenSSL();
+		goto end;
+	}
+
+	if (EVP_PKEY_verify(ctx, sig, sig_len, digest, 32) == 0) {
+		diag_set_OpenSSL();
+		goto end;
+	}
+
+	result = true;
+end:
+	EVP_PKEY_CTX_free(ctx);
+	EVP_PKEY_free(pkey);
+	EVP_MD_free(md);
+	OPENSSL_free(digest);
+	OSSL_LIB_CTX_free(libctx);
+	return result;
 }
