@@ -56,7 +56,11 @@ local function gen_path_builder(basepath_fn, templates, need_traverse)
     assert(type(templates) == 'table', 'templates must be a table')
 
     return function()
-        local base = basepath_fn() or '.'
+        local base = basepath_fn()
+        -- The current directory may be unavailable (e.g. removed).
+        if base == nil then
+            return ''
+        end
         local dirs = need_traverse and traverse_path(base) or { base }
 
         local searchpaths = {}
