@@ -1,0 +1,765 @@
+---Since version 2.4.1, Tarantool has the `popen` built-in module that
+---supports execution of external programs. It is similar to Python's
+---`subprocess()` or Ruby's `Open3`. However, Tarantool's `popen` module
+---does not have all the helpers that those languages provide; it provides
+---only basic functions. `popen` uses the `vfork()` system call to create
+---an object, so the caller thread is blocked until execution of a child
+---process begins.
+---
+---The `popen` module provides two functions to create a popen object:
+---
+---* `popen.shell()`, which is similar to the libc `popen()` syscall;
+---* `popen.new()`, which creates a popen object with more specific
+---  options.
+---
+---Either function returns a handle, which is called `popen_handle` or
+---`ph`. The handle provides methods for interacting with the child
+---process.
+---@class popen
+---Execute a child program in a new process.
+---
+---`argv` is an array of a program to run with command line options. It is
+---mandatory. An absolute path to the program is required when
+---`opts.shell` is false (the default).
+---
+---`opts` is an optional table of options. See `popen.options` for the
+---full list.
+---
+---On success, returns a popen handle. On failure, returns `nil, err`.
+---
+---Possible raised errors:
+---
+---* `IllegalParams`: incorrect type or value of a parameter.
+---* `IllegalParams`: group signal is set, while `setsid` is not.
+---
+---Possible error reasons when `nil, err` is returned:
+---
+---* `SystemError`: `dup()`, `fcntl()`, `pipe()`, `vfork()`, or `close()`
+---  fails in the parent process.
+---* `SystemError`: (temporary restriction) the parent process has closed
+---  stdin, stdout, or stderr.
+---
+---The `opts.stdin`, `opts.stdout`, and `opts.stderr` options define
+---actions on `STDIN_FILENO`, `STDOUT_FILENO`, and `STDERR_FILENO`. The
+---action may be one of the `popen.opts` constants:
+---
+---* `popen.opts.INHERIT` (`'inherit'`, default): inherit the file
+---  descriptor from the parent.
+---* `popen.opts.DEVNULL` (`'devnull'`): open `/dev/null` on the file
+---  descriptor.
+---* `popen.opts.CLOSE` (`'close'`): close the file descriptor.
+---* `popen.opts.PIPE` (`'pipe'`): feed data from the file descriptor to
+---  the parent, or from the parent to the file descriptor, using a pipe.
+---
+---The `opts.env` table defines environment variables for the child
+---process. If it is not set, the current environment is inherited. An
+---empty table drops the environment. A non-empty table replaces it.
+---
+---The returned handle provides the `popen_handle:close()` method for
+---explicitly releasing all occupied resources, including the child
+---process itself if `opts.keep_child` is not set. If `close()` is not
+---called during the handle lifetime, the Lua garbage collector triggers
+---the same freeing actions.
+---
+---Since version 3.2.0, the `inherit_fds` option allows defining file
+---descriptor numbers that should be left open in the child process when
+---the `close_fds` flag is set to `true`.
+---
+---Tarantool recommends using `opts.setsid` plus `opts.group_signal` if a
+---child process may spawn its own children and they should all be killed
+---together.
+---
+---A signal is not sent if the child process is already dead. Otherwise
+---Tarantool might kill another process that occupies the same PID later.
+---This means that if the child process dies before its own children, the
+---function does not send a signal to the process group even when
+---`opts.setsid` and `opts.group_signal` are set.
+---
+---Use `os.environ()` to pass a copy of the current environment with
+---several replacements (see Example 2).
+---
+---**Example 1**
+---
+---This is the equivalent of the `sh -c date` command. It starts a
+---process, runs `'date'`, reads the output, and closes the popen object
+---(`ph`).
+---
+---```lua
+---local popen = require('popen')
+---
+---local ph = popen.new({'/bin/date'}, {
+---    stdout = popen.opts.PIPE,
+---})
+---local date = ph:read():rstrip()
+---ph:close()
+---print(date) -- e.g. Thu 16 Apr 2020 01:40:56 AM MSK
+---```
+---
+---**Example 2**
+---
+---Example 2 is quite similar to Example 1, but sets an environment
+---variable and uses the shell builtin `'echo'` to show it.
+---
+---```lua
+---local popen = require('popen')
+---local env = os.environ()
+---env['FOO'] = 'bar'
+---local ph = popen.new({'echo "${FOO}"'}, {
+---    stdout = popen.opts.PIPE,
+---    shell = true,
+---    env = env,
+---})
+---local res = ph:read():rstrip()
+---ph:close()
+---print(res) -- bar
+---```
+---
+---**Example 3**
+---
+---Example 3 demonstrates how to capture a child's stderr.
+---
+---```lua
+---local popen = require('popen')
+---local ph = popen.new({'echo hello >&2'}, { -- !!
+---    stderr = popen.opts.PIPE,              -- !!
+---    shell = true,
+---})
+---local res = ph:read({stderr = true}):rstrip()
+---ph:close()
+---print(res) -- hello
+---```
+---
+---**Example 4**
+---
+---Example 4 demonstrates how to run a stream program (like `grep`,
+---`sed`, and so on), write to its stdin, and read from its stdout.
+---
+---The example assumes that input data are small enough to fit in a pipe
+---buffer (typically 64 KiB, but this depends on the platform and its
+---configuration).
+---
+---If a process writes lengthy data, it gets stuck in
+---`popen_handle:write()`. To handle this case, call
+---`popen_handle:read()` in a loop in another fiber (start it before the
+---first `:write()`).
+---
+---If a process writes lengthy text to stderr, it may get stuck in
+---`write()` because the stderr pipe buffer becomes full. To handle this
+---case, read stderr in a separate fiber.
+---
+---```lua
+---local function call_jq(input, filter)
+---    -- Start jq process, connect to stdin, stdout and stderr.
+---    local jq_argv = {'/usr/bin/jq', '-M', '--unbuffered', filter}
+---    local ph, err = popen.new(jq_argv, {
+---        stdin = popen.opts.PIPE,
+---        stdout = popen.opts.PIPE,
+---        stderr = popen.opts.PIPE,
+---    })
+---    if ph == nil then return nil, err end
+---    -- Write input data to child's stdin and send EOF.
+---    local ok, err = ph:write(input)
+---    if not ok then return nil, err end
+---    ph:shutdown({stdin = true})
+---    -- Read everything until EOF.
+---    local chunks = {}
+---    while true do
+---        local chunk, err = ph:read()
+---        if chunk == nil then
+---            ph:close()
+---            return nil, err
+---        end
+---        if chunk == '' then break end -- EOF
+---        table.insert(chunks, chunk)
+---    end
+---    -- Read diagnostics from stderr if any.
+---    local err = ph:read({stderr = true})
+---    if err ~= '' then
+---        ph:close()
+---        return nil, err
+---    end
+---    -- Glue all chunks, strip trailing newline.
+---    return table.concat(chunks):rstrip()
+---end
+---```
+---
+---@field new fun(argv: string[],
+---    opts?: popen.options): popen.handle, any?
+---
+---Execute a shell command.
+---
+---`command` is a command to run. It is mandatory.
+---
+---`mode` is an optional communication mode. The possible values are:
+---
+---* `'w'`, which enables `popen_handle:write()`;
+---* `'r'`, which enables `popen_handle:read()`;
+---* `'R'`, which enables `popen_handle:read({stderr = true})`;
+---* `nil`, which means inherit the parent's standard file descriptors.
+---
+---Several mode characters can be set together, for example, `'rw'`,
+---`'rRw'`.
+---
+---`shell()` is a shortcut for `popen.new({command}, opts)` with
+---`opts.shell`, `opts.setsid`, and `opts.group_signal` set to `true`.
+---The `opts.stdin`, `opts.stdout`, and `opts.stderr` options are set
+---based on `mode`. All standard streams are inherited from the parent by
+---default unless changed by `mode`: `'r'` for stdout, `'R'` for stderr,
+---and `'w'` for stdin.
+---
+---On success, returns a popen handle. On failure, returns `nil, err`.
+---
+---If a parameter is incorrect, raises `IllegalParams`. For other possible
+---errors, see `popen.new()`.
+---
+---**Example:**
+---
+---This is the equivalent of the `sh -c date` command. It starts a
+---process, runs `'date'`, reads the output, and closes the popen object
+---(`ph`).
+---
+---```lua
+---local popen = require('popen')
+---local ph = popen.shell('date', 'r')
+---local date = ph:read():rstrip()
+---ph:close()
+---print(date)
+---```
+---
+---Unix defines a text file as a sequence of lines, each terminated by a
+---newline (`\n`) symbol. The same convention is usually applied to text
+---output of a command, so when it is redirected to a file, the file is
+---correct.
+---
+---However, an application usually operates on strings that are not
+---terminated by a newline (for example, literals for error messages). The
+---newline is usually added just before a string is written to the outside
+---world (stdout, console, or log). This is why the example above contains
+---`rstrip()`.
+---
+---@field shell fun(command: string, mode?: string): popen.handle, any?
+---
+---Stream actions for the `opts.stdin`, `opts.stdout`, and `opts.stderr`
+---options of `popen.new()`.
+---
+---@field opts popen.opts
+---
+---Signal numbers. The set of available constants depends on the platform.
+---For example, `popen.signal.SIGTERM` and `popen.signal.SIGKILL` are
+---available on all supported platforms.
+---
+---@field signal popen.signal
+---
+---Process states, as returned in the `state` field of a process status.
+---
+---@field state popen.state
+---
+---Statuses of the parent's end of a piped standard stream.
+---
+---@field stream popen.stream
+local popen = {}
+
+---@alias popen.stream_action
+---| 'inherit' # Inherit the file descriptor from the parent.
+---| 'devnull' # Open `/dev/null` on the file descriptor.
+---| 'close' # Close the file descriptor.
+---| 'pipe' # Use a pipe to communicate with the child process.
+
+---@alias popen.process_state
+---| 'alive'
+---| 'exited'
+---| 'signaled'
+
+---@alias popen.stream_status
+---| 'open'
+---| 'closed'
+
+---@class popen.opts
+---Stream actions for `opts.stdin`, `opts.stdout`, and `opts.stderr`.
+---@field INHERIT 'inherit' Inherit the file descriptor from the parent.
+---@field DEVNULL 'devnull' Open `/dev/null` on the file descriptor.
+---@field CLOSE 'close' Close the file descriptor.
+---@field PIPE 'pipe' Use a pipe to communicate with the child process.
+
+---@class popen.state
+---Process states.
+---@field ALIVE 'alive' The process is running.
+---@field EXITED 'exited' The process has exited.
+---@field SIGNALED 'signaled' The process was terminated by a signal.
+
+---@class popen.stream
+---Statuses of the parent's end of a piped standard stream.
+---@field OPEN 'open' The stream is open.
+---@field CLOSED 'closed' The stream is closed.
+
+---@class popen.signal
+---Signal numbers. The set of available constants depends on the platform.
+---@field SIGHUP integer Hangup.
+---@field SIGINT integer Interrupt.
+---@field SIGQUIT integer Quit.
+---@field SIGILL integer Illegal instruction.
+---@field SIGTRAP integer Trace or breakpoint trap.
+---@field SIGABRT integer Abort.
+---@field SIGIOT integer IOT trap, a synonym for `SIGABRT`.
+---@field SIGBUS integer Bus error.
+---@field SIGFPE integer Floating-point exception.
+---@field SIGKILL integer Kill, cannot be caught or ignored.
+---@field SIGUSR1 integer User-defined signal 1.
+---@field SIGSEGV integer Segmentation fault.
+---@field SIGUSR2 integer User-defined signal 2.
+---@field SIGPIPE integer Broken pipe.
+---@field SIGALRM integer Alarm clock.
+---@field SIGTERM integer Termination request.
+---@field SIGSTKFLT integer Stack fault.
+---@field SIGCHLD integer Child process status changed.
+---@field SIGCONT integer Continue.
+---@field SIGSTOP integer Stop, cannot be caught or ignored.
+---@field SIGTSTP integer Terminal stop.
+---@field SIGTTIN integer Background read from terminal.
+---@field SIGTTOU integer Background write to terminal.
+---@field SIGURG integer Urgent condition on socket.
+---@field SIGXCPU integer CPU time limit exceeded.
+---@field SIGXFSZ integer File size limit exceeded.
+---@field SIGVTALRM integer Virtual alarm clock.
+---@field SIGPROF integer Profiling alarm clock.
+---@field SIGWINCH integer Window size change.
+---@field SIGIO integer I/O is now possible.
+---@field SIGPOLL integer Pollable event, a synonym for `SIGIO`.
+---@field SIGPWR integer Power failure.
+---@field SIGSYS integer Bad system call.
+
+---@class popen.options
+---Options passed to `popen.new()`.
+---
+---@field stdin? popen.stream_action Action on STDIN_FILENO. The default is
+---    `popen.opts.INHERIT`.
+---@field stdout? popen.stream_action Action on STDOUT_FILENO. The default
+---    is `popen.opts.INHERIT`.
+---@field stderr? popen.stream_action Action on STDERR_FILENO. The default
+---    is `popen.opts.INHERIT`.
+---@field env? table<string, string> Environment variables for the child
+---    process. If not set, the current environment is inherited. An empty
+---    table drops the environment. A non-empty table replaces it.
+---@field shell? boolean Run the child process through `sh -c`. The default
+---    is `false`.
+---@field setsid? boolean Run the child process in a new session. The
+---    default is `false`.
+---@field close_fds? boolean Close all inherited file descriptors except
+---    the ones listed in `inherit_fds`. The default is `true`.
+---@field inherit_fds? integer[] File descriptors that should be left open
+---    in the child process when `close_fds` is set. Since version 3.2.0.
+---@field restore_signals? boolean Reset signal actions modified in the
+---    parent process. The default is `true`.
+---@field group_signal? boolean Send signals to the child process group
+---    instead of the process. Requires `setsid`. The default is `false`.
+---@field keep_child? boolean Do not send SIGKILL to the child process when
+---    the handle is closed or collected by the garbage collector. The
+---    default is `false`.
+
+---@class popen.read_options
+---Options passed to `popen_handle:read()`.
+---
+---@field stdout? boolean Read from stdout. The default is `true`.
+---@field stderr? boolean Read from stderr. The default is `false`.
+---@field timeout? number Time quota in seconds. The default is 100 years.
+
+---@class popen.write_options
+---Options passed to `popen_handle:write()`.
+---
+---@field timeout? number Time quota in seconds. The default is 100 years.
+
+---@class popen.shutdown_options
+---Options passed to `popen_handle:shutdown()`.
+---
+---@field stdin? boolean Close the parent's end of stdin.
+---@field stdout? boolean Close the parent's end of stdout.
+---@field stderr? boolean Close the parent's end of stderr.
+
+---@class popen.wait_options
+---Options passed to `popen_handle:wait()`.
+---
+---@field timeout? number Time quota in seconds. The default is infinity.
+---    Since version 3.2.0.
+
+---@class popen.handle_options
+---Options of a popen handle returned by `popen_handle:info()`.
+---`opts.env` and `opts.inherit_fds` are not included.
+---
+---@field stdin popen.stream_action The action on STDIN_FILENO.
+---@field stdout popen.stream_action The action on STDOUT_FILENO.
+---@field stderr popen.stream_action The action on STDERR_FILENO.
+---@field shell boolean Whether the child process was run through `sh -c`.
+---@field setsid boolean Whether the child process was run in a new session.
+---@field close_fds boolean Whether inherited file descriptors were closed.
+---@field restore_signals boolean Whether signal actions modified in the
+---    parent were reset.
+---@field group_signal boolean Whether signals are sent to the process group.
+---@field keep_child boolean Whether SIGKILL is not sent when the handle is
+---    closed or collected by the garbage collector.
+
+---@class popen.process_status
+---A process status returned by `popen_handle:wait()` and
+---`popen_handle:info()`.
+---
+---@field state popen.process_state The current process state.
+---@field exit_code? integer The exit code. Present when `state` is
+---    `'exited'`.
+---@field signo? integer The signal number. Present when `state` is
+---    `'signaled'`.
+---@field signame? string The signal name. Present when `state` is
+---    `'signaled'`.
+
+---@class popen.info
+---Information about a popen handle returned by `popen_handle:info()`.
+---
+---@field pid? integer The process id when the process is alive, otherwise
+---    nil.
+---@field command string A concatenation of space-separated arguments that
+---    were passed to `execve()`. Multiword arguments are quoted. Quotes
+---    inside arguments are not escaped.
+---@field opts popen.handle_options The handle options as in the
+---    `popen.new()` `opts` parameter. `opts.env` is not shown because the
+---    environment variables map is not stored in a handle.
+---@field status popen.process_status The process status.
+---@field stdin? popen.stream_status The status of the parent's end of the
+---    stdin pipe, or nil when stdin is not piped.
+---@field stdout? popen.stream_status The status of the parent's end of the
+---    stdout pipe, or nil when stdout is not piped.
+---@field stderr? popen.stream_status The status of the parent's end of the
+---    stderr pipe, or nil when stderr is not piped.
+
+---@class popen.handle
+---A handle of a child process created by `popen.new()` or
+---`popen.shell()`.
+---
+---@field pid? integer The process id when the process is alive, otherwise
+---    nil.
+---@field command string A concatenation of space-separated arguments that
+---    were passed to `execve()`. Multiword arguments are quoted.
+---@field opts popen.handle_options The handle options.
+---@field status popen.process_status The process status.
+---@field stdin? popen.stream_status The status of the parent's end of the
+---    stdin pipe, or nil when stdin is not piped.
+---@field stdout? popen.stream_status The status of the parent's end of the
+---    stdout pipe, or nil when stdout is not piped.
+---@field stderr? popen.stream_status The status of the parent's end of the
+---    stderr pipe, or nil when stderr is not piped.
+---
+---Read data from a child peer.
+---
+---Possible `opts` items are `opts.stdout` (boolean, default `true`),
+---`opts.stderr` (boolean, default `false`), and `opts.timeout` (number,
+---default 100 years, time quota in seconds).
+---
+---By default, `read()` reads from stdout, but reads from stderr if
+---`opts.stderr` is `true`. It is not legal to set both `opts.stdout` and
+---`opts.stderr` to `true`.
+---
+---On success, returns a string with the read value, or an empty string at
+---EOF. On failure, returns `nil, err`.
+---
+---Possible raised errors:
+---
+---* `IllegalParams`: incorrect type or value of a parameter.
+---* `IllegalParams`: called on a closed handle.
+---* `IllegalParams`: `opts.stdout` and `opts.stderr` are both set.
+---* `IllegalParams`: a requested IO operation is not supported by the
+---  handle (stdout or stderr is not piped).
+---* `IllegalParams`: attempt to operate on a closed file descriptor.
+---* `FiberIsCancelled`: cancelled by external code.
+---
+---Possible error reasons when `nil, err` is returned:
+---
+---* `SocketError`: an IO error occurs at `read()`.
+---* `TimedOut`: the `opts.timeout` quota is exceeded.
+---* `LuajitError`: "not enough memory", no memory space for the Lua
+---  string.
+---
+---@field read fun(self: popen.handle,
+---    opts?: popen.read_options): string?, any?
+---
+---Write a string to the stdin stream of a child process.
+---
+---`str` is the string to write. `opts.timeout` is the time quota in
+---seconds (the default is 100 years).
+---
+---On success, returns `true`. On failure, returns `nil, err`.
+---
+---Possible raised errors:
+---
+---* `IllegalParams`: incorrect type or value of a parameter.
+---* `IllegalParams`: called on a closed handle.
+---* `IllegalParams`: string length is greater than `SSIZE_MAX`.
+---* `IllegalParams`: a requested IO operation is not supported by the
+---  handle (stdin is not piped).
+---* `IllegalParams`: attempt to operate on a closed file descriptor.
+---* `FiberIsCancelled`: cancelled by an outside code.
+---
+---Possible error reasons when `nil, err` is returned:
+---
+---* `SocketError`: an IO error occurs at `write()`.
+---* `TimedOut`: the `opts.timeout` quota is exceeded.
+---
+---`write()` may yield forever if the child process does not read data
+---from stdin and a pipe buffer becomes full. The size of this pipe buffer
+---depends on the platform. Set `opts.timeout` when unsure.
+---
+---When `opts.timeout` is not set, `write()` blocks (yields the fiber)
+---until all data is written or an error happens.
+---
+---@field write fun(self: popen.handle, str: string,
+---    opts?: popen.write_options): boolean?, any?
+---
+---Close the parent's ends of standard streams.
+---
+---Possible `opts` items are `opts.stdin` (boolean, close the parent's end
+---of stdin), `opts.stdout` (boolean, close the parent's end of stdout),
+---and `opts.stderr` (boolean, close the parent's end of stderr). The term
+---std* means any one of these items.
+---
+---The main reason to use `shutdown()` is to send EOF to a child's stdin.
+---However, the parent's end of stdout or stderr may be closed too.
+---
+---`shutdown()` does not fail on already closed file descriptors
+---(idempotence). However, it fails on an attempt to close the end of a
+---pipe that never existed. In other words, only those std* options that
+---were set to `popen.opts.PIPE` during handle creation may be used here
+---(for `popen.shell()`: `'r'` corresponds to stdout, `'R'` to stderr, and
+---`'w'` to stdin).
+---
+---`shutdown()` does not close any file descriptors on a failure: either
+---all requested file descriptors are closed or none of them.
+---
+---On success, returns `true`. On failure, returns `nil, err`.
+---
+---Possible raised errors:
+---
+---* `IllegalParams`: an incorrect handle parameter.
+---* `IllegalParams`: called on a closed handle.
+---* `IllegalParams`: neither stdin, stdout, nor stderr is chosen.
+---* `IllegalParams`: a requested IO operation is not supported by the
+---  handle (one of std* is not piped).
+---
+---**Example:**
+---
+---```lua
+---local popen = require('popen')
+---local ph = popen.shell('sed s/foo/bar/', 'rw')
+---ph:write('lorem foo ipsum')
+---ph:shutdown({stdin = true})
+---local res = ph:read()
+---ph:close()
+---print(res) -- lorem bar ipsum
+---```
+---
+---@field shutdown fun(self: popen.handle,
+---    opts?: popen.shutdown_options): boolean?, any?
+---
+---Send SIGTERM to a child process.
+---
+---See `popen_handle:signal()` for errors and return values.
+---
+---`terminate()` only sends a SIGTERM signal. It does not free any
+---resources, such as popen handle memory and file descriptors.
+---
+---@field terminate fun(self: popen.handle): boolean?, any?
+---
+---Send SIGKILL to a child process.
+---
+---See `popen_handle:signal()` for errors and return values.
+---
+---`kill()` only sends a SIGKILL signal. It does not free any resources,
+---such as popen handle memory and file descriptors.
+---
+---@field kill fun(self: popen.handle): boolean?, any?
+---
+---Send a signal to a child process.
+---
+---`signo` is the signal number to send.
+---
+---On success, returns `true` if the signal is sent. On failure, returns
+---`nil, err`.
+---
+---Possible raised errors:
+---
+---* `IllegalParams`: an incorrect handle parameter.
+---* `IllegalParams`: called on a closed handle.
+---
+---Possible error values for `nil, err`:
+---
+---* `SystemError`: a process does not exist anymore. This may also be
+---  returned for a zombie process or when all processes in a group are
+---  zombies (but see the note about Mac OS below).
+---* `SystemError`: invalid signal number.
+---* `SystemError`: no permission to send a signal to a process or a
+---  process group. This is returned on Mac OS when a signal is sent to a
+---  process group where a group leader is a zombie, or when all processes
+---  in it are zombies. It may also appear due to other reasons.
+---
+---If `opts.setsid` and `opts.group_signal` are set for the handle, the
+---signal is sent to the process group rather than to the process. See
+---`popen.new()` for details about group signaling.
+---
+---Warning: on Mac OS, a process in the group may not receive the signal,
+---particularly if the process has just been forked. This may be due to a
+---race condition.
+---
+---The module offers `popen.signal.SIG*` constants, because some signals
+---have different numbers on different platforms.
+---
+---@field signal fun(self: popen.handle, signo: integer): boolean?, any?
+---
+---Return information about the popen handle.
+---
+---Possible raised errors:
+---
+---* `IllegalParams`: an incorrect handle parameter.
+---* `IllegalParams`: called on a closed handle.
+---
+---The result is described by `popen.info`. It contains `pid`, `command`,
+---`opts`, `status`, `stdin`, `stdout`, and `stderr`.
+---
+---**Example 1**
+---
+---On the Tarantool console:
+---
+---```lua
+---tarantool> require('popen').new({'/usr/bin/touch', '/tmp/foo'})
+------
+---- command: /usr/bin/touch /tmp/foo
+---  status:
+---    state: alive
+---  opts:
+---    stdout: inherit
+---    stdin: inherit
+---    group_signal: false
+---    keep_child: false
+---    close_fds: true
+---    restore_signals: true
+---    shell: false
+---    setsid: false
+---    stderr: inherit
+---  pid: 9499
+---...
+---```
+---
+---**Example 2**
+---
+---On the Tarantool console:
+---
+---```lua
+---tarantool> require('popen').shell('grep foo', 'wrR')
+------
+---- stdout: open
+---  command: sh -c 'grep foo'
+---  stderr: open
+---  status:
+---    state: alive
+---  stdin: open
+---  opts:
+---    stdout: pipe
+---    stdin: pipe
+---    group_signal: true
+---    keep_child: false
+---    close_fds: true
+---    restore_signals: true
+---    shell: true
+---    setsid: true
+---    stderr: pipe
+---  pid: 10497
+---...
+---```
+---
+---@field info fun(self: popen.handle): popen.info
+---
+---Wait until a child process exits or is signaled.
+---
+---`opts.timeout` is the time quota in seconds. The default value is
+---infinity. The parameter is available since version 3.2.0.
+---
+---On success, returns a process status table. On failure, returns
+---`nil, err`.
+---
+---Possible raised errors:
+---
+---* `IllegalParams`: an incorrect handle parameter.
+---* `IllegalParams`: called on a closed handle.
+---* `FiberIsCancelled`: cancelled by an outside code.
+---
+---Possible error reasons when `nil, err` is returned:
+---
+---* `TimedOut`: since version 3.2.0. The method reached the defined
+---  timeout without a result.
+---* `ChannelIsClosed`: since version 3.2.0. The popen handle was closed
+---  during the `:wait()` operation.
+---
+---The result is a process status table, the same as the `status`
+---component of the table returned by `popen_handle:info()`.
+---
+---**Timeout parameter example**
+---
+---```lua
+---local ph = popen.new(<...>)
+---local res, err = ph:wait({timeout = 1})
+---if res == nil then
+---    -- Timeout is reached.
+---    assert(err.type == 'TimedOut')
+---    <...>
+---end
+---```
+---
+---@field wait fun(self: popen.handle,
+---    opts?: popen.wait_options): popen.process_status?, any?
+---
+---Close a popen handle.
+---
+---On success, returns `true`. On failure, returns `nil, err`.
+---
+---Possible raised errors:
+---
+---* `IllegalParams`: an incorrect handle parameter.
+---
+---Possible diagnostics when `nil, err` is returned (do not consider them
+---as errors):
+---
+---* `SystemError`: no permission to send a signal to a process or a
+---  process group. This diagnostic may appear due to Mac OS behavior on
+---  zombies when `opts.group_signal` is set. See
+---  `popen_handle:signal()`. It may appear for other reasons.
+---
+---The return is always `true` when a process is known to be dead (for
+---example, after `popen_handle:wait()`, no signal is sent, so no failure
+---may appear).
+---
+---`close()` kills a process using SIGKILL and releases all resources
+---associated with the popen handle.
+---
+---Details about signaling:
+---
+---* The signal is sent only when `opts.keep_child` is not set.
+---* The signal is sent only when a process is alive according to the
+---  information available on the current event loop iteration. There is a
+---  gap here: a zombie may be signaled; it is harmless.
+---* The signal is sent to a process or a process group depending on
+---  `opts.group_signal`. See `popen.new()` for details of group signaling.
+---
+---Resources are released regardless of whether a signal sending succeeds:
+---file descriptors are closed, memory is released, and the handle is
+---marked as closed.
+---
+---No operation is possible on a closed handle except `close()`, which is
+---always successful on a closed handle (idempotence).
+---
+---`close()` may return `true` or `nil, err`, but it always frees the
+---handle resources. So any return value usually means success for a
+---caller. The return values are purely informational: they are for
+---logging or some kind of reporting.
+---
+---@field close fun(self: popen.handle): boolean?, any?
+---
+---Return `true` if the handle is closed, `false` otherwise.
+---
+---@field is_closed fun(self: popen.handle): boolean
+---
+---@type popen
+return popen
