@@ -302,32 +302,32 @@ prepare_start_prefix_iterator(enum iterator_type *type, const char **key,
 	if (mp_typeof(*c) != MP_STR)
 		return true;
 
+	size_t prefix_size = c - *key;
 	uint32_t str_size = mp_decode_strl(&c);
-	/* Any string logically starts with empty string; iteration is over. */
+	/*
+	 * The least string greater than all strings with the given prefix is
+	 * the prefix without trailing UCHAR_MAX bytes and with the last byte
+	 * increased.
+	 */
+	while (str_size > 0 && (unsigned char)c[str_size - 1] == UCHAR_MAX)
+		str_size--;
+	/*
+	 * Any string logically starts with empty string, and if prefix
+	 * consists of UCHAR_MAX, there's no next. Iteration is over.
+	 */
 	if (str_size == 0)
 		return false;
-	size_t prefix_size = c - *key;
-	size_t total_size = prefix_size + str_size;
 
-	unsigned char *p = (unsigned char *)xregion_alloc(region, total_size);
-	memcpy(p, *key, total_size);
-
-	/* Increase the key to the least greater value. */
-	unsigned char *str = p + prefix_size;
-	for (uint32_t i = str_size - 1; ; i--) {
-		if (str[i] != UCHAR_MAX) {
-			str[i]++;
-			break;
-		} else if (i == 0) {
-			/* If prefix consists of CHAR_MAX, there's no next. */
-			return false;
-		}
-		str[i] = 0;
-	}
+	char *p = (char *)xregion_alloc(region, prefix_size +
+					mp_sizeof_str(str_size));
+	memcpy(p, *key, prefix_size);
+	char *str = mp_encode_strl(p + prefix_size, str_size);
+	memcpy(str, c, str_size);
+	str[str_size - 1]++;
 
 	/* With increased key we can continue the GE/LE search. */
 	*type = (*type == ITER_GT) ? ITER_GE : ITER_LE;
-	*key = (char *)p;
+	*key = p;
 	return true;
 }
 
