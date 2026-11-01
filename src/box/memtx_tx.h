@@ -310,13 +310,13 @@ memtx_tx_track_point(struct txn *txn, struct space *space,
 }
 
 /**
- * Helper of memtx_tx_track_gap.
+ * Helper of memtx_tx_track_gap and memtx_tx_track_gap_equal.
  */
 void
 memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *index,
 			struct memtx_index_entry successor,
 			enum iterator_type type, const char *key,
-			uint32_t part_count);
+			uint32_t part_count, uint32_t prefix_part_count);
 
 /**
  * Record in TX manager that a transaction @a txn have read nothing
@@ -338,7 +338,32 @@ memtx_tx_track_gap(struct txn *txn, struct space *space, struct index *index,
 	if (txn == NULL || space == NULL || space->def->opts.is_ephemeral)
 		return;
 	memtx_tx_track_gap_slow(txn, space, index, successor,
-				type, key, part_count);
+				type, key, part_count, 0);
+}
+
+/**
+ * Track the starting gap of an EQ/REQ iterator resumed from @a after.
+ * The position must match the original search key, whose part count is
+ * @a prefix_part_count. Only tuples with this prefix strictly after the
+ * position in the iteration direction are tracked.
+ *
+ * NB: can trigger story garbage collection.
+ */
+static inline void
+memtx_tx_track_gap_equal(struct txn *txn, struct space *space, struct index *index,
+			 struct memtx_index_entry successor,
+			 enum iterator_type type, const char *after,
+			 uint32_t part_count, uint32_t prefix_part_count)
+{
+	assert(type == ITER_EQ || type == ITER_REQ);
+	assert(after != NULL);
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return;
+	if (txn == NULL || space == NULL || space->def->opts.is_ephemeral)
+		return;
+	type = type == ITER_REQ ? ITER_LT : ITER_GT;
+	memtx_tx_track_gap_slow(txn, space, index, successor,
+				type, after, part_count, prefix_part_count);
 }
 
 /**
