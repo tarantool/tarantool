@@ -683,9 +683,6 @@ g.test_net_box = function(cg)
     ]], connect_args, {_thread_id = 2}), {
         {3, 'c'}, {2, 'b'}, {1, 'a'},
     })
-    t.assert(cg.server:eval([[
-        return require('net.box').self == nil
-    ]], {}, {_thread_id = 3}))
 end
 
 g.after_test('test_net_box', function(cg)
@@ -695,6 +692,21 @@ g.after_test('test_net_box', function(cg)
         end
     end)
 end)
+
+g.test_net_box_self_unsupported = function(cg)
+    cg.server:exec(function()
+        local net_box_self = require('net.box').self
+        t.assert_type(net_box_self, 'table')
+        local err = {
+            type = 'ClientError',
+            name = 'UNSUPPORTED',
+            message = 'application thread does not support net.box.self',
+        }
+        t.assert_equals(net_box_self.space, {})
+        t.assert_error_covers(err, net_box_self.call, net_box_self)
+        t.assert_error_covers(err, net_box_self.eval, net_box_self)
+    end, {}, {_thread_id = 1})
+end
 
 g.test_net_replicaset = function()
     local config = cbuilder:new()
