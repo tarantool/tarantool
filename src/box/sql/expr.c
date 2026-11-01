@@ -907,9 +907,6 @@ heightOfSelect(Select * p, int *pnHeight)
  * Expr.pSelect member has a height of 1. Any other expression
  * has a height equal to the maximum height of any other
  * referenced Expr plus one.
- *
- * Also propagate EP_Propagate flags up from Expr.x.pList to Expr.flags,
- * if appropriate.
  */
 static void
 exprSetHeight(Expr * p)
@@ -921,26 +918,8 @@ exprSetHeight(Expr * p)
 		heightOfSelect(p->x.pSelect, &nHeight);
 	} else if (p->x.pList) {
 		heightOfExprList(p->x.pList, &nHeight);
-		p->flags |= EP_Propagate & sqlExprListFlags(p->x.pList);
 	}
 	p->nHeight = nHeight + 1;
-}
-
-/*
- * Set the Expr.nHeight variable using the exprSetHeight() function. If
- * the height is greater than the maximum allowed expression depth,
- * leave an error in pParse.
- *
- * Also propagate all EP_Propagate flags from the Expr.x.pList into
- * Expr.flags.
- */
-void
-sqlExprSetHeightAndFlags(Parse * pParse, Expr * p)
-{
-	if (pParse->is_aborted)
-		return;
-	exprSetHeight(p);
-	sqlExprCheckHeight(pParse, p->nHeight);
 }
 
 /*
@@ -1090,21 +1069,15 @@ sqlPExpr(Parse * pParse,	/* Parsing context */
 		p->iAgg = -1;
 		sqlExprAttachSubtrees(p, pLeft, pRight);
 	}
-	sqlExprCheckHeight(pParse, p->nHeight);
 	return p;
 }
 
-/*
- * Add pSelect to the Expr.x.pSelect field.  Or, if pExpr is NULL (due
- * do a memory allocation failure) then delete the pSelect object.
- */
 void
-sqlPExprAddSelect(Parse * pParse, Expr * pExpr, Select * pSelect)
+sqlPExprAddSelect(struct Expr *expr, struct Select *select)
 {
-	assert(pExpr != NULL);
-	pExpr->x.pSelect = pSelect;
-	ExprSetProperty(pExpr, EP_xIsSelect | EP_Subquery);
-	sqlExprSetHeightAndFlags(pParse, pExpr);
+	assert(expr != NULL);
+	expr->x.pSelect = select;
+	ExprSetProperty(expr, EP_xIsSelect | EP_Subquery);
 }
 
 /**
@@ -1147,21 +1120,6 @@ sql_and_expr_new(struct Expr *left_expr, struct Expr *right_expr)
 		sqlExprAttachSubtrees(new_expr, left_expr, right_expr);
 		return new_expr;
 	}
-}
-
-/*
- * Construct a new expression node for a function with multiple
- * arguments.
- */
-Expr *
-sqlExprFunction(Parse * pParse, ExprList * pList, Token * pToken)
-{
-	assert(pToken != NULL);
-	struct Expr *new_expr = sql_expr_new_dequoted(TK_FUNCTION, pToken);
-	new_expr->x.pList = pList;
-	assert(!ExprHasProperty(new_expr, EP_xIsSelect));
-	sqlExprSetHeightAndFlags(pParse, new_expr);
-	return new_expr;
 }
 
 /*
