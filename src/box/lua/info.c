@@ -359,6 +359,13 @@ lbox_info_ro_reason(struct lua_State *L)
 	return 1;
 }
 
+static int
+lbox_info_ro_details(struct lua_State *L)
+{
+	lua_pushstring(L, box_ro_details());
+	return 1;
+}
+
 /*
  * Tarantool 1.6.x compat
  */
@@ -842,6 +849,7 @@ static const struct luaL_Reg lbox_info_dynamic_meta[] = {
 	{"vclock", lbox_info_vclock},
 	{"ro", lbox_info_ro},
 	{"ro_reason", lbox_info_ro_reason},
+	{"ro_details", lbox_info_ro_details},
 	{"replication", lbox_info_replication},
 	{"replication_anon", lbox_info_replication_anon},
 	{"replicaset", lbox_info_replicaset},
