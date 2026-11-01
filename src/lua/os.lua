@@ -1,0 +1,169 @@
+---@meta
+-- luacheck: ignore 121
+
+---# Builtin `os` module
+---
+---The `os` module contains the functions `execute()`, `rename()`,
+---`getenv()`, `remove()`, `date()`, `exit()`, `time()`, `clock()`,
+---`tmpname()`, `environ()`, `setenv()`, `setlocale()`, and `difftime()`.
+---Most of these functions are described in the Lua manual, Chapter 22,
+---"The Operating System Library".
+---
+---Tarantool overrides `os.getenv()` with a safer variant and `os.exit()`
+---with a graceful shutdown variant. It also adds `os.environ()` and
+---`os.setenv()`.
+
+---@class os
+---
+---Execute a command by passing it to the shell.
+---
+---**Example:**
+---
+---```lua
+---os.execute('ls -l /usr')
+---```
+---
+---@field execute fun(command: string): integer
+---
+---Rename a file or directory.
+---
+---**Example:**
+---
+---```lua
+---os.rename('local', 'foreign')
+---```
+---
+---@field rename fun(old_name: string, new_name: string):
+---    boolean, string?, integer?
+---
+---Get an environment variable.
+---
+---Tarantool uses a safer variant of `os.getenv()`: it returns a value
+---only if the value has a sane length.
+---
+---**Example:**
+---
+---```lua
+---os.getenv('PATH')
+---```
+---
+---@field getenv fun(variable_name: string): string?
+---
+---Remove a file or directory.
+---
+---**Example:**
+---
+---```lua
+---os.remove('file')
+---```
+---
+---@field remove fun(name: string): boolean, string?, integer?
+---
+---Return a formatted date.
+---
+---`format` is a format string. `time` is the number of seconds since
+---1970-01-01. If `time` is omitted, the current time is used.
+---
+---**Example:**
+---
+---```lua
+---os.date("%A %B %d")
+---```
+---
+---@field date fun(format?: string, time?: integer): string|os.date_table
+---
+---Exit the program. On a server instance, this stops the instance.
+---
+---Tarantool makes `os.exit()` exit gracefully: it runs `on_shutdown`
+---triggers. Only the main thread may call `os.exit()`.
+---
+---@field exit fun(code?: integer)
+---
+---Return the number of seconds since the epoch.
+---
+---**Example:**
+---
+---```lua
+---os.time()
+---```
+---
+---@field time fun(time?: os.date_table): integer
+---
+---Return the number of CPU seconds since the program start.
+---
+---**Example:**
+---
+---```lua
+---os.clock()
+---```
+---
+---@field clock fun(): number
+---
+---Return a name for a temporary file.
+---
+---**Example:**
+---
+---```lua
+---os.tmpname()
+---```
+---
+---@field tmpname fun(): string
+---
+---Return a table containing all environment variables.
+---
+---**Example:**
+---
+---```lua
+---os.environ()['TERM']
+---```
+---
+---@field environ fun(): table<string, string>?
+---
+---Set an environment variable.
+---
+---When `variable_value` is `nil`, the variable is removed.
+---
+---**Example:**
+---
+---```lua
+---os.setenv('VERSION', '99')
+---```
+---
+---@field setenv fun(variable_name: string, variable_value?: string)
+---
+---Change the locale.
+---
+---If `new_locale_string` is not specified, return the current locale.
+---
+---**Example:**
+---
+---```lua
+---string.sub(os.setlocale(), 1, 20)
+---```
+---
+---@field setlocale fun(new_locale_string?: string, category?: string): string?
+---
+---Return the number of seconds between two times.
+---
+---**Example:**
+---
+---```lua
+---os.difftime(os.time(), 0)
+---```
+---
+---@field difftime fun(time1: integer, time2: integer): number
+
+---@type os
+os = {}
+
+---@class os.date_table
+---A table returned by `os.date('*t')`.
+---@field year integer The year.
+---@field month integer The month, 1-12.
+---@field day integer The day of the month, 1-31.
+---@field hour integer The hour, 0-23.
+---@field min integer The minute, 0-59.
+---@field sec integer The second, 0-59.
+---@field wday integer The day of the week, 1-7, where 1 is Sunday.
+---@field yday integer The day of the year, 1-366.
+---@field isdst boolean Whether daylight saving time is in effect.
