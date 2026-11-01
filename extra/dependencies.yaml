@@ -18,7 +18,7 @@ dependencies:
   - name: libreadline
     version: 8.0
   - name: libunwind
-    version: 1.6.2
+    version: 1.8.3
   - name: libyaml
     version: 788563cb51bb71649ecf1f0a00f60b259e5372be
   - name: libzip
