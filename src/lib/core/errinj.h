@@ -141,6 +141,7 @@ struct errinj {
 	_(ERRINJ_REPLICA_JOIN_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SIGILL_MAIN_THREAD, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SIGILL_NONMAIN_THREAD, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_SIO_GETADDRINFO_ADDRCONFIG, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SIO_READ_MAX, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_SNAP_COMMIT_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SNAP_COMMIT_FAIL, ERRINJ_BOOL, {.bparam = false}) \
