@@ -266,6 +266,8 @@ txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request)
 		row->stream_id = 0;
 		row->audit_context = NULL;
 		row->audit_context_len = 0;
+		row->trace_context_span_id = 0;
+		row->trace_context_flag = true;
 		row->header = NULL;
 		row->header_end = NULL;
 	}

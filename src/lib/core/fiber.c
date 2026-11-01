@@ -1625,6 +1625,7 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 	assert(cord->next_fid > FIBER_ID_MAX_RESERVED);
 	if (!(fiber->flags & FIBER_IS_SYSTEM))
 		cord()->client_fiber_count++;
+	fiber->storage.traceparent = fiber()->storage.traceparent;
 
 	return fiber;
 
@@ -2380,6 +2381,16 @@ fiber_set_managed_shutdown(struct fiber *f)
 		f->flags |= FIBER_MANAGED_SHUTDOWN;
 		cord()->managed_shutdown_fiber_count++;
 	}
+}
+
+bool
+fiber_is_traceparent_null(const struct fiber *fiber)
+{
+	if (fiber->storage.traceparent.span_id != 0)
+		return false;
+	if (fiber->storage.traceparent.trace_flag)
+		return false;
+	return true;
 }
 
 int
