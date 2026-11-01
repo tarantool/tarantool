@@ -40,9 +40,17 @@ fiber.clock64 = fiber_clock64
 local stall = fiber.stall
 local fiber_set_system = fiber.set_system
 local fiber_set_managed_shutdown = fiber.set_managed_shutdown
+local fiber_set_span_id = fiber.set_span_id
+local fiber_get_span_id = fiber.get_span_id
+local fiber_set_trace_flag = fiber.set_trace_flag
+local fiber_get_trace_flag = fiber.get_trace_flag
 fiber.stall = nil
 fiber.set_system = nil
 fiber.set_managed_shutdown = nil
+fiber.set_span_id = nil
+fiber.get_span_id = nil
+fiber.set_trace_flag = nil
+fiber.get_trace_flag = nil
 
 local worker_next_task = nil
 local worker_last_task
@@ -96,6 +104,10 @@ fiber._internal = fiber._internal or {}
 fiber._internal.schedule_task = worker_schedule_task
 fiber._internal.set_system = fiber_set_system
 fiber._internal.set_managed_shutdown = fiber_set_managed_shutdown
+fiber._internal.set_span_id = fiber_set_span_id
+fiber._internal.get_span_id = fiber_get_span_id
+fiber._internal.set_trace_flag = fiber_set_trace_flag
+fiber._internal.get_trace_flag = fiber_get_trace_flag
 fiber._internal.cord_is_main = C.cord_is_main()
 
 setmetatable(fiber, {__serialize = function(self)
