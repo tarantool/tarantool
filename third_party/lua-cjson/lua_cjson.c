@@ -39,6 +39,7 @@
 #include "trivia/util.h"
 
 #include <assert.h>
+#include <errno.h>
 #include <string.h>
 #include <math.h>
 #include <limits.h>
@@ -732,10 +733,11 @@ static void json_next_number_token(json_parse_t *json, json_token_t *token)
 {
     char *endptr;
 
-
+    errno = 0;
     token->type = T_INT;
     token->value.ival = strtoll(json->ptr, &endptr, 10);
     if (token->value.ival == LLONG_MAX) {
+        errno = 0;
         token->type = T_UINT;
         token->value.ival = strtoull(json->ptr, &endptr, 10);
     }
@@ -744,10 +746,18 @@ static void json_next_number_token(json_parse_t *json, json_token_t *token)
         token->value.number = fpconv_strtod(json->ptr, &endptr);
     }
 
-    if (json->ptr == endptr)
+    if (json->ptr == endptr) {
         json_set_token_error(token, json, "invalid number");
-    else
-        json->ptr = endptr;     /* Skip the processed number */
+        return;
+    }
+    if (token->type != T_NUMBER && errno == ERANGE &&
+        json->cfg->decode_overflow == JSON_DECODE_OVERFLOW_ERROR) {
+        json_set_token_error(token, json, "integer outside the supported "
+                             "range [INT64_MIN, UINT64_MAX]");
+        return;
+    }
+    /* strtoll()/strtoull() already clamp overflowing integers. */
+    json->ptr = endptr;     /* Skip the processed number */
 }
 
 /* Fills in the token struct.
