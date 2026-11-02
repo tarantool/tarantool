@@ -1,5 +1,4 @@
 local fio = require('fio')
-local fun = require('fun')
 local ffi = require('ffi')
 local it = require('test.interactive_tarantool')
 local net = require('net.box')
@@ -46,6 +45,9 @@ local OPENSSL_VERSION_NUMBER = ffi.C.ssl_openssl_version_number()
 local OPENSSL_3_0_0_OR_NEWER = (OPENSSL_VERSION_NUMBER >=
                                 tonumber('30000000', 16))
 
+package.path = ('%s/?.lua'):format(debug.__dir__)..';'..package.path
+local utils = require('ssl_test_utils')
+
 g.before_test('test_invalid_cfg', function()
     g.server = server:new({alias = 'master'})
     g.server:start()
@@ -65,8 +67,8 @@ g.test_invalid_cfg = function()
                 ssl_cert_file = SERVER_CERT_FILE,
                 ssl_key_file = SERVER_KEY_FILE,
             },
-            error_msg = "Error loading SSL CA '/no/such/file': " ..
-                        "No such file or directory",
+            error_msg = "^Error loading SSL CA '/no/such/file':" ..
+                        ".*:No such file or directory:.*",
         },
         {
             uri_params = {
@@ -74,8 +76,8 @@ g.test_invalid_cfg = function()
                 ssl_cert_file = '/no/such/file',
                 ssl_key_file = SERVER_KEY_FILE,
             },
-            error_msg = "Error loading SSL certificate '/no/such/file': " ..
-                        "No such file or directory",
+            error_msg = "^Error loading SSL certificate '/no/such/file':" ..
+                        ".*:No such file or directory:.*",
         },
         {
             uri_params = {
@@ -83,9 +85,11 @@ g.test_invalid_cfg = function()
                 ssl_cert_file = SERVER_CERT_FILE,
                 ssl_key_file = '/no/such/file',
             },
-            error_msg = "Error loading SSL private key '/no/such/file': " ..
-                        "No such file or directory",
+            error_msg = "^Error loading SSL private key '/no/such/file':" ..
+                        ".*:No such file or directory:.*",
         },
+        -- Tarantool's ssl.c reads password_file and raises a SystemError,
+        -- it's not an OpenSSL error.
         {
             uri_params = {
                 transport = 'ssl',
@@ -93,8 +97,8 @@ g.test_invalid_cfg = function()
                 ssl_key_file = SERVER_KEY_FILE,
                 ssl_password_file = '/no/such/file',
             },
-            error_msg = "Error reading SSL password file '/no/such/file': " ..
-                        "No such file or directory",
+            error_msg = "^Error reading SSL password file '/no/such/file':" ..
+                        " No such file or directory$",
         },
         {
             uri_params = {
@@ -102,8 +106,11 @@ g.test_invalid_cfg = function()
                 ssl_cert_file = SERVER_KEY_FILE,
                 ssl_key_file = SERVER_KEY_FILE,
             },
-            error_msg = string.format("Error loading SSL certificate '%s': " ..
-                                      "no start line", SERVER_KEY_FILE)
+            error_msg = {
+                ssl_c = string.format("Error loading SSL certificate '%s':",
+                                      SERVER_KEY_FILE),
+                openssl_cases = {".*:no start line:.*"},
+            },
         },
         {
             uri_params = {
@@ -112,10 +119,19 @@ g.test_invalid_cfg = function()
                 ssl_key_file = SERVER_CERT_FILE,
             },
             -- The error message depends on the OpenSSL version.
-            error_msg = fun.map(function(v)
-                return string.format("Error loading SSL private key '%s': %s",
-                                     SERVER_CERT_FILE, v)
-            end, {'unsupported', 'PEM lib', 'no start line'}):totable()
+            error_msg = {
+                ssl_c = string.format("Error loading SSL private key '%s'",
+                                      SERVER_CERT_FILE),
+                openssl_cases = {
+                    -- Checked for 1.1.1 / Ubuntu 20.
+                    '.*:no start line:.*',
+                    -- Checked for 3.0.2 / Ubuntu 22.
+                    '.*:PEM lib:.*',
+                    -- Checked for 3.0.13 / Ubuntu 24.
+                    -- Checked for 3.5.5 / Ubuntu 26.
+                    '.*:unsupported:.*',
+                },
+            },
         },
         {
             uri_params = {
@@ -123,8 +139,11 @@ g.test_invalid_cfg = function()
                 ssl_cert_file = CA_FILE,
                 ssl_key_file = SERVER_KEY_FILE,
             },
-            error_msg = string.format("Error loading SSL private key '%s': " ..
-                                      "key values mismatch", SERVER_KEY_FILE),
+            error_msg = {
+                ssl_c = string.format("Error loading SSL private key '%s':",
+                                      SERVER_KEY_FILE),
+                openssl_cases = {".*:key values mismatch:.*"},
+            },
         },
         {
             uri_params = {
@@ -132,8 +151,11 @@ g.test_invalid_cfg = function()
                 ssl_cert_file = SERVER_CERT_FILE,
                 ssl_key_file = SERVER_KEY_FILE_ENC,
             },
-            error_msg = string.format("Error loading SSL private key '%s': " ..
-                                      "bad decrypt", SERVER_KEY_FILE_ENC),
+            error_msg = {
+                ssl_c = string.format("Error loading SSL private key '%s':",
+                                      SERVER_KEY_FILE_ENC),
+                openssl_cases = {".*:bad decrypt:.*"},
+            },
         },
     }
     local LISTEN_TEST_CASES = {
@@ -153,14 +175,10 @@ g.test_invalid_cfg = function()
         },
     }
     g.server:exec(function(uri, test_cases, listen_test_cases)
+        package.path = ('%s/?.lua'):format(debug.__dir__)..';'..package.path
+        local utils = require('ssl_test_utils')
+        local check_error_msg = utils.check_ssl_error_msg
         local net = require('net.box')
-        local function check_error_msg(error_msg, f, ...)
-            if type(error_msg) ~= 'table' then
-                error_msg = {error_msg}
-            end
-            local ok, err = pcall(f, ...)
-            t.assert_items_include(error_msg, {ok or err.message})
-        end
         -- box.cfg.listen and box.cfg.replication
         for _, v in ipairs(test_cases) do
             check_error_msg(
@@ -233,6 +251,7 @@ g.test_net_box = function()
     c:close()
 
     -- Check server authority.
+    -- Non CA cert.
     c = net.connect({
         uri = uri,
         params = {
@@ -243,6 +262,18 @@ g.test_net_box = function()
     t.assert_equals(c.state, 'error')
     t.assert_str_contains(c.error, 'certificate verify failed')
     c:close()
+    -- Other CA cert.
+    c = net.connect({
+        uri = uri,
+        params = {
+            transport = 'ssl',
+            ssl_ca_file = CA2_FILE,
+        }
+    })
+    t.assert_equals(c.state, 'error')
+    t.assert_str_contains(c.error, 'certificate verify failed')
+    c:close()
+    -- Actual CA cert.
     c = net.connect({
         uri = uri,
         params = {
@@ -268,10 +299,30 @@ g.test_net_box = function()
     end, {uri, CA_FILE, SERVER_CERT_FILE, SERVER_KEY_FILE})
 
     -- Check client authority.
+    -- No cert.
     c = net.connect({uri = uri, params = {transport = 'ssl'}})
     t.assert_equals(c.state, 'error')
     t.assert_str_contains(c.error, 'handshake failure')
     c:close()
+    t.assert(g.server:grep_log(
+           '.*:SSL routines:.*:peer did not return a certificate:.*') ~= nil,
+        "no error 'peer did not return a certificate' in server's log")
+    -- Other CA cert.
+    c = net.connect({
+        uri = uri,
+        params = {
+            transport = 'ssl',
+            ssl_cert_file = CLIENT2_CERT_FILE,
+            ssl_key_file = CLIENT2_KEY_FILE,
+        }
+    })
+    t.assert_equals(c.state, 'error')
+    t.assert_str_contains(c.error, 'decrypt error')
+    c:close()
+    t.assert(g.server:grep_log(
+           '.*:SSL routines:.*:certificate verify failed:.*') ~= nil,
+        "no error 'certificate verify failed' in server's log")
+    -- Actual CA cert.
     c = net.connect({
         uri = uri,
         params = {
@@ -352,7 +403,7 @@ g.after_test('test_replication', function()
 end)
 
 g.test_replication = function()
-    g.replica:exec(function(uri, ca_file, cert_file, key_file)
+    g.replica:exec(function(uri, ca_file, cert_file, key_file, other_ca_file)
         local replication_connect_timeout = box.cfg.replication_connect_timeout
 
         t.assert_equals(box.info.status, 'running')
@@ -388,7 +439,8 @@ g.test_replication = function()
         t.assert_equals(box.info.replication[1].upstream.status, 'follow')
         box.cfg({replication = {}})
 
-        -- Check server authority,
+        -- Check server authority.
+        -- Non CA cert.
         box.cfg({replication_connect_timeout = 0.1})
         box.cfg({replication = {
             uri = uri,
@@ -400,6 +452,19 @@ g.test_replication = function()
         box.cfg({replication_connect_timeout = replication_connect_timeout})
         t.assert_equals(box.info.status, 'orphan')
         t.assert_not(box.info.replication[1].upstream)
+        -- Other CA cert.
+        box.cfg({replication_connect_timeout = 0.1})
+        box.cfg({replication = {
+            uri = uri,
+            params = {
+                transport = 'ssl',
+                ssl_ca_file = other_ca_file,
+            }
+        }})
+        box.cfg({replication_connect_timeout = replication_connect_timeout})
+        t.assert_equals(box.info.status, 'orphan')
+        t.assert_not(box.info.replication[1].upstream)
+        -- Actual CA cert.
         box.cfg({replication = {
             uri = uri,
             params = {
@@ -410,7 +475,8 @@ g.test_replication = function()
         t.assert_equals(box.info.status, 'running')
         t.assert_equals(box.info.replication[1].upstream.status, 'follow')
         box.cfg({replication = {}})
-    end, {g.master.net_box_uri, CA_FILE, CLIENT_CERT_FILE, CLIENT_KEY_FILE})
+    end, {g.master.net_box_uri, CA_FILE, CLIENT_CERT_FILE, CLIENT_KEY_FILE,
+        CA2_FILE})
 
     g.master:exec(function(uri, ca_file, cert_file, key_file)
         -- Enforce client authentication.
@@ -425,10 +491,12 @@ g.test_replication = function()
         }})
     end, {g.master.net_box_uri, CA_FILE, SERVER_CERT_FILE, SERVER_KEY_FILE})
 
-    g.replica:exec(function(uri, cert_file, key_file)
+    g.replica:exec(function(uri, cert_file, key_file,
+        other_ca_cert_file, other_ca_key_file)
         local replication_connect_timeout = box.cfg.replication_connect_timeout
 
         -- Check client authority.
+        -- No cert.
         box.cfg({replication_connect_timeout = 0.1})
         box.cfg({replication = {
             uri = uri,
@@ -437,6 +505,20 @@ g.test_replication = function()
         box.cfg({replication_connect_timeout = replication_connect_timeout})
         t.assert_equals(box.info.status, 'orphan')
         t.assert_not(box.info.replication[1].upstream)
+        -- Other CA cert.
+        box.cfg({replication_connect_timeout = 0.1})
+        box.cfg({replication = {
+            uri = uri,
+            params = {
+                transport = 'ssl',
+                ssl_cert_file = other_ca_cert_file,
+                ssl_key_file = other_ca_key_file,
+            }
+        }})
+        box.cfg({replication_connect_timeout = replication_connect_timeout})
+        t.assert_equals(box.info.status, 'orphan')
+        t.assert_not(box.info.replication[1].upstream)
+        -- Actual cert.
         box.cfg({replication = {
             uri = uri,
             params = {
@@ -448,7 +530,8 @@ g.test_replication = function()
         t.assert_equals(box.info.status, 'running')
         t.assert_equals(box.info.replication[1].upstream.status, 'follow')
         box.cfg({replication = {}})
-    end, {g.master.net_box_uri, CLIENT_CERT_FILE, CLIENT_KEY_FILE})
+    end, {g.master.net_box_uri, CLIENT_CERT_FILE, CLIENT_KEY_FILE,
+        CLIENT2_CERT_FILE, CLIENT2_KEY_FILE})
 end
 
 g.before_test('test_replication_reconnect_after_enabling_ssl', function()
@@ -611,8 +694,8 @@ g.test_ciphers = function()
                 ssl_ciphers = 'FOO:BAR',
             }
         }
-        t.assert_error_msg_equals(
-            "Error setting SSL ciphers 'FOO:BAR': no cipher match",
+        t.assert_error_msg_matches(
+            "Error setting SSL ciphers 'FOO:BAR':.*:no cipher match:.*",
             box.cfg, {listen = ssl_uri})
         ssl_uri.params.ssl_ciphers = 'ECDHE-RSA-AES256-GCM-SHA384'
         box.cfg({listen = ssl_uri})
@@ -628,6 +711,9 @@ g.test_ciphers = function()
     t.assert_equals(c.state, 'error')
     t.assert_str_contains(c.error, 'handshake failure')
     c:close()
+    t.assert(g.server:grep_log(
+            '.*:SSL routines:.*:no shared cipher:.*') ~= nil,
+        "no error 'no shared cipher' in server's log")
     ssl_uri.params.ssl_ciphers = (ssl_uri.params.ssl_ciphers ..
                                   ':ECDHE-RSA-AES256-GCM-SHA384')
     c = net.connect(ssl_uri)
@@ -674,8 +760,11 @@ g.test_passwd = function()
             ssl_password_file = g.passwd_path,
         }
     }
-    local err = string.format("Error loading SSL private key '%s': bad decrypt",
-                              CLIENT_KEY_FILE_ENC)
+    local error_msg = {
+        ssl_c = string.format("Error loading SSL private key '%s':",
+                              CLIENT_KEY_FILE_ENC),
+        openssl_cases = {'.*:bad decrypt:.*'},
+    }
     local c
 
     -- Valid password in the password file.
@@ -725,13 +814,13 @@ g.test_passwd = function()
     -- Empty password file.
     passwd_file:seek(0)
     passwd_file:truncate(0)
-    t.assert_error_msg_equals(err, net.connect, uri)
+    utils.check_ssl_error_msg(error_msg, net.connect, uri)
 
     -- No matching password.
     passwd_file:seek(0)
     passwd_file:truncate(0)
     passwd_file:write('foo\nbar\nbaz\n')
-    t.assert_error_msg_equals(err, net.connect, uri)
+    utils.check_ssl_error_msg(error_msg, net.connect, uri)
 
     -- Valid password in the password parameter.
     -- No matching password in the password file.
@@ -845,6 +934,7 @@ g.test_reload_listen = function()
     }
     local c = net.connect(uri)
     t.assert_equals(c.state, 'active')
+    t.assert_equals(c:eval('return true'), true)
     c:close()
     -- Update the SSL certificate on the server.
     t.assert(fio.copyfile(SERVER2_CERT_FILE, TMP_CERT_FILE))
@@ -855,11 +945,13 @@ g.test_reload_listen = function()
     -- Connection with the old CA should fail.
     c = net.connect(uri)
     t.assert_equals(c.state, 'error')
+    t.assert_str_contains(c.error, 'certificate verify failed')
     c:close()
     -- Connection with the new CA should succeed.
     uri.params.ssl_ca_file = CA2_FILE
     c = net.connect(uri)
     t.assert_equals(c.state, 'active')
+    t.assert_equals(c:eval('return true'), true)
     c:close()
 end
 
