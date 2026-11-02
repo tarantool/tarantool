@@ -146,6 +146,12 @@ iproto_override(uint32_t req_type, iproto_handler_t cb,
 void
 iproto_register_func(const char *name);
 
+/**
+ * Cancels the effect of iproto_register_func().
+ */
+void
+iproto_unregister_func(const char *name);
+
 void
 iproto_init(int threads_count);
 

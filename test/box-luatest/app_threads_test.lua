@@ -345,6 +345,7 @@ g.test_builtin_modules = function(cg)
         'protocol_version',
         'raft_key',
         'type',
+        'unexport',
     })
     t.assert_items_equals(eval([[
         local keys = {}
@@ -354,6 +355,7 @@ g.test_builtin_modules = function(cg)
         return keys
     ]]), {
         'register_func',
+        'unregister_func',
     })
 end
 

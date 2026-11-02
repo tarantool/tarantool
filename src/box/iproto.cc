@@ -5206,3 +5206,58 @@ iproto_register_func(const char *name)
 			   &msg->base);
 	}
 }
+
+/**
+ * Unregister a function in an IPROTO thread.
+ */
+static void
+net_unregister_func(struct cmsg *m)
+{
+	struct iproto_service_msg *msg = (struct iproto_service_msg *)m;
+	int srv_id = msg->srv_id;
+	struct iproto_thread *iproto_thread = msg->iproto_thread;
+	const char *name = msg->func_name;
+	uint32_t name_len = strlen(name);
+	uint32_t name_hash = mh_strn_hash(name, name_len);
+	struct mh_strnptr_t *funcs = iproto_thread->funcs;
+	struct mh_strnptr_key_t k = {name, name_len, name_hash};
+	mh_int_t i = mh_strnptr_find(funcs, &k, NULL);
+	if (i != mh_end(funcs)) {
+		struct iproto_func *func =
+			(struct iproto_func *)mh_strnptr_node(funcs, i)->val;
+		for (int i = 0; i < func->srv_count; i++) {
+			if (func->srv_ids[i] == srv_id) {
+				memmove(&func->srv_ids[i],
+					&func->srv_ids[i + 1],
+					(func->srv_count - i - 1) *
+					sizeof(*func->srv_ids));
+				func->srv_count--;
+				break;
+			}
+		}
+		if (func->srv_count == 0) {
+			mh_strnptr_del(funcs, i, NULL);
+			free(func);
+		}
+	}
+	free(msg->func_name);
+	iproto_service_msg_delete(msg);
+}
+
+void
+iproto_unregister_func(const char *name)
+{
+	assert(app_thread_id >= 0);
+	for (int i = 0; i < iproto_threads_count; i++) {
+		static const struct cmsg_hop route[] = {
+			{net_unregister_func, NULL},
+		};
+		struct iproto_service_msg *msg = iproto_service_msg_new(route);
+		struct iproto_thread *iproto_thread = &iproto_threads[i];
+		msg->srv_id = app_thread_id;
+		msg->iproto_thread = iproto_thread;
+		msg->func_name = (char *)xstrdup(name);
+		cpipe_push(&iproto_thread->srv[app_thread_id].ret_pipe,
+			   &msg->base);
+	}
+}

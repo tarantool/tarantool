@@ -16,6 +16,17 @@ box.iproto.export = function(func_name, func)
     end
 end
 
+box.iproto.unexport = function(func_name)
+    utils.check_param(func_name, 'function name', 'string', 2)
+    if box.internal.func_registry[func_name] == nil then
+        box.error(box.error.NO_SUCH_FUNCTION, func_name, 2)
+    end
+    box.internal.func_registry[func_name] = nil
+    if may_register_funcs then
+        box.iproto.internal.unregister_func(func_name)
+    end
+end
+
 if fiber._internal.cord_is_main then
 
 --
