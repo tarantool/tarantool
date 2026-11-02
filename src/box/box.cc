@@ -4630,6 +4630,8 @@ bootstrap_master(const struct tt_uuid *replicaset_uuid)
 	 */
 	if (bootstrap_strategy == BOOTSTRAP_STRATEGY_AUTO)
 		check_bootstrap_unanimity();
+	/* A failed join may have left the instance vclock unset. */
+	vclock_create(&instance_vclock_storage);
 	engine_bootstrap_xc();
 
 	uint32_t replica_id = 1;
