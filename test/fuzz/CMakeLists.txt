@@ -271,6 +271,11 @@ create_fuzz_test(PREFIX xrow_decode_ballot_event
                          ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
                  LIBRARIES xrow fuzzer_config)
 
+create_fuzz_test(PREFIX xrow_update_splice
+                 SOURCES xrow_update_splice_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
+                 LIBRARIES tuple fuzzer_config)
+
 # Blocked by https://github.com/tarantool/tarantool/issues/8948.
 if (NOT ENABLE_UB_SANITIZER)
   create_fuzz_test(PREFIX decimal_to_int64
