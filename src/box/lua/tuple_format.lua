@@ -239,6 +239,12 @@ local function normalize_default_func(func_name, error_prefix, level)
 end
 
 local function normalize_format(space_id, space_name, format, level)
+    local ok, err, arg1, arg2 = utils.table_is_array(format)
+    if not ok then
+        box.error(box.error.ILLEGAL_PARAMS,
+                  'format must be an array: ' ..
+                  string.format(err, arg1, arg2), level + 1)
+    end
     local result = {}
     for i, given in ipairs(format) do
         local field = {}

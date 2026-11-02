@@ -3,6 +3,30 @@ local t = require('luatest')
 
 local g = t.group()
 
+g.test_table_is_array = function()
+    for _, array in ipairs({{}, {'a'}, {'a', 'b'}, {{name = 'a'}}}) do
+        t.assert_equals(utils.table_is_array(array), true)
+    end
+
+    local invalid = {
+        {name = 'a'},
+        {'a', extra = true},
+        {[true] = 'a'},
+        {[1.5] = 'a'},
+        {[0] = 'a'},
+        {[-1] = 'a'},
+        {[2] = 'a'},
+        {[1] = 'a', [3] = 'b'},
+    }
+    for _, data in ipairs(invalid) do
+        local ok, err, arg1, arg2 = utils.table_is_array(data)
+        t.assert_equals(ok, false)
+        t.assert_type(err, 'string')
+        t.assert_type(string.format(err, arg1, arg2), 'string')
+    end
+    t.assert_error_msg_contains('assertion failed', utils.table_is_array, 'a')
+end
+
 g.test_check_param = function()
     t.assert_error_msg_equals("foo should be a string",
                               utils.check_param, 42, "foo", 'string')
