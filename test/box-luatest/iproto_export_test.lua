@@ -20,6 +20,8 @@ g1.test_iproto_export = function(cg)
         rawset(_G, 'test', {})
         _G.test.func_2 = function(v) return {123, v} end
         _G.test.func_3 = function(v) return {3, v} end
+        box.iproto.export('test.func_4', function(v) return {4, v} end)
+        box.iproto.unexport('test.func_4')
     ]]
     local env = {}
     if cg.params.before_box_cfg then
@@ -38,6 +40,11 @@ g1.test_iproto_export = function(cg)
         name = 'NO_SUCH_PROC',
         func = 'test.func_4',
     }, cg.server.call, cg.server, 'test.func_4', {'x'})
+    t.assert_error_covers({
+        type = 'ClientError',
+        name = 'NO_SUCH_PROC',
+        func = 'test.func_5',
+    }, cg.server.call, cg.server, 'test.func_5', {'x'})
 end
 
 local g2 = t.group('iproto_export')
@@ -60,12 +67,27 @@ g2.test_invalid_arguments = function(cg)
             type = 'IllegalParams',
             message = 'function object should be a function',
         }, box.iproto.export, 'foo', 20)
+        t.assert_error_covers({
+            type = 'IllegalParams',
+            message = 'function name should be a string',
+        }, box.iproto.unexport, 10)
         box.iproto.export('foo', function() end)
         t.assert_error_covers({
             type = 'ClientError',
             name = 'FUNCTION_EXISTS',
             func = 'foo',
         }, box.iproto.export, 'foo', function() end)
+        t.assert_error_covers({
+            type = 'ClientError',
+            name = 'NO_SUCH_FUNCTION',
+            func = 'bar',
+        }, box.iproto.unexport, 'bar')
+        box.iproto.unexport('foo')
+        t.assert_error_covers({
+            type = 'ClientError',
+            name = 'NO_SUCH_FUNCTION',
+            func = 'foo',
+        }, box.iproto.unexport, 'foo')
     end)
 end
 
@@ -112,6 +134,16 @@ g2.test_iproto_export_in_app_threads = function(cg)
                           'test.func_1', {'x'}, {_thread_id = 2})
     t.assert_error_covers(err, conn.call, conn,
                           'test.func_2', {'x'}, {_thread_id = 2})
+    cg.server:exec(function()
+        box.iproto.unexport('test.func_1')
+    end, {}, {_thread_id = 0})
+    t.assert_error_covers(err, conn.call, conn,
+                          'test.func_1', {'x'}, {_thread_id = 0})
+    cg.server:exec(function()
+        box.iproto.unexport('test.func_2')
+    end, {}, {_thread_id = 1})
+    t.assert_equals(conn:call('test.func_2', {'x'}, {_thread_id = 1}),
+                    {123, 'x'})
 end
 
 g2.test_iproto_call_routing = function(cg)
@@ -191,6 +223,24 @@ g2.test_iproto_call_routing = function(cg)
     t.assert_almost_equals(thread_calls[3], 500, err_margin)
     run_test('test_func_4')
     t.assert_equals(thread_calls[0], 1000)
+    t.assert_equals(thread_calls[1], 0)
+    t.assert_equals(thread_calls[2], 0)
+    t.assert_equals(thread_calls[3], 0)
+
+    cg.server:exec(function()
+        box.iproto.unexport('test_func_2')
+    end, {}, {_thread_id = 2})
+    run_test('test_func_2')
+    t.assert_equals(thread_calls[0], 0)
+    t.assert_equals(thread_calls[1], 0)
+    t.assert_equals(thread_calls[2], 0)
+    t.assert_almost_equals(thread_calls[3], 1000, err_margin)
+
+    cg.server:exec(function()
+        box.iproto.unexport('test_func_2')
+    end, {}, {_thread_id = 3})
+    run_test('test_func_2')
+    t.assert_almost_equals(thread_calls[0], 1000, err_margin)
     t.assert_equals(thread_calls[1], 0)
     t.assert_equals(thread_calls[2], 0)
     t.assert_equals(thread_calls[3], 0)
