@@ -5384,6 +5384,8 @@ bootstrap_master(void)
 			 "instance proceeds as a bootstrap leader");
 		is_graceful_supervised_bootstrap_requested = false;
 	}
+	/* A failed join may have left the instance vclock unset. */
+	vclock_create(&instance_vclock_storage);
 	engine_bootstrap_xc();
 	if (box_set_replication_synchro_queue_max_size() != 0)
 		diag_raise();
