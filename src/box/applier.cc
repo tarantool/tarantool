@@ -776,6 +776,11 @@ applier_wait_snapshot(struct applier *applier)
 	struct ibuf *ibuf = &applier->ibuf;
 	struct xrow_header row;
 	/*
+	 * The vclock of the checkpoint the master is sending to the replica.
+	 * Used as the replica's initial vclock after applying initial data.
+	 */
+	struct vclock vclock;
+	/*
 	 * Counts all the applied rows which change the local state - both the
 	 * join metadata and the snapshot data. A retry after any of them is
 	 * applied is not safe.
@@ -795,15 +800,7 @@ applier_wait_snapshot(struct applier *applier)
 			tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
 				  (uint32_t) row.type);
 		}
-		/*
-		 * Start vclock. The vclock of the checkpoint
-		 * the master is sending to the replica.
-		 * Used to initialize the replica's initial
-		 * vclock in bootstrap_from_master()
-		 */
-		struct vclock vclock;
 		xrow_decode_vclock_ignore0_xc(&row, &vclock);
-		box_init_instance_vclock(&vclock);
 	}
 
 	coio_read_xrow(io, ibuf, &row);
@@ -852,14 +849,10 @@ applier_wait_snapshot(struct applier *applier)
 			if (applier->version_id < version_id(1, 7, 0)) {
 				/*
 				 * This is the start vclock if the
-				 * server is 1.6. Since we have
-				 * not initialized replication
-				 * vclock yet, do it now. In 1.7+
-				 * this vclock is not used.
+				 * server is 1.6. In 1.7+ this vclock
+				 * is not used.
 				 */
-				struct vclock vclock;
 				xrow_decode_vclock_ignore0_xc(&row, &vclock);
-				box_init_instance_vclock(&vclock);
 			}
 			break; /* end of stream */
 		} else if (iproto_type_is_error(row.type)) {
@@ -870,6 +863,12 @@ applier_wait_snapshot(struct applier *applier)
 		}
 		coio_read_xrow(io, ibuf, &row);
 	}
+	/*
+	 * Before any metadata or snapshot data is applied, a failed transfer
+	 * can be retried. Keep the instance vclock unset until the snapshot
+	 * is complete so retries do not initialize it twice.
+	 */
+	box_init_instance_vclock(&vclock);
 }
 
 static void
