@@ -3,27 +3,92 @@ local utils = require('internal.utils')
 
 local may_register_funcs = true
 
--- Makes a function callable over the IPROTO protocol by the given name.
-box.iproto.export = function(func_name, func)
-    utils.check_param(func_name, 'function name', 'string', 2)
-    utils.check_param(func, 'function object', 'function', 2)
-    if box.internal.func_registry[func_name] ~= nil then
-        box.error(box.error.FUNCTION_EXISTS, func_name, 2)
+--
+-- Makes a flat table by concatenating table keys with nested table keys using
+-- a dot as a separator.
+--
+local function flatten_func_table(arg, level)
+    level = level or 3
+    local ret = {}
+    for k, v in pairs(arg) do
+        utils.check_param(k, 'function name', 'string', level)
+        if type(v) == 'table' then
+            v = flatten_func_table(v, level + 1)
+            for k1, v1 in pairs(v) do
+                ret[k .. '.' .. k1] = v1
+            end
+        else
+            ret[k] = v
+        end
     end
-    box.internal.func_registry[func_name] = func
-    if may_register_funcs then
-        box.iproto.internal.register_func(func_name)
+    return ret
+end
+
+--
+-- Makes a function callable over the IPROTO protocol by the given name.
+--
+-- The function takes either a function name and a function or a table
+-- {[name] = function}, where nested table keys are concatenated using a dot
+-- as a separator, which works as if the table was merged into the global
+-- Lua namespace _G.
+--
+box.iproto.export = function(name_or_table, func_or_nil)
+    local func_table
+    if type(name_or_table) == 'table' then
+        func_table = name_or_table
+    elseif name_or_table ~= nil and func_or_nil ~= nil then
+        func_table = {[name_or_table] = func_or_nil}
+    else
+        box.error(box.error.ILLEGAL_PARAMS,
+                  'Usage: box.iproto.export(name, func) or '..
+                  'box.iproto.export({[name] = func})', 2)
+    end
+    func_table = flatten_func_table(func_table)
+    for _, func in pairs(func_table) do
+        utils.check_param(func, 'function object', 'function', 2)
+    end
+    for name in pairs(func_table) do
+        if box.internal.func_registry[name] ~= nil then
+            box.error(box.error.FUNCTION_EXISTS, name, 2)
+        end
+    end
+    for name, func in pairs(func_table) do
+        box.internal.func_registry[name] = func
+        if may_register_funcs then
+            box.iproto.internal.register_func(name)
+        end
     end
 end
 
-box.iproto.unexport = function(func_name)
-    utils.check_param(func_name, 'function name', 'string', 2)
-    if box.internal.func_registry[func_name] == nil then
-        box.error(box.error.NO_SUCH_FUNCTION, func_name, 2)
+--
+-- Cancels the effect of box.iproto.export().
+--
+-- Similarly to box.iproto.export(), the function takes either the name of
+-- an exported function or a table where keys are function names and values
+-- are ignored.
+--
+box.iproto.unexport = function(name_or_table)
+    local func_table
+    if type(name_or_table) == 'table' then
+        func_table = name_or_table
+    elseif name_or_table ~= nil then
+        func_table = {[name_or_table] = box.NULL}
+    else
+        box.error(box.error.ILLEGAL_PARAMS,
+                  'Usage: box.iproto.unexport(name) or '..
+                  'box.iproto.unexport({[name] = func})', 2)
     end
-    box.internal.func_registry[func_name] = nil
-    if may_register_funcs then
-        box.iproto.internal.unregister_func(func_name)
+    func_table = flatten_func_table(func_table)
+    for name in pairs(func_table) do
+        if box.internal.func_registry[name] == nil then
+            box.error(box.error.NO_SUCH_FUNCTION, name, 2)
+        end
+    end
+    for name in pairs(func_table) do
+        box.internal.func_registry[name] = nil
+        if may_register_funcs then
+            box.iproto.internal.unregister_func(name)
+        end
     end
 end
 
