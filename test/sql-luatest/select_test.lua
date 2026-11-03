@@ -95,3 +95,46 @@ g.test_13133_no_table_value_functions = function(cg)
         t.assert_equals(err.message, exp_err)
     end)
 end
+
+--
+-- gh-13358: Make sure that comparing vectors different sizes using `CASE`
+-- does not trigger an assertion.
+--
+g.test_13358_comparing_vectors_different_sizes_with_case = function(cg)
+    cg.server:exec(function()
+        local sql = "SELECT CASE (1, 2) WHEN (1, 2, 3) THEN 'a' ELSE 'b' END;"
+        local _, err = box.execute(sql)
+        local exp_err = "Unequal number of entries in row expression: "..
+                        "left side has 2, but right side - 3"
+        t.assert_equals(tostring(err), exp_err)
+
+        local sql = "SELECT CASE (1, 2) WHEN (2, 3) THEN 'a' "..
+                    "WHEN (1, 2, 3) THEN 'b' ELSE 'c' END;"
+        local _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+
+        box.execute([[CREATE TABLE t(id INT PRIMARY KEY, a INT, b INT);]])
+        box.execute([[INSERT TABLE t(1, 2, 3);]])
+        box.execute([[INSERT TABLE t(4, 5, 6);]])
+
+        sql = "SELECT id, CASE (a, b) WHEN (1, 2, 3) THEN 'a' ELSE 'b' END "..
+              "AS res FROM t;"
+        _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+        box.execute([[DROP TABLE t;]])
+
+        exp_err = "Unequal number of entries in row expression: "..
+                  "left side has 2, but right side - 1"
+        sql = [[SELECT CASE (1, 2) WHEN 'a' THEN 'a' ELSE 'b' END;]]
+        _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+
+        exp_err = "Unequal number of entries in row expression: "..
+                  "left side has 2, but right side - 3"
+        sql = "CREATE VIEW v AS SELECT CASE (1, 2) "..
+              "WHEN (1, 2, 3) THEN 'a' ELSE 'b' END AS res;"
+        _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+        box.execute([[DROP VIEW v;]])
+    end)
+end

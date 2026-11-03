@@ -726,6 +726,21 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 			}
 			break;
 		}
+	case TK_CASE:
+		if (pExpr->pLeft == NULL)
+			break;
+		int nLeft, nRight;
+		nLeft = sqlExprVectorSize(pExpr->pLeft);
+		for (int i = 0; i < pExpr->x.pList->nExpr; i = i + 2) {
+			nRight = sqlExprVectorSize(pExpr->x.pList->a[i].pExpr);
+			if (nLeft != nRight) {
+				diag_set(ClientError, ER_SQL_COLUMN_COUNT,
+					 nLeft, nRight);
+				pParse->is_aborted = true;
+				break;
+			}
+		}
+		break;
 	case TK_BETWEEN:
 	case TK_EQ:
 	case TK_NE:
