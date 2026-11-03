@@ -241,6 +241,47 @@ g_config.test_uuid = function(cg)
     end)
 end
 
+g_config.test_bootstrap_with_foreign_replicaset = function(cg)
+    cg.replica_set = replica_set:new{}
+    local master = cg.replica_set:build_and_add_server({alias = 'master'})
+    master:start()
+    local master_replicaset_uuid = master:exec(function()
+        local s = box.schema.space.create('master_data')
+        s:create_index('pk')
+        s:insert{1, 'from master'}
+        t.assert_gt(box.info.vclock[1], 0)
+        -- Refresh the ballot so it contains the nonzero vclock component.
+        box.cfg{read_only = true}
+        return box.info.replicaset.uuid
+    end)
+    local replica = cg.replica_set:build_and_add_server({
+        alias = 'replica',
+        box_cfg = {
+            bootstrap_strategy = 'config',
+            bootstrap_leader = uuid2,
+            instance_uuid = uuid2,
+            -- Read the foreign master's ballot before bootstrapping here.
+            -- Its rows with replica id 1 must not be treated as our own.
+            replication = {master.net_box_uri},
+            replication_connect_timeout = 120,
+        },
+    })
+    replica:start()
+    t.assert(replica:grep_log('connected to 1 replicas'))
+    t.helpers.retrying({timeout = 120}, function()
+        t.assert(replica:grep_log('REPLICASET_UUID_MISMATCH'))
+    end)
+    replica:exec(function(master_replicaset_uuid)
+        t.assert_equals(box.info.id, 1)
+        t.assert_not_equals(box.info.replicaset.uuid, master_replicaset_uuid)
+        t.assert_not(box.info.ro)
+        t.assert_equals(box.space.master_data, nil)
+        local s = box.schema.space.create('test')
+        s:create_index('pk')
+        s:insert{1}
+    end, {master_replicaset_uuid})
+end
+
 g_config.before_test('test_name', function(cg)
     cg.replica_set = replica_set:new{}
     cg.server1 = cg.replica_set:build_and_add_server{
@@ -804,7 +845,9 @@ g_supervised.test_bootstrap_without_replication = function(cg)
     -- Let the instance step into box.cfg(). This way we verify
     -- that it doesn't exit immediately if there is no
     -- box.cfg.make_bootstrap_leader(<...>) before box.cfg().
-    fiber.sleep(1)
+    t.helpers.retrying({timeout = 120}, function()
+        t.assert(grep_log(cg.server1, 'waiting for the bootstrap command'))
+    end)
 
     -- Run box.cfg.make_bootstrap_leader() and wait till the
     -- database bootstrap.
@@ -1011,7 +1054,9 @@ g_graceful_supervised.test_singleton_after_box_cfg = function(cg)
     -- Let the instance step into box.cfg(). This way we verify
     -- that it doesn't exit immediately if there is no
     -- box.cfg.make_bootstrap_leader(<...>) before box.cfg().
-    fiber.sleep(1)
+    t.helpers.retrying({timeout = 120}, function()
+        t.assert(grep_log(cg.server1, 'waiting for the bootstrap command'))
+    end)
 
     -- Run box.cfg.make_bootstrap_leader({graceful = true}) and
     -- wait till the database bootstrap.
