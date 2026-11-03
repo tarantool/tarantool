@@ -59,18 +59,38 @@ g2.test_invalid_arguments = function(cg)
     cg.server = server:new()
     cg.server:start()
     cg.server:exec(function()
-        t.assert_error_covers({
+        local err = {
+            type = 'IllegalParams',
+            message = 'Usage: box.iproto.export(name, func) or ' ..
+                      'box.iproto.export({[name] = func})'
+        }
+        t.assert_error_covers(err, box.iproto.export)
+        t.assert_error_covers(err, box.iproto.export, 'foo')
+        err = {
             type = 'IllegalParams',
             message = 'function name should be a string',
-        }, box.iproto.export, 10, 20)
-        t.assert_error_covers({
+        }
+        t.assert_error_covers(err, box.iproto.export, 10, 20)
+        t.assert_error_covers(err, box.iproto.export, {[10] = 20})
+        t.assert_error_covers(err, box.iproto.export, {foo = {[10] = 20}})
+        err = {
             type = 'IllegalParams',
             message = 'function object should be a function',
-        }, box.iproto.export, 'foo', 20)
+        }
+        t.assert_error_covers(err, box.iproto.export, 'foo', 20)
+        t.assert_error_covers(err, box.iproto.export, {foo = 20})
+        t.assert_error_covers(err, box.iproto.export, {foo = {bar = 20}})
         t.assert_error_covers({
             type = 'IllegalParams',
+            message = 'Usage: box.iproto.unexport(name) or ' ..
+                      'box.iproto.unexport({[name] = func})'
+        }, box.iproto.unexport)
+        err = {
+            type = 'IllegalParams',
             message = 'function name should be a string',
-        }, box.iproto.unexport, 10)
+        }
+        t.assert_error_covers(err, box.iproto.unexport, 10)
+        t.assert_error_covers(err, box.iproto.unexport, {10, 20})
         box.iproto.export('foo', function() end)
         t.assert_error_covers({
             type = 'ClientError',
@@ -88,6 +108,123 @@ g2.test_invalid_arguments = function(cg)
             name = 'NO_SUCH_FUNCTION',
             func = 'foo',
         }, box.iproto.unexport, 'foo')
+    end)
+end
+
+g2.test_export_table = function(cg)
+    cg.server = server:new()
+    cg.server:start()
+    cg.server:exec(function()
+        local function call(...)
+            return require('net.box').self:call(...)
+        end
+
+        -- Nested tables are treated as namespaces.
+        box.iproto.export({
+            test_func_0 = function() return 'func_0' end,
+            test_1 = {
+                func_1 = function() return 'func_1' end,
+                func_2 = function() return 'func_2' end,
+            },
+            test_2 = {
+                func_3 = function() return 'func_3' end,
+                sub = {
+                    func_4 = function() return 'func_4' end,
+                    sub = {
+                        func_5 = function() return 'func_5' end,
+                        sub = {},
+                    },
+                },
+            },
+        })
+        box.iproto.export('test_3', {
+            func_6 = function() return 'func_6' end,
+        })
+
+        t.assert_equals(call('test_func_0'), 'func_0')
+        t.assert_equals(call('test_1.func_1'), 'func_1')
+        t.assert_equals(call('test_1.func_2'), 'func_2')
+        t.assert_equals(call('test_2.func_3'), 'func_3')
+        t.assert_equals(call('test_2.sub.func_4'), 'func_4')
+        t.assert_equals(call('test_2.sub.sub.func_5'), 'func_5')
+        t.assert_equals(call('test_3.func_6'), 'func_6')
+
+        -- Exported functions are not unexported on error.
+        t.assert_error_covers({
+            name = 'NO_SUCH_FUNCTION',
+            func = 'test_2.func_4',
+        }, box.iproto.unexport, {
+            test_func_0 = function() end,
+            test_2 = {
+                func_3 = function() end,
+                func_4 = function() end,
+            },
+        })
+        t.assert_equals(call('test_func_0'), 'func_0')
+        t.assert_equals(call('test_1.func_1'), 'func_1')
+        t.assert_equals(call('test_1.func_2'), 'func_2')
+        t.assert_equals(call('test_2.func_3'), 'func_3')
+        t.assert_equals(call('test_2.sub.func_4'), 'func_4')
+        t.assert_equals(call('test_2.sub.sub.func_5'), 'func_5')
+        t.assert_equals(call('test_3.func_6'), 'func_6')
+
+        -- New functions are not exported on error.
+        t.assert_error_covers({
+            name = 'FUNCTION_EXISTS',
+            func = 'test_2.sub.func_4',
+        }, box.iproto.export, {
+            func_x = function() end,
+            test_2 = {
+                sub = {
+                    func_4 = function() end,
+                    func_y = function() end
+                },
+            },
+            test_3 = {
+                func_z = function() end,
+            }
+        })
+        t.assert_error_covers({
+            name = 'NO_SUCH_PROC',
+            func = 'func_x',
+        }, call, 'func_x')
+        t.assert_error_covers({
+            name = 'NO_SUCH_PROC',
+            func = 'test_2.sub.func_y',
+        }, call, 'test_2.sub.func_y')
+        t.assert_error_covers({
+            name = 'NO_SUCH_PROC',
+            func = 'test_3.func_z',
+        }, call, 'test_3.func_z')
+
+        -- Unexporting nested functions.
+        box.iproto.unexport('test_1.func_1')
+        box.iproto.unexport({
+            test_func_0 = function() end,
+            test_2 = {
+                sub = {
+                    func_4 = box.NULL,
+                },
+            }
+        })
+        t.assert_error_covers({
+            name = 'NO_SUCH_PROC',
+            func = 'test_func_0',
+        }, call, 'test_func_0')
+        t.assert_error_covers({
+            name = 'NO_SUCH_PROC',
+            func = 'test_1.func_1',
+        }, call, 'test_1.func_1')
+        t.assert_error_covers({
+            name = 'NO_SUCH_PROC',
+            func = 'test_2.sub.func_4',
+        }, call, 'test_2.sub.func_4')
+
+        -- Other functions are still available.
+        t.assert_equals(call('test_1.func_2'), 'func_2')
+        t.assert_equals(call('test_2.func_3'), 'func_3')
+        t.assert_equals(call('test_2.sub.sub.func_5'), 'func_5')
+        t.assert_equals(call('test_3.func_6'), 'func_6')
     end)
 end
 
