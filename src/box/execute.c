@@ -125,7 +125,7 @@ sql_reprepare(struct Vdbe **stmt)
 {
 	const char *sql_str = sql_stmt_query_str(*stmt);
 	struct Vdbe *new_stmt;
-	if (sql_stmt_compile(sql_str, strlen(sql_str), NULL,
+	if (sql_stmt_compile(sql_str, strlen(sql_str),
 			     &new_stmt, NULL) != 0)
 		return -1;
 	sql_stmt_set_id(new_stmt, sql_stmt_get_id(*stmt));
@@ -164,7 +164,7 @@ sql_prepare(const char *sql, size_t len, struct port *port)
 		count++;
 	}
 	if (stmt == NULL) {
-		if (sql_stmt_compile(sql, len, NULL, &stmt, NULL) != 0)
+		if (sql_stmt_compile(sql, len, &stmt, NULL) != 0)
 			return -1;
 		sql_stmt_set_id(stmt, stmt_id);
 		if (sql_stmt_cache_insert(stmt) != 0) {
@@ -291,7 +291,7 @@ sql_prepare_and_execute(const char *sql, int len, const struct sql_bind *bind,
 			struct region *region)
 {
 	struct Vdbe *stmt;
-	if (sql_stmt_compile(sql, len, NULL, &stmt, NULL) != 0)
+	if (sql_stmt_compile(sql, len, &stmt, NULL) != 0)
 		return -1;
 	assert(stmt != NULL);
 	enum sql_serialization_format format = sql_column_count(stmt) > 0 ?

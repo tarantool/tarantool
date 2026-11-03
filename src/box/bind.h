@@ -119,9 +119,9 @@ int
 sql_bind_decode(struct sql_bind *bind, int i, const char **packet);
 
 /**
- * Bind SQL parameter value to its position.
+ * Bind SQL parameter type to its position.
  * @param stmt Prepared statement.
- * @param p Parameter value.
+ * @param p Parameter value contained by the type.
  * @param pos Ordinal bind position.
  *
  * @retval  0 Success.
@@ -139,17 +139,16 @@ sql_bind_column(struct Vdbe *stmt, const struct sql_bind *p, uint32_t pos);
  * @retval  0 Success.
  * @retval -1 Client or memory error.
  */
-static inline int
-sql_bind(struct Vdbe *stmt, const struct sql_bind *bind, uint32_t bind_count)
-{
-	assert(stmt != NULL);
-	uint32_t pos = 1;
-	for (uint32_t i = 0; i < bind_count; pos = ++i + 1) {
-		if (sql_bind_column(stmt, &bind[i], pos) != 0)
-			return -1;
-	}
-	return 0;
-}
+int
+sql_bind(struct Vdbe *stmt, const struct sql_bind *bind, uint32_t bind_count);
+
+/**
+ * This function finds the position among bind variables
+ * whose name matches the specified one.
+ */
+uint32_t
+sql_bind_lookup(const struct sql_bind *bind, uint32_t bind_count,
+		const char *name);
 
 #if defined(__cplusplus)
 } /* extern "C" { */

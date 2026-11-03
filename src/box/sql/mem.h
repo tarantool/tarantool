@@ -111,6 +111,10 @@ struct Mem {
 #define MEM_Static    0x1000	/* Mem.z points to a static string */
 #define MEM_Ephem     0x2000	/* Mem.z points to an ephemeral string */
 
+/** Initialize Mem element which corresponds to bind element. */
+void
+mem_set_bind(struct Mem *mem, const struct sql_bind *bind);
+
 static inline bool
 mem_is_null(const struct Mem *mem)
 {
@@ -382,7 +386,7 @@ mem_set_str_ephemeral(struct Mem *mem, char *value, size_t len);
 
 /** Clear MEM and set it to STRING. The string is static. */
 void
-mem_set_str_static(struct Mem *mem, char *value, size_t len);
+mem_set_str_static(struct Mem *mem, const char *value, size_t len);
 
 /**
  * Clear MEM and set it to STRING. The string was allocated by another object
@@ -433,7 +437,7 @@ mem_set_bin_ephemeral(struct Mem *mem, char *value, size_t size);
 
 /** Clear MEM and set it to VARBINARY. The binary value is static. */
 void
-mem_set_bin_static(struct Mem *mem, char *value, size_t size);
+mem_set_bin_static(struct Mem *mem, const char *value, size_t size);
 
 /**
  * Clear MEM and set it to VARBINARY. The binary value was allocated by another
