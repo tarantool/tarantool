@@ -6025,8 +6025,12 @@ box_cfg_xc(void)
 	 * transactions. This needs to be done before subscribing, in order to
 	 * correctly determine the id_filter value in the subscribe request.
 	 * The appliers will continue after calling replicaset_follow.
+	 *
+	 * A bootstrap leader creates a new replica set and has no old rows to
+	 * recover. Connected peers may belong to a different replica set.
 	 */
-	box_check_waiting_for_own_rows();
+	if (!is_bootstrap_leader)
+		box_check_waiting_for_own_rows();
 
 	/* Follow replica */
 	replicaset_follow();
