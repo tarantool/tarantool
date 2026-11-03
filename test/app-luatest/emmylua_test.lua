@@ -26,6 +26,25 @@ local modules = {
             },
         },
     },
+    {
+        name = 'socket',
+        source = 'src/lua/socket.lua',
+        fixtures = 'test/app-luatest/emmylua/socket',
+        type_name = 'socket',
+        fields = {
+            tcp_connect = 'Connect a socket to a remote host',
+            getaddrinfo = 'useful for finding information',
+            tcp_server = 'makes Tarantool act as a server',
+        },
+        object = {
+            type_name = 'socket_object',
+            fields = {
+                send = 'Send data over a connected socket',
+                recv = 'Read `size` bytes',
+                close = 'Close (destroy) a socket',
+            },
+        },
+    },
 }
 
 local function normalize(value)
