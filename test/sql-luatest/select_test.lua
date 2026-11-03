@@ -95,3 +95,17 @@ g.test_13133_no_table_value_functions = function(cg)
         t.assert_equals(err.message, exp_err)
     end)
 end
+
+--
+-- gh-13358: Make sure that comparing vectors different sizes using `CASE`
+-- does not trigger an assertion.
+--
+g.test_13358_comparing_vectors_diffrent_sizes_with_case = function(cg)
+    cg.server:exec(function()
+        local sql = [[SELECT CASE (1, 2) WHEN (1, 2, 3) THEN 'a' ELSE 'b' END;]]
+        local _, err = box.execute(sql)
+        local exp_err = "Unequal number of entries in row expression: "..
+                        "left side has 2, but right side - 3"
+        t.assert_equals(tostring(err), exp_err)
+    end)
+end
