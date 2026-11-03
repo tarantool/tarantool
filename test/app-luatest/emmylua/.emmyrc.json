@@ -1,0 +1,8 @@
+{
+  "runtime": {
+    "version": "LuaJIT"
+  },
+  "workspace": {
+    "ignoreGlobs": []
+  }
+}
