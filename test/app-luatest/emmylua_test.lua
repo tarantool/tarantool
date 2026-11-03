@@ -26,6 +26,24 @@ local modules = {
             },
         },
     },
+    {
+        name = 'xlog',
+        source = 'src/box/lua/xlog.lua',
+        fixtures = 'test/app-luatest/emmylua/xlog',
+        type_name = 'xlog',
+        fields = {
+            pairs = 'Open a file, and allow iterating',
+            meta = 'Open an xlog file',
+        },
+        object = {
+            type_name = 'xlog.meta',
+            fields = {
+                filetype = 'The file type',
+                instance_uuid = 'The instance UUID',
+                prev_vclock = 'The previous vclock',
+            },
+        },
+    },
 }
 
 local function normalize(value)
