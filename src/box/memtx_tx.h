@@ -48,6 +48,12 @@ extern "C" {
  */
 extern bool memtx_tx_manager_use_mvcc_engine;
 
+/**
+ * Set while the story garbage collector deletes tuples from indexes. Such
+ * deletions must not fail.
+ */
+extern bool memtx_tx_story_gc_in_progress;
+
 enum memtx_tx_alloc_type {
 	MEMTX_TX_ALLOC_TRACKER = 0,
 	MEMTX_TX_ALLOC_CONFLICT = 1,
