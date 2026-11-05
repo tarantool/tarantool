@@ -959,6 +959,10 @@ say_format_plain(struct log *log, char *buf, int len, int level,
 		SNPRINT(total, snprintf, buf, len, ": %s", error);
 
 	if (log->type != SAY_LOGGER_SYSLOG) {
+		if (len < 2) {
+			buf = buf_start + len_max - 2;
+			len = 2;
+		}
 		SNPRINT(total, snprintf, buf, len, "\n");
 		return total;
 	}
