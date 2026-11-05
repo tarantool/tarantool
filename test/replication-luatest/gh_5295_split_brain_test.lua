@@ -263,21 +263,26 @@ g.test_promote_new_term_small_lsn = function(cg)
     reconnect_and_check_split_brain(cg)
 end
 
+-- Write a synchronous transaction which can't gather its quorum, and wait
+-- until it is in the WAL. The state is observable, which means the transaction
+-- is in the instance's vclock already.
 local function fill_queue_and_write(server)
-    local wal_write_count = server:exec(function()
+    server:exec(function()
         local fiber = require('fiber')
         box.cfg{
             replication_synchro_quorum = 31,
             replication_synchro_timeout = 1000,
         }
-        local write_cnt = box.error.injection.get('ERRINJ_WAL_WRITE_COUNT')
+        local queue_len = box.info.synchro.queue.len
+        local lsn = box.info.vclock[box.info.id]
         fiber.new(box.space.sync.replace, box.space.sync, {1})
-        return write_cnt
+        t.helpers.retrying({timeout = 60}, function()
+            t.assert_equals(box.info.synchro.queue.len, queue_len + 1,
+                            'the transaction is in the queue')
+            t.assert_gt(box.info.vclock[box.info.id], lsn,
+                        'the transaction is written')
+        end)
     end)
-    t.helpers.retrying({}, server.exec, server, function(cnt)
-        local new_cnt = box.error.injection.get('ERRINJ_WAL_WRITE_COUNT')
-        t.assert(new_cnt > cnt, 'WAL write succeeded')
-    end, {wal_write_count})
 end
 
 local function perform_rollback(server)
