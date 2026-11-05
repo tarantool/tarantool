@@ -156,15 +156,16 @@ box_raft_worker_f(va_list args)
 	(void)args;
 	struct raft *raft = fiber()->f_arg;
 	assert(raft == box_raft());
+	box_raft_has_work = true;
 	while (!fiber_is_cancelled()) {
 		fiber_check_gc();
+		if (!box_raft_has_work) {
+			fiber_yield();
+			continue;
+		}
 		box_raft_has_work = false;
-
 		raft_process_async(raft);
 		box_raft_update_synchro_queue(raft);
-
-		if (!box_raft_has_work)
-			fiber_yield();
 	}
 	return 0;
 }
