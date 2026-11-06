@@ -1,3 +1,44 @@
+---The `table` module has everything in the standard Lua table library, and
+---some Tarantool extensions.
+---
+---Write `table` to see the list of functions:
+---
+---* `clear` (LuaJIT extension = erase all elements)
+---* `concat` (concatenate)
+---* `copy` (make a copy of an array)
+---* `deepcopy` (see below)
+---* `foreach`
+---* `foreachi`
+---* `getn` (get the number of elements in an array)
+---* `insert` (insert an element into an array)
+---* `maxn` (get the largest index)
+---* `move` (move elements between tables)
+---* `new` (LuaJIT extension = return a new table with pre-allocated
+---  elements)
+---* `remove` (remove an element from an array)
+---* `sort` (sort the elements of an array)
+---
+---In this section we describe the additional functions added by Tarantool:
+---`copy`, `deepcopy`, and `equals`.
+---
+---@class table
+---The Tarantool extensions of the `table` module.
+---
+---@field copy fun(input_table: table): table @Copy a table at the top level.
+---
+---    Supports the `__copy` metamethod for copying custom tables with
+---    metatables.
+---@field deepcopy fun(input_table: table): table
+---@field sort fun(input_table: table,
+---    comparison_function?: fun(a: any, b: any): boolean): nil
+---@field equals fun(a: table, b: table): boolean @Compare two Lua tables.
+---
+---    Supports the `__eq` metamethod for comparing custom tables with
+---    metatables.
+
+---@type table
+local table = require('table')
+
 local function table_deepcopy_internal(orig, cyclic)
     cyclic = cyclic or {}
     local copy = orig
@@ -23,22 +64,33 @@ local function table_deepcopy_internal(orig, cyclic)
     return copy
 end
 
---- Deepcopy lua table (all levels)
--- Supports __copy metamethod for copying custom tables with metatables
--- @function deepcopy
--- @table         inp  original table
--- @shallow[opt]  sep  flag for shallow copy
--- @returns            table (copy)
+---Return a "deep" copy of the table -- a copy which follows nested
+---structures to any depth and does not depend on pointers, it copies the
+---contents.
+---
+---Supports the `__copy` metamethod for copying custom tables with
+---metatables.
+---
+---**Example:**
+---
+--- ```lua
+--- local input_table = {1, {'a', 'b'}}
+--- local output_table = table.deepcopy(input_table)
+--- ```
+---
+---@param orig table the table to copy.
+---@return table result the copy of the table.
 local function table_deepcopy(orig)
     return table_deepcopy_internal(orig, nil)
 end
 
---- Copy any table (only top level)
--- Supports __copy metamethod for copying custom tables with metatables
--- @function copy
--- @table         inp  original table
--- @shallow[opt]  sep  flag for shallow copy
--- @returns            table (copy)
+---Copy any table, only the top level.
+---
+---Supports the `__copy` metamethod for copying custom tables with
+---metatables.
+---
+---@param orig table the table to copy.
+---@return table result the copy of the table.
 local function table_shallowcopy(orig)
     local copy = orig
     if type(orig) == 'table' then
@@ -57,10 +109,21 @@ local function table_shallowcopy(orig)
     return copy
 end
 
---- Compare two lua tables
--- Supports __eq metamethod for comparing custom tables with metatables
--- @function equals
--- @return true when the two tables are equal (false otherwise).
+---Compare two Lua tables.
+---
+---Supports the `__eq` metamethod for comparing custom tables with
+---metatables.
+---
+---**Example:**
+---
+--- ```lua
+--- table.equals({1, 2}, {1, 2}) -- true
+--- ```
+---
+---@param a table a table to compare.
+---@param b table a table to compare with.
+---@return boolean result true when the two tables are equal, false
+---    otherwise.
 local function table_equals(a, b)
     if type(a) ~= 'table' or type(b) ~= 'table' then
         return type(a) == type(b) and a == b
@@ -86,7 +149,6 @@ local function table_equals(a, b)
 end
 
 -- table library extension
-local table = require('table')
 -- require modifies global "table" module and adds functions "clear" and "new".
 -- Lua applications like Cartridge rely on it.
 require('table.clear')

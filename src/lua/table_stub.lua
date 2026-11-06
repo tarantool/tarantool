@@ -1,0 +1,54 @@
+-- luacheck: ignore 122 142 212
+
+---Return a deep copy of the table.
+---
+---A deep copy follows nested structures to any depth and does not depend
+---on pointers; it copies the contents.
+---
+---Supports the `__copy` metamethod for copying custom tables with
+---metatables.
+---
+---**Example:**
+---
+---```lua
+---input_table = {1, {'a', 'b'}}
+---output_table = table.deepcopy(input_table)
+---```
+---@param input_table table
+table.deepcopy = function(input_table) end
+
+---Sort the input table in place.
+---
+---The standard `table.sort` uses `a < b` as the default comparison
+---function. It is not suitable for tables with nils, mixed types, or
+---language-aware string sorting. The `tarantool_sort()` helper below sorts
+---a table using a temporary Tarantool space.
+---
+---**Example (`tarantool_sort`):**
+---
+---```lua
+---function tarantool_sort(input_table, collation)
+---    local c = collation or 'binary'
+---    local tmp_name = 'Temporary_for_tarantool_sort'
+---    pcall(function() box.space[tmp_name]:drop() end)
+---    box.schema.space.create(tmp_name, {temporary = true})
+---    box.space[tmp_name]:create_index('I')
+---    box.space[tmp_name]:create_index('I2',
+---                                     {unique = false,
+---                                      type = 'tree',
+---                                      parts = {{2, 'scalar',
+---                                                collation = c,
+---                                                is_nullable = true}}})
+---    for i = 1, table.maxn(input_table) do
+---        box.space[tmp_name]:insert{i, input_table[i]}
+---    end
+---    local t = box.space[tmp_name].index.I2:select()
+---    for i = 1, table.maxn(input_table) do
+---        input_table[i] = t[i][2]
+---    end
+---    box.space[tmp_name]:drop()
+---end
+---```
+---@param input_table table
+---@param comparison_function? fun(a: any, b: any): boolean
+table.sort = function(input_table, comparison_function) end
