@@ -86,6 +86,12 @@ struct coll {
 	const char fingerprint[0];
 };
 
+/** Unicode collation. */
+extern struct coll *unicode_coll;
+
+/** Unicode case-insensitive collation. */
+extern struct coll *unicode_ci_coll;
+
 /**
  * Return true if a key part using the second collation can be
  * merged into a key def using the first collation for the same

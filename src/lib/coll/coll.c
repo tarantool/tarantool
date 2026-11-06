@@ -50,6 +50,9 @@
 struct UCaseMap *icu_ucase_default_map = NULL;
 struct UConverter *icu_utf8_conv = NULL;
 
+struct coll *unicode_coll = NULL;
+struct coll *unicode_ci_coll = NULL;
+
 /**
  * Null-terminated array of locale strings that will be used for creating
  * predefined collations.
@@ -519,13 +522,15 @@ coll_new(const struct coll_def *def)
 /**
  * Creates a new predefined collation and adds it to the cache.
  */
-static void
-coll_create_predefined(const struct coll_def *def)
+static struct coll *
+coll_new_predefined(const struct coll_def *def)
 {
-	if (coll_new_impl(def, /*is_predefined=*/true) == NULL) {
+	struct coll *coll = coll_new_impl(def, /*is_predefined=*/true);
+	if (coll == NULL) {
 		diag_log();
 		panic("Can not create predefined collation");
 	}
+	return coll;
 }
 
 static void
@@ -548,18 +553,18 @@ coll_init(void)
 	struct coll_def def;
 	memset(&def, 0, sizeof(def));
 	def.type = COLL_TYPE_BINARY;
-	coll_create_predefined(&def); /* binary */
+	coll_new_predefined(&def); /* binary */
 	def.type = COLL_TYPE_ICU;
 	def.icu.strength = COLL_ICU_STRENGTH_TERTIARY;
-	coll_create_predefined(&def); /* unicode */
+	unicode_coll = coll_new_predefined(&def);
 	def.icu.strength = COLL_ICU_STRENGTH_PRIMARY;
-	coll_create_predefined(&def); /* unicode_ci */
+	unicode_ci_coll = coll_new_predefined(&def);
 	for (const char * const *plocale = predefined_locales;
 	     *plocale != NULL; plocale++) {
 		strlcpy(def.locale, *plocale, sizeof(def.locale));
 		for (int strength = 1; strength <= 3; strength++) {
 			def.icu.strength = strength;
-			coll_create_predefined(&def);
+			coll_new_predefined(&def);
 		}
 	}
 }
