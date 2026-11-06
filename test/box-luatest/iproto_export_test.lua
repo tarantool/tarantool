@@ -73,13 +73,10 @@ g2.test_invalid_arguments = function(cg)
         t.assert_error_covers(err, box.iproto.export, 10, 20)
         t.assert_error_covers(err, box.iproto.export, {[10] = 20})
         t.assert_error_covers(err, box.iproto.export, {foo = {[10] = 20}})
-        err = {
+        t.assert_error_covers({
             type = 'IllegalParams',
             message = 'function object should be a function',
-        }
-        t.assert_error_covers(err, box.iproto.export, 'foo', 20)
-        t.assert_error_covers(err, box.iproto.export, {foo = 20})
-        t.assert_error_covers(err, box.iproto.export, {foo = {bar = 20}})
+        }, box.iproto.export, 'foo', 20)
         t.assert_error_covers({
             type = 'IllegalParams',
             message = 'Usage: box.iproto.unexport(name) or ' ..
@@ -137,17 +134,32 @@ g2.test_export_table = function(cg)
                 },
             },
         })
-        box.iproto.export('test_3', {
-            func_6 = function() return 'func_6' end,
-        })
-
         t.assert_equals(call('test_func_0'), 'func_0')
         t.assert_equals(call('test_1.func_1'), 'func_1')
         t.assert_equals(call('test_1.func_2'), 'func_2')
         t.assert_equals(call('test_2.func_3'), 'func_3')
         t.assert_equals(call('test_2.sub.func_4'), 'func_4')
         t.assert_equals(call('test_2.sub.sub.func_5'), 'func_5')
+
+        -- Callable tables are exported while scalars aren't.
+        box.iproto.export({
+            not_func_1 = 100,
+            test_3 = {
+                func_6 = setmetatable({}, {
+                    __call = function() return 'func_6' end,
+                }),
+                not_func_2 = 200,
+            },
+        })
         t.assert_equals(call('test_3.func_6'), 'func_6')
+        t.assert_error_covers({
+            name = 'NO_SUCH_PROC',
+            func = 'not_func_1',
+        }, call, 'not_func_1')
+        t.assert_error_covers({
+            name = 'NO_SUCH_PROC',
+            func = 'test_3.not_func_2',
+        }, call, 'test_3.not_func_2')
 
         -- Exported functions are not unexported on error.
         t.assert_error_covers({
@@ -205,7 +217,11 @@ g2.test_export_table = function(cg)
                 sub = {
                     func_4 = box.NULL,
                 },
-            }
+            },
+            not_func_1 = 100,
+            test_3 = {
+                not_func_2 = 200,
+            },
         })
         t.assert_error_covers({
             name = 'NO_SUCH_PROC',
