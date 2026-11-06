@@ -289,3 +289,42 @@ g.test_4755_scalar_collation_metadata = function(cg)
         t.assert_equals(box.space.t, nil)
     end, {cg.params.engine})
 end
+
+local g = t.group("metadata")
+
+g.before_all(function(cg)
+    cg.server = server:new({alias = 'master'})
+    cg.server:start()
+end)
+
+g.after_all(function(cg)
+    cg.server:drop()
+end)
+
+g.test_13358_metadata_in_request_with_grater_or_equal = function(cg)
+    cg.server:exec(function()
+        local res = box.execute([[select 2 >= 1;]])
+        t.assert_equals(res.metadata[1].type, "boolean")
+
+        res = box.execute([[select 2.0 >= 1.0;]])
+        t.assert_equals(res.metadata[1].type, "boolean")
+
+        local sql = [[select cast(2.0 as decimal) >= cast(1.0 as decimal);]]
+        res = box.execute(sql)
+        t.assert_equals(res.metadata[1].type, "boolean")
+
+        res = box.execute([[select 2 >= 1.0;]])
+        t.assert_equals(res.metadata[1].type, "boolean")
+
+        res = box.execute([[select 'b' >= 'a';]])
+        t.assert_equals(res.metadata[1].type, "boolean")
+
+        res = box.execute([[select NULL >= 1;]])
+        t.assert_equals(res.metadata[1].type, "boolean")
+
+        local s = box.prepare([[select ? >= ?;]])
+        res = s:execute({1, 2})
+        t.assert_equals(res.metadata[1].type, "boolean")
+        s:unprepare()
+    end)
+end
