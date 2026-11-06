@@ -19,26 +19,24 @@
 
 const struct type_info type_SSLError = make_type("SSLError", NULL);
 
+static int
+ssl_error_append_entry(const char *str, size_t len, void *arg)
+{
+	SSLError *err = static_cast<SSLError *>(arg);
+	error_append_msg(err, "%.*s", (int)len, str);
+	return 1;
+}
+
 static void
 ssl_error_create(SSLError *err, const char *format, va_list ap)
 {
-	unsigned long code = ERR_peek_error();
-	ERR_clear_error();
 	error_vformat_msg(err, format, ap);
-	if (code != 0) {
-		const char *msg;
-#if OPENSSL_VERSION_NUMBER >= 0x30000000L
-		/**
-		 * Since OpenSSL 3.0, ERR_reason_error_string() returns NULL
-		 * for system errors so we have to format the message manually.
-		 */
-		if (ERR_SYSTEM_ERROR(code))
-			msg = tt_strerror(ERR_GET_REASON(code));
-		else
-#endif
-			msg = ERR_reason_error_string(code);
-		assert(msg != NULL);
-		error_append_msg(err, ": %s", msg);
+	if (ERR_peek_error() != 0) {
+		error_append_msg(err, ":\n");
+		ERR_print_errors_cb(ssl_error_append_entry, err);
+		assert(ERR_peek_error() == 0);
+	} else {
+		error_append_msg(err, ": <no SSL error>");
 	}
 }
 
