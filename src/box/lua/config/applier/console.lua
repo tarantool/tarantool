@@ -37,9 +37,7 @@ local function apply(config)
         {use_default = true})
     assert(new_socket_file ~= nil)
 
-    -- The same socket file is pointed by different paths before
-    -- and after first box.cfg() if the `process.work_dir` option
-    -- is set.
+    -- Keep paths short enough for the Unix socket length limit.
     local iconfig_def = configdata._iconfig_def
     new_socket_file = instance_config:prepare_file_path(iconfig_def,
         new_socket_file)

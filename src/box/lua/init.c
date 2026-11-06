@@ -197,6 +197,7 @@ extern char session_lua[],
 	config_utils_odict_lua[],
 	config_utils_schema_lua[],
 	config_utils_snapshot_lua[],
+	config_utils_workdir_lua[],
 	config_utils_tabulate_lua[],
 	config_utils_textutils_lua[],
 	config_utils_funcutils_lua[],
@@ -435,6 +436,10 @@ static const char * const lua_sources_main[] = {
 	"config/validators",
 	"internal.config.validators",
 	config_validators_lua,
+
+	"config/utils/workdir",
+	"internal.config.utils.workdir",
+	config_utils_workdir_lua,
 
 	"config/instance_config",
 	"internal.config.instance_config",
