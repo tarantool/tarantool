@@ -752,6 +752,23 @@ interval_from_map_test(void)
 }
 
 static void
+datetime_from_map_overflow_test(void)
+{
+	plan(1);
+	header();
+
+	struct datetime dt;
+	char buffer[128];
+	int rc = mp_format(buffer, sizeof(buffer), "{%s%d}", "year", -5878000);
+	fail_if(rc >= (int)sizeof(buffer));
+	rc = datetime_from_map(&dt, buffer);
+	is((int64_t)dt.epoch, -185553931075200, "min year epoch no overflow");
+
+	footer();
+	check_plan();
+}
+
+static void
 snprint_test(void)
 {
 	plan(4);
@@ -788,7 +805,7 @@ snprint_test(void)
 int
 main(void)
 {
-	plan(13);
+	plan(14);
 	datetime_parse_full_ok_test();
 	datetime_parse_full_fail_test();
 	tostring_datetime_test();
@@ -801,6 +818,7 @@ main(void)
 	mp_datetime_test();
 	mp_print_test();
 	interval_from_map_test();
+	datetime_from_map_overflow_test();
 	snprint_test();
 
 	return check_plan();

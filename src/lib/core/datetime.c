@@ -1136,8 +1136,8 @@ datetime_from_fields(struct datetime *dt, const struct dt_fields *fields)
 		return -1;
 	if (fields->sec < 0 || fields->sec > 60)
 		return -1;
-	double days = dt_from_ymd(fields->year, fields->month, fields->day) -
-		      DT_EPOCH_1970_OFFSET;
+	double days = (int64_t)dt_from_ymd(fields->year, fields->month,
+					   fields->day) - DT_EPOCH_1970_OFFSET;
 	dt->epoch = days * SECS_PER_DAY + fields->hour * 3600 +
 		    fields->min * 60 + fields->sec;
 	dt->nsec = nsec;
