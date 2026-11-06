@@ -887,6 +887,7 @@ tarantool_lua_init_minimal_impl(lua_State *L)
 	tarantool_lua_fio_init(L);
 	tarantool_lua_socket_init(L);
 	tarantool_lua_uri_init(L);
+	tarantool_lua_utf8_init(L);
 	tarantool_lua_digest_init(L);
 	tarantool_lua_decimal_init(L);
 	tarantool_lua_pickle_init(L);
@@ -959,7 +960,6 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 
 	tarantool_lua_init_minimal_impl(L);
 
-	tarantool_lua_utf8_init(L);
 	tarantool_lua_xml_init(L);
 	tarantool_lua_popen_init(L);
 	tarantool_lua_swim_init(L);
