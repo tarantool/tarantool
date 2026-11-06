@@ -3198,6 +3198,12 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 			return -1;
 		}
 		user_cache_delete(uid);
+		/*
+		 * Close all sessions for the dropped user to prevent
+		 * privilege leaks if a new user is created with the same uid.
+		 * See tarantool/tarantool#4535 and tarantool/tarantool#4536.
+		 */
+		session_close_all_by_uid(uid);
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(user_cache_alter_user, old_tuple);
 		if (on_rollback == NULL)
