@@ -137,6 +137,7 @@ file(GLOB_RECURSE METRICS_SOURCE_FILES
     "${PROJECT_SOURCE_DIR}/third_party/metrics/metrics/*.lua"
 )
 lua_stub(metrics FILES ${METRICS_SOURCE_FILES})
+lua_stub(strict FILES lua/strict.lua)
 
 # LuaJIT jit.* library
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/src/jit/bc.lua jit_bc_lua)
