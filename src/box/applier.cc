@@ -1085,6 +1085,13 @@ applier_wait_register(struct applier *applier)
 		if (applier_apply_tx(applier, &tx.rows) != 0)
 			diag_raise();
 	}
+	/*
+	 * Registration becomes visible only on commit. Async registrations
+	 * commit on WAL completion. For synchronous registrations,
+	 * apply_synchro_req() has already written and applied the CONFIRM.
+	 */
+	if (journal_sync(NULL) != 0)
+		diag_raise();
 }
 
 static void
