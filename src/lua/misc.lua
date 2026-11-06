@@ -1,0 +1,240 @@
+---@meta
+
+---# Builtin `misc` module
+---
+---The `misc` module provides LuaJIT metrics and profiling capabilities.
+---`misc.getmetrics()` returns metrics of the current LuaJIT instance,
+---`misc.sysprof` implements a LuaJIT sampling profiler, and
+---`misc.memprof` implements a LuaJIT memory profiler.
+---
+---Since version 2.10.0, Tarantool has the `misc.sysprof` module that
+---implements a LuaJIT sampling profiler. It can capture both guest and
+---host stacks simultaneously, along with virtual machine states.
+---
+---Since version 2.7.1, Tarantool has the `misc.memprof` module that
+---implements a LuaJIT memory profiler. It provides a memory allocation
+---report that helps analyze Lua code and find places that put the most
+---pressure on the Lua garbage collector.
+
+---@class misc
+---
+---Get the LuaJIT metrics values into a table.
+---
+---The metrics table contains 19 values. All values have type `number` and
+---are the result of a cast to double, so there may be a very slight
+---precision loss.
+---
+---Values whose names begin with `gc_` are associated with the LuaJIT
+---garbage collector. Values whose names begin with `jit_` are associated
+---with JIT compilation phases.
+---
+---Values described as monotonic are cumulative: they are totals since all
+---operations began, not since the last `getmetrics()` call. Overflow is
+---possible.
+---
+---A typical analysis calls `getmetrics()`, saves the table, calls
+---`getmetrics()` again, and compares the tables.
+---
+---**Example:**
+---
+---```lua
+---local metrics_table = misc.getmetrics()
+---```
+---
+---**Example with `gc_allocated` and `gc_freed`:**
+---
+---```lua
+---function f()
+---    for i = 1, 10 do collectgarbage("collect") end
+---    local oldm = misc.getmetrics()
+---    local newm = misc.getmetrics()
+---    oldm = misc.getmetrics()
+---    collectgarbage("collect")
+---    newm = misc.getmetrics()
+---    print("gc_allocated diff = " .. newm.gc_allocated - oldm.gc_allocated)
+---    print("gc_freed diff = " .. newm.gc_freed - oldm.gc_freed)
+---end
+---f()
+---```
+---
+---@field getmetrics fun(): misc.metrics
+
+---@type misc
+misc = {}
+
+---@class misc.metrics
+---LuaJIT metrics returned by `misc.getmetrics()`.
+---@field gc_allocated number The number of bytes of allocated memory.
+---    Monotonic.
+---@field gc_cdatanum number The number of allocated cdata objects.
+---@field gc_freed number The number of bytes of freed memory. Monotonic.
+---@field gc_steps_atomic number The number of garbage collector steps,
+---    atomic phases. Monotonic.
+---@field gc_steps_finalize number The number of garbage collector steps,
+---    finalize. Monotonic.
+---@field gc_steps_pause number The number of garbage collector steps,
+---    pauses. Monotonic.
+---@field gc_steps_propagate number The number of garbage collector steps,
+---    propagate. Monotonic.
+---@field gc_steps_sweep number The number of garbage collector steps,
+---    sweep phases. Monotonic.
+---@field gc_steps_sweepstring number The number of garbage collector
+---    steps, sweep phases for strings. Monotonic.
+---@field gc_strnum number The number of allocated string objects.
+---@field gc_tabnum number The number of allocated table objects.
+---@field gc_total number The number of bytes of currently allocated
+---    memory. Normally equals `gc_allocated - gc_freed`.
+---@field gc_udatanum number The number of allocated udata objects.
+---@field jit_mcode_size number The total size of all allocated machine
+---    code areas.
+---@field jit_snap_restore number The overall number of snap restores,
+---    based on the number of guard assertions leading to stopping trace
+---    executions. Monotonic.
+---@field jit_trace_abort number The overall number of aborted traces.
+---    Monotonic.
+---@field jit_trace_num number The number of JIT traces.
+---@field strhash_hit number The number of strings being interned because,
+---    if a string with the same value is found via the hash, a new one is
+---    not created or allocated. Monotonic.
+---@field strhash_miss number The total number of string allocations during
+---    the platform lifetime. Monotonic.
+
+---@class misc.sysprof
+---
+---Start the LuaJIT sampling profiler.
+---
+---The profiler usage involves collecting a binary profile between
+---`misc.sysprof.start()` and `misc.sysprof.stop()` and then parsing it
+---with the default parser to get a `flamegraph.pl`-suitable report.
+---
+---If the operation fails, returns `nil`, an error message, and a
+---system-dependent error code. If it succeeds, returns `true`.
+---
+---**Example (`test.lua`):**
+---
+---```lua
+---local function payload()
+---    local function fib(n)
+---        if n <= 1 then
+---            return n
+---        end
+---        return fib(n - 1) + fib(n - 2)
+---    end
+---    return fib(32)
+---end
+---
+---payload()
+---
+---local res, err = misc.sysprof.start({
+---    mode = 'C', interval = 1, path = 'sysprof.bin',
+---})
+---assert(res, err)
+---
+---payload()
+---
+---res, err = misc.sysprof.stop()
+---assert(res, err)
+---```
+---
+---@field start fun(opts?: misc.sysprof.options): boolean?, string?, integer?
+---
+---Stop the LuaJIT sampling profiler.
+---
+---If the operation fails, returns `nil`, an error message, and a
+---system-dependent error code. If it succeeds, returns `true`.
+---
+---@field stop fun(): boolean?, string?, integer?
+---
+---Get the profiling counters.
+---
+---Returns a table with `samples` and per-vmstate counters on success or
+---`nil, err, errno` on failure.
+---
+---@field report fun(): misc.sysprof.report?, string?, integer?
+---
+---@field available boolean Whether the sysprof profiler is supported.
+
+---@type misc.sysprof
+misc.sysprof = {}
+
+---@class misc.sysprof.options
+---Options passed to `misc.sysprof.start()`.
+---
+---Three profiling modes are available:
+---
+---* `DEFAULT` collects only virtual machine state counters.
+---* `LEAF` collects the last frame on the stack.
+---* `CALLCHAIN` performs a complete stack dump.
+---
+---@field mode 'D'|'L'|'C' A profiling mode: `'D'` = DEFAULT, `'L'` =
+---    LEAF, `'C'` = CALLGRAPH.
+---@field interval? integer A sampling interval in msec. The default is 10.
+---@field path? string A path to a file to store profile data. The default
+---    is `sysprof.bin`.
+
+---@class misc.sysprof.report
+---Profiling counters returned by `misc.sysprof.report()`.
+---@field samples integer The number of collected samples.
+---@field vmstate misc.sysprof.vmstate Profiling counters for each virtual
+---    machine state.
+
+---@class misc.sysprof.vmstate
+---Profiling counters for each LuaJIT virtual machine state.
+---@field ASM integer The assembler state.
+---@field CFUNC integer The C function state.
+---@field EXIT integer The exit from a trace state.
+---@field FFUNC integer The fast function state.
+---@field GC integer The garbage collector state.
+---@field INTERP integer The interpreter state.
+---@field LFUNC integer The Lua function state.
+---@field OPT integer The trace optimization state.
+---@field RECORD integer The trace recording state.
+---@field TRACE integer The trace execution state.
+
+---@class misc.memprof
+---
+---Start the LuaJIT memory profiler.
+---
+---The profiler collects allocation, reallocation, and deallocation events
+---caused by the Lua allocator. The collected binary profile can then be
+---parsed with the default parser to get a human-readable report.
+---
+---If the operation fails, returns `nil`, an error message, and a
+---system-dependent error code. If it succeeds, returns `true`.
+---
+---**Example (`test.lua`):**
+---
+---```lua
+----- Prevent allocations on traces.
+---jit.off()
+---local str, err = misc.memprof.start("memprof_new.bin")
+----- Lua doesn't create a new frame to call string.rep, and all allocations
+----- are attributed not to the append() function but to the parent scope.
+---local function append(str, rep)
+---    return string.rep(str, rep)
+---end
+---
+---local t = {}
+---for i = 1, 1e4 do
+---    -- table.insert is the built-in function and all corresponding
+---    -- allocations are reported in the scope of the main chunk.
+---    table.insert(t,
+---        append('q', i)
+---    )
+---end
+---local str, err = misc.memprof.stop()
+---```
+---
+---@field start fun(fname?: string): boolean?, string?, integer?
+---
+---Stop the LuaJIT memory profiler.
+---
+---If the operation fails, returns `nil`, an error message, and a
+---system-dependent error code. If it succeeds, returns `true`.
+---
+---@field stop fun(): boolean?, string?, integer?
+---
+---@field available boolean Whether the memprof profiler is supported.
+
+---@type misc.memprof
+misc.memprof = {}
