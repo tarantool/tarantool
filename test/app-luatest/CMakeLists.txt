@@ -25,6 +25,16 @@ list(APPEND TEST_ENV
   "VARDIR=${VARDIR}"
 )
 
+# find_program() sets the variable to the '<name>-NOTFOUND' string when the
+# program is missing, and that string must not be passed to the tests: they
+# try to run it instead of being skipped.
+find_program(EMMYLUA_LS emmylua_ls)
+if(EMMYLUA_LS)
+  list(APPEND TEST_ENV "EMMYLUA_LS=${EMMYLUA_LS}")
+else()
+  message(STATUS "emmylua_ls is not found, annotation tests are skipped")
+endif()
+
 file(GLOB tests ${CMAKE_CURRENT_SOURCE_DIR} *_test.lua)
 foreach(test_path ${tests})
   get_filename_component(test_name ${test_path} NAME)
