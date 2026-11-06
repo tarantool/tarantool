@@ -1,6 +1,6 @@
 # lua_stub() exports EmmyLua annotations from Lua sources into a stub file.
 #
-# lua_stub(<module> FILES <file>...)
+# lua_stub(<module> FILES <file>... [RETURN <name>])
 #
 # Gathers EmmyLua annotation comments (---@...) from the given files
 # together with bodyless declarations they annotate and writes the result
@@ -8,12 +8,18 @@
 # `${PROJECT_BINARY_DIR}/emmylua` directory. The file is installed
 # into `${MODULE_LUADIR}/emmylua`.
 #
+# When RETURN is specified, the stub ends with `return <name>`, so that
+# require() resolves the module value in an LSP workspace that only contains
+# the generated stubs. The name must be declared by the extracted annotations.
+# A `---@type` block followed by a table literal also creates the declaration
+# for <name>.
+#
 # The file is generated at build time by the `emmylua-stubs` target. When
 # ENABLE_DIST is set, the target is a part of the default build, so that
 # the stubs are ready for installation. The extraction itself runs in a
 # Lua helper (tools/gen-emmylua-stubs.lua) executed by the bundled LuaJIT.
 function(lua_stub name)
-    cmake_parse_arguments(ARG "" "" "FILES" ${ARGN})
+    cmake_parse_arguments(ARG "" "RETURN" "FILES" ${ARGN})
     if(NOT ARG_FILES)
         message(FATAL_ERROR "lua_stub(${name}): FILES is not specified")
     endif()
@@ -33,10 +39,15 @@ function(lua_stub name)
         list(APPEND _abs_files "${_abs}")
     endforeach()
 
+    set(_return_args)
+    if(ARG_RETURN)
+        set(_return_args --return "${ARG_RETURN}")
+    endif()
+
     add_custom_command(OUTPUT "${_out_file}"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${_out_dir}"
         COMMAND ${LUAJIT_EXECUTABLE} "${_extractor}"
-            --out "${_out_file}" ${_abs_files}
+            --out "${_out_file}" ${_return_args} ${_abs_files}
         DEPENDS ${_abs_files} "${_extractor}" luajit_static
         VERBATIM
         COMMENT "Generating EmmyLua stub ${name}")

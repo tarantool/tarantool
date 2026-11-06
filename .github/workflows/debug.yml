@@ -88,6 +88,14 @@ jobs:
       - name: Install deps
         uses: ./.github/actions/install-deps-debian
 
+      # The EmmyLua annotation tests are a part of the app-luatest suite
+      # that is run below, they are skipped unless emmylua_ls is available.
+      - name: Setup emmylua_ls
+        uses: ./.github/actions/setup-emmylua-analyzer
+        with:
+          check: 'false'
+          language-server: 'true'
+
       - name: Optional submodule bump
         if: ${{ inputs.submodule }}
         uses: ./.github/actions/bump-submodule
