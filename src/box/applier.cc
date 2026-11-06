@@ -775,6 +775,17 @@ applier_wait_snapshot(struct applier *applier)
 	struct iostream *io = &applier->io;
 	struct ibuf *ibuf = &applier->ibuf;
 	struct xrow_header row;
+	/*
+	 * The vclock of the checkpoint the master is sending to the replica.
+	 * Used as the replica's initial vclock after applying initial data.
+	 */
+	struct vclock vclock;
+	/*
+	 * Counts all the applied rows which change the local state - both the
+	 * join metadata and the snapshot data. A retry after any of them is
+	 * applied is not safe.
+	 */
+	applier->row_count = 0;
 
 	/**
 	 * Tarantool < 1.7.0: if JOIN is successful, there is no "OK"
@@ -789,20 +800,11 @@ applier_wait_snapshot(struct applier *applier)
 			tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
 				  (uint32_t) row.type);
 		}
-		/*
-		 * Start vclock. The vclock of the checkpoint
-		 * the master is sending to the replica.
-		 * Used to initialize the replica's initial
-		 * vclock in bootstrap_from_master()
-		 */
-		struct vclock vclock;
 		xrow_decode_vclock_ignore0_xc(&row, &vclock);
-		box_init_instance_vclock(&vclock);
 	}
 
 	coio_read_xrow(io, ibuf, &row);
 	if (row.type == IPROTO_JOIN_META) {
-		/* Read additional metadata. Empty at the moment. */
 		do {
 			coio_read_xrow(io, ibuf, &row);
 			if (iproto_type_is_error(row.type)) {
@@ -814,11 +816,13 @@ applier_wait_snapshot(struct applier *applier)
 				}
 				if (txn_limbo_process(&txn_limbo, &req) != 0)
 					diag_raise();
+				++applier->row_count;
 			} else if (iproto_type_is_raft_request(row.type)) {
 				struct raft_request req;
 				if (xrow_decode_raft(&row, &req) != 0)
 					diag_raise();
 				box_raft_recover(&req);
+				++applier->row_count;
 			} else if (row.type != IPROTO_JOIN_SNAPSHOT) {
 				tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
 					  (uint32_t)row.type);
@@ -832,7 +836,6 @@ applier_wait_snapshot(struct applier *applier)
 	/*
 	 * Receive initial data.
 	 */
-	applier->row_count = 0;
 	while (true) {
 		applier->last_row_time = ev_monotonic_now(loop());
 		if (iproto_type_is_dml(row.type)) {
@@ -846,14 +849,10 @@ applier_wait_snapshot(struct applier *applier)
 			if (applier->version_id < version_id(1, 7, 0)) {
 				/*
 				 * This is the start vclock if the
-				 * server is 1.6. Since we have
-				 * not initialized replication
-				 * vclock yet, do it now. In 1.7+
-				 * this vclock is not used.
+				 * server is 1.6. In 1.7+ this vclock
+				 * is not used.
 				 */
-				struct vclock vclock;
 				xrow_decode_vclock_ignore0_xc(&row, &vclock);
-				box_init_instance_vclock(&vclock);
 			}
 			break; /* end of stream */
 		} else if (iproto_type_is_error(row.type)) {
@@ -864,6 +863,12 @@ applier_wait_snapshot(struct applier *applier)
 		}
 		coio_read_xrow(io, ibuf, &row);
 	}
+	/*
+	 * Before any metadata or snapshot data is applied, a failed transfer
+	 * can be retried. Keep the instance vclock unset until the snapshot
+	 * is complete so retries do not initialize it twice.
+	 */
+	box_init_instance_vclock(&vclock);
 }
 
 static void
@@ -2747,8 +2752,14 @@ applier_f(va_list ap)
 		 * incorrectly conclude that it has all the data. Thus, we treat
 		 * errors during APPLIER_FETCH_SNAPSHOT as unrecoverable if
 		 * replica has some data.
+		 *
+		 * The same is about the join metadata, applied even before the
+		 * snapshot data, in APPLIER_WAIT_SNAPSHOT. It initializes the
+		 * synchro queue and Raft states, and a retry would try to
+		 * initialize them again on top of the already changed state.
 		 */
-		if (applier->state == APPLIER_FETCH_SNAPSHOT &&
+		if ((applier->state == APPLIER_WAIT_SNAPSHOT ||
+		     applier->state == APPLIER_FETCH_SNAPSHOT) &&
 		    applier->row_count > 0) {
 			say_info("Error occurred during fetching snapshot, "
 				 "but some data has "

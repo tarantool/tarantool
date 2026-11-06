@@ -5383,6 +5383,8 @@ bootstrap_master(void)
 			 "instance proceeds as a bootstrap leader");
 		is_graceful_supervised_bootstrap_requested = false;
 	}
+	/* A failed join may have left the instance vclock unset. */
+	vclock_create(&instance_vclock_storage);
 	engine_bootstrap_xc();
 	if (box_set_replication_synchro_queue_max_size() != 0)
 		diag_raise();
@@ -5462,6 +5464,13 @@ bootstrap_from_master(struct replica *master)
 	} catch (FiberIsCancelled *e) {
 		throw e;
 	} catch (...) {
+		/*
+		 * The join metadata is applied while waiting here. It changes
+		 * the local state, so a retry is not possible after it, same
+		 * as after the snapshot data. See applier_f().
+		 */
+		if (applier->row_count > 0)
+			throw;
 		return false;
 	}
 
@@ -6024,8 +6033,12 @@ box_cfg_xc(void)
 	 * transactions. This needs to be done before subscribing, in order to
 	 * correctly determine the id_filter value in the subscribe request.
 	 * The appliers will continue after calling replicaset_follow.
+	 *
+	 * A bootstrap leader creates a new replica set and has no old rows to
+	 * recover. Connected peers may belong to a different replica set.
 	 */
-	box_check_waiting_for_own_rows();
+	if (!is_bootstrap_leader)
+		box_check_waiting_for_own_rows();
 
 	/* Follow replica */
 	replicaset_follow();
