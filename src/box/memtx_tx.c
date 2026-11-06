@@ -331,6 +331,11 @@ struct nearby_gap_item {
 	const char *key;
 	uint32_t key_len;
 	uint32_t part_count;
+	/**
+	 * If not zero, the item doesn't match tuples that don't equal
+	 * to first `equals_part_count` parts of `key`.
+	 */
+	uint32_t equals_part_count;
 	/** Search mode. */
 	enum iterator_type type;
 	/** Storage for short key. @key may point here. */
@@ -403,7 +408,8 @@ memtx_tx_inplace_gap_item_new(struct txn *txn, bool abort_on_rollback);
  */
 static struct nearby_gap_item *
 memtx_tx_nearby_gap_item_new(struct txn *txn, enum iterator_type type,
-			     const char *key, uint32_t part_count);
+			     const char *key, uint32_t part_count,
+			     uint32_t equals_part_count);
 
 /**
  * Allocate and create full scan gap item.
@@ -2579,13 +2585,21 @@ memtx_tx_handle_gap_write(struct memtx_story_link *link,
 		struct nearby_gap_item *item =
 			(struct nearby_gap_item *)item_base;
 		int cmp = 0;
+		int eq_parts_cmp = 0;
 		if (item->key != NULL) {
-			struct key_def *def = index->def->key_def;
+			/* Pagination can use `pk` parts, so use `cmp_def`. */
+			struct key_def *def = index->def->cmp_def;
 			hint_t oh = key_hint(item->key, item->part_count, def);
 			hint_t kh = memtx_tx_story_link_hint(link, index, def);
 			cmp = tuple_compare_with_key(tuple, kh, item->key,
 						     item->part_count, oh,
 						     def);
+			if (item->equals_part_count != 0) {
+				uint32_t count = item->equals_part_count;
+				hint_t hint = key_hint(item->key, count, def);
+				eq_parts_cmp = tuple_compare_with_key(
+					tuple, kh, item->key, count, hint, def);
+			}
 		}
 		int dir = iterator_direction(item->type);
 		bool is_full_key = item->part_count ==
@@ -2602,6 +2616,17 @@ memtx_tx_handle_gap_write(struct memtx_story_link *link,
 						item->type == ITER_LT)));
 		bool need_track = need_split ||
 				  (is_full_key && cmp == 0 && is_e);
+		if (eq_parts_cmp != 0) {
+			/*
+			 * The whole tracked interval stays on one side of the
+			 * insertion. Move it left for a greater prefix,
+			 * otherwise leave it on the successor. No conflict is
+			 * needed.
+			 */
+			need_split = false;
+			need_move = eq_parts_cmp > 0;
+			need_track = false;
+		}
 		if (need_track)
 			memtx_tx_track_story_gap(item_base->txn, link);
 		if (need_split) {
@@ -2611,10 +2636,10 @@ memtx_tx_handle_gap_write(struct memtx_story_link *link,
 			 * to another.
 			 */
 			struct nearby_gap_item *copy =
-				memtx_tx_nearby_gap_item_new(item_base->txn,
-							     item->type,
-							     item->key,
-							     item->part_count);
+				memtx_tx_nearby_gap_item_new(
+					item_base->txn, item->type, item->key,
+					item->part_count,
+					item->equals_part_count);
 
 			rlist_add(&link->read_gaps,
 				  &copy->base.in_read_gaps);
@@ -2624,7 +2649,7 @@ memtx_tx_handle_gap_write(struct memtx_story_link *link,
 			rlist_add(&link->read_gaps,
 				  &item->base.in_read_gaps);
 		} else {
-			assert((dir > 0 && cmp < 0) ||
+			assert(eq_parts_cmp < 0 || (dir > 0 && cmp < 0) ||
 			       (cmp < 0 && item->type == ITER_REQ) ||
 			       (cmp == 0 && ((dir > 0 && is_full_key) ||
 					     item->type == ITER_GT)));
@@ -4406,14 +4431,17 @@ memtx_tx_save_key(struct txn *txn, const char *key, uint32_t part_count,
  */
 static struct nearby_gap_item *
 memtx_tx_nearby_gap_item_new(struct txn *txn, enum iterator_type type,
-			     const char *key, uint32_t part_count)
+			     const char *key, uint32_t part_count,
+			     uint32_t equals_part_count)
 {
+	assert(equals_part_count <= part_count);
 	struct memtx_tx_mempool *pool = &txm.nearby_gap_item_mempoool;
 	struct nearby_gap_item *item = memtx_tx_xmempool_alloc(txn, pool);
 	gap_item_base_create(&item->base, GAP_NEARBY, txn);
 
 	item->type = type;
 	item->part_count = part_count;
+	item->equals_part_count = equals_part_count;
 	item->key = memtx_tx_save_key(txn, key, part_count, item->short_key,
 				      sizeof(item->short_key), &item->key_len);
 	return item;
@@ -4480,13 +4508,14 @@ void
 memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *index,
 			struct memtx_index_entry successor,
 			enum iterator_type type, const char *key,
-			uint32_t part_count)
+			uint32_t part_count, uint32_t equals_part_count)
 {
 	if (txn->status != TXN_INPROGRESS)
 		return;
 
 	struct nearby_gap_item *item =
-		memtx_tx_nearby_gap_item_new(txn, type, key, part_count);
+		memtx_tx_nearby_gap_item_new(txn, type, key, part_count,
+					     equals_part_count);
 
 	if (successor.tuple != NULL) {
 		if (!tuple_has_flag(successor.tuple, TUPLE_IS_DIRTY))
