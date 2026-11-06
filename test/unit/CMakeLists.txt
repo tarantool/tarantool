@@ -528,6 +528,11 @@ create_unit_test(PREFIX say
                  LIBRARIES core unit
 )
 
+create_unit_test(PREFIX say_color
+                 SOURCES say_color.c core_test_utils.c
+                 LIBRARIES core unit
+)
+
 set(ITERATOR_TEST_SOURCES
     vy_iterators_helper.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_stmt.c

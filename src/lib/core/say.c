@@ -36,6 +36,7 @@
 #include "tt_pthread.h"
 #include "tt_strerror.h"
 
+#include <sys/uio.h>
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -1215,18 +1216,30 @@ format_syslog_header(char *buf, int len, int level,
  */
 enum { SAY_BUF_LEN_MAX = 16 * 1024 };
 static __thread char say_buf[SAY_BUF_LEN_MAX];
+/** Whether NO_COLOR permits colors, or -1 if not checked yet. */
+static __thread int log_color_enabled = -1;
 
 /**
- * Wrapper over write which ensures, that writes not more than buffer size.
+ * Write a log entry, adding colors only to plain terminal output.
  */
 static ssize_t
-safe_write(int fd, const char *buf, int size)
+log_write(struct log *log, int fd, int level, int size)
 {
-	assert(size >= 0);
-	/* Writes at most SAY_BUF_LEN_MAX - 1
-	 * (1 byte was taken for 0 byte in vsnprintf).
-	 */
-	return write(fd, buf, MIN(size, SAY_BUF_LEN_MAX - 1));
+	assert(size > 0);
+	size = MIN(size, SAY_BUF_LEN_MAX - 1);
+	if (!log_color_enabled || level > S_WARN ||
+	    (log->format_func != say_format_plain &&
+	     log->format_func != say_format_boot) || !isatty(fd))
+		return write(fd, say_buf, size);
+
+	int newline = say_buf[size - 1] == '\n';
+	struct iovec iov[] = {
+		{(void *)(level == S_WARN ? "\033[33m" : "\033[31m"),
+		 sizeof("\033[31m") - 1},
+		{say_buf, size - newline},
+		{(void *)"\033[0m\n", sizeof("\033[0m") - 1 + newline},
+	};
+	return writev(fd, iov, lengthof(iov));
 }
 
 /**
@@ -1242,7 +1255,7 @@ say_internal(int level, bool check_level, const char *module,
 			     line, error, format, ap);
 	if (total > 0 &&
 	    level == S_FATAL && log_default->fd != STDERR_FILENO) {
-		ssize_t r = safe_write(STDERR_FILENO, say_buf, total);
+		ssize_t r = log_write(log_default, STDERR_FILENO, level, total);
 		(void)r;
 	}
 	errno = errsv; /* Preserve the errno. */
@@ -1308,13 +1321,13 @@ log_write_flightrec_from_lua(int level, const char *filename, int line, ...)
  * File and pipe logger
  */
 static void
-write_to_file(struct log *log, int total)
+write_to_file(struct log *log, int level, int total)
 {
 	assert(log->type == SAY_LOGGER_FILE ||
 	       log->type == SAY_LOGGER_PIPE ||
 	       log->type == SAY_LOGGER_STDERR);
 	assert(total >= 0);
-	ssize_t r = safe_write(log->fd, say_buf, total);
+	ssize_t r = log_write(log, log->fd, level, total);
 	(void) r;                               /* silence gcc warning */
 }
 
@@ -1322,11 +1335,11 @@ write_to_file(struct log *log, int total)
  * Syslog logger
  */
 static void
-write_to_syslog(struct log *log, int total)
+write_to_syslog(struct log *log, int level, int total)
 {
 	assert(log->type == SAY_LOGGER_SYSLOG);
 	assert(total >= 0);
-	if (log->fd < 0 || safe_write(log->fd, say_buf, total) <= 0) {
+	if (log->fd < 0 || log_write(log, log->fd, level, total) <= 0) {
 		/*
 		 * Try to reconnect, if write to syslog has
 		 * failed. Syslog write can fail, if, for example,
@@ -1344,7 +1357,7 @@ write_to_syslog(struct log *log, int total)
 			 * it would block thread. Try to reconnect
 			 * on next vsay().
 			 */
-			ssize_t r = safe_write(log->fd, say_buf, total);
+			ssize_t r = log_write(log, log->fd, level, total);
 			(void) r;               /* silence gcc warning */
 		}
 	}
@@ -1552,6 +1565,14 @@ log_vsay(struct log *log, int level, bool check_level, const char *module,
 	if (check_level && level > log_get_module_log_level(log, "tarantool"))
 		goto out;
 
+	if (log_color_enabled < 0) {
+		/* getenv_safe() may log, so initialize before formatting. */
+		log_color_enabled = 0;
+		char buf[2];
+		const char *env = getenv_safe("NO_COLOR", buf, sizeof(buf));
+		log_color_enabled = env == NULL || strcmp(env, "1") != 0;
+	}
+
 	total = format_log_entry(log, level, module, filename, line, error,
 				 format, ap);
 	if (total <= 0)
@@ -1560,25 +1581,25 @@ log_vsay(struct log *log, int level, bool check_level, const char *module,
 	switch (log->type) {
 	case SAY_LOGGER_FILE:
 	case SAY_LOGGER_PIPE:
-		write_to_file(log, total);
+		write_to_file(log, level, total);
 		break;
 	case SAY_LOGGER_STDERR:
 		if (before_stderr_callback != NULL)
 			before_stderr_callback();
-		write_to_file(log, total);
+		write_to_file(log, level, total);
 		if (after_stderr_callback != NULL)
 			after_stderr_callback();
 		break;
 	case SAY_LOGGER_SYSLOG:
-		write_to_syslog(log, total);
+		write_to_syslog(log, level, total);
 		if (level == S_FATAL && log->fd != STDERR_FILENO)
-			(void)safe_write(STDERR_FILENO, say_buf, total);
+			(void)log_write(log, STDERR_FILENO, level, total);
 		break;
 	case SAY_LOGGER_BOOT:
 	{
 		if (before_stderr_callback != NULL)
 			before_stderr_callback();
-		ssize_t r = safe_write(STDERR_FILENO, say_buf, total);
+		ssize_t r = log_write(log, STDERR_FILENO, level, total);
 		(void) r;                       /* silence gcc warning */
 		if (after_stderr_callback != NULL)
 			after_stderr_callback();
