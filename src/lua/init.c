@@ -202,7 +202,8 @@ extern char minifio_lua[],
 	print_lua[],
 	pairs_lua[],
 	luadebug_lua[],
-	version_lua[]
+	version_lua[],
+	tracer_lua[]
 ;
 
 /** List of modules available in all threads. */
@@ -235,6 +236,7 @@ static const char * const lua_modules_minimal[] = {
 	"datetime", datetime_lua,
 	"msgpackffi", msgpackffi_lua,
 	"http.client", httpc_lua,
+	"tracer", tracer_lua,
 	NULL
 };
 
