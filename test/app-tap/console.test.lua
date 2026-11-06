@@ -106,23 +106,29 @@ test:is(yaml.decode(client:read(EOL)), '', "clear delimiter")
 -- gh-3583: yaml.encode encodes null incorrectly.
 --
 
-test:is(type(yaml.decode(yaml.encode('false'))), 'string')
-test:is(type(yaml.decode(yaml.encode('true'))), 'string')
-test:is(type(yaml.decode(yaml.encode({a = 'false'})).a), 'string')
-test:is(type(yaml.decode(yaml.encode({a = 'false'})).a), 'string')
+test:is(type(yaml.decode(yaml.encode('false'))), 'string',
+        'yaml boolean false decodes to a string')
+test:is(type(yaml.decode(yaml.encode('true'))), 'string',
+        'yaml boolean true decodes to a string')
+test:is(type(yaml.decode(yaml.encode({a = 'false'})).a), 'string',
+        'yaml boolean field false decodes to a string')
+test:is(type(yaml.decode(yaml.encode({a = 'false'})).a), 'string',
+        'yaml boolean field false decodes to a string')
 
-test:is(yaml.encode(false), "--- false\n...\n")
-test:is(yaml.encode(true), "--- true\n...\n")
-test:is(yaml.encode('false'), "--- 'false'\n...\n")
-test:is(yaml.encode('true'), "--- 'true'\n...\n")
-test:is(yaml.encode(nil), "--- null\n...\n")
+test:is(yaml.encode(false), "--- false\n...\n", 'yaml encodes false')
+test:is(yaml.encode(true), "--- true\n...\n", 'yaml encodes true')
+test:is(yaml.encode('false'), "--- 'false'\n...\n",
+        'yaml encodes string false')
+test:is(yaml.encode('true'), "--- 'true'\n...\n",
+        'yaml encodes string true')
+test:is(yaml.encode(nil), "--- null\n...\n", 'yaml encodes nil as null')
 
-test:is(yaml.decode('false'), false)
-test:is(yaml.decode('no'), false)
-test:is(yaml.decode('true'), true)
-test:is(yaml.decode('yes'), true)
-test:is(yaml.decode('~'), nil)
-test:is(yaml.decode('null'), nil)
+test:is(yaml.decode('false'), false, 'yaml decodes false')
+test:is(yaml.decode('no'), false, 'yaml decodes no as false')
+test:is(yaml.decode('true'), true, 'yaml decodes true')
+test:is(yaml.decode('yes'), true, 'yaml decodes yes as true')
+test:is(yaml.decode('~'), nil, 'yaml decodes tilde as nil')
+test:is(yaml.decode('null'), nil, 'yaml decodes null as nil')
 
 box.cfg{
     listen=IPROTO_SOCKET;
