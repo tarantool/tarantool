@@ -873,6 +873,11 @@ tarantool_lua_init_minimal_impl(lua_State *L)
 	/* Initialize ffi to enable luaL_pushcdata/luaL_checkcdata functions */
 	luaL_loadstring(L, "return require('ffi')");
 	lua_call(L, 0, 0);
+	/*
+	 * Module searchers may return errors (e.g. if cwd is removed), so
+	 * error objects must be available before the first require().
+	 */
+	tarantool_lua_error_init(L);
 	lua_register(L, "tonumber64", lbox_tonumber64);
 
 	tarantool_lua_utils_init(L);
@@ -883,7 +888,6 @@ tarantool_lua_init_minimal_impl(lua_State *L)
 	tarantool_lua_fiber_cond_init(L);
 	tarantool_lua_fiber_channel_init(L);
 	tarantool_lua_errno_init(L);
-	tarantool_lua_error_init(L);
 	tarantool_lua_fio_init(L);
 	tarantool_lua_socket_init(L);
 	tarantool_lua_uri_init(L);
