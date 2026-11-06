@@ -115,9 +115,29 @@ merge_test()
 	footer();
 }
 
+static void
+overflow_test()
+{
+	plan(1);
+	header();
+
+	uint32_t count = UINT32_MAX / 5;
+	struct bloom before, after;
+	bloom_create(&before, count, 0.05);
+	bloom_create(&after, count + 1, 0.05);
+	size_t before_size = bloom_data_size(&before);
+	size_t after_size = bloom_data_size(&after);
+	ok(after_size >= before_size,
+	   "filter size does not decrease (%zu -> %zu bytes)",
+	   before_size, after_size);
+
+	footer();
+}
+
 int
 main(void)
 {
 	simple_test();
 	merge_test();
+	overflow_test();
 }

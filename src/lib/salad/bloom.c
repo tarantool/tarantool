@@ -45,7 +45,8 @@ bloom_create(struct bloom *bloom, uint32_t number_of_values,
 {
 	/* Optimal hash_count and bit count calculation */
 	uint16_t hash_count = ceil(log(false_positive_rate) / log(0.5));
-	uint64_t bit_count = ceil(number_of_values * hash_count / log(2));
+	uint64_t bit_count = ceil((uint64_t)number_of_values * hash_count /
+				  log(2));
 	uint32_t block_bits = CHAR_BIT * sizeof(struct bloom_block);
 	uint32_t block_count = (bit_count + block_bits - 1) / block_bits;
 
