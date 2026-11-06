@@ -439,3 +439,36 @@ g.test_directory_list = function(cg)
                         {'README.md', 'folder/', 'src/', 'test/'})
     end)
 end
+
+-- Trailing '\xff' bytes of the prefix are dropped on increment (gh-13438).
+g.test_next_prefix_trailing_max = function(cg)
+    cg.server:exec(function(engine)
+        local asc = box.space.test
+        asc:create_index('pk', {parts = {{1, 'string'}, {2, 'string'}}})
+        local desc = box.schema.space.create('desc', {engine = engine})
+        desc:create_index('pk', {parts = {{1, 'string'},
+                                          {2, 'string', sort_order = 'desc'}}})
+        -- The incremented key gets a shorter MsgPack header (str8 -> fixstr).
+        local long = string.rep('a', 31) .. '\xff'
+        local long_next = string.rep('a', 30) .. 'b'
+        for _, s in pairs({asc, desc}) do
+            for _, v in pairs({'a\xff', 'a\xff\xff', 'b', 'b\x00',
+                               long, long_next}) do
+                s:insert({'k', v})
+            end
+        end
+
+        local exp = {{'k', 'b'}, {'k', 'b\x00'}}
+        local exp_long = {{'k', long_next}, {'k', 'a\xff'},
+                          {'k', 'a\xff\xff'}, {'k', 'b'}, {'k', 'b\x00'}}
+        local opts = {iterator = 'np'}
+        t.assert_equals(asc:select({'k', 'a\xff'}, opts), exp)
+        t.assert_equals(asc:select({'k', 'a\xff\xff'}, opts), exp)
+        t.assert_equals(asc:select({'k', long}, opts), exp_long)
+        opts = {iterator = 'pp'}
+        t.assert_equals(desc:select({'k', 'a\xff'}, opts), exp)
+        t.assert_equals(desc:select({'k', 'a\xff\xff'}, opts), exp)
+        t.assert_equals(desc:select({'k', long}, opts), exp_long)
+        desc:drop()
+    end, {cg.params.engine})
+end
