@@ -1833,7 +1833,7 @@ SELECT true >= true;
  | ---
  | - metadata:
  |   - name: COLUMN_1
- |     type: any
+ |     type: boolean
  |   rows:
  |   - [true]
  | ...
@@ -1841,7 +1841,7 @@ SELECT true >= false;
  | ---
  | - metadata:
  |   - name: COLUMN_1
- |     type: any
+ |     type: boolean
  |   rows:
  |   - [true]
  | ...
@@ -1849,7 +1849,7 @@ SELECT false >= true;
  | ---
  | - metadata:
  |   - name: COLUMN_1
- |     type: any
+ |     type: boolean
  |   rows:
  |   - [false]
  | ...
@@ -1857,7 +1857,7 @@ SELECT false >= false;
  | ---
  | - metadata:
  |   - name: COLUMN_1
- |     type: any
+ |     type: boolean
  |   rows:
  |   - [true]
  | ...
@@ -1900,7 +1900,7 @@ SELECT a, true >= a FROM t;
  |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
- |     type: any
+ |     type: boolean
  |   rows:
  |   - [false, true]
  |   - [true, true]
@@ -1911,7 +1911,7 @@ SELECT a, false >= a FROM t;
  |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
- |     type: any
+ |     type: boolean
  |   rows:
  |   - [false, true]
  |   - [true, false]
@@ -1944,7 +1944,7 @@ SELECT a, a >= true FROM t;
  |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
- |     type: any
+ |     type: boolean
  |   rows:
  |   - [false, false]
  |   - [true, true]
@@ -1955,7 +1955,7 @@ SELECT a, a >= false FROM t;
  |   - name: a
  |     type: boolean
  |   - name: COLUMN_1
- |     type: any
+ |     type: boolean
  |   rows:
  |   - [false, true]
  |   - [true, true]
@@ -1991,7 +1991,7 @@ SELECT a, a1, a >= a1 FROM t, t6;
  |   - name: a1
  |     type: boolean
  |   - name: COLUMN_1
- |     type: any
+ |     type: boolean
  |   rows:
  |   - [false, false, true]
  |   - [false, true, false]

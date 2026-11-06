@@ -289,3 +289,30 @@ g.test_4755_scalar_collation_metadata = function(cg)
         t.assert_equals(box.space.t, nil)
     end, {cg.params.engine})
 end
+
+local g = t.group("metadata")
+
+g.before_all(function(cg)
+    cg.server = server:new({alias = 'master'})
+    cg.server:start()
+end)
+
+g.after_all(function(cg)
+    cg.server:drop()
+end)
+
+g.test_13358_metadata_in_request_with_to_boolean_arguments = function(cg)
+    cg.server:exec(function()
+        local res = box.execute([[select true >= true;]])
+        t.assert_equals(res.metadata[1].type, "boolean")
+
+        res = box.execute([[select true > true;]])
+        t.assert_equals(res.metadata[1].type, "boolean")
+
+        res = box.execute([[select true < true;]])
+        t.assert_equals(res.metadata[1].type, "boolean")
+
+        res = box.execute([[select true <= true;]])
+        t.assert_equals(res.metadata[1].type, "boolean")
+    end)
+end
