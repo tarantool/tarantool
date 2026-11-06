@@ -775,12 +775,12 @@ codeVectorCompare(Parse * pParse,	/* Code generator context */
 	u8 op = pExpr->op;
 	int addrDone = sqlVdbeMakeLabel(v);
 
-	/*
-	 * Situation when vectors have different dimensions is
-	 * filtred way before - during expr resolution:
-	 * see resolveExprStep().
-	 */
-	assert(nLeft == sqlExprVectorSize(pRight));
+	int nRight = sqlExprVectorSize(pRight);
+	if (nLeft != nRight) {
+		diag_set(ClientError, ER_SQL_COLUMN_COUNT, nLeft, nRight);
+		pParse->is_aborted = true;
+		return;
+	}
 	assert(pExpr->op == TK_EQ || pExpr->op == TK_NE
 	       || pExpr->op == TK_LT || pExpr->op == TK_GT
 	       || pExpr->op == TK_LE || pExpr->op == TK_GE);
