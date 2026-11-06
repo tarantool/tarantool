@@ -585,6 +585,14 @@ vy_page_info_decode(struct vy_page_info *page, const struct xrow_header *xrow,
 				    vy_page_info_key_name(key)));
 		return -1;
 	}
+	if (page->row_index_offset > page->unpacked_size) {
+		diag_set(ClientError, ER_INVALID_INDEX_FILE, filename,
+			 tt_sprintf("Row index offset %u is out of bounds "
+				    "(page size %u)",
+				    (unsigned)page->row_index_offset,
+				    (unsigned)page->unpacked_size));
+		return -1;
+	}
 
 	return 0;
 }
@@ -902,7 +910,7 @@ vy_run_iterator_stop(struct vy_run_iterator *itr)
 
 static int
 vy_row_index_decode(uint32_t *row_index, uint32_t row_count,
-		    struct xrow_header *xrow)
+		    uint32_t unpacked_size, struct xrow_header *xrow)
 {
 	assert(xrow->type == VY_RUN_ROW_INDEX);
 	const char *pos = xrow->body->iov_base;
@@ -927,6 +935,15 @@ vy_row_index_decode(uint32_t *row_index, uint32_t row_count,
 	}
 	for (uint32_t i = 0; i < row_count; ++i) {
 		row_index[i] = mp_load_u32(&pos);
+		if (row_index[i] > unpacked_size ||
+		    (i > 0 && row_index[i] < row_index[i - 1])) {
+			diag_set(ClientError, ER_INVALID_RUN_FILE,
+				 tt_sprintf("Wrong row index value %u "
+					    "(page size %u)",
+					    (unsigned)row_index[i],
+					    (unsigned)unpacked_size));
+			return -1;
+		}
 	}
 	assert(pos == xrow->body->iov_base + xrow->body->iov_len);
 	return 0;
@@ -1000,7 +1017,8 @@ vy_page_read(struct vy_page *page, const struct vy_page_info *page_info,
 				    VY_RUN_ROW_INDEX, (unsigned)xrow.type));
 		goto error;
 	}
-	if (vy_row_index_decode(page->row_index, page->row_count, &xrow) != 0)
+	if (vy_row_index_decode(page->row_index, page->row_count,
+				page->unpacked_size, &xrow) != 0)
 		goto error;
 	region_truncate(&fiber()->gc, region_svp);
 	ERROR_INJECT(ERRINJ_VY_READ_PAGE, {
