@@ -2445,12 +2445,13 @@ memtx_index_extent_alloc(struct matras_allocator *matras_allocator)
 		goto fail;
 	return ret;
 fail:
-	if (in_txn() != NULL && txn_has_flag(in_txn(), TXN_STMT_ROLLBACK)) {
+	if (memtx_tx_story_gc_in_progress ||
+	    (in_txn() != NULL && txn_has_flag(in_txn(), TXN_STMT_ROLLBACK))) {
 		/*
-		 * We cannot sanely reserve blocks for rollback because strictly
-		 * speaking the whole index can change. We cannot tolerate
-		 * allocation failure also. So just allocate outside of the
-		 * memtx arena quota.
+		 * We cannot sanely reserve blocks for rollback or story GC
+		 * because strictly speaking the whole index can change. We
+		 * cannot tolerate allocation failure also. So just allocate
+		 * outside of the memtx arena quota.
 		 */
 		ret = xmalloc(MEMTX_EXTENT_SIZE);
 		mh_ptr_put(memtx->malloc_extents, (const void **)&ret,

@@ -846,6 +846,9 @@ enum {
 /** That's a definition, see declaration for description. */
 bool memtx_tx_manager_use_mvcc_engine = false;
 
+/** That's a definition, see declaration for description. */
+bool memtx_tx_story_gc_in_progress = false;
+
 /** The one and only instance of tx_manager. */
 static struct tx_manager txm;
 
@@ -1938,11 +1941,13 @@ memtx_tx_story_full_unlink_story_link_gc_step(struct memtx_story_link *link)
 static void
 memtx_tx_story_full_unlink_story_gc_step(struct memtx_story *story)
 {
+	memtx_tx_story_gc_in_progress = true;
 	for (uint32_t i = 0; i < story->index_count; i++) {
 		struct memtx_story_link *link;
 		rlist_foreach_entry(link, &story->link[i].list, link)
 			memtx_tx_story_full_unlink_story_link_gc_step(link);
 	}
+	memtx_tx_story_gc_in_progress = false;
 }
 
 /**
