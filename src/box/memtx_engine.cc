@@ -553,13 +553,21 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 		}
 		if (type == IPROTO_RAFT_PROMOTE) {
 			/*
-			 * Origin id cannot be deduced from row.replica_id in
-			 * a checkpoint, because all its rows have a zero
-			 * replica_id.
+			 * Snapshots written before the introduction of synchronous
+			 * PROMOTE had the limbo state described as a single PROMOTE row
+			 * with the zero replica_id, like every snapshot row.
+			 *
+			 * Since the introduction of wait-ack PROMOTE it became important
+			 * to have a real origin ID in each PROMOTE, and so the older rows
+			 * simply get the queue owner ID assigned as the origin.
+			 *
+			 * This is fine since the origin ID only affects correctness for
+			 * wait-ack PROMOTEs.
 			 */
-			entry->synchro.origin_id =
-				entry->synchro.queue_owner_id;
-			return txn_limbo_process(&txn_limbo, &entry->synchro);
+			struct synchro_request *req = &entry->synchro;
+			if (req->origin_id == REPLICA_ID_NIL)
+				req->origin_id = req->queue_owner_id;
+			return txn_limbo_process(&txn_limbo, req);
 		}
 		diag_set(ClientError, ER_UNKNOWN_REQUEST_TYPE,
 			 (uint32_t)type);
@@ -1005,7 +1013,6 @@ checkpoint_write_row(struct xlog *l, struct xrow_header *row)
 	}
 
 	row->tm = last;
-	row->replica_id = 0;
 	/**
 	 * Rows in snapshot are numbered from 1 to %rows.
 	 * This makes streaming such rows to a replica or
@@ -1233,17 +1240,22 @@ checkpoint_write_synchro(struct xlog *l, const struct synchro_request *req)
 	struct xrow_header row;
 	char body[XROW_BODY_LEN_MAX];
 	xrow_encode_synchro(&row, body, req);
+	row.replica_id = req->origin_id;
 	return checkpoint_write_row(l, &row);
 }
 
 static int
 checkpoint_write_system_data(struct xlog *l, const struct raft_request *raft,
-			     const struct synchro_request *synchro)
+			     const struct synchro_snapshot *limbo)
 {
 	if (checkpoint_write_raft(l, raft) != 0)
 		return -1;
-	if (checkpoint_write_synchro(l, synchro) != 0)
-		return -1;
+	for (const struct synchro_request *req = limbo->rows; req->type != 0;
+	     req++) {
+		assert(req->type == IPROTO_RAFT_PROMOTE);
+		if (checkpoint_write_synchro(l, req) != 0)
+			return -1;
+	}
 	return 0;
 }
 
@@ -2128,11 +2140,11 @@ static void
 append_total_max_avg_stats(struct info_handler *h, const char *key,
 			   size_t total, size_t max, size_t avg)
 {
-	info_table_begin(h, key);
-	info_append_int(h, "total", total);
-	info_append_int(h, "max", max);
-	info_append_int(h, "avg", avg);
-	info_table_end(h);
+	info_begin_key_table(h, key);
+	info_set_key_int(h, "total", total);
+	info_set_key_int(h, "max", max);
+	info_set_key_int(h, "avg", avg);
+	info_end_table(h);
 }
 
 /** Appends (total, count) stats to info. */
@@ -2140,10 +2152,10 @@ static void
 append_total_count_stats(struct info_handler *h, const char *key,
 			 size_t total, size_t count)
 {
-	info_table_begin(h, key);
-	info_append_int(h, "total", total);
-	info_append_int(h, "count", count);
-	info_table_end(h);
+	info_begin_key_table(h, key);
+	info_set_key_int(h, "total", total);
+	info_set_key_int(h, "count", count);
+	info_end_table(h);
 }
 
 /** Appends memtx tx stats to info. */
@@ -2153,8 +2165,8 @@ memtx_engine_stat_tx(struct memtx_engine *memtx, struct info_handler *h)
 	(void)memtx;
 	struct memtx_tx_statistics stats;
 	memtx_tx_statistics_collect(&stats);
-	info_table_begin(h, "tx");
-	info_table_begin(h, "txn");
+	info_begin_key_table(h, "tx");
+	info_begin_key_table(h, "txn");
 	for (size_t i = 0; i < TX_ALLOC_TYPE_MAX; ++i) {
 		size_t avg = 0;
 		if (stats.txn_count != 0)
@@ -2163,8 +2175,8 @@ memtx_engine_stat_tx(struct memtx_engine *memtx, struct info_handler *h)
 					   stats.tx_total[i],
 					   stats.tx_max[i], avg);
 	}
-	info_table_end(h); /* txn */
-	info_table_begin(h, "mvcc");
+	info_end_table(h); /* txn */
+	info_begin_key_table(h, "mvcc");
 	for (size_t i = 0; i < MEMTX_TX_ALLOC_TYPE_MAX; ++i) {
 		size_t avg = 0;
 		if (stats.txn_count != 0)
@@ -2173,20 +2185,20 @@ memtx_engine_stat_tx(struct memtx_engine *memtx, struct info_handler *h)
 					   stats.memtx_tx_total[i],
 					   stats.memtx_tx_max[i], avg);
 	}
-	info_table_begin(h, "tuples");
+	info_begin_key_table(h, "tuples");
 	for (size_t i = 0; i < MEMTX_TX_STORY_STATUS_MAX; ++i) {
-		info_table_begin(h, memtx_tx_story_status_strs[i]);
+		info_begin_key_table(h, memtx_tx_story_status_strs[i]);
 		append_total_count_stats(h, "stories",
 					 stats.stories[i].total,
 					 stats.stories[i].count);
 		append_total_count_stats(h, "retained",
 					 stats.retained_tuples[i].total,
 					 stats.retained_tuples[i].count);
-		info_table_end(h);
+		info_end_table(h);
 	}
-	info_table_end(h); /* tuples */
-	info_table_end(h); /* mvcc */
-	info_table_end(h); /* tx */
+	info_end_table(h); /* tuples */
+	info_end_table(h); /* mvcc */
+	info_end_table(h); /* tx */
 }
 
 /** Appends memtx data stats to info. */
@@ -2196,11 +2208,11 @@ memtx_engine_stat_data(struct memtx_engine *memtx, struct info_handler *h)
 	(void)memtx;
 	struct memtx_allocator_stats stats;
 	memtx_allocators_stats(&stats);
-	info_table_begin(h, "data");
-	info_append_int(h, "total", stats.used_total);
-	info_append_int(h, "read_view", stats.used_rv);
-	info_append_int(h, "garbage", stats.used_gc);
-	info_table_end(h); /* data */
+	info_begin_key_table(h, "data");
+	info_set_key_int(h, "total", stats.used_total);
+	info_set_key_int(h, "read_view", stats.used_rv);
+	info_set_key_int(h, "garbage", stats.used_gc);
+	info_end_table(h); /* data */
 }
 
 /** Appends memtx index stats to info. */
@@ -2208,12 +2220,12 @@ static void
 memtx_engine_stat_index(struct memtx_engine *memtx, struct info_handler *h)
 {
 	struct matras_stats *stats = &memtx->index_extent_stats;
-	info_table_begin(h, "index");
-	info_append_int(h, "total", (size_t)stats->extent_count *
+	info_begin_key_table(h, "index");
+	info_set_key_int(h, "total", (size_t)stats->extent_count *
 			MEMTX_EXTENT_SIZE);
-	info_append_int(h, "read_view", (size_t)stats->read_view_extent_count *
+	info_set_key_int(h, "read_view", (size_t)stats->read_view_extent_count *
 			MEMTX_EXTENT_SIZE);
-	info_table_end(h); /* index */
+	info_end_table(h); /* index */
 }
 
 void

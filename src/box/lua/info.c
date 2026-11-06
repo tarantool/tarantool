@@ -713,35 +713,9 @@ lbox_info_election(struct lua_State *L)
 static int
 lbox_info_synchro(struct lua_State *L)
 {
-	lua_createtable(L, 0, 2);
-
-	/* Quorum value may be evaluated via formula */
-	lua_pushinteger(L, replication_synchro_quorum);
-	lua_setfield(L, -2, "quorum");
-
-	/* Queue information. */
-	struct txn_limbo *limbo = &txn_limbo;
-	struct txn_limbo_queue *queue = &limbo->queue;
-	lua_createtable(L, 0, 7);
-	lua_pushnumber(L, queue->len);
-	lua_setfield(L, -2, "len");
-	lua_pushnumber(L, queue->size);
-	lua_setfield(L, -2, "size");
-	lua_pushnumber(L, queue->owner_id);
-	lua_setfield(L, -2, "owner");
-	lua_pushboolean(L, latch_is_locked(&limbo->state_latch));
-	lua_setfield(L, -2, "busy");
-	luaL_pushuint64(L, limbo->term);
-	lua_setfield(L, -2, "term");
-	if (queue->len == 0)
-		lua_pushnumber(L, 0);
-	else
-		lua_pushnumber(L, txn_limbo_queue_age(queue));
-	lua_setfield(L, -2, "age");
-	lua_pushnumber(L, queue->confirm_lag);
-	lua_setfield(L, -2, "confirm_lag");
-	lua_setfield(L, -2, "queue");
-
+	struct info_handler h;
+	luaT_info_handler_create(&h, L);
+	txn_limbo_info(&txn_limbo, &h);
 	return 1;
 }
 

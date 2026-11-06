@@ -503,9 +503,22 @@ send_join_meta(struct xstream *stream, const struct box_checkpoint *ckpt)
 	xstream_write(stream, &row);
 
 	char body[XROW_BODY_LEN_MAX];
-	xrow_encode_synchro(&row, body, &ckpt->limbo);
-	row.replica_id = ckpt->limbo.queue_owner_id;
-	xstream_write(stream, &row);
+	/*
+	 * The promotions are ordered by term. This makes it work even for older
+	 * instances which have no support of wait-ack PROMOTE. They will simply
+	 * apply the ascending sequence of promotions, not rejecting any of
+	 * them. In case of this leading to a split-brain though (unlikely case
+	 * of too low quorum or some intricate sequence of valid wait-ack
+	 * PROMOTEs) it might make sense to join this new replica using the
+	 * latest version which supports wait-ack PROMOTE.
+	 */
+	for (const struct synchro_request *req = ckpt->limbo.rows;
+	     req->type != 0; req++) {
+		assert(req->type == IPROTO_RAFT_PROMOTE);
+		xrow_encode_synchro(&row, body, req);
+		row.replica_id = req->origin_id;
+		xstream_write(stream, &row);
+	}
 }
 
 void
@@ -1361,6 +1374,10 @@ relay_filter_row(struct relay *relay, struct xrow_header *packet)
 	 * code. PROMOTE/DEMOTE should be sent only after corresponding RAFT
 	 * term was already sent. We assume that PROMOTE/DEMOTE will arrive
 	 * after RAFT term, otherwise something might break.
+	 *
+	 * XXX: this is no longer needed. The latest version of VRaft protocol
+	 * tolerates the limbo vs elections race. The ordering might be only
+	 * needed for older versions, until Tarantool reaches the version 5.x.
 	 */
 	if (iproto_type_is_promote_request(packet->type)) {
 		struct synchro_request req;

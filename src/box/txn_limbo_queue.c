@@ -208,6 +208,19 @@ txn_limbo_queue_last_synchro_entry(struct txn_limbo_queue *queue)
 	return NULL;
 }
 
+struct txn_limbo_entry *
+txn_limbo_queue_last_written_synchro_entry(struct txn_limbo_queue *queue)
+{
+	struct txn_limbo_entry *entry;
+	rlist_foreach_entry_reverse(entry, &queue->entries, in_queue) {
+		if (entry->state == TXN_LIMBO_ENTRY_VOLATILE)
+			continue;
+		if (txn_has_flag(entry->txn, TXN_WAIT_ACK))
+			return entry;
+	}
+	return NULL;
+}
+
 bool
 txn_limbo_queue_would_block(struct txn_limbo_queue *queue)
 {
@@ -751,7 +764,8 @@ txn_limbo_queue_apply_rollback(struct txn_limbo_queue *queue, int64_t lsn,
 
 void
 txn_limbo_queue_transfer_ownership(struct txn_limbo_queue *queue,
-				   uint32_t new_owner_id, int64_t border_lsn)
+				   uint32_t new_owner_id, int64_t border_lsn,
+				   const struct vclock *confirmed_vclock)
 {
 	/* New transactions can't be coming during the ownership switch. */
 	assert(queue->is_fenced);
@@ -760,8 +774,14 @@ txn_limbo_queue_transfer_ownership(struct txn_limbo_queue *queue,
 				       TXN_SIGNATURE_SYNC_ROLLBACK);
 	assert(txn_limbo_queue_is_empty(queue));
 	queue->owner_id = new_owner_id;
-	queue->confirmed_lsn = vclock_get(&queue->confirmed_vclock,
-					  new_owner_id);
+	/*
+	 * The confirmed history can only grow. Ahead in some components or
+	 * incomparable - VCLOCK_ORDER_UNDEFINED is a positive value too.
+	 */
+	assert(vclock_compare_ignore0(&queue->confirmed_vclock,
+				      confirmed_vclock) <= 0);
+	vclock_copy(&queue->confirmed_vclock, confirmed_vclock);
+	queue->confirmed_lsn = vclock_get(confirmed_vclock, new_owner_id);
 	queue->volatile_confirmed_lsn = queue->confirmed_lsn;
 	queue->entry_to_confirm = NULL;
 	/*

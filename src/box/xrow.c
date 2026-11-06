@@ -1371,6 +1371,8 @@ xrow_encode_synchro(struct xrow_header *row, char *body,
 		    const struct synchro_request *req)
 {
 	assert(iproto_type_is_synchro_request(req->type));
+	memset(row, 0, sizeof(*row));
+	row->type = req->type;
 	char *pos = body;
 	/* Skip one byte for the map. */
 	pos++;
@@ -1392,6 +1394,7 @@ xrow_encode_synchro(struct xrow_header *row, char *body,
 		break;
 	case IPROTO_RAFT_PROMOTE:
 	case IPROTO_RAFT_DEMOTE:
+		map_size = 3;
 		pos = mp_encode_uint(pos, IPROTO_REPLICA_ID);
 		pos = mp_encode_uint(pos, req->queue_owner_id);
 		pos = mp_encode_uint(pos, IPROTO_LSN);
@@ -1399,19 +1402,36 @@ xrow_encode_synchro(struct xrow_header *row, char *body,
 		pos = mp_encode_uint(pos, IPROTO_TERM);
 		pos = mp_encode_uint(pos, req->promote.term);
 		if (vclock_is_set(&req->promote.confirmed_vclock)) {
-			map_size = 4;
+			++map_size;
 			pos = mp_encode_uint(pos, IPROTO_VCLOCK);
 			pos = mp_encode_vclock_ignore0(
 				pos, &req->promote.confirmed_vclock);
-		} else {
-			map_size = 3;
+		}
+		if (vclock_is_set(&req->promote.term_map)) {
+			++map_size;
+			pos = mp_encode_uint(pos, IPROTO_TERM_MAP);
+			pos = mp_encode_vclock_ignore0(
+				pos, &req->promote.term_map);
+		}
+		if (req->promote.wait_ack) {
+			++map_size;
+			pos = mp_encode_uint(pos, IPROTO_FLAGS);
+			pos = mp_encode_uint(pos, IPROTO_FLAG_WAIT_ACK);
+		}
+		/*
+		 * Known only for a checkpoint row describing a row written
+		 * earlier. A fresh request learns its LSN from the journal
+		 * write, after the encoding, and carries it in the row header.
+		 */
+		if (req->promote.journal_lsn != 0) {
+			++map_size;
+			pos = mp_encode_uint(pos, IPROTO_ROW_LSN);
+			pos = mp_encode_uint(pos, req->promote.journal_lsn);
 		}
 		break;
 	}
 	mp_encode_map(body, map_size);
 	assert(pos - body < XROW_BODY_LEN_MAX);
-	memset(row, 0, sizeof(*row));
-	row->type = req->type;
 	row->body[0].iov_base = body;
 	row->body[0].iov_len = pos - body;
 	row->bodycnt = 1;
@@ -1486,6 +1506,7 @@ xrow_decode_synchro_promote(struct synchro_request *req, const char *d)
 	assert(req->type == IPROTO_RAFT_PROMOTE ||
 	       req->type == IPROTO_RAFT_DEMOTE);
 	vclock_clear(&req->promote.confirmed_vclock);
+	vclock_clear(&req->promote.term_map);
 	uint32_t map_size = mp_decode_map(&d);
 	for (uint32_t i = 0; i < map_size; i++) {
 		enum mp_type type = mp_typeof(*d);
@@ -1513,6 +1534,20 @@ xrow_decode_synchro_promote(struct synchro_request *req, const char *d)
 					&d,
 					&req->promote.confirmed_vclock) != 0)
 				return -1;
+			break;
+		case IPROTO_TERM_MAP:
+			if (mp_decode_vclock_ignore0(
+					&d, &req->promote.term_map) != 0)
+				return -1;
+			break;
+		case IPROTO_FLAGS: {
+			uint64_t flags = mp_decode_uint(&d);
+			req->promote.wait_ack =
+				(flags & IPROTO_FLAG_WAIT_ACK) != 0;
+			break;
+		}
+		case IPROTO_ROW_LSN:
+			req->promote.journal_lsn = mp_decode_uint(&d);
 			break;
 		default:
 			mp_next(&d);
@@ -1543,6 +1578,8 @@ xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req)
 		break;
 	case IPROTO_RAFT_PROMOTE:
 	case IPROTO_RAFT_DEMOTE:
+		/* The body overrides it for a checkpoint row. */
+		req->promote.journal_lsn = row->lsn;
 		rc = xrow_decode_synchro_promote(req, d);
 		break;
 	}
