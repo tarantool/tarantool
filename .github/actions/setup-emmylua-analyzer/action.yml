@@ -1,8 +1,16 @@
 name: Setup EmmyLua tools on Linux
 
-description: Install emmylua_check and, optionally, emmylua_doc_cli
+description: Install emmylua_check, emmylua_ls and, optionally, emmylua_doc_cli
 
 inputs:
+  check:
+    description: Install emmylua_check and the Rust toolchain required for it
+    required: false
+    default: "true"
+  language-server:
+    description: Install emmylua_ls required by the annotation tests
+    required: false
+    default: "false"
   doc-cli:
     description: Also install emmylua_doc_cli
     required: false
@@ -16,11 +24,13 @@ runs:
   using: composite
   steps:
     - name: Setup Rust toolchain
+      if: inputs.check == 'true'
       uses: actions-rust-lang/setup-rust-toolchain@v1
       with:
         toolchain: stable
 
     - name: Cache Cargo dependencies
+      if: inputs.check == 'true'
       uses: actions/cache@v4
       with:
         path: |
@@ -32,7 +42,52 @@ runs:
           ${{ runner.os }}-cargo-
 
     - name: Setup emmylua_check
+      if: inputs.check == 'true'
       run: cargo install emmylua_check --version ${{ inputs.emmylua-version }}
+      shell: bash
+
+    # Building emmylua_ls from sources requires the Rust toolchain, which is
+    # not available in all the CI images and takes minutes to install and
+    # build, so the prebuilt binary is used instead.
+    - name: Setup emmylua_ls
+      if: inputs.language-server == 'true'
+      run: |
+        set -euo pipefail
+        case "$(uname -m)" in
+          x86_64)
+            ASSET=emmylua_ls-linux-musl.tar.gz
+            ;;
+          aarch64|arm64)
+            ASSET=emmylua_ls-linux-aarch64-glibc.2.17.tar.gz
+            ;;
+          *)
+            echo "::error::unsupported architecture: $(uname -m)"
+            exit 1
+            ;;
+        esac
+        # The checksums are pinned per release, so a new version needs its
+        # checksum to be added here.
+        case "${{ inputs.emmylua-version }}:${ASSET}" in
+          0.25.1:emmylua_ls-linux-musl.tar.gz)
+            SHA256=56c0c34494436817ba6aeb0964172d8e6522af6d1eea1c92e4c5bef55f03efc3
+            ;;
+          0.25.1:emmylua_ls-linux-aarch64-glibc.2.17.tar.gz)
+            SHA256=210535be13c31ceefcdd0f8451eb4c0d3d430887fc2c382eaf82484a9187220d
+            ;;
+          *)
+            echo "::error::no checksum for ${{ inputs.emmylua-version }}:${ASSET}"
+            exit 1
+            ;;
+        esac
+        URL=https://github.com/EmmyLuaLs/emmylua-analyzer-rust
+        URL="${URL}/releases/download/${{ inputs.emmylua-version }}/${ASSET}"
+        curl -fsSL -o emmylua_ls.tar.gz "${URL}"
+        echo "${SHA256}  emmylua_ls.tar.gz" | sha256sum -c -
+        tar xzf emmylua_ls.tar.gz
+        SUDO=$([ "$(id -u)" = 0 ] || echo sudo)
+        ${SUDO} install -m 0755 emmylua_ls /usr/local/bin/emmylua_ls
+        rm -f emmylua_ls emmylua_ls.tar.gz
+        emmylua_ls --version
       shell: bash
 
     - name: Setup emmylua_doc_cli

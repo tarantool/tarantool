@@ -893,6 +893,9 @@ endif ()
 add_subdirectory(src)
 add_subdirectory(doc)
 
+# Create the Lua API documentation target after all lua_stub() calls.
+lua_doc()
+
 option(WITH_NOTIFY_SOCKET "Enable notifications on NOTIFY_SOCKET" ON)
 
 if (WITH_SYSTEMD AND NOT WITH_NOTIFY_SOCKET)
