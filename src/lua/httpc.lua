@@ -29,6 +29,242 @@
 --  SUCH DAMAGE.
 --
 
+---# Builtin `http` module
+---
+---The `http` module, specifically the `http.client` submodule, provides the
+---functionality of an HTTP client with support for HTTPS and keepalive.
+---
+---The HTTP client uses the [libcurl](https://curl.haxx.se/libcurl/) library
+---under the hood and takes into account the environment variables libcurl
+---understands.
+---@class http.client
+---The `http.client` module provides the API for making HTTP requests. The
+---module itself acts as the default client instance: request methods can be
+---called with the dot syntax, for example `http.get(url, opts)`. To create a
+---configured client instance, use `http.client.new()`.
+---
+---@field new fun(options?: http.client.options): http.client_object
+---
+---Encoders used to serialize request bodies.
+---@field encoders table<string, fun(body: any, content_type?: string): string>
+---
+---Decoders used to deserialize response bodies.
+---@field decoders table<string, fun(body: string, content_type?: string): any>
+---
+---Make an HTTP request and receive a response.
+---@field request fun(method: string, url: string, body?: any,
+---    options?: http.client.request.options): http.client.result
+---
+---Make a `GET` request and receive a response.
+---@field get fun(url: string, options?: http.client.request.options):
+---    http.client.result
+---
+---Make a `POST` request and receive a response.
+---@field post fun(url: string, body?: any,
+---    options?: http.client.request.options): http.client.result
+---
+---Make a `PUT` request and receive a response.
+---@field put fun(url: string, body?: any,
+---    options?: http.client.request.options): http.client.result
+---
+---Make a `PATCH` request and receive a response.
+---@field patch fun(url: string, body?: any,
+---    options?: http.client.request.options): http.client.result
+---
+---Make an `OPTIONS` request and receive a response.
+---@field options fun(url: string, options?: http.client.request.options):
+---    http.client.result
+---
+---Make a `HEAD` request and receive a response.
+---@field head fun(url: string, options?: http.client.request.options):
+---    http.client.result
+---
+---Make a `DELETE` request and receive a response.
+---@field delete fun(url: string, options?: http.client.request.options):
+---    http.client.result
+---
+---Make a `TRACE` request and receive a response.
+---@field trace fun(url: string, options?: http.client.request.options):
+---    http.client.result
+---
+---Make a `CONNECT` request and receive a response.
+---@field connect fun(url: string, options?: http.client.request.options):
+---    http.client.result
+
+---@alias http.client.result http.response|http.io
+
+---@class http.client_object
+---An HTTP client instance that exposes the API for making requests. To
+---create a client, call `http.client.new()`. Request methods are called
+---with the colon syntax, for example `client:get(url, opts)`.
+---
+---@field request fun(self: http.client_object, method: string, url: string,
+---    body?: any, options?: http.client.request.options): http.client.result
+---
+---Make a `GET` request and receive a response.
+---@field get fun(self: http.client_object, url: string,
+---    options?: http.client.request.options): http.client.result
+---
+---Make a `POST` request and receive a response.
+---@field post fun(self: http.client_object, url: string, body?: any,
+---    options?: http.client.request.options): http.client.result
+---
+---Make a `PUT` request and receive a response.
+---@field put fun(self: http.client_object, url: string, body?: any,
+---    options?: http.client.request.options): http.client.result
+---
+---Make a `PATCH` request and receive a response.
+---@field patch fun(self: http.client_object, url: string, body?: any,
+---    options?: http.client.request.options): http.client.result
+---
+---Make an `OPTIONS` request and receive a response.
+---@field options fun(self: http.client_object, url: string,
+---    options?: http.client.request.options): http.client.result
+---
+---Make a `HEAD` request and receive a response.
+---@field head fun(self: http.client_object, url: string,
+---    options?: http.client.request.options): http.client.result
+---
+---Make a `DELETE` request and receive a response.
+---@field delete fun(self: http.client_object, url: string,
+---    options?: http.client.request.options): http.client.result
+---
+---Make a `TRACE` request and receive a response.
+---@field trace fun(self: http.client_object, url: string,
+---    options?: http.client.request.options): http.client.result
+---
+---Make a `CONNECT` request and receive a response.
+---@field connect fun(self: http.client_object, url: string,
+---    options?: http.client.request.options): http.client.result
+---
+---Get a table with statistics for the HTTP client.
+---@field stat fun(self: http.client_object): http.client.stat
+---
+---Encoders used to serialize request bodies.
+---@field encoders table<string, fun(body: any, content_type?: string): string>
+---
+---Decoders used to deserialize response bodies.
+---@field decoders table<string, fun(body: string, content_type?: string): any>
+
+---@class http.client.options
+---Configuration options of the client. These options can be passed to the
+---`http.client.new()` function.
+---
+---@field max_connections? integer The maximum number of entries in the
+---    connection cache. The default is -1.
+---@field max_total_connections? integer The maximum number of active
+---    connections. The default is 0, which allows libcurl to scale
+---    accordingly.
+
+---@class http.client.request.options
+---Options passed to a request method (`request`, `get`, `post`, and so on).
+---
+---@field ca_file? string The path to an SSL certificate file to verify the
+---    peer with.
+---@field ca_path? string The path to a directory holding one or more
+---    certificates to verify the peer with.
+---@field chunked? boolean Whether to return an IO object for streaming
+---    download/upload instead of the full response. The default is false.
+---@field headers? table<string, string|string[]> A table of HTTP headers.
+---@field params? table<string, any> A table of parameters passed to a
+---    request. For GET, HEAD, and DELETE requests, these are query string
+---    parameters. For POST, PUT, and PATCH requests, they are sent as form
+---    parameters using the application/x-www-form-urlencoded type.
+---@field keepalive_idle? integer A delay (in seconds) the operating system
+---    waits while the connection is idle before sending keepalive probes.
+---@field keepalive_interval? integer The interval (in seconds) the operating
+---    system waits between sending keepalive probes. If both keepalive_idle
+---    and keepalive_interval are set, then Tarantool also sets the HTTP
+---    keepalive headers: `Connection:Keep-Alive` and
+---    `Keep-Alive:timeout=<keepalive_idle>`. Otherwise, Tarantool sends
+---    `Connection:close`.
+---@field low_speed_limit? integer The average transfer speed in bytes per
+---    second that the transfer should be below during "low speed time"
+---    seconds for the library to consider it to be too slow and abort.
+---@field low_speed_time? integer The time that the transfer speed should be
+---    below the "low speed limit" for the library to consider it too slow
+---    and abort.
+---@field max_header_name_length? integer The maximum length of a header
+---    name. If a header name length exceeds this value, it is truncated to
+---    this length. The default value is 32.
+---@field follow_location? boolean Whether the client will follow the
+---    'Location' header that a server sends as part of a 3xx response. The
+---    default is true.
+---@field no_proxy? string A comma-separated list of hosts that do not
+---    require proxies, or '*', or ''.
+---@field proxy? string A proxy server host or IP address, or ''.
+---@field proxy_port? integer A proxy server port. The default is 443 for
+---    an HTTPS proxy and 1080 for a non-HTTPS proxy.
+---@field proxy_user_pwd? string A proxy server username and password.
+---@field ssl_cert? string The path to an SSL client certificate file.
+---@field ssl_key? string The path to a private key file for a TLS and SSL
+---    client certificate.
+---@field timeout? integer The number of seconds to wait for a curl API read
+---    request before timing out. The default is 36586400100.
+---@field unix_socket? string A socket name to use instead of an Internet
+---    address for a local connection.
+---@field verbose? boolean Turn on/off a verbose mode.
+---@field verify_host? boolean Enable verification of the certificate's name
+---    (CN) against the specified host.
+---@field verify_peer? boolean Set on/off verification of the peer's SSL
+---    certificate.
+---@field accept_encoding? string Enables automatic decompression of HTTP
+---    responses by setting the contents of the `Accept-Encoding` header sent
+---    in an HTTP request and enabling decoding of a response when the
+---    `Content-Encoding` header is received.
+---@field http_version? string Describes an HTTP version.
+---@field interface? string A source interface for outgoing traffic.
+
+---@class http.response
+---A response object returned by a request method (`request`, `get`, `post`,
+---and so on).
+---
+---@field status integer A response status code.
+---@field reason string A response status text.
+---@field headers table<string, string|string[]> Response headers.
+---@field cookies? table<string, [string, string[]]> Response cookies, where
+---    the first element is the cookie value and the second one is an array
+---    with the cookie's options.
+---@field body? string A response body.
+---@field proto? table The HTTP protocol version, `{1: major, 2: minor}`.
+---@field url string The request URL.
+---@field decode fun(self: http.response): any Decode the response body to a
+---    Lua object based on the content type.
+
+---@class http.io
+---An IO object used to read or write data in chunks. To get an IO object
+---instead of the full response, set the `chunked` request option to true.
+---
+---@field read fun(self: http.io, opts: integer|string|
+---    {chunk?: integer, delimiter?: string|string[]},
+---    timeout?: integer): string?
+---
+---Write the specified chunk of data. `timeout` is the number of seconds
+---to wait; the default is 10.
+---@field write fun(self: http.io, data: string, timeout?: integer): integer
+---
+---Finish reading or writing data. `timeout` is the number of seconds to
+---wait; the default is 10.
+---@field finish fun(self: http.io, timeout?: integer)
+---@field status? integer A response status code, set after `finish()`.
+---@field reason? string A response status text, set after `finish()`.
+
+---@class http.client.stat
+---Statistics of the HTTP client.
+---
+---@field active_requests integer The number of currently executing requests.
+---@field sockets_added integer The total number of sockets added into an
+---    event loop.
+---@field sockets_deleted integer The total number of sockets deleted from an
+---    event loop.
+---@field total_requests integer The total number of requests.
+---@field http_200_responses integer The total number of requests that
+---    returned HTTP 200 OK responses.
+---@field http_other_responses integer The total number of requests that
+---    returned non-200 OK responses.
+---@field failed_requests integer The total number of failed requests,
+---    including system, curl, and HTTP errors.
+
 local driver = require('http.client.lib')
 
 local ffi = require('ffi')
@@ -72,18 +308,10 @@ local function filter_out_private_fields(t)
     return res
 end
 
---
---  <http> - create a new curl instance.
---
---  Parameters:
---
---  max_connections -  Maximum number of entries in the connection cache
---  max_total_connections -  Maximum number of active connections
---
---  Returns:
---  curl object or raise error()
---
-
+---Create an HTTP client instance.
+---
+---@param opts? http.client.options configuration options of the client.
+---@return http.client_object client a new HTTP client instance.
 local http_new = function(opts)
 
     opts = opts or {}
@@ -235,6 +463,9 @@ end
 -- See RFC 1521, https://www.w3.org/Protocols/HTTP/1.0/spec.html#Media-Types
 -- Function splits header with content type for part with type, part with
 -- subtype and part with parameters and returns a string "type/subtype".
+---
+---@param content_type? string a Content-Type header value.
+---@return string? mime_type a "type/subtype" part, or nil.
 local function extract_mime_type(content_type)
     if content_type == nil then
         return nil
@@ -254,6 +485,11 @@ end
 
 -- Get a value from map by case-insensitive key.
 -- Returns the value in the lower case on the first match.
+---
+---@param t table a map to look up the key in.
+---@param key string a key to look up.
+---@return string? value the value in the lower case on the first match, or
+---    nil.
 local function get_icase(t, key)
     key = string_lower(key)
     for k, v in pairs(t) do
@@ -267,8 +503,15 @@ local function get_icase(t, key)
     return nil
 end
 
+---Serialize a request body according to the content type.
+---
+---@param body any a request body.
+---@param content_type string a Content-Type header value.
+---@param encoders table<string, fun(body: any, content_type: string): string>
+---    a table of encoders.
+---@return string raw_body a serialized body.
 local function encode_body(body, content_type, encoders)
-    local raw_body
+    local raw_body = ''
     local body_type = type(body)
     local mime_type
     if body == nil then
@@ -303,6 +546,11 @@ local default_decoder = function(raw_body, _content_type)
     return json.decode(raw_body)
 end
 
+---Deserialize a response body to a Lua object based on the Content-Type
+---header value.
+---
+---@param response http.response a response object.
+---@return any result a decoded body.
 local function decode_body(response)
     if response.body == nil then
         error('Unable to decode body: body is empty')
@@ -383,6 +631,20 @@ local function check_delimiter(self, limit, eols)
     return nil
 end
 
+---Read request data in chunks of a specified length or up to a specific
+---delimiter.
+---
+---@overload fun(self: http.io, chunk: integer, timeout?: integer): string?
+---@overload fun(self: http.io, delimiter: string, timeout?: integer): string?
+---@overload fun(self: http.io, opts: {chunk?: integer,
+---    delimiter?: string|string[]}, timeout?: integer): string?
+---@param self http.io
+---@param opts integer|string|{chunk?: integer, delimiter?: string|string[]}
+---    the maximum number of bytes to read, the delimiter used to stop
+---    reading, or a table with `chunk` and `delimiter` fields.
+---@param timeout? integer the number of seconds to wait. The default is 10.
+---@return string? data a chunk of read data, an empty string if there is
+---    nothing more to read, or nil on timeout.
 local function io_read(self, opts, timeout)
     timeout = timeout or IO_TIMEOUT_DEFAULT
     local chunk
@@ -455,101 +717,43 @@ local function io_read(self, opts, timeout)
     return nil
 end
 
+---Write a chunk of data.
+---
+---@param self http.io
+---@param data string data to be written.
+---@param timeout? integer the number of seconds to wait. The default is 10.
 local function io_write(self, data, timeout)
     timeout = timeout or IO_TIMEOUT_DEFAULT
     return self._internal.io:write(data, #data, timeout)
 end
 
+---Finish reading or writing data.
+---
+---@param self http.io
+---@param timeout? integer the number of seconds to wait. The default is 10.
 local function io_finish(self, timeout)
     timeout = timeout or IO_TIMEOUT_DEFAULT
     self["status"], self["reason"] = self._internal.io:finish(timeout)
 end
 
---
---  <request> This function does HTTP request
---
---  Parameters:
---
---  method  - HTTP method, like GET, POST, PUT and so on
---  url     - HTTP url, like https://tarantool.org/doc
---  body    - this parameter is optional, you may use it for passing
---            data to a server. Like 'My text string!'
---  options - this is a table of options.
---
---      ca_path - a path to ssl certificate dir;
---
---      ca_file - a path to ssl certificate file;
---
---      unix_socket - a path to Unix domain socket;
---
---      verify_host - set on/off verification of the certificate's name (CN)
---          against host;
---
---      verify_peer - set on/off verification of the peer's SSL certificate;
---
---      ssl_key - set path to the file with private key for TLS and SSL client
---          certificate;
---
---      ssl_cert - set path to the file with SSL client certificate;
---
---      proxy - set a proxy to use;
---
---      proxy_port - set a port number the proxy listens on;
---
---      proxy_user_pwd - set a user name and a password to use in authentication;
---
---      no_proxy - disable proxy use for specific hosts;
---
---      headers - a table of HTTP headers;
---
---      keepalive_idle & keepalive_interval -
---          non-universal keepalive knobs (Linux, AIX, HP-UX, more);
---
---      low_speed_time & low_speed_limit -
---          If the download receives less than "low speed limit" bytes/second
---          during "low speed time" seconds, the operations is aborted.
---          You could i.e if you have a pretty high speed connection, abort if
---          it is less than 2000 bytes/sec during 20 seconds;
---
---      timeout - time-out the read operation and
---          waiting for the curl api request after this amount of seconds;
---
---      max_header_name_length - maximum length of a response header;
---
---      verbose - set on/off verbose mode;
---
---      interface - source interface for outgoing traffic;
---
---      follow_location - whether the client will follow 'Location' header that
---          a server sends as part of an 3xx response;
---
---      accept_encoding - enables automatic decompression of HTTP responses;
---
---      http_version - describes an http version;
---
---      chunked - enables chunked io interface;
---
---      params - a table with query parameters;
---
---  Returns:
---      {
---          status=NUMBER (if the request is completed),
---          reason=ERRMSG (if the request is completed),
---          body=STRING (if !opts.chunked == false),
---          headers=STRING,
---          errmsg=STRING (if the request is completed),
---          write=FUNCTION (if opts.chunked == true),
---          read=FUNCTION (if opts.chunked == true),
---          finish=FUNCTION (if opts.chunked == true),
---      }
---  Raises error() on invalid arguments and OOM
---
-
 curl_mt = {
     __index = {
-        --
-        --  <request> see above <request>
-        --
+        ---Make an HTTP request and receive a response.
+        ---
+        ---The response object is returned if the `chunked` option is false
+        ---(the default), otherwise an IO object is returned for streaming
+        ---download/upload.
+        ---
+        ---@param self http.client_object
+        ---@param method string an HTTP method, possible values: 'GET',
+        ---    'POST', 'PUT', 'PATCH', 'OPTIONS', 'HEAD', 'DELETE', 'TRACE',
+        ---    'CONNECT'.
+        ---@param url string a request URL, for example,
+        ---    'https://httpbin.org/get'.
+        ---@param body? any a request body.
+        ---@param opts? http.client.request.options request options.
+        ---@return http.client.result result a response object, or an IO
+        ---    object if `opts.chunked` is set to true.
         request = function(self, method, url, body, opts)
             if not method or not url then
                 error('request(method, url[, body, [options]])')
@@ -623,107 +827,121 @@ curl_mt = {
             end
         end,
 
-        --
-        -- <get> - see <request>
-        --
+        ---Shortcut for `request('GET', url, nil, options)`.
+        ---
+        ---@param self http.client_object
+        ---@param url string a request URL.
+        ---@param options? http.client.request.options request options.
+        ---@return http.client.result result a response object, or an IO
+        ---    object if `options.chunked` is set to true.
         get = function(self, url, options)
             check_args(self, 'get')
             return self:request('GET', url, nil, options)
         end,
 
-        --
-        -- <post> - see <request>
-        --
+        ---Shortcut for `request('POST', url, body, options)`.
+        ---
+        ---@param self http.client_object
+        ---@param url string a request URL.
+        ---@param body? any a request body.
+        ---@param options? http.client.request.options request options.
+        ---@return http.client.result result a response object, or an IO
+        ---    object if `options.chunked` is set to true.
         post = function(self, url, body, options)
             check_args(self, 'post')
             return self:request('POST', url, body, options)
         end,
 
-        --
-        -- <put> - see <request>
-        --
+        ---Shortcut for `request('PUT', url, body, options)`.
+        ---
+        ---@param self http.client_object
+        ---@param url string a request URL.
+        ---@param body? any a request body.
+        ---@param options? http.client.request.options request options.
+        ---@return http.client.result result a response object, or an IO
+        ---    object if `options.chunked` is set to true.
         put = function(self, url, body, options)
             check_args(self, 'put')
             return self:request('PUT', url, body, options)
         end,
 
-        --
-        -- <patch> - see <request>
-        --
+        ---Shortcut for `request('PATCH', url, body, options)`.
+        ---
+        ---@param self http.client_object
+        ---@param url string a request URL.
+        ---@param body? any a request body.
+        ---@param options? http.client.request.options request options.
+        ---@return http.client.result result a response object, or an IO
+        ---    object if `options.chunked` is set to true.
         patch = function(self, url, body, options)
             check_args(self, 'patch')
             return self:request('PATCH', url, body, options)
         end,
 
-        --
-        -- <options> see <request>
-        --
+        ---Shortcut for `request('OPTIONS', url, nil, options)`.
+        ---
+        ---@param self http.client_object
+        ---@param url string a request URL.
+        ---@param options? http.client.request.options request options.
+        ---@return http.client.result result a response object, or an IO
+        ---    object if `options.chunked` is set to true.
         options = function(self, url, options)
             check_args(self, 'options')
             return self:request('OPTIONS', url, nil, options)
         end,
 
-        --
-        -- <head> see <request>
-        --
+        ---Shortcut for `request('HEAD', url, nil, options)`.
+        ---
+        ---@param self http.client_object
+        ---@param url string a request URL.
+        ---@param options? http.client.request.options request options.
+        ---@return http.client.result result a response object, or an IO
+        ---    object if `options.chunked` is set to true.
         head = function(self, url, options)
             check_args(self, 'head')
             return self:request('HEAD', url, nil, options)
         end,
-        --
-        -- <delete> see <request>
-        --
+
+        ---Shortcut for `request('DELETE', url, nil, options)`.
+        ---
+        ---@param self http.client_object
+        ---@param url string a request URL.
+        ---@param options? http.client.request.options request options.
+        ---@return http.client.result result a response object, or an IO
+        ---    object if `options.chunked` is set to true.
         delete = function(self, url, options)
             check_args(self, 'delete')
             return self:request('DELETE', url, nil, options)
         end,
 
-        --
-        -- <trace> see <request>
-        --
+        ---Shortcut for `request('TRACE', url, nil, options)`.
+        ---
+        ---@param self http.client_object
+        ---@param url string a request URL.
+        ---@param options? http.client.request.options request options.
+        ---@return http.client.result result a response object, or an IO
+        ---    object if `options.chunked` is set to true.
         trace = function(self, url, options)
             check_args(self, 'trace')
             return self:request('TRACE', url, nil, options)
         end,
 
-        --
-        -- <connect> see <request>
-        --
+        ---Shortcut for `request('CONNECT', url, nil, options)`.
+        ---
+        ---@param self http.client_object
+        ---@param url string a request URL.
+        ---@param options? http.client.request.options request options.
+        ---@return http.client.result result a response object, or an IO
+        ---    object if `options.chunked` is set to true.
         connect = function(self, url, options)
             check_args(self, 'connect')
             return self:request('CONNECT', url, nil, options)
         end,
 
-        --
-        -- <stat> - this function returns a table with many values of statistic.
-        --
-        -- Returns {
-        --
-        --  active_requests - this is number of currently executing requests
-        --
-        --  sockets_added -
-        --  this is a total number of added sockets into libev loop
-        --
-        --  sockets_deleted -
-        --  this is a total number of deleted sockets from libev
-        --                      loop
-        --
-        --  total_requests - this is a total number of requests
-        --
-        --  http_200_responses -
-        --  this is a total number of requests which have
-        --              returned a code HTTP 200
-        --
-        --  http_other_responses -
-        --      this is a total number of requests which have
-        --      requests not a HTTP 200
-        --
-        --  failed_requests - this is a total number of requests which have
-        --      failed (included systeme erros, curl errors, HTTP
-        --      errors and so on)
-        --  }
-        --  or error()
-        --
+        ---Get a table with statistics for the HTTP client.
+        ---
+        ---@param self http.client_object
+        ---@return http.client.stat stat a table with statistics.
         stat = function(self)
             return self.curl:stat()
         end,
@@ -748,6 +966,11 @@ local this_module = {
     }
 }
 
+---Wrap a method of the default HTTP client instance to call it with the
+---dot syntax.
+---
+---@param fname string a method name of the default client instance.
+---@return function wrapped function.
 local function http_default_wrap(fname)
     return function(...) return http_default[fname](http_default, ...) end
 end
@@ -758,4 +981,5 @@ for _, name in ipairs({ 'get', 'delete', 'trace', 'options', 'head',
 end
 this_module.curl = http_default.curl
 
+---@type http.client
 return this_module
