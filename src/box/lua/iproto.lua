@@ -12,13 +12,13 @@ local function flatten_func_table(arg, level)
     local ret = {}
     for k, v in pairs(arg) do
         utils.check_param(k, 'function name', 'string', level)
-        if type(v) == 'table' then
+        if utils.is_callable(v) then
+            ret[k] = v
+        elseif type(v) == 'table' then
             v = flatten_func_table(v, level + 1)
             for k1, v1 in pairs(v) do
                 ret[k .. '.' .. k1] = v1
             end
-        else
-            ret[k] = v
         end
     end
     return ret
@@ -35,17 +35,15 @@ end
 box.iproto.export = function(name_or_table, func_or_nil)
     local func_table
     if type(name_or_table) == 'table' then
-        func_table = name_or_table
+        func_table = flatten_func_table(name_or_table)
     elseif name_or_table ~= nil and func_or_nil ~= nil then
+        utils.check_param(name_or_table, 'function name', 'string', 2)
+        utils.check_param(func_or_nil, 'function object', 'function', 2)
         func_table = {[name_or_table] = func_or_nil}
     else
         box.error(box.error.ILLEGAL_PARAMS,
                   'Usage: box.iproto.export(name, func) or '..
                   'box.iproto.export({[name] = func})', 2)
-    end
-    func_table = flatten_func_table(func_table)
-    for _, func in pairs(func_table) do
-        utils.check_param(func, 'function object', 'function', 2)
     end
     for name in pairs(func_table) do
         if box.internal.func_registry[name] ~= nil then
@@ -64,21 +62,20 @@ end
 -- Cancels the effect of box.iproto.export().
 --
 -- Similarly to box.iproto.export(), the function takes either the name of
--- an exported function or a table where keys are function names and values
--- are ignored.
+-- an exported function or a table {[name] = function}.
 --
 box.iproto.unexport = function(name_or_table)
     local func_table
     if type(name_or_table) == 'table' then
-        func_table = name_or_table
+        func_table = flatten_func_table(name_or_table)
     elseif name_or_table ~= nil then
+        utils.check_param(name_or_table, 'function name', 'string', 2)
         func_table = {[name_or_table] = box.NULL}
     else
         box.error(box.error.ILLEGAL_PARAMS,
                   'Usage: box.iproto.unexport(name) or '..
                   'box.iproto.unexport({[name] = func})', 2)
     end
-    func_table = flatten_func_table(func_table)
     for name in pairs(func_table) do
         if box.internal.func_registry[name] == nil then
             box.error(box.error.NO_SUCH_FUNCTION, name, 2)
