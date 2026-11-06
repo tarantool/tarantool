@@ -165,9 +165,9 @@ local function stress_test_impl(seed, interactive_dml, wal_errinj)
                     box.error.injection.set('ERRINJ_WAL_DELAY', false)
                 end
                 if math.random(1, 10) < 9 then
-                    box.error.injection.set('ERRINJ_WAL_ERROR', true)
+                    box.error.injection.set('ERRINJ_WAL_WRITE', true)
                     fiber.sleep(0.5)
-                    box.error.injection.set('ERRINJ_WAL_ERROR', false)
+                    box.error.injection.set('ERRINJ_WAL_WRITE', false)
                 end
             end
         end

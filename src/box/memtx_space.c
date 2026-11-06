@@ -1630,6 +1630,7 @@ memtx_space_finish_alter(struct space *old_space, struct space *new_space)
 	struct memtx_space *old_memtx_space = (struct memtx_space *)old_space;
 	struct memtx_space *new_memtx_space = (struct memtx_space *)new_space;
 
+	memtx_tx_space_account_uncommitted_tuple_stat(old_space, in_txn());
 	bool is_empty = new_space->index_count == 0 ||
 			index_size(new_space->index[0]) == 0;
 	if (!is_empty) {
