@@ -70,6 +70,19 @@ _ = fiber.create(function() local r = pcall(s.replace, s, {1}) c:put(r) end)
 _ = test_run:wait_cond(function() return count_inprogress() > 0 end)
  | ---
  | ...
+ls = fio.listdir(box.cfg.wal_dir)
+ | ---
+ | ...
+table.sort(ls)
+ | ---
+ | ...
+ls
+ | ---
+ | - - 00000000000000000002.snap
+ |   - 00000000000000000002.xlog
+ |   - 00000000000000000003.snap
+ |   - 00000000000000000003.xlog.inprogress
+ | ...
 assert(count_inprogress() == 1)
  | ---
  | - true
@@ -88,6 +101,18 @@ end
  | ...
 
 -- The xlog.inprogress file shouldn't be deleted by GC.
+ls = fio.listdir(box.cfg.wal_dir)
+ | ---
+ | ...
+table.sort(ls)
+ | ---
+ | ...
+ls
+ | ---
+ | - - 00000000000000000002.xlog
+ |   - 00000000000000000003.snap
+ |   - 00000000000000000003.xlog.inprogress
+ | ...
 assert(count_inprogress() == 1)
  | ---
  | - true
@@ -104,6 +129,17 @@ assert(c:get() == true)
  | ...
 
 -- The xlog.inprogress file was renamed.
+ls = fio.listdir(box.cfg.wal_dir)
+ | ---
+ | ...
+table.sort(ls)
+ | ---
+ | ...
+ls
+ | ---
+ | - - 00000000000000000003.snap
+ |   - 00000000000000000003.xlog
+ | ...
 assert(count_inprogress() == 0)
  | ---
  | - true
