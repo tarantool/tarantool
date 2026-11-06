@@ -130,6 +130,23 @@ g.test_alter_field_count = function(cg)
     end)
 end
 
+--
+-- gh-13358: Check that an attempt to create a reference to a space
+-- without a primary key does not cause a segmentation fault.
+--
+g.test_13358_creating_reference_on_space_without_primaty_key = function(cg)
+    cg.server:exec(function()
+        box.schema.space.create('nopk', {format = {{'a', 'integer'}}})
+        local sql = [[ALTER TABLE nopk ADD COLUMN d INT REFERENCES nopk;]]
+        local _, err = box.execute(sql)
+        local exp_err = "Failed to create "..
+                        "foreign key constraint 'fk_unnamed_nopk_d_1': "..
+                        "The space 'nopk' lacks a primary key"
+        t.assert_equals(tostring(err), exp_err)
+        box.space.nopk:drop()
+    end)
+end
+
 g.after_test('test_alter_user', function(cg)
     cg.server:exec(function()
         box.schema.user.drop('test', {if_exists = true})
