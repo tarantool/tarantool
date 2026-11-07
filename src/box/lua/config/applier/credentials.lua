@@ -234,6 +234,22 @@ local function privileges_from_config(config_data)
     return intermediate
 end
 
+-- Check whether the config grants the 'execute' permission on the universe.
+-- Such a grant allows the subject to call all global functions, including
+-- box.session.su(), which is a frequently overlooked privilege escalation.
+local function has_dangerous_universe_execute(config_data)
+    for _, priv in ipairs(config_data.privileges or {}) do
+        if priv.universe then
+            for _, perm in ipairs(priv.permissions) do
+                if perm == 'execute' then
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
 -- Intermediate representation is basically a set, so this function subtracts
 -- `current` from `target`.
 -- Return privileges that are present in `target` but not in `current` as
@@ -545,6 +561,8 @@ local function sync_privileges(credentials, obj_to_sync)
     config._aboard:each(function(_key, alert)
         if alert._trait == 'missed_privilege' then
             alert._trait = 'missed_privilege_obsolete'
+        elseif obj_to_sync == nil and alert._trait == 'dangerous_execute' then
+            alert._trait = 'dangerous_execute_obsolete'
         end
     end)
 
@@ -561,6 +579,20 @@ local function sync_privileges(credentials, obj_to_sync)
         end
 
         local box_privileges = privileges_from_box(name)
+
+        if has_dangerous_universe_execute(config_privileges) then
+            local msg = ('credentials: %s %q is granted the execute ' ..
+                'permission on the universe. It allows calling all global ' ..
+                'functions, including box.session.su(). Consider granting ' ..
+                'execute only on the lua_call object type instead.'):format(
+                role_or_user, name)
+            config._aboard:set({
+                type = 'warn',
+                message = msg,
+                _trait = 'dangerous_execute',
+            }, {key = 'dangerous_execute/' .. role_or_user .. '/' .. name})
+        end
+
         config_privileges = privileges_from_config(config_privileges)
 
         local grants = privileges_subtract(config_privileges, box_privileges)
@@ -645,7 +677,8 @@ local function sync_privileges(credentials, obj_to_sync)
 
     -- Drop obsolete missed_privilege alerts.
     config._aboard:drop_if(function(_key, alert)
-        return alert._trait == 'missed_privilege_obsolete'
+        return alert._trait == 'missed_privilege_obsolete' or
+               alert._trait == 'dangerous_execute_obsolete'
     end)
 end
 
