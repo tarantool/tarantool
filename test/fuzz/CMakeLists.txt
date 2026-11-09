@@ -278,6 +278,10 @@ if (NOT ENABLE_UB_SANITIZER)
                    LIBRARIES core fuzzer_config)
 endif ()
 
+create_fuzz_test(PREFIX bps_tree
+                 SOURCES bps_tree_fuzzer.cc
+                 LIBRARIES small misc fuzzer_config)
+
 include(ProtobufMutator)
 
 add_subdirectory(luaL_loadbuffer)
