@@ -83,7 +83,7 @@ box.once('init', function()
     })
     s:create_index('pk')
     for i = 1, params.secondary_indexes do
-        s:create_index('sk' .. i, {parts = {{1}}, covers = {{2}}})
+        s:create_index('sk' .. i, {parts = {{1}}, covers = {2}})
     end
     fiber.set_max_slice(9000)
     box.begin()
