@@ -1287,6 +1287,18 @@ lbox_func_new_or_delete(struct trigger *trigger, void *event)
 	return 0;
 }
 
+/** Return the user name set in the runtime credentials. */
+static int
+lbox_runtime_user(struct lua_State *L)
+{
+	struct runtime_credentials *runtime_cr =
+			fiber()->storage.runtime_credentials;
+	const char *uname = runtime_cr->user_name != NULL ?
+			    runtime_cr->user_name : "guest";
+	lua_pushstring(L, uname);
+	return 1;
+}
+
 static int
 lbox_box_lua_call_runtime_priv_reset(struct lua_State *L)
 {
@@ -1349,6 +1361,7 @@ static const struct luaL_Reg boxlib_internal_main[] = {
 };
 
 static const struct luaL_Reg boxlib_internal_common[] = {
+	{"runtime_user", lbox_runtime_user},
 	{"lua_call_runtime_priv_grant", lbox_box_lua_call_runtime_priv_grant},
 	{"lua_call_runtime_priv_reset", lbox_box_lua_call_runtime_priv_reset},
 	{NULL, NULL}

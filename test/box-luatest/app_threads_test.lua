@@ -944,3 +944,46 @@ g.test_utf8 = function(cg)
         t.assert_equals(utf8.casecmp('aBc', 'AbC'), 0)
     end, {}, {_thread_id = 1})
 end
+
+g.after_test('test_box_session_user', function(cg)
+    cg.server:exec(function()
+        box.schema.user.drop('client', {if_exists = true})
+    end)
+    cg.server:exec(function()
+        box.internal.lua_call_runtime_priv_reset()
+    end, {}, {_thread_id = 1})
+end)
+
+g.test_box_session_user = function(cg)
+    cg.server:exec(function()
+        box.schema.user.create('client', {password = 'secret'})
+    end)
+    cg.server:exec(function()
+        box.internal.lua_call_runtime_priv_grant(
+            'guest', 'box.session.user')
+        box.internal.lua_call_runtime_priv_grant(
+            'guest', 'box.session.effective_user')
+        box.internal.lua_call_runtime_priv_grant(
+            'client', 'box.session.user')
+        box.internal.lua_call_runtime_priv_grant(
+            'client', 'box.session.effective_user')
+    end, {}, {_thread_id = 1})
+    local conn = cg.server.net_box
+    local conn1 = net.connect(cg.server.net_box_uri)
+    local conn2 = net.connect(cg.server.net_box_uri,
+                              {user = 'client', password = 'secret'})
+    t.assert_equals(conn:call('box.session.user', {},
+                    {_thread_id = 1}), 'admin')
+    t.assert_equals(conn:call('box.session.effective_user', {},
+                    {_thread_id = 1}), 'admin')
+    t.assert_equals(conn1:call('box.session.user', {},
+                    {_thread_id = 1}), 'guest')
+    t.assert_equals(conn1:call('box.session.effective_user', {},
+                    {_thread_id = 1}), 'guest')
+    t.assert_equals(conn2:call('box.session.user', {},
+                    {_thread_id = 1}), 'client')
+    t.assert_equals(conn2:call('box.session.effective_user', {},
+                    {_thread_id = 1}), 'client')
+    conn1:close()
+    conn2:close()
+end
