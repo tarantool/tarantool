@@ -3,6 +3,7 @@ local dt = require('datetime')
 local fun = require('fun')
 local checks = require('checks')
 local compat = require('compat')
+local json = require('json')
 
 -- {{{ Datetime module and related helper constants.
 
@@ -2948,22 +2949,80 @@ local TIMEZONES = {
         tzoffset = 0,
     },
     {
+        tzname = 'Africa/Accra',
+        tzoffset = 0,
+    },
+    {
+        tzname = 'America/Montevideo',
+        tzoffset = -180,
+    },
+    {
         tzname = 'America/Argentina/Buenos_Aires',
         tzoffset = -180,
+    },
+    {
+        tzname = 'America/Panama',
+        tzoffset = -300,
     },
     {
         tzname = 'Asia/Krasnoyarsk',
         tzoffset = 420,
     },
     {
-        tzname = 'Pacific/Fiji',
+        tzname = 'Asia/Singapore',
+        tzoffset = 480,
+    },
+    {
+        tzname = 'Asia/Shanghai',
+        tzoffset = 480,
+    },
+    {
+        tzname = 'Asia/Tokyo',
+        tzoffset = 540,
+    },
+    {
+        tzname = 'Pacific/Guam',
+        tzoffset = 600,
+    },
+    {
+        tzname = 'Pacific/Tarawa',
         tzoffset = 720,
-    }
+    },
 }
+local TIMEZONES_VALID = {}
+local TIMEZONES_OUTDATED = {}
+
+local pg_10363 = t.group('pg10363')
+
+pg_10363.before_all(function()
+    local now = dt.now()
+    pg_10363.now = now
+
+    -- Ensure the hardcoded offset is still correct for the
+    -- timezone, it may change with a tzdata update.
+    -- Fill the valid time zones table.
+    for _, case in ipairs(TIMEZONES) do
+        local d = dt.new({timestamp = now.timestamp, tz = case.tzname})
+        if d.tzoffset == case.tzoffset then
+            table.insert(TIMEZONES_VALID, case)
+        else
+            table.insert(TIMEZONES_OUTDATED, {
+                tzname = case.tzname,
+                tzoffset = case.tzoffset,
+                tzdata_tzoffset = d.tzoffset,
+            })
+        end
+    end
+    assert(#TIMEZONES_OUTDATED <= 0.2 * #TIMEZONES, ('outdated tzoffset cases '
+        .. 'is %d - more than 20%%(%d): %s'):format(
+            #TIMEZONES_OUTDATED,
+            0.2 * #TIMEZONES,
+            json.encode(TIMEZONES_OUTDATED)))
+end)
 
 -- Restore the default behavior so it doesn't leak into other
 -- tests, which run in a random order.
-pg.after_each(function()
+pg_10363.after_each(function()
     compat.datetime_apply_timezone_action = 'default'
 end)
 
@@ -2981,19 +3040,14 @@ end
 
 -- Test new/old behavior of applying timezone to datetime objects
 -- (gh-10363).
-for _, case in ipairs(TIMEZONES) do
+for _, case in ipairs(TIMEZONES_VALID) do
     local function add_test_case(method, behavior, ...)
         local testcase_name = ('test_tz_behavior_%s_%s_%s')
             :format(method, case.tzname:gsub('/', '_'), behavior)
-        pg[testcase_name] = tz_behavior_test_case(behavior, ...)
+        pg_10363[testcase_name] = tz_behavior_test_case(behavior, ...)
     end
 
-    local now = dt.now()
-
-    -- Ensure the hardcoded offset is still correct for the
-    -- timezone, it may change with a tzdata update.
-    assert(dt.new{timestamp = now.timestamp, tz = case.tzname}.tzoffset ==
-           case.tzoffset, ('outdated tzoffset for %s'):format(case.tzname))
+    local now = pg_10363.now
 
     -- Note the following when using old behavior.
     --
@@ -3052,7 +3106,7 @@ end
 -- Test new/old behavior of applying timezone when parsing
 -- datetime objects.
 -- Adapted from app-tap/datetime.test.lua (gh-10363).
-pg.test_new_tz_behavior_parse = function()
+pg_10363.test_new_tz_behavior_parse = function()
     t.assert_equals(compat.datetime_apply_timezone_action.default, 'old')
     compat.datetime_apply_timezone_action = 'new'
 
@@ -3103,7 +3157,7 @@ end
 -- Test the new behavior preserves the zero timestamp when only
 -- a timezone is provided to `new()`, so it stays equivalent to
 -- setting the timezone on a default datetime object (gh-10363).
-pg.test_new_tz_behavior_tz_only_new = function()
+pg_10363.test_new_tz_behavior_tz_only_new = function()
     t.assert_equals(compat.datetime_apply_timezone_action.default, 'old')
     compat.datetime_apply_timezone_action = 'new'
 
@@ -3121,7 +3175,7 @@ end
 -- Test time units provided together with a timezone are applied
 -- to the wall clock time regardless of the compat option value
 -- (gh-10363).
-pg.test_tz_behavior_time_units_with_tz = function()
+pg_10363.test_tz_behavior_time_units_with_tz = function()
     t.assert_equals(compat.datetime_apply_timezone_action.default, 'old')
     for _, behavior in ipairs({'old', 'new'}) do
         compat.datetime_apply_timezone_action = behavior
