@@ -33,6 +33,7 @@
 
 #include <assert.h>
 #include <ctype.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -144,15 +145,15 @@ json_parse_integer(struct json_lexer *lexer, struct json_token *token)
 	const char *pos = lexer->src + lexer->offset;
 	assert(pos < end);
 	int len = 0;
-	int value = 0;
+	int64_t value = 0;
 	char c = *pos;
 	if (! isdigit(c))
 		return lexer->symbol_count + 1;
 	do {
-		value = value * 10 + c - (int)'0';
+		value = value * 10 + (c - '0');
 		++len;
-	} while (++pos < end && isdigit((c = *pos)));
-	if (value < lexer->index_base)
+	} while (value <= INT_MAX && ++pos < end && isdigit((c = *pos)));
+	if (value < lexer->index_base || value > INT_MAX)
 		return lexer->symbol_count + 1;
 	lexer->offset += len;
 	lexer->symbol_count += len;
