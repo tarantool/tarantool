@@ -1262,7 +1262,8 @@ replicaset_is_connected(struct replicaset_connect_state *state,
 			return true;
 		}
 	}
-	if (state->connected == count)
+	/* Stopped appliers cannot make any more progress. */
+	if (state->connected + state->failed == count)
 		return true;
 	/*
 	 * After a quorum is reached, it is considered enough to proceed. Except
