@@ -529,7 +529,7 @@ applier_ballot_watcher_f(va_list ap)
 			return 0;
 		} catch (Exception *) {
 			diag_log();
-			applier_run_ballot_triggers(applier);
+			trigger_run(&applier->on_state, applier);
 			diag_clear(diag_get());
 			break;
 		}
