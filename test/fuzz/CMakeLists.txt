@@ -278,6 +278,21 @@ if (NOT ENABLE_UB_SANITIZER)
                    LIBRARIES core fuzzer_config)
 endif ()
 
+create_fuzz_test(PREFIX bps_tree
+                 SOURCES bps_tree_fuzzer.cc
+                 LIBRARIES small misc fuzzer_config)
+target_compile_definitions(bps_tree_fuzzer PRIVATE TEST_DEFAULT)
+
+create_fuzz_test(PREFIX bps_tree_inner_card
+                 SOURCES bps_tree_fuzzer.cc
+                 LIBRARIES small misc fuzzer_config)
+target_compile_definitions(bps_tree_inner_card_fuzzer PRIVATE TEST_INNER_CARD)
+
+create_fuzz_test(PREFIX bps_tree_inner_child_cards
+                 SOURCES bps_tree_fuzzer.cc
+                 LIBRARIES small misc fuzzer_config)
+target_compile_definitions(bps_tree_inner_child_cards_fuzzer PRIVATE TEST_INNER_CHILD_CARDS)
+
 include(ProtobufMutator)
 
 add_subdirectory(luaL_loadbuffer)
