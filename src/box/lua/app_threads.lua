@@ -313,6 +313,13 @@ local function box_info_init()
     end
 end
 
+local function box_session_init()
+    box.session = {
+        user = box.internal.runtime_user,
+        effective_user = box.internal.runtime_user,
+    }
+end
+
 --
 -- Initializes the subsystem in the current thread.
 --
@@ -337,6 +344,7 @@ function box.internal.threads.init(cfg, group_name, id_in_group, conn_fd)
     init_thread_groups(cfg)
     if not is_main then
         box_info_init()
+        box_session_init()
     end
 end
 
