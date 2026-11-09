@@ -272,4 +272,5 @@ print("-------------------------------------------------------------")
 # Cleanup
 sys.stdout.pop_filter()
 master.admin("box.schema.user.revoke('guest', 'replication')")
-master.admin("box.space._cluster:delete{2} ~= nil")
+# Foreign replicas are rejected before registration.
+master.admin("box.space._cluster:get{2} == nil")

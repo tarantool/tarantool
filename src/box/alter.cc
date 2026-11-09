@@ -4264,6 +4264,7 @@ on_commit_replicaset_uuid(struct trigger *trigger, void * /* event */)
 		return 0;
 	REPLICASET_UUID = *uuid;
 	box_broadcast_id();
+	box_broadcast_ballot();
 	say_info("replicaset uuid %s", tt_uuid_str(uuid));
 	return 0;
 }

@@ -17,7 +17,8 @@ assert(test_run:grep_log('master2', 'REPLICASET_UUID_MISMATCH'))
 info = box.info
 repl_info = info.replication[1]
 assert(not repl_info.downstream and not repl_info.upstream)
-assert(info.status == 'orphan')
+-- A peer rejected on connect does not contribute to the sync quorum.
+assert(info.status == 'running')
 
 test_run:switch('default')
 test_run:cmd('stop server master2')

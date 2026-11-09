@@ -180,6 +180,9 @@ extern bool is_graceful_supervised_bootstrap_requested;
  */
 extern char cfg_instance_name[];
 
+/** Replicaset UUID configured before bootstrap or recovery. */
+extern struct tt_uuid cfg_replicaset_uuid;
+
 /** Replica set state. */
 extern enum replicaset_state replicaset_state;
 
@@ -324,6 +327,14 @@ extern struct tt_uuid REPLICASET_UUID;
 extern char REPLICASET_NAME[];
 /** Name of the entire cluster with all its replicasets. */
 extern char CLUSTER_NAME[];
+
+/** Return the stored replicaset UUID, or the configured UUID if unset. */
+static inline const struct tt_uuid *
+replicaset_get_uuid(void)
+{
+	return tt_uuid_is_nil(&REPLICASET_UUID) ?
+		&cfg_replicaset_uuid : &REPLICASET_UUID;
+}
 
 typedef rb_tree(struct replica) replica_hash_t;
 
