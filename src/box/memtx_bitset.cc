@@ -88,7 +88,7 @@ enum {
 
 static int
 memtx_bitset_index_register_tuple(struct memtx_bitset_index *index,
-				  struct tuple *tuple)
+				  struct tuple *tuple, uint32_t *value)
 {
 	uint32_t id;
 	struct tuple **place;
@@ -108,6 +108,7 @@ memtx_bitset_index_register_tuple(struct memtx_bitset_index *index,
 	entry.id = id;
 	entry.tuple = tuple;
 	mh_bitset_index_put(index->tuple_to_id, &entry, 0, 0);
+	*value = id;
 	return 0;
 }
 
@@ -330,7 +331,9 @@ memtx_bitset_index_replace(struct index *base, struct tuple *old_tuple,
 		uint32_t key_len;
 		const void *key = make_key(field, &key_len);
 #ifndef OLD_GOOD_BITSET
-		if (memtx_bitset_index_register_tuple(index, new_tuple) != 0) {
+		uint32_t value = 0;
+		if (memtx_bitset_index_register_tuple(index, new_tuple,
+						      &value) != 0) {
 			/*
 			 * We can't fail to allocate a new tuple pointer if we
 			 * have just deregistered the old one - it will be moved
@@ -339,10 +342,6 @@ memtx_bitset_index_replace(struct index *base, struct tuple *old_tuple,
 			assert(*result == NULL);
 			return -1;
 		}
-		uint32_t value;
-		if (!memtx_bitset_index_tuple_to_value(index, new_tuple,
-						       &value))
-			unreachable();
 #else /* #ifndef OLD_GOOD_BITSET */
 		uint32_t value = tuple_to_value(new_tuple);
 #endif /* #ifndef OLD_GOOD_BITSET */
