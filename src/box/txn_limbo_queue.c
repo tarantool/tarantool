@@ -208,6 +208,19 @@ txn_limbo_queue_last_synchro_entry(struct txn_limbo_queue *queue)
 	return NULL;
 }
 
+struct txn_limbo_entry *
+txn_limbo_queue_last_written_synchro_entry(struct txn_limbo_queue *queue)
+{
+	struct txn_limbo_entry *entry;
+	rlist_foreach_entry_reverse(entry, &queue->entries, in_queue) {
+		if (entry->state == TXN_LIMBO_ENTRY_VOLATILE)
+			continue;
+		if (txn_has_flag(entry->txn, TXN_WAIT_ACK))
+			return entry;
+	}
+	return NULL;
+}
+
 bool
 txn_limbo_queue_would_block(struct txn_limbo_queue *queue)
 {

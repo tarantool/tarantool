@@ -50,6 +50,9 @@
  *    };          -- info_end_table
  *
  *    section2 = {
+ *        [1] = { -- info_idx_begin_table
+ *            [2] = int; -- info_idx_int
+ *        };      -- info_end_table
  *        ...
  *    };
  *    ...
@@ -79,6 +82,8 @@ struct info_handler_vtab {
 	void (*end)(struct info_handler *);
 	/** The begin of associative array (a map) under the given key. */
 	void (*set_begin_table)(struct info_handler *info, const char *key);
+	/** The begin of associative array (a map) under the given index. */
+	void (*idx_begin_table)(struct info_handler *info, int64_t idx);
 	/** The end of associative array (a map). */
 	void (*end_table)(struct info_handler *);
 	/** Set string value under the given key. */
@@ -93,6 +98,8 @@ struct info_handler_vtab {
 	/** Set boolean value under the given key. */
 	void (*set_bool)(struct info_handler *info, const char *key,
 			 bool value);
+	/** Set int64_t value under the given index. */
+	void (*idx_int)(struct info_handler *info, int64_t idx, int64_t value);
 };
 
 /**
@@ -177,6 +184,19 @@ info_set_bool(struct info_handler *info, const char *key, bool value)
 	return info->vtab->set_bool(info, key, value);
 }
 
+/**
+ * Associates int64_t value with the integer @a idx in the current associative
+ * array.
+ * @param info box.info() adapter.
+ * @param idx index.
+ * @param value value.
+ */
+static inline void
+info_idx_int(struct info_handler *info, int64_t idx, int64_t value)
+{
+	return info->vtab->idx_int(info, idx, value);
+}
+
 /*
  * Associates a new associative array with @a key.
  * @param info box.info() adapter.
@@ -186,6 +206,17 @@ static inline void
 info_set_begin_table(struct info_handler *info, const char *key)
 {
 	return info->vtab->set_begin_table(info, key);
+}
+
+/*
+ * Associates a new associative array with the integer @a idx.
+ * @param info box.info() adapter.
+ * @param idx index.
+ */
+static inline void
+info_idx_begin_table(struct info_handler *info, int64_t idx)
+{
+	return info->vtab->idx_begin_table(info, idx);
 }
 
 /*

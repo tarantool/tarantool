@@ -1,6 +1,7 @@
 local replica_set = require('luatest.replica_set')
 local server = require('luatest.server')
 local t = require('luatest')
+local qsync = require('test.replication-luatest.lib.qsync_tools')
 
 local g = t.group()
 
@@ -23,6 +24,13 @@ g.before_each(function(cg)
         box_cfg = cg.box_cfg,
     }
     cg.replica_set:start()
+    cg.replica_set:wait_for_fullmesh()
+    -- The WAL hold spans several steps, the silence must not break a
+    -- connection.
+    qsync.reconnect_fullmesh({cg.master, cg.replica}, {
+        timeout = 1000,
+        reconnect_timeout = cg.box_cfg.replication_timeout,
+    })
     cg.replica_set:wait_for_fullmesh()
     cg.master:exec(function()
         rawset(_G, 'fiber', require('fiber'))

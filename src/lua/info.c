@@ -53,6 +53,15 @@ luaT_info_set_begin_table(struct info_handler *info, const char *key)
 	lua_newtable(L);
 }
 
+/** Starts a new table under the integer index in the table on the Lua stack. */
+static void
+luaT_info_idx_begin_table(struct info_handler *info, int64_t idx)
+{
+	lua_State *L = (lua_State *)info->ctx;
+	luaL_pushint64(L, idx);
+	lua_newtable(L);
+}
+
 static void
 luaT_info_end_table(struct info_handler *info)
 {
@@ -97,6 +106,16 @@ luaT_info_set_bool(struct info_handler *info, const char *key, bool value)
 	lua_settable(L, -3);
 }
 
+/** Appends {idx: int_value} to the table on the Lua stack. */
+static void
+luaT_info_idx_int(struct info_handler *info, int64_t idx, int64_t value)
+{
+	lua_State *L = (lua_State *)info->ctx;
+	luaL_pushint64(L, idx);
+	luaL_pushint64(L, value);
+	lua_settable(L, -3);
+}
+
 void
 luaT_info_handler_create(struct info_handler *h, struct lua_State *L)
 {
@@ -104,11 +123,13 @@ luaT_info_handler_create(struct info_handler *h, struct lua_State *L)
 		.begin = luaT_info_begin,
 		.end = luaT_info_end,
 		.set_begin_table = luaT_info_set_begin_table,
+		.idx_begin_table = luaT_info_idx_begin_table,
 		.end_table = luaT_info_end_table,
 		.set_str = luaT_info_set_str,
 		.set_int = luaT_info_set_int,
 		.set_double = luaT_info_set_double,
 		.set_bool = luaT_info_set_bool,
+		.idx_int = luaT_info_idx_int,
 	};
 	h->vtab = &lua_vtab;
 	h->ctx = L;

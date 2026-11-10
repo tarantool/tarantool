@@ -79,6 +79,49 @@ function rows.insert(opts)
     }
 end
 
+-- A PROMOTE from opts.origin at opts.lsn: opts.term, replacing opts.owner at
+-- opts.confirm_lsn, with opts.confirmed_vclock and opts.term_map (maps
+-- already), waiting for acks when opts.wait_ack. The row LSN of a checkpoint
+-- row is opts.row_lsn, absent otherwise.
+function rows.promote(opts)
+    local flags = 0
+    if opts.wait_ack then
+        flags = box.iproto.flag.WAIT_ACK
+    end
+    return {
+        header = setmap{
+            [key.REQUEST_TYPE] = types.RAFT_PROMOTE,
+            [key.REPLICA_ID] = opts.origin,
+            [key.LSN] = opts.lsn,
+        },
+        body = setmap{
+            [key.TERM] = opts.term,
+            [key.REPLICA_ID] = opts.owner,
+            [key.LSN] = opts.confirm_lsn,
+            [key.VCLOCK] = opts.confirmed_vclock,
+            [key.TERM_MAP] = opts.term_map,
+            [key.FLAGS] = flags,
+            [key.ROW_LSN] = opts.row_lsn,
+        },
+    }
+end
+
+-- A CONFIRM from opts.origin at opts.lsn: opts.owner's rows up to
+-- opts.confirm_lsn.
+function rows.confirm(opts)
+    return {
+        header = setmap{
+            [key.REQUEST_TYPE] = types.RAFT_CONFIRM,
+            [key.REPLICA_ID] = opts.origin,
+            [key.LSN] = opts.lsn,
+        },
+        body = setmap{
+            [key.REPLICA_ID] = opts.owner,
+            [key.LSN] = opts.confirm_lsn,
+        },
+    }
+end
+
 --
 -- One accepted connection of an applier. Before the SUBSCRIBE it is the
 -- handshake, the ballot watcher's session never gets past it. After the

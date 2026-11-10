@@ -32,7 +32,7 @@ struct box_checkpoint {
 	 * Full descriptor of the txn limbo collected exactly when the last
 	 * known synchronous txn was confirmed.
 	 */
-	struct synchro_request limbo;
+	struct synchro_snapshot limbo;
 };
 
 /**
