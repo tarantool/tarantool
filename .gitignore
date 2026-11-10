@@ -195,3 +195,6 @@ doc/agents/local_setup.md
 # Local findings files of the agent-driven reviews (see
 # doc/agents/review.md)
 /reviews/
+
+# Nix build result
+/result
