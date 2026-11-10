@@ -166,10 +166,12 @@ end
 ---Create a new `varbinary` object.
 ---
 ---With no arguments, creates an empty `varbinary` object. With a string
----argument, creates an object from the string data. With a cdata pointer
----and size, creates an object from that memory region.
+---argument, creates an object from the string data. With a `varbinary`
+---object, creates a copy of it. With a cdata pointer and size, creates an
+---object from that memory region.
 ---
 ---@overload fun(): varbinary_object
+---@overload fun(obj: varbinary_object): varbinary_object
 ---@overload fun(data: ffi.cdata*, size: integer): varbinary_object
 ---@param data string a string object.
 ---@param size integer object size in bytes, mandatory if `data` is a

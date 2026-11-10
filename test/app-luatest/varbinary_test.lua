@@ -56,6 +56,16 @@ g.test_new_from_ptr = function()
     t.assert_equals(v, varbinary.new(ffi.cast('const char *', 'foo'), 3))
 end
 
+g.test_new_from_varbinary = function()
+    local v = varbinary.new('foo')
+    local copy = varbinary.new(v)
+    t.assert(varbinary.is(copy))
+    t.assert_equals(#copy, #v)
+    t.assert_equals(tostring(copy), 'foo')
+    t.assert_equals(copy, v)
+    t.assert_not(rawequal(copy, v))
+end
+
 g.test_is = function()
     t.assert_equals(varbinary.is(varbinary.new()), true)
     t.assert_equals(varbinary.is(varbinary.new('')), true)
