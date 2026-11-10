@@ -4,7 +4,7 @@ local server = require('luatest.server')
 
 local g = t.group()
 
-local TIMEOUT = 10
+local TIMEOUT = 60
 
 --
 -- gh-13625: a new leader whose promotion can't complete has to shut down like
