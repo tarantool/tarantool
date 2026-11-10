@@ -53,7 +53,7 @@ enum {
 	XROW_BODY_IOVMAX = 2,
 	XROW_IOVMAX = XROW_HEADER_IOVMAX + XROW_BODY_IOVMAX,
 	XROW_HEADER_LEN_MAX = 52,
-	XROW_BODY_LEN_MAX = 512,
+	XROW_BODY_LEN_MAX = 1024,
 	IPROTO_HEADER_LEN = 32,
 	/** 7 = sizeof(iproto_body_bin). */
 	IPROTO_SELECT_HEADER_LEN = IPROTO_HEADER_LEN + 7,
@@ -402,6 +402,31 @@ struct synchro_request {
 			uint64_t term;
 			/** Confirmed lsns of all the previous limbo owners. */
 			struct vclock confirmed_vclock;
+			/**
+			 * Latest known PROMOTE/DEMOTE term per instance from
+			 * the PoV of the entry's author. Empty only for legacy
+			 * entries written by older Tarantool versions.
+			 */
+			struct vclock term_map;
+			/**
+			 * If set, the PROMOTE is applied only after gathering
+			 * a quorum of acks for it and persisting that fact in
+			 * a CONFIRM. Travels in the request body under
+			 * IPROTO_FLAGS. It can't use the xrow_header flags -
+			 * those get reset when a replica writes a received
+			 * row into its own WAL, and further relaying of the
+			 * row would lose the flag.
+			 */
+			bool wait_ack;
+			/**
+			 * LSN of the PROMOTE row in the origin's journal - the
+			 * row its CONFIRM names. Filled on decoding from the
+			 * row header, or from the body under IPROTO_ROW_LSN for
+			 * a checkpoint row, whose header LSN is its number in
+			 * the snapshot. A locally written request learns it from
+			 * the journal write, after encoding.
+			 */
+			int64_t journal_lsn;
 		} promote;
 		struct {
 			/** Confirm all txns having LSN <= this one. */
@@ -412,6 +437,20 @@ struct synchro_request {
 			int64_t lsn;
 		} rollback;
 	};
+};
+
+/** The limbo state as persisted in a snapshot and sent in a join stream. */
+struct synchro_snapshot {
+	/**
+	 * The applied state, as a PROMOTE describing it, and the pending
+	 * PROMOTEs, including the poisoned ones - their CONFIRMs have to be
+	 * recognized after a restart or on a joined replica too. Ascending by
+	 * term, terminated by a zero-type request: a reader applying the rows
+	 * in order ends up on the latest term, whether it knows the pending
+	 * ones or not. Replica ID 0 has no pending PROMOTE, so the rows are at
+	 * most VCLOCK_MAX - 1 pending ones, the state and the terminator.
+	 */
+	struct synchro_request rows[VCLOCK_MAX + 1];
 };
 
 /**

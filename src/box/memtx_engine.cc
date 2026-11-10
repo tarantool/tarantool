@@ -553,13 +553,21 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 		}
 		if (type == IPROTO_RAFT_PROMOTE) {
 			/*
-			 * Origin id cannot be deduced from row.replica_id in
-			 * a checkpoint, because all its rows have a zero
-			 * replica_id.
+			 * Snapshots written before the introduction of synchronous
+			 * PROMOTE had the limbo state described as a single PROMOTE row
+			 * with the zero replica_id, like every snapshot row.
+			 *
+			 * Since the introduction of wait-ack PROMOTE it became important
+			 * to have a real origin ID in each PROMOTE, and so the older rows
+			 * simply get the queue owner ID assigned as the origin.
+			 *
+			 * This is fine since the origin ID only affects correctness for
+			 * wait-ack PROMOTEs.
 			 */
-			entry->synchro.origin_id =
-				entry->synchro.queue_owner_id;
-			return txn_limbo_process(&txn_limbo, &entry->synchro);
+			struct synchro_request *req = &entry->synchro;
+			if (req->origin_id == REPLICA_ID_NIL)
+				req->origin_id = req->queue_owner_id;
+			return txn_limbo_process(&txn_limbo, req);
 		}
 		diag_set(ClientError, ER_UNKNOWN_REQUEST_TYPE,
 			 (uint32_t)type);
@@ -1005,7 +1013,6 @@ checkpoint_write_row(struct xlog *l, struct xrow_header *row)
 	}
 
 	row->tm = last;
-	row->replica_id = 0;
 	/**
 	 * Rows in snapshot are numbered from 1 to %rows.
 	 * This makes streaming such rows to a replica or
@@ -1233,17 +1240,22 @@ checkpoint_write_synchro(struct xlog *l, const struct synchro_request *req)
 	struct xrow_header row;
 	char body[XROW_BODY_LEN_MAX];
 	xrow_encode_synchro(&row, body, req);
+	row.replica_id = req->origin_id;
 	return checkpoint_write_row(l, &row);
 }
 
 static int
 checkpoint_write_system_data(struct xlog *l, const struct raft_request *raft,
-			     const struct synchro_request *synchro)
+			     const struct synchro_snapshot *limbo)
 {
 	if (checkpoint_write_raft(l, raft) != 0)
 		return -1;
-	if (checkpoint_write_synchro(l, synchro) != 0)
-		return -1;
+	for (const struct synchro_request *req = limbo->rows; req->type != 0;
+	     req++) {
+		assert(req->type == IPROTO_RAFT_PROMOTE);
+		if (checkpoint_write_synchro(l, req) != 0)
+			return -1;
+	}
 	return 0;
 }
 
