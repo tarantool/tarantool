@@ -175,6 +175,30 @@
                 "CMAKE_BUILD_TYPE": "RelWithDebInfo"
             },
             "inherits": "clang_base_asan"
+        },
+        {
+            "name": "clang_libfuzzer",
+            "displayName": "Clang libFuzzer ASAN+UBSAN",
+            "description": "Clang Debug build with ASAN+UBSAN for libFuzzer",
+            "inherits": "clang_debug",
+            "cacheVariables": {
+                "ENABLE_FUZZER": {
+                    "type": "BOOL",
+                    "value": "TRUE"
+                },
+                "ENABLE_ASAN": {
+                    "type": "BOOL",
+                    "value": "TRUE"
+                },
+                "ENABLE_UB_SANITIZER": {
+                    "type": "BOOL",
+                    "value": "TRUE"
+                },
+                "FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION": {
+                    "type": "BOOL",
+                    "value": "TRUE"
+                }
+            }
         }
     ],
     "buildPresets": [
@@ -246,6 +270,13 @@
             "configurePreset": "clang_release_asan",
             "displayName": "Clang Release ASAN+UBSAN",
             "description": "Clang Release ASAN+UBSAN Build using the output of the corresponding cmake configure step",
+            "jobs": 0
+        },
+        {
+            "name": "clang_libfuzzer",
+            "configurePreset": "clang_libfuzzer",
+            "displayName": "Clang libFuzzer ASAN+UBSAN",
+            "description": "Clang libFuzzer ASAN+UBSAN Build using the output of the corresponding cmake configure step",
             "jobs": 0
         }
     ],
@@ -376,6 +407,32 @@
             "output": {
                 "outputOnFailure": true,
                 "verbosity": "verbose"
+            }
+        },
+        {
+            "name": "clang_libfuzzer",
+            "displayName": "Clang libFuzzer ASAN+UBSAN",
+            "inherits": "base",
+            "configurePreset": "clang_libfuzzer",
+            "configuration": "Debug",
+            "filter": {
+                "include": {
+                    "label": "fuzzing"
+                }
+            },
+            "execution": {
+                "noTestsAction": "error",
+                "scheduleRandom": false,
+                "stopOnFailure": false,
+                "jobs": 1,
+                "timeout": 0,
+                "repeat": {
+                    "mode": "until-fail",
+                    "count": 1
+                }
+            },
+            "output": {
+                "outputOnFailure": true
             }
         }
     ],
@@ -557,6 +614,24 @@
                 {
                     "type": "test",
                     "name": "clang_perf"
+                }
+            ]
+        },
+        {
+            "name": "clang_libfuzzer",
+            "displayName": "Clang libFuzzer ASAN+UBSAN",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "clang_libfuzzer"
+                },
+                {
+                    "type": "build",
+                    "name": "clang_libfuzzer"
+                },
+                {
+                    "type": "test",
+                    "name": "clang_libfuzzer"
                 }
             ]
         }
