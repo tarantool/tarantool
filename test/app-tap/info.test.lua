@@ -20,7 +20,7 @@ test:test("info", function(test)
     test:ok(tarantool.uptime() > 0, "uptime")
     test:ok(tarantool.pid() > 0, "pid")
 
-    local tzdata_version = "2022a"
+    local tzdata_version = "2026c"
     test:is(tarantool.build.tzdata_version, tzdata_version,
             "build.tzdata_version")
 end)
