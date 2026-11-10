@@ -1,0 +1,155 @@
+# The VRaft witness matrix. Each entry adds one invariant or property
+# from VRaftWitness.tla - the negation of a scenario the model must be
+# able to reach. The run (tools/run.py --witness) succeeds when every config
+# ends with exactly that invariant or property violated: the violation trace
+# is the proof the state space covers the scenario, and a script for a test.
+# So the entry's name is the witness operator's name.
+#
+# Three data nodes with quorum 1 reach every scenario in the fewest steps:
+# every node elects itself, confirms alone, and every refusal is possible.
+# Two run on a majority quorum instead, to show the scenario is not a
+# fork artifact: the delayed ack (the own ack is never stale, so it needs a
+# quorum of two) and the leader with a newer pending PROMOTE. The cheap ones
+# go first.
+
+configs:
+
+  - name: WitnessTwoLeadersOneTerm
+    note: two leaders elected in the same term, each with its own PROMOTE
+    invariant: WitnessTwoLeadersOneTerm
+    data_nodes: 3
+    voters: 0
+    quorum: 1
+    max_term: 3
+    transactions: 2
+
+  - name: WitnessPromoteAheadOfTerm
+    note: a PROMOTE delivered before the receiver learned its term
+    invariant: WitnessPromoteAheadOfTerm
+    data_nodes: 3
+    voters: 0
+    quorum: 1
+    max_term: 3
+    transactions: 2
+
+  - name: WitnessDataFork
+    note: a transaction committed on one node and rolled back on another
+    invariant: WitnessDataFork
+    data_nodes: 3
+    voters: 0
+    quorum: 1
+    max_term: 3
+    transactions: 2
+
+  - name: WitnessPoisonedConfirmRefused
+    note: the CONFIRM of a poisoned pending PROMOTE arrives and is refused
+    property: WitnessPoisonedConfirmRefused
+    data_nodes: 3
+    voters: 0
+    quorum: 1
+    max_term: 3
+    transactions: 2
+
+  - name: WitnessChainConfirmed
+    note: a chained PROMOTE confirmed, bringing a term never applied before
+    property: WitnessChainConfirmed
+    data_nodes: 3
+    voters: 0
+    quorum: 1
+    max_term: 3
+    transactions: 2
+
+  - name: WitnessOlderPromoteConfirmedLater
+    note: an own PROMOTE confirmed with a newer live one pending beside it
+    property: WitnessOlderPromoteConfirmedLater
+    data_nodes: 3
+    voters: 0
+    quorum: 1
+    max_term: 3
+    transactions: 2
+
+  - name: WitnessConfirmOnDelayedAck
+    note: >-
+      a CONFIRM whose quorum holds only with an ack from a node that moved
+      to a higher term since
+    property: WitnessConfirmOnDelayedAck
+    data_nodes: 3
+    voters: 0
+    quorum: 2
+    max_term: 3
+    transactions: 1
+
+  - name: WitnessLeaderWithNewerPending
+    note: a limbo leader with a newer PROMOTE pending beside it, in a majority cluster
+    invariant: WitnessLeaderWithNewerPending
+    data_nodes: 3
+    voters: 0
+    quorum: 2
+    max_term: 3
+    transactions: 1
+
+  - name: WitnessQuiescentSplit
+    note: replication finished with the cluster split, one pair still connected
+    invariant: WitnessQuiescentSplit
+    data_nodes: 3
+    voters: 0
+    quorum: 1
+    max_term: 3
+    transactions: 2
+
+  - name: WitnessAllLinksBroken
+    note: >-
+      every data node refuses every other one - three leaders of one term
+      refuse each other's PROMOTE on arrival
+    invariant: WitnessAllLinksBroken
+    data_nodes: 3
+    voters: 0
+    quorum: 1
+    max_term: 2
+    transactions: 2
+
+# The three-promotion patterns - what the fourth term is for. They run with
+# the PROMOTE cap 08 runs with, so they double as the check that the cap
+# keeps them reachable.
+
+  - name: WitnessChainOfThree
+    note: a chain through a chain confirmed - three terms applied at once
+    property: WitnessChainOfThree
+    data_nodes: 3
+    voters: 0
+    quorum: 1
+    max_term: 4
+    max_promotes: 4
+    transactions: 1
+
+  - name: WitnessChainSquashesOwnPending
+    note: >-
+      a chain revisits its origin - a leader chains over another's pending
+      above its own still live one, squashing its own slot
+    property: WitnessChainSquashesOwnPending
+    data_nodes: 2
+    voters: 0
+    quorum: 1
+    max_term: 4
+    max_promotes: 4
+    transactions: 1
+
+  - name: WitnessPoisonedReplacedByOrigin
+    note: a poisoned pending PROMOTE replaced in its slot by its origin's later one
+    property: WitnessPoisonedReplacedByOrigin
+    data_nodes: 2
+    voters: 0
+    quorum: 1
+    max_term: 4
+    max_promotes: 4
+    transactions: 1
+
+  - name: WitnessThreeOwners
+    note: three fork sides - every data node owns the limbo on itself
+    invariant: WitnessThreeOwners
+    data_nodes: 3
+    voters: 0
+    quorum: 1
+    max_term: 4
+    max_promotes: 4
+    transactions: 1
