@@ -85,6 +85,39 @@ jobs:
       - name: Run emmylua_check
         run: emmylua_check --warnings-as-errors --config .emmyrc.json .
 
+  nix:
+    # Run on push to the 'master' and release branches of tarantool/tarantool
+    # or on pull request if the 'notest' label is not set.
+    if: github.repository == 'tarantool/tarantool' &&
+        ( github.event_name != 'pull_request' ||
+          ( github.event_name == 'pull_request' &&
+            !contains(github.event.pull_request.labels.*.name, 'notest') ) )
+
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # flake.nix declares `inputs.self.submodules = true', so the
+          # flake source needs the submodules even for evaluation only.
+          submodules: recursive
+      - uses: cachix/install-nix-action@v31.11.1
+        if: hashFiles('flake.nix') != ''
+      - name: Parse Nix files
+        if: hashFiles('flake.nix') != ''
+        run: git ls-files -z '*.nix' | xargs -0 -r nix-instantiate --parse
+      - name: Check Nix flake outputs
+        if: hashFiles('flake.nix') != ''
+        run: nix flake check --all-systems --no-build --no-update-lock-file
+      - name: Lint Nix files
+        if: hashFiles('flake.nix') != ''
+        run: nix run --no-update-lock-file --inputs-from . nixpkgs#statix -- check .
+      - name: Check Nix formatting
+        if: hashFiles('flake.nix') != ''
+        run: git ls-files -z '*.nix' | xargs -0 -r nix run --no-update-lock-file --inputs-from . nixpkgs#nixfmt -- --check
+
   release-notes:
     # Run on push to the 'master' and release branches of tarantool/tarantool
     # or on pull request if the 'notest' label is not set.
