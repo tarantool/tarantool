@@ -348,6 +348,11 @@ relay_start(struct relay *relay, struct iostream *io, uint64_t sync,
 	relay->last_heartbeat_time = relay->last_row_time;
 	/* Never send rows for REPLICA_ID_NIL to anyone */
 	relay->id_filter = 1 << REPLICA_ID_NIL;
+	/*
+	 * Nothing is received on this connection yet. There might be remaining
+	 * data left from a previous connection.
+	 */
+	memset(&relay->last_recv_ack, 0, sizeof(relay->last_recv_ack));
 	memset(&relay->status_msg, 0, sizeof(relay->status_msg));
 	/* Store the local address the remote connected to. */
 	strlcpy(relay->listen_addr_str, sio_getsockname_str(io->fd),
@@ -674,16 +679,22 @@ tx_status_update(struct cmsg *msg)
 	 * from one of such nodes. It means that the row was written on the
 	 * replica but can't CONFIRM/ROLLBACK - the old term has ended, new one
 	 * has no result yet, need a PROMOTE.
-	 */
-	raft_process_term(box_raft(), status->term, ack.source);
-	/*
+	 *
+	 * Until the peer sends its current term, the instance can't trust the
+	 * acked vclock. It might be from a newer term, potentially. This is
+	 * possible, for example, if the vclock is received from SUBSCRIBE - it
+	 * has a vclock but no term. Can't be used as an ack then.
+	 *
 	 * A replica can declare itself anon, but master might assign it an ID.
 	 * Or replica might be having an ID, but the master can remove it. A
 	 * true proper replica must declare itself not anon, and not be expelled
 	 * by the master.
 	 */
-	if (!anon && ack.source != REPLICA_ID_NIL)
-		trigger_run(&replicaset.on_ack, &ack);
+	if (status->term != 0) {
+		raft_process_term(box_raft(), status->term, ack.source);
+		if (!anon && ack.source != REPLICA_ID_NIL)
+			trigger_run(&replicaset.on_ack, &ack);
+	}
 
 	if (!relay->tx.is_paired) {
 		/*
