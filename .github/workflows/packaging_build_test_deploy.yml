@@ -15,6 +15,46 @@ on:
         type: string
 
 jobs:
+  nix:
+    # Build the repository checkout only once,
+    # for the x86_64 variant of the reusable workflow.
+    if: inputs.arch == 'x86_64'
+
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 60
+
+    steps:
+      - name: Prepare checkout
+        uses: tarantool/actions/prepare-checkout@master
+
+      - uses: actions/checkout@v4
+        with:
+          # tarantool-master builds this checkout and needs its submodules.
+          submodules: recursive
+
+      - uses: cachix/install-nix-action@v31.11.1
+        if: hashFiles('flake.nix') != ''
+
+      - uses: nix-community/cache-nix-action@v7
+        if: hashFiles('flake.nix') != ''
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+          # tarantool-master builds the checkout itself, so only the build
+          # dependencies are reused between runs.
+          gc-max-store-size-linux: 5G
+
+      - name: Build Tarantool
+        if: hashFiles('flake.nix') != ''
+        run: >
+          nix build --no-update-lock-file .#tarantool-master
+          --print-build-logs
+
+      - name: Smoke test
+        if: hashFiles('flake.nix') != ''
+        run: ./result/bin/tarantool --version
+
   build:
     runs-on: ${{ inputs.arch == 'aarch64' && 'ubuntu-26.04-arm' ||
                  fromJSON('["self-hosted", "Linux", "x86_64", "regular"]') }}
