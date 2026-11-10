@@ -558,6 +558,16 @@ replica_delete(struct replica *replica)
 	free(replica);
 }
 
+/** Remove an orphan replica from the registry and free it. */
+static void
+replica_delete_if_orphan(struct replica *replica)
+{
+	if (!replica_is_orphan(replica))
+		return;
+	replica_hash_remove(&replicaset.hash, replica);
+	replica_delete(replica);
+}
+
 struct replica *
 replicaset_add(uint32_t replica_id, const struct tt_uuid *replica_uuid)
 {
@@ -667,15 +677,7 @@ replica_clear_id(struct replica *replica)
 		gc_consumer_unregister(replica->gc);
 		replica->gc = NULL;
 	}
-	if (replica_is_orphan(replica)) {
-		replica_hash_remove(&replicaset.hash, replica);
-		/*
-		 * The replica had an ID, it couldn't be anon by
-		 * definition.
-		 */
-		assert(!replica->anon);
-		replica_delete(replica);
-	}
+	replica_delete_if_orphan(replica);
 	box_broadcast_ballot();
 }
 
@@ -1123,14 +1125,8 @@ next:
 	rlist_swap(&replicaset.anon, &anon_replicas);
 
 	assert(replica_hash_first(&uniq) == NULL);
-	replica_hash_foreach_safe(&replicaset.hash, replica, next) {
-		if (replica_is_orphan(replica)) {
-			replica_hash_remove(&replicaset.hash, replica);
-			replicaset.anon_count -= replica->anon;
-			assert(replicaset.anon_count >= 0);
-			replica_delete(replica);
-		}
-	}
+	replica_hash_foreach_safe(&replicaset.hash, replica, next)
+		replica_delete_if_orphan(replica);
 }
 
 struct applier_on_connect {
@@ -1656,12 +1652,7 @@ replica_on_disconnect(struct replica *replica)
 		gc_consumer_unregister(replica->gc);
 		replica->gc = NULL;
 	}
-	if (replica_is_orphan(replica)) {
-		replica_hash_remove(&replicaset.hash, replica);
-		replicaset.anon_count -= replica->anon;
-		assert(replicaset.anon_count >= 0);
-		replica_delete(replica);
-	}
+	replica_delete_if_orphan(replica);
 }
 
 struct replica *
