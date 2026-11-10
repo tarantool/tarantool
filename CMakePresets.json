@@ -140,6 +140,30 @@
             "inherits": "clang_base"
         },
         {
+            "name": "gcc_perf",
+            "displayName": "GCC Performance",
+            "description": "GCC RelWithDebInfo build for performance testing",
+            "inherits": "gcc_release",
+            "cacheVariables": {
+                "ENABLE_BUNDLED_LIBBENCHMARK": {
+                    "type": "BOOL",
+                    "value": "TRUE"
+                }
+            }
+        },
+        {
+            "name": "clang_perf",
+            "displayName": "Clang Performance",
+            "description": "Clang RelWithDebInfo build for performance testing",
+            "inherits": "clang_release",
+            "cacheVariables": {
+                "ENABLE_BUNDLED_LIBBENCHMARK": {
+                    "type": "BOOL",
+                    "value": "TRUE"
+                }
+            }
+        },
+        {
             "name": "clang_debug_asan",
             "displayName": "Clang Debug ASAN+UBSAN",
             "inherits": "clang_base_asan"
@@ -194,6 +218,20 @@
             "configurePreset": "clang_release",
             "displayName": "Clang Release",
             "description": "Clang Release Build using the output of the corresponding cmake configure step",
+            "jobs": 0
+        },
+        {
+            "name": "gcc_perf",
+            "configurePreset": "gcc_perf",
+            "displayName": "GCC Performance",
+            "description": "GCC Performance Build using the output of the corresponding cmake configure step",
+            "jobs": 0
+        },
+        {
+            "name": "clang_perf",
+            "configurePreset": "clang_perf",
+            "displayName": "Clang Performance",
+            "description": "Clang Performance Build using the output of the corresponding cmake configure step",
             "jobs": 0
         },
         {
@@ -285,6 +323,60 @@
             "inherits": "base",
             "configurePreset": "clang_release_asan",
             "configuration": "RelWithDebInfo"
+        },
+        {
+            "name": "gcc_perf",
+            "displayName": "GCC Performance",
+            "inherits": "base",
+            "configurePreset": "gcc_perf",
+            "configuration": "RelWithDebInfo",
+            "filter": {
+                "include": {
+                    "label": "performance"
+                }
+            },
+            "execution": {
+                "noTestsAction": "error",
+                "scheduleRandom": false,
+                "stopOnFailure": false,
+                "jobs": 1,
+                "timeout": 0,
+                "repeat": {
+                    "mode": "until-fail",
+                    "count": 1
+                }
+            },
+            "output": {
+                "outputOnFailure": true,
+                "verbosity": "verbose"
+            }
+        },
+        {
+            "name": "clang_perf",
+            "displayName": "Clang Performance",
+            "inherits": "base",
+            "configurePreset": "clang_perf",
+            "configuration": "RelWithDebInfo",
+            "filter": {
+                "include": {
+                    "label": "performance"
+                }
+            },
+            "execution": {
+                "noTestsAction": "error",
+                "scheduleRandom": false,
+                "stopOnFailure": false,
+                "jobs": 1,
+                "timeout": 0,
+                "repeat": {
+                    "mode": "until-fail",
+                    "count": 1
+                }
+            },
+            "output": {
+                "outputOnFailure": true,
+                "verbosity": "verbose"
+            }
         }
     ],
     "workflowPresets": [
@@ -429,6 +521,42 @@
                  {
                     "type": "test",
                     "name": "clang_release_asan"
+                }
+            ]
+        },
+        {
+            "name": "gcc_perf",
+            "displayName": "GCC Performance",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "gcc_perf"
+                },
+                {
+                    "type": "build",
+                    "name": "gcc_perf"
+                },
+                {
+                    "type": "test",
+                    "name": "gcc_perf"
+                }
+            ]
+        },
+        {
+            "name": "clang_perf",
+            "displayName": "Clang Performance",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "clang_perf"
+                },
+                {
+                    "type": "build",
+                    "name": "clang_perf"
+                },
+                {
+                    "type": "test",
+                    "name": "clang_perf"
                 }
             ]
         }
