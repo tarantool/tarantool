@@ -110,3 +110,13 @@ g.test_alter_table_reserved_keyword_error = function(cg)
         box.space.t:drop()
     end)
 end
+
+-- gh-13358: Check for an error message on query with deleting a CONSTRAINT.
+g.test_error_deleting_constraint = function(cg)
+    cg.server:exec(function()
+        box.execute([[CREATE TABLE t (a INT PRIMARY KEY);]])
+        local exp_err = [[Field 'nosuch' was not found in space 't' format]]
+        local _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT nosuch.c;]])
+        t.assert_equals(tostring(err), exp_err)
+    end)
+end
