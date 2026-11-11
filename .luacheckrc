@@ -43,6 +43,7 @@ exclude_files = {
     "luatest/**/*.lua",
     "test-run/**/*.lua",
     "test/app/*.test.lua",
+    "test/app-luatest/emmylua/**/*.lua",
     "test/box/*.test.lua",
     "test/engine/*.test.lua",
     "test/engine_long/*.test.lua",

@@ -81,6 +81,9 @@ if(ENABLE_LUA_EXTRAS)
     lua_multi_source(lua_sources ${EXTRA_LUA_SOURCES})
 endif()
 
+lua_stub(varbinary FILES lua/varbinary.lua RETURN varbinary)
+lua_stub(socket FILES lua/socket.lua RETURN socket)
+
 # 3rd party lua sources
 lua_source(lua_sources ../third_party/luafun/fun.lua fun_lua)
 lua_source(lua_sources ../third_party/lua/luadebug.lua luadebug_lua)
