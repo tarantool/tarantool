@@ -1,0 +1,129 @@
+# The VRaft test matrix. gen.py turns each entry into <name>.cfg from
+# template.cfg. Every config must pass. The order is the run order, by the
+# estimated size, smallest first, so that a run gets through as many configs
+# as it can before the big ones. The names carry the position, so a shell
+# glob over the generated dir lists them in this order.
+#
+# 01-08 are exhaustive. Measured on the 16-core server, 2026-10-09: 01 3 s,
+# 02 7 s, 03 9 s, 04 26 s, 05 838 s, 06 1649 s; 07 completes (its one
+# deadlock was a starved JVM, see the review doc). 08 with two txns and 6 of
+# 9 PROMOTEs passed 3.4B states in two days at depth 29 of ~50 and was
+# abandoned; with one txn and 4 PROMOTEs it passed in 22 h (2026-10-16).
+#
+# 09 and 10 are simulated: `simulate: traces: N` makes run.py run TLC's
+# random simulation on the config - N behaviors of up to `depth` steps -
+# instead of the exhaustive search, which is out of reach for them. A
+# violation found by a simulation is real; a pass proves nothing, the traces
+# count only bounds the run. Measured locally with one worker, 2026-10-15,
+# depth 100: 500-800 traces/s on three nodes, 270/s on five; the mean trace
+# is 30-40 steps, the depth rarely binds. The counts below, a billion each,
+# are weeks on one worker at that rate and days on 16; they are to be timed
+# on the server and raised if it keeps up. For scale: the third poison
+# (README section 4) took hours of 16-worker simulation on 08's shape to find.
+#
+# Depth: max_term 4 allows three promotions, which is what the deepest known
+# pattern needs - a chain through a chain, a poisoned entry covered by a
+# later promotion of its origin, three fork sides. max_term 3 is for smoke.
+#
+# Voters vote and observe terms but receive no rows, so a quorum above the
+# data node count can never confirm a PROMOTE. Such combinations are left
+# out.
+#
+# max_promotes caps the PROMOTEs the whole cluster writes; the natural
+# maximum is data nodes * (max_term - 1), the default 999 never binds. A cap
+# cuts the breadth of a big run and keeps its depth; the witnesses show
+# which scenarios survive it.
+
+configs:
+
+  - name: 01_majority_d2v0_q2_t4
+    note: every ack required, no fork possible
+    data_nodes: 2
+    voters: 0
+    quorum: 2
+    max_term: 4
+    transactions: 2
+
+  - name: 02_majority_d2v1_q2_t4
+    note: a voter decides elections, data nodes ack alone
+    data_nodes: 2
+    voters: 1
+    quorum: 2
+    max_term: 4
+    transactions: 2
+
+  - name: 03_majority_d3v0_q2_t3
+    note: smoke test, majority
+    data_nodes: 3
+    voters: 0
+    quorum: 2
+    max_term: 3
+    transactions: 2
+
+  - name: 04_bad_d2v0_q1_t4
+    note: every node elects itself
+    data_nodes: 2
+    voters: 0
+    quorum: 1
+    max_term: 4
+    transactions: 2
+
+  - name: 05_majority_d3v0_q2_t4
+    note: the full majority run
+    data_nodes: 3
+    voters: 0
+    quorum: 2
+    max_term: 4
+    transactions: 2
+
+  - name: 06_bad_d3v0_q1_t3
+    note: smoke test, two-sided forks
+    data_nodes: 3
+    voters: 0
+    quorum: 1
+    max_term: 3
+    transactions: 2
+
+  - name: 07_majority_d3v2_q3_t4
+    note: two voters, every data node must ack; covers d3v1_q3 with one voter idle
+    data_nodes: 3
+    voters: 2
+    quorum: 3
+    max_term: 4
+    transactions: 2
+
+  - name: 08_bad_d3v0_q1_t4
+    note: >-
+      three sides, all links can break, three promotions deep; one txn and
+      4 of the 9 possible PROMOTEs - the two-txn data forks are 06's, the
+      three-promotion patterns need no second txn and at most four PROMOTEs
+    data_nodes: 3
+    voters: 0
+    quorum: 1
+    max_term: 4
+    max_promotes: 4
+    transactions: 1
+
+  - name: 09_bad_d3v0_q1_t7
+    note: >-
+      room for a chain six PROMOTEs long - every node promoted twice, the
+      chain squashed into three slots - with two txns to reorder
+    data_nodes: 3
+    voters: 0
+    quorum: 1
+    max_term: 7
+    transactions: 2
+    simulate:
+      traces: 1000000000
+      depth: 100
+
+  - name: 10_majority_d5v0_q3_t4
+    note: five data nodes, a majority of three, two disjoint minorities
+    data_nodes: 5
+    voters: 0
+    quorum: 3
+    max_term: 4
+    transactions: 2
+    simulate:
+      traces: 1000000000
+      depth: 100

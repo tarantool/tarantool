@@ -249,6 +249,20 @@ extern const char *iproto_flag_bit_strs[];
 	  * true and CHECKPOINT_VCLOCK to be set.
 	  */								\
 	 _(CHECKPOINT_LSN, 0x64, MP_UINT)				\
+	 /**
+	  * A map of replica ID -> term, attached to a PROMOTE entry, with the
+	  * latest known confirmed terms per instance from the PoV of the
+	  * PROMOTE author. Receivers use it to catch up the per-instance latest
+	  * term when applying a chained PROMOTE.
+	  */								\
+	 _(TERM_MAP, 0x65, MP_MAP)					\
+	 /**
+	  * LSN of the row carrying a PROMOTE in its origin's journal. Only in
+	  * the checkpoint rows describing pending PROMOTEs: a snapshot row's
+	  * header LSN is its number in the snapshot, while the CONFIRM of the
+	  * PROMOTE names the journal LSN.
+	  */								\
+	 _(ROW_LSN, 0x66, MP_UINT)					\
 
 #define IPROTO_KEY_MEMBER(s, v, ...) IPROTO_ ## s = v,
 
