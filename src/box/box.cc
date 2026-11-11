@@ -2751,6 +2751,22 @@ box_set_replication_skip_conflict(void)
 	replication_skip_conflict = cfg_geti("replication_skip_conflict");
 }
 
+/** Finish registration with other appliers paused before subscribing. */
+static void
+box_wait_registration(void)
+{
+	struct replica *master = replicaset_find_join_master();
+	if (master == NULL || master->applier == NULL ||
+	    master->applier->state != APPLIER_CONNECTED) {
+		tnt_raise(ClientError, ER_CANNOT_REGISTER);
+	}
+	struct applier *master_applier = master->applier;
+	applier_resume_to_state(master_applier, APPLIER_REGISTERED,
+				TIMEOUT_INFINITY);
+	applier_resume_to_state(master_applier, APPLIER_READY,
+				TIMEOUT_INFINITY);
+}
+
 /** Register on the master instance. Could be initial join or a name change. */
 static void
 box_register_on_master(void)
@@ -2760,17 +2776,7 @@ box_register_on_master(void)
 	 * need a new name).
 	 */
 	box_restart_replication();
-	struct replica *master = replicaset_find_join_master();
-	if (master == NULL || master->applier == NULL ||
-	    master->applier->state != APPLIER_CONNECTED) {
-		tnt_raise(ClientError, ER_CANNOT_REGISTER);
-	} else {
-		struct applier *master_applier = master->applier;
-		applier_resume_to_state(master_applier, APPLIER_REGISTERED,
-					TIMEOUT_INFINITY);
-		applier_resume_to_state(master_applier, APPLIER_READY,
-					TIMEOUT_INFINITY);
-	}
+	box_wait_registration();
 	replicaset_follow();
 	replicaset_sync();
 }
