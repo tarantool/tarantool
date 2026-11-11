@@ -478,6 +478,9 @@ g.test_defaults = function()
         connpool = {
             idle_timeout = 60,
         },
+        app = {
+            thread_group = 'tx',
+        },
     }
 
     -- Global defaults.

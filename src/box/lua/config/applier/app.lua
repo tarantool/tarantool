@@ -1,3 +1,4 @@
+local threads = require('threads')
 local log = require('internal.config.utils.log')
 local utils_file = require('internal.config.utils.file')
 local expression = require('internal.config.utils.expression')
@@ -14,10 +15,11 @@ local app_state = {
     early_loaded = nil,
 }
 
-local function run(config, opts)
-    local configdata = config._configdata
+local function run(configdata, opts)
     local file = configdata:get('app.file', {use_default = true})
     local module = configdata:get('app.module', {use_default = true})
+    local thread_group = configdata:get('app.thread_group',
+                                        {use_default = true})
 
     if opts == nil then
         opts = {}
@@ -61,6 +63,11 @@ local function run(config, opts)
             end
         end
 
+        if metadata['early_load'] and thread_group ~= 'tx' then
+            error(('App %q cannot be loaded on thread group %q because it ' ..
+                   'has the "early_load" tag'):format(file, thread_group), 0)
+        end
+
         if metadata['early_load']
         and app_state.early_loaded ~= nil
         and app_state.early_loaded ~= file then
@@ -73,9 +80,12 @@ local function run(config, opts)
             return
         end
 
-        local fn = assert(loadfile(path))
         log.verbose('app.run: loading '..file)
-        fn(file)
+        local ok, err = pcall(threads.eval, thread_group,
+                              [[assert(loadfile(...))()]], {path})
+        if not ok then
+            error(tostring(err), 0)
+        end
 
         if metadata['early_load'] and app_state.early_loaded == nil then
             app_state.early_loaded = file
@@ -105,6 +115,11 @@ local function run(config, opts)
             end
         end
 
+        if metadata['early_load'] and thread_group ~= 'tx' then
+            error(('App %q cannot be loaded on thread group %q because it ' ..
+                   'has the "early_load" tag'):format(module, thread_group), 0)
+        end
+
         if metadata['early_load']
         and app_state.early_loaded ~= nil
         and app_state.early_loaded ~= module
@@ -119,7 +134,11 @@ local function run(config, opts)
         end
 
         log.verbose('app.run: loading '..module)
-        require(module)
+        local ok, err = pcall(threads.eval, thread_group,
+                              [[require(...)]], {module})
+        if not ok then
+            error(tostring(err), 0)
+        end
 
         if metadata['early_load'] and app_state.early_loaded == nil then
             app_state.early_loaded = module
@@ -127,9 +146,29 @@ local function run(config, opts)
     end
 end
 
+local function check_app_thread_group(configdata)
+    local app_thread_group = configdata:get('app.thread_group',
+                                            {use_default = true})
+    if app_thread_group == 'tx' then
+        return
+    end
+    local exists = false
+    local thread_groups = configdata:get('threads.groups') or {}
+    for _, tg in ipairs(thread_groups) do
+        if app_thread_group == tg.name then
+            exists = true
+        end
+    end
+    if not exists then
+        error('app.thread_group must be defined in threads.groups', 0)
+    end
+end
+
 -- This apply function will be called before the box_cfg applier.
 local function preload(config)
-    run(config, {early_load_only = true})
+    local configdata = config._configdata
+    check_app_thread_group(configdata)
+    run(configdata, {early_load_only = true})
     if app_state.early_loaded == nil then
         -- This was the only run() call before box.cfg() call, lets mark it.
         app_state.early_loaded = true
@@ -138,7 +177,8 @@ end
 
 -- This post_apply function will be called after the box_cfg applier.
 local function post_apply(config)
-    run(config, {early_load_only = false})
+    local configdata = config._configdata
+    run(configdata, {early_load_only = false})
 end
 
 return {
