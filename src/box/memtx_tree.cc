@@ -2095,6 +2095,11 @@ struct tree_read_view_iterator {
 	 * is exhausted - pagination relies on it.
 	 */
 	struct memtx_tree_data<USE_HINT> *last;
+	/**
+	 * The last element of the range of tuples matching the iterator key.
+	 * Is NULL for the iterators that do not use the range end.
+	 */
+	struct memtx_tree_data<USE_HINT> *exhaust_after;
 };
 
 static_assert(sizeof(struct tree_read_view_iterator<false>) <=
@@ -2373,17 +2378,21 @@ struct TreeReadViewIteratorEQ {
 	{
 		struct tree_read_view<USE_HINT> *rv =
 			(struct tree_read_view<USE_HINT> *)it->base.index;
+		if (it->exhaust_after != NULL &&
+		    it->last == it->exhaust_after)
+			return NULL;
 		memtx_tree_view_iterator_next(&rv->tree_view,
 					      &it->tree_iterator);
 		struct memtx_tree_data<USE_HINT> *res =
 			memtx_tree_view_iterator_get_elem(&rv->tree_view,
 							  &it->tree_iterator);
 		return res != NULL &&
-		       tuple_compare_with_key(res->tuple, res->hint,
-					      it->key_data.key,
-					      it->key_data.part_count,
-					      it->key_data.hint,
-					      rv->base.def->key_def) == 0 ?
+		       ((it->last != NULL && it->exhaust_after != NULL) ||
+			tuple_compare_with_key(res->tuple, res->hint,
+					       it->key_data.key,
+					       it->key_data.part_count,
+					       it->key_data.hint,
+					       rv->base.def->key_def) == 0) ?
 		       res : NULL;
 	}
 };
@@ -2396,17 +2405,21 @@ struct TreeReadViewIteratorREQ {
 	{
 		struct tree_read_view<USE_HINT> *rv =
 			(struct tree_read_view<USE_HINT> *)it->base.index;
+		if (it->exhaust_after != NULL &&
+		    it->last == it->exhaust_after)
+			return NULL;
 		memtx_tree_view_iterator_prev(&rv->tree_view,
 					      &it->tree_iterator);
 		struct memtx_tree_data<USE_HINT> *res =
 			memtx_tree_view_iterator_get_elem(&rv->tree_view,
 							  &it->tree_iterator);
 		return res != NULL &&
-		       tuple_compare_with_key(res->tuple, res->hint,
-					      it->key_data.key,
-					      it->key_data.part_count,
-					      it->key_data.hint,
-					      rv->base.def->key_def) == 0 ?
+		       ((it->last != NULL && it->exhaust_after != NULL) ||
+			tuple_compare_with_key(res->tuple, res->hint,
+					       it->key_data.key,
+					       it->key_data.part_count,
+					       it->key_data.hint,
+					       rv->base.def->key_def) == 0) ?
 		       res : NULL;
 	}
 };
@@ -2511,9 +2524,49 @@ tree_read_view_iterator_start(struct tree_read_view_iterator<USE_HINT> *it,
 	if (USE_HINT)
 		it->key_data.set_hint(key_hint(key, part_count, cmp_def));
 
-	/* Perform the lookup. */
-	struct memtx_tree_key_data<USE_HINT> start_data = it->key_data;
+	struct memtx_tree_key_data<USE_HINT> start_data;
 	size_t curr_offset;
+
+	/*
+	 * Find both ends of the range of tuples matching the key. The read
+	 * view is immutable, so the last tuple of the range is a stable
+	 * sentinel: once it is returned, there is nothing matching left and
+	 * the following steps can compare pointers instead of the key.
+	 */
+	if (type == ITER_EQ || type == ITER_REQ) {
+		memtx_tree_iterator_t<USE_HINT> lower, upper;
+		bool exact;
+		memtx_tree_view_binary_search(tree_view, &it->key_data, &lower,
+					      &upper, &exact);
+		if (!exact)
+			return 0; /* The iterator is exhausted. */
+		if (type == ITER_EQ) {
+			memtx_tree_view_iterator_prev(tree_view, &upper);
+			it->exhaust_after = memtx_tree_view_iterator_get_elem(
+				tree_view, &upper);
+		} else {
+			it->exhaust_after = memtx_tree_view_iterator_get_elem(
+				tree_view, &lower);
+		}
+		/*
+		 * Without a start position and an offset the range bounds
+		 * also give the start of the iteration, so the separate
+		 * lookup below is not needed.
+		 */
+		if (pos == NULL && offset == 0) {
+			if (type == ITER_EQ) {
+				it->tree_iterator = lower;
+				memtx_tree_view_iterator_prev(
+					tree_view, &it->tree_iterator);
+			} else {
+				it->tree_iterator = upper;
+			}
+			goto set_next;
+		}
+	}
+
+	/* Perform the lookup. */
+	start_data = it->key_data;
 	if (!memtx_tree_view_lookup(tree_view, &start_data, pos, &type,
 				    &it->tree_iterator, &curr_offset))
 		return 0; /* The iterator is exhausted. */
@@ -2576,6 +2629,7 @@ tree_read_view_iterator_start(struct tree_read_view_iterator<USE_HINT> *it,
 		}
 	}
 
+set_next:
 	/* Set the corresponding step method. */
 	switch (type) {
 	case ITER_EQ:
@@ -2673,6 +2727,7 @@ tree_read_view_create_iterator_with_offset(
 	if (USE_HINT)
 		it->key_data.set_hint(HINT_NONE);
 	it->last = NULL;
+	it->exhaust_after = NULL;
 	invalidate_tree_iterator(&it->tree_iterator);
 	return tree_read_view_iterator_start(it, type, key, part_count,
 					     pos, offset);

@@ -1130,6 +1130,83 @@ g.after_test('test_select_tree', function(cg)
     end)
 end)
 
+-- Checks that a long EQ/REQ iteration over a read view returns exactly the
+-- matching range, including the ranges at both ends of the tree.
+g.test_select_tree_eq_req_long = function(cg)
+    cg.server:exec(function()
+        box.schema.space.create('test')
+        box.space.test:create_index('primary')
+        box.space.test:create_index('secondary', {
+            unique = false, parts = {{2, 'integer'}},
+        })
+        local count = 1000
+        for i = 1, count do
+            box.space.test:insert({i, 1, i})
+        end
+        -- Two tuples at each end of the tree.
+        box.space.test:insert({count + 1, 0, count + 1})
+        box.space.test:insert({count + 2, 0, count + 2})
+        box.space.test:insert({count + 3, 2, count + 3})
+        box.space.test:insert({count + 4, 2, count + 4})
+        local rv = box.read_view.open()
+        local idx = rv.space.test.index.secondary
+        local eq = idx:select({1}, {iterator = 'eq'})
+        local req = idx:select({1}, {iterator = 'req'})
+        t.assert_equals(#eq, count)
+        t.assert_equals(#req, count)
+        for i = 1, count do
+            t.assert_equals(eq[i], {i, 1, i})
+            t.assert_equals(req[i], {count - i + 1, 1, count - i + 1})
+        end
+        -- The ranges at both ends of the tree.
+        t.assert_equals(idx:select({0}, {iterator = 'eq'}),
+                        {{count + 1, 0, count + 1},
+                         {count + 2, 0, count + 2}})
+        t.assert_equals(idx:select({0}, {iterator = 'req'}),
+                        {{count + 2, 0, count + 2},
+                         {count + 1, 0, count + 1}})
+        t.assert_equals(idx:select({2}, {iterator = 'eq'}),
+                        {{count + 3, 2, count + 3},
+                         {count + 4, 2, count + 4}})
+        t.assert_equals(idx:select({2}, {iterator = 'req'}),
+                        {{count + 4, 2, count + 4},
+                         {count + 3, 2, count + 3}})
+        -- A scan that stops before the sentinel.
+        local limited = idx:select({1}, {iterator = 'eq', limit = count - 1})
+        t.assert_equals(#limited, count - 1)
+        -- Pagination within the range.
+        local after = idx:select({1}, {iterator = 'eq',
+                                        after = {500, 1, 500}})
+        t.assert_equals(#after, count - 500)
+        t.assert_equals(after[1], {501, 1, 501})
+        local req_after = idx:select({1}, {iterator = 'req',
+                                            after = {500, 1, 500}})
+        t.assert_equals(#req_after, 499)
+        t.assert_equals(req_after[1], {499, 1, 499})
+        -- Offset within the range.
+        local offset = idx:select({1}, {iterator = 'eq', offset = 500})
+        t.assert_equals(#offset, count - 500)
+        t.assert_equals(offset[1], {501, 1, 501})
+        local req_offset = idx:select({1}, {iterator = 'req', offset = 500})
+        t.assert_equals(#req_offset, count - 500)
+        t.assert_equals(req_offset[1], {500, 1, 500})
+        -- No match before and after the range.
+        t.assert_equals(idx:select({-1}, {iterator = 'eq'}), {})
+        t.assert_equals(idx:select({3}, {iterator = 'eq'}), {})
+        t.assert_equals(idx:select({-1}, {iterator = 'req'}), {})
+        t.assert_equals(idx:select({3}, {iterator = 'req'}), {})
+        rv:close()
+    end)
+end
+
+g.after_test('test_select_tree_eq_req_long', function(cg)
+    cg.server:exec(function()
+        if box.space.test then
+            box.space.test:drop()
+        end
+    end)
+end)
+
 -- Checks errors raised when 'select' is used with arguments that are not
 -- supported by a hash index.
 g.test_select_hash_invalid = function(cg)
@@ -1241,6 +1318,43 @@ g.after_test('test_select_multikey', function(cg)
     end)
 end)
 
+-- Checks a long EQ/REQ iteration over a multikey index read view.
+g.test_select_tree_eq_req_long_multikey = function(cg)
+    cg.server:exec(function()
+        box.schema.space.create('test')
+        box.space.test:create_index('primary')
+        box.space.test:create_index('secondary', {
+            unique = false, parts = {{'[2][*]', 'unsigned'}},
+        })
+        local count = 1000
+        for i = 1, count do
+            box.space.test:insert({i, {1, count + i}})
+        end
+        local rv = box.read_view.open()
+        local idx = rv.space.test.index.secondary
+        local eq = idx:select({1}, {iterator = 'eq'})
+        local req = idx:select({1}, {iterator = 'req'})
+        t.assert_equals(#eq, count)
+        t.assert_equals(#req, count)
+        for i = 1, count do
+            t.assert_equals(eq[i], {i, {1, count + i}})
+            t.assert_equals(req[i],
+                            {count - i + 1, {1, count * 2 - i + 1}})
+        end
+        local limited = idx:select({1}, {iterator = 'eq', limit = count - 1})
+        t.assert_equals(#limited, count - 1)
+        rv:close()
+    end)
+end
+
+g.after_test('test_select_tree_eq_req_long_multikey', function(cg)
+    cg.server:exec(function()
+        if box.space.test then
+            box.space.test:drop()
+        end
+    end)
+end)
+
 -- Checks 'select' implementation of the functional index read view.
 g.test_select_func = function(cg)
     cg.server:exec(function()
@@ -1282,6 +1396,50 @@ g.test_select_func = function(cg)
 end
 
 g.after_test('test_select_func', function(cg)
+    cg.server:exec(function()
+        if box.space.test then
+            box.space.test:drop()
+        end
+        box.schema.func.drop('test', {if_exists = true})
+    end)
+end)
+
+-- Checks a long EQ/REQ iteration over a functional index read view.
+g.test_select_tree_eq_req_long_func = function(cg)
+    cg.server:exec(function()
+        box.schema.func.create('test', {
+            body = [[function(t) return {t[2]} end]],
+            is_deterministic = true,
+            is_sandboxed = true,
+        })
+        box.schema.space.create('test')
+        box.space.test:create_index('primary')
+        box.space.test:create_index('secondary', {
+            unique = false,
+            parts = {1, 'unsigned'},
+            func = box.func.test.id,
+        })
+        local count = 1000
+        for i = 1, count do
+            box.space.test:insert({i, 1, i})
+        end
+        local rv = box.read_view.open()
+        local idx = rv.space.test.index.secondary
+        local eq = idx:select({1}, {iterator = 'eq'})
+        local req = idx:select({1}, {iterator = 'req'})
+        t.assert_equals(#eq, count)
+        t.assert_equals(#req, count)
+        for i = 1, count do
+            t.assert_equals(eq[i], {i, 1, i})
+            t.assert_equals(req[i], {count - i + 1, 1, count - i + 1})
+        end
+        local limited = idx:select({1}, {iterator = 'eq', limit = count - 1})
+        t.assert_equals(#limited, count - 1)
+        rv:close()
+    end)
+end
+
+g.after_test('test_select_tree_eq_req_long_func', function(cg)
     cg.server:exec(function()
         if box.space.test then
             box.space.test:drop()
@@ -2701,6 +2859,88 @@ g_mvcc.test_select_offset_cleaner = function(cg)
         check(rv.space.test.index.sk)
 
         -- Clean-up.
+        rv:close()
+    end, {cg.params.func_index})
+end
+
+-- Checks a long EQ/REQ iteration over a read view with invisible tuples,
+-- including invisible tuples at both ends of the matching range.
+g_mvcc.test_select_tree_eq_req_long_invisible = function(cg)
+    cg.server:exec(function(func_index)
+        -- The test space.
+        local s = box.schema.space.create('test')
+        s:create_index('pk')
+        if func_index then
+            box.schema.func.create('test', {
+                is_deterministic = true,
+                is_sandboxed = true,
+                body = [[function(tuple)
+                    return {tuple[2]}
+                end]]
+            })
+            s:create_index('sk', {
+                unique = false, parts = {1, 'unsigned'},
+                func = box.func.test.id,
+            })
+        else
+            s:create_index('sk', {
+                unique = false, parts = {{2, 'unsigned'}},
+            })
+        end
+        local count = 1000
+        for i = 1, count do
+            s:insert({i * 2, 1, i})
+        end
+
+        -- Prepare proxies and uncommitted changes.
+        local txn_proxy = require('test.box.lua.txn_proxy')
+        local other = txn_proxy.new()
+        other:begin()
+        -- Invisible tuples at both ends of the range and inside it.
+        other("box.space.test:insert({1, 1, 1})")
+        other("box.space.test:insert({999, 1, 999})")
+        other("box.space.test:insert({2001, 1, 2001})")
+        other("box.space.test:delete({1000})")
+
+        local rv = box.read_view.open()
+        local idx = rv.space.test.index.sk
+        local function check()
+            local eq = idx:select({1}, {iterator = 'eq'})
+            t.assert_equals(#eq, count)
+            t.assert_equals(eq[1], {2, 1, 1})
+            t.assert_equals(eq[#eq], {2000, 1, 1000})
+            local req = idx:select({1}, {iterator = 'req'})
+            t.assert_equals(#req, count)
+            t.assert_equals(req[1], {2000, 1, 1000})
+            t.assert_equals(req[#req], {2, 1, 1})
+            -- Pagination and offset across the invisible tuples. A
+            -- functional index has no position by tuple.
+            if not func_index then
+                local after = idx:select({1}, {iterator = 'eq',
+                                                after = {998, 1, 499}})
+                t.assert_equals(#after, 501)
+                t.assert_equals(after[1], {1000, 1, 500})
+                local req_after = idx:select({1},
+                                             {iterator = 'req',
+                                              after = {1002, 1, 501}})
+                t.assert_equals(#req_after, 500)
+                t.assert_equals(req_after[1], {1000, 1, 500})
+                local offset = idx:select({1},
+                                          {iterator = 'eq', offset = 500})
+                t.assert_equals(#offset, 500)
+                t.assert_equals(offset[1], {1002, 1, 501})
+                local req_offset = idx:select({1},
+                                              {iterator = 'req',
+                                               offset = 500})
+                t.assert_equals(#req_offset, 500)
+                t.assert_equals(req_offset[1], {1000, 1, 500})
+            end
+        end
+
+        -- The invisible tuples are skipped before and after the commit.
+        check()
+        other:commit()
+        check()
         rv:close()
     end, {cg.params.func_index})
 end
