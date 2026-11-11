@@ -509,7 +509,7 @@ lbox_memtx_tx_gc(struct lua_State *L)
 {
 	if (lua_gettop(L) != 1 || !lua_isnumber(L, 1) ||
 	    lua_tonumber(L, 1) < 1) {
-		diag_set(ClientError, ER_ILLEGAL_PARAMS,
+		diag_set(IllegalParams,
 			 "step_num must be a number not less than 1");
 		return luaT_error(L);
 	}
