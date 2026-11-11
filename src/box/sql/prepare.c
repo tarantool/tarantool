@@ -40,14 +40,12 @@
 #include "box/session.h"
 
 int
-sql_stmt_compile(const char *zSql, int nBytes, struct Vdbe *pReprepare,
+sql_stmt_compile(const char *zSql, int nBytes,
 		 struct Vdbe **ppStmt, const char **pzTail)
 {
 	int rc = 0;	/* Result code */
 	Parse sParse;		/* Parsing context */
 	sql_parser_create(&sParse, current_session()->sql_flags);
-	sParse.pReprepare = pReprepare;
-	*ppStmt = NULL;
 
 	/* Check to verify that it is possible to get a read lock on all
 	 * database schemas.  The inability to get a read lock indicates that
@@ -163,29 +161,6 @@ sql_stmt_compile(const char *zSql, int nBytes, struct Vdbe *pReprepare,
 	return rc;
 }
 
-/*
- * Rerun the compilation of a statement after a schema change.
- */
-int
-sqlReprepare(Vdbe * p)
-{
-	struct Vdbe *pNew;
-	const char *zSql;
-
-	zSql = sql_sql(p);
-	assert(zSql != 0);
-	if (sql_stmt_compile(zSql, -1, p, &pNew, 0) != 0) {
-		assert(pNew == 0);
-		return -1;
-	}
-	assert(pNew != 0);
-	sqlVdbeSwap(pNew, p);
-	sqlTransferBindings(pNew, p);
-	sqlVdbeResetStepResult(pNew);
-	sqlVdbeFinalize(pNew);
-	return 0;
-}
-
 void
 sql_parser_create(struct Parse *parser, uint32_t sql_flags)
 {
@@ -194,6 +169,8 @@ sql_parser_create(struct Parse *parser, uint32_t sql_flags)
 	parser->line_count = 1;
 	parser->line_pos = 1;
 	region_create(&parser->region, &cord()->slabc);
+	parser->var.offset = 1;
+	parser->var.pos = 0;
 }
 
 void
