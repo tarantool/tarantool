@@ -2762,27 +2762,37 @@ box_set_replication_skip_conflict(void)
 	replication_skip_conflict = cfg_geti("replication_skip_conflict");
 }
 
-/** Register on the master instance. Could be initial join or a name change. */
+/**
+ * Finish registration with other appliers paused before subscribing and
+ * throw ER_CANNOT_REGISTER if the join master is missing or not connected,
+ * or an exception on failure.
+ */
 static void
 box_register_on_master(void)
+{
+	struct replica *master = replicaset_find_join_master();
+	if (master == NULL || master->applier == NULL ||
+	    tt_uuid_is_equal(&master->uuid, &INSTANCE_UUID) ||
+	    master->applier->state != APPLIER_CONNECTED)
+		tnt_raise(ClientError, ER_CANNOT_REGISTER);
+
+	struct applier *master_applier = master->applier;
+	applier_resume_to_state(master_applier, APPLIER_REGISTERED,
+				TIMEOUT_INFINITY);
+	applier_resume_to_state(master_applier, APPLIER_READY,
+				TIMEOUT_INFINITY);
+}
+
+/** Register on the master instance. Could be initial join or a name change. */
+static void
+box_register_on_master_and_sync(void)
 {
 	/*
 	 * Restart the appliers so as they would notice the change (need an ID,
 	 * need a new name).
 	 */
 	box_restart_replication();
-	struct replica *master = replicaset_find_join_master();
-	if (master == NULL || master->applier == NULL ||
-	    tt_uuid_is_equal(&master->uuid, &INSTANCE_UUID) ||
-	    master->applier->state != APPLIER_CONNECTED) {
-		tnt_raise(ClientError, ER_CANNOT_REGISTER);
-	} else {
-		struct applier *master_applier = master->applier;
-		applier_resume_to_state(master_applier, APPLIER_REGISTERED,
-					TIMEOUT_INFINITY);
-		applier_resume_to_state(master_applier, APPLIER_READY,
-					TIMEOUT_INFINITY);
-	}
+	box_register_on_master();
 	replicaset_follow();
 	replicaset_sync();
 }
@@ -2802,7 +2812,7 @@ box_set_replication_anon(void)
 	cfg_replication_anon = new_anon;
 	box_broadcast_ballot();
 	if (!new_anon) {
-		box_register_on_master();
+		box_register_on_master_and_sync();
 		assert(!box_is_anon());
 	} else {
 		/*
@@ -2939,7 +2949,7 @@ box_set_instance_name(void)
 	/* Nil means the config doesn't care, allows to use any name. */
 	if (*name != 0) {
 		if (box_is_ro())
-			box_register_on_master();
+			box_register_on_master_and_sync();
 		else
 			box_register_replica(&INSTANCE_UUID, name);
 	}
