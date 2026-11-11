@@ -1633,6 +1633,10 @@ return schema.new('instance_config', schema.record({
                 type = 'any',
             }),
         }),
+        thread_group = schema.scalar({
+            type = 'string',
+            default = 'tx',
+        }),
     }, {
         validate = validators['app'],
     }),

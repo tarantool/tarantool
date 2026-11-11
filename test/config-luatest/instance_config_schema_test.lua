@@ -1442,6 +1442,7 @@ g.test_app = function()
         app = {
             file = 'one',
             cfg = {three = 'four'},
+            thread_group = 'app',
         },
     }
     instance_config:validate(iconfig)
@@ -1461,7 +1462,7 @@ g.test_app = function()
     end)
 
     local res = instance_config:apply_default({}).app
-    t.assert_equals(res, nil)
+    t.assert_equals(res, {thread_group = 'tx'})
 end
 
 -- Whether all box.cfg() options can be set using the declarative
