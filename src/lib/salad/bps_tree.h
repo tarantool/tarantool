@@ -420,6 +420,12 @@ typedef int64_t bps_tree_block_card_t;
 #define bps_tree_upper_bound_impl _bps_tree(upper_bound)
 #define bps_tree_upper_bound _api_name(upper_bound)
 #define bps_tree_view_upper_bound _api_name(view_upper_bound)
+#define bps_tree_lower_bound_from _bps_tree(lower_bound_from)
+#define bps_tree_upper_bound_from _bps_tree(upper_bound_from)
+#define bps_tree_make_bound_iterator _bps_tree(make_bound_iterator)
+#define bps_tree_binary_search_impl _bps_tree(binary_search_impl)
+#define bps_tree_binary_search _api_name(binary_search)
+#define bps_tree_view_binary_search _api_name(view_binary_search)
 #define bps_tree_lower_bound_elem_impl _bps_tree(lower_bound_elem)
 #define bps_tree_lower_bound_elem _api_name(lower_bound_elem)
 #define bps_tree_view_lower_bound_elem _api_name(view_lower_bound_elem)
@@ -2551,6 +2557,176 @@ bps_tree_view_upper_bound(const struct bps_tree_view *view, bps_tree_key_t key,
 			  bool *exact)
 {
 	return bps_tree_upper_bound_impl(&view->common, key, exact, NULL);
+}
+
+/**
+ * @brief Make an iterator pointing to the element at the given position of
+ *  the leaf, or to the first element of the next leaf if the position is
+ *  past the last element.
+ */
+static inline struct bps_tree_iterator
+bps_tree_make_bound_iterator(const struct bps_leaf *leaf,
+			     bps_tree_block_id_t block_id,
+			     bps_tree_pos_t pos)
+{
+	struct bps_tree_iterator res;
+	if (pos >= leaf->header.size) {
+		res.block_id = leaf->next_id;
+		res.pos = 0;
+	} else {
+		res.block_id = block_id;
+		res.pos = pos;
+	}
+	return res;
+}
+
+/**
+ * @brief Find the lower bound starting from the given block at the given
+ *  level. The levels are counted from the root: the root is 0 and a leaf
+ *  is tree->depth - 1.
+ */
+static inline struct bps_tree_iterator
+bps_tree_lower_bound_from(const struct bps_tree_common *tree,
+			  bps_tree_block_id_t block_id,
+			  bps_tree_block_id_t level,
+			  bps_tree_key_t key, bool *exact)
+{
+	struct bps_block *block = bps_tree_restore_block(tree, block_id);
+	for (bps_tree_block_id_t i = level; i < tree->depth - 1; i++) {
+		struct bps_inner *inner = (struct bps_inner *)block;
+		bps_tree_pos_t pos = bps_tree_find_ins_point_key(
+			tree, inner->elems, inner->header.size - 1, key, exact);
+		block_id = inner->child_ids[pos];
+		block = bps_tree_restore_block(tree, block_id);
+	}
+	struct bps_leaf *leaf = (struct bps_leaf *)block;
+	bps_tree_pos_t pos = bps_tree_find_ins_point_key(
+		tree, leaf->elems, leaf->header.size, key, exact);
+	return bps_tree_make_bound_iterator(leaf, block_id, pos);
+}
+
+/**
+ * @brief Find the upper bound starting from the given block at the given
+ *  level. See bps_tree_lower_bound_from().
+ */
+static inline struct bps_tree_iterator
+bps_tree_upper_bound_from(const struct bps_tree_common *tree,
+			  bps_tree_block_id_t block_id,
+			  bps_tree_block_id_t level,
+			  bps_tree_key_t key)
+{
+	struct bps_block *block = bps_tree_restore_block(tree, block_id);
+	for (bps_tree_block_id_t i = level; i < tree->depth - 1; i++) {
+		struct bps_inner *inner = (struct bps_inner *)block;
+		bool exact;
+		bps_tree_pos_t pos = bps_tree_find_after_ins_point_key(
+			tree, inner->elems, inner->header.size - 1, key,
+			&exact);
+		block_id = inner->child_ids[pos];
+		block = bps_tree_restore_block(tree, block_id);
+	}
+	struct bps_leaf *leaf = (struct bps_leaf *)block;
+	bool exact;
+	bps_tree_pos_t pos = bps_tree_find_after_ins_point_key(
+		tree, leaf->elems, leaf->header.size, key, &exact);
+	return bps_tree_make_bound_iterator(leaf, block_id, pos);
+}
+
+/**
+ * @brief Find the lower and upper bounds of the range of elements equal
+ *  to the key in one descent. The lower and upper bound paths share the
+ *  descent until the key compares equal to a separator; from that point
+ *  the bounds are in different subtrees and are searched separately.
+ * @param tree - pointer to a tree
+ * @param key - key to find
+ * @param[out] lower - the first element greater than or equal to the key
+ * @param[out] upper - the first element greater than the key
+ * @param[out] exact - true if an element equal to the key exists
+ * @return true if the range is not empty
+ */
+static inline bool
+bps_tree_binary_search_impl(const struct bps_tree_common *tree,
+			    bps_tree_key_t key,
+			    struct bps_tree_iterator *lower,
+			    struct bps_tree_iterator *upper,
+			    bool *exact)
+{
+	bool local_exact;
+	if (exact == NULL)
+		exact = &local_exact;
+	*exact = false;
+	if (tree->root_id == (bps_tree_block_id_t)(-1)) {
+		*lower = bps_tree_invalid_iterator();
+		*upper = bps_tree_invalid_iterator();
+		return false;
+	}
+	struct bps_block *block = bps_tree_root(tree);
+	bps_tree_block_id_t block_id = tree->root_id;
+	for (bps_tree_block_id_t level = 0; level < tree->depth - 1;
+	     level++) {
+		struct bps_inner *inner = (struct bps_inner *)block;
+		size_t sep_count = inner->header.size - 1;
+		bps_tree_pos_t lower_pos = bps_tree_find_ins_point_key(
+			tree, inner->elems, sep_count, key, exact);
+		/*
+		 * If the key does not equal a separator, the first greater
+		 * element and the first greater or equal one are in the same
+		 * child, so the bounds do not split at this level.
+		 */
+		if (!*exact) {
+			block_id = inner->child_ids[lower_pos];
+			block = bps_tree_restore_block(tree, block_id);
+			continue;
+		}
+		/*
+		 * The key equals a separator. Find the first greater
+		 * separator in the suffix following it, not in the whole
+		 * array.
+		 */
+		bool upper_exact;
+		bps_tree_pos_t upper_pos = lower_pos +
+			bps_tree_find_after_ins_point_key(
+				tree, inner->elems + lower_pos,
+				sep_count - lower_pos, key, &upper_exact);
+		*lower = bps_tree_lower_bound_from(
+			tree, inner->child_ids[lower_pos], level + 1,
+			key, exact);
+		*upper = bps_tree_upper_bound_from(
+			tree, inner->child_ids[upper_pos], level + 1, key);
+		return *exact;
+	}
+	struct bps_leaf *leaf = (struct bps_leaf *)block;
+	bps_tree_pos_t lower_pos = bps_tree_find_ins_point_key(
+		tree, leaf->elems, leaf->header.size, key, exact);
+	bps_tree_pos_t upper_pos = lower_pos;
+	if (*exact) {
+		bool upper_exact;
+		upper_pos += bps_tree_find_after_ins_point_key(
+			tree, leaf->elems + lower_pos,
+			leaf->header.size - lower_pos, key, &upper_exact);
+	}
+	*lower = bps_tree_make_bound_iterator(leaf, block_id, lower_pos);
+	*upper = bps_tree_make_bound_iterator(leaf, block_id, upper_pos);
+	return *exact;
+}
+
+static inline bool
+bps_tree_binary_search(const struct bps_tree *tree, bps_tree_key_t key,
+		       struct bps_tree_iterator *lower,
+		       struct bps_tree_iterator *upper, bool *exact)
+{
+	return bps_tree_binary_search_impl(&tree->common, key, lower, upper,
+					   exact);
+}
+
+static inline bool
+bps_tree_view_binary_search(const struct bps_tree_view *view,
+			    bps_tree_key_t key,
+			    struct bps_tree_iterator *lower,
+			    struct bps_tree_iterator *upper, bool *exact)
+{
+	return bps_tree_binary_search_impl(&view->common, key, lower, upper,
+					   exact);
 }
 
 /**
@@ -7669,6 +7845,12 @@ bps_tree_debug_check_internal_functions(bool assertme)
 #undef bps_tree_upper_bound_impl
 #undef bps_tree_upper_bound
 #undef bps_tree_view_upper_bound
+#undef bps_tree_lower_bound_from
+#undef bps_tree_upper_bound_from
+#undef bps_tree_make_bound_iterator
+#undef bps_tree_binary_search_impl
+#undef bps_tree_binary_search
+#undef bps_tree_view_binary_search
 #undef bps_tree_lower_bound_elem_impl
 #undef bps_tree_lower_bound_elem
 #undef bps_tree_view_lower_bound_elem
