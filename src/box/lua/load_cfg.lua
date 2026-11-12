@@ -970,6 +970,8 @@ local function reload_cfg(oldcfg, cfg)
     if type(box.on_reload_configuration) == 'function' then
         box.on_reload_configuration()
     end
+
+    require('internal.ssl_certificate').apply()
 end
 
 local function load_cfg_apply_dynamic(oldcfg)
@@ -1176,6 +1178,8 @@ local function load_cfg(cfg)
             'schema.upgrade().', schema_version_str, box.info.version)
         log.warn(msg)
     end
+
+    require('internal.ssl_certificate').apply()
 end
 box.cfg = locked(load_cfg)
 
