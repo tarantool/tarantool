@@ -130,6 +130,7 @@ extern char session_lua[],
 	merger_lua[],
 	checks_version_lua[],
 	checks_lua[],
+	ssl_certificate_lua[],
 	metrics_api_lua[],
 	metrics_cartridge_failover_lua[],
 	metrics_cartridge_issues_lua[],
@@ -237,6 +238,7 @@ static const char *lua_sources[] = {
 	"third_party/checks/checks/version",
 	"checks.version", checks_version_lua,
 	"third_party/checks/checks", "checks", checks_lua,
+	"box/ssl_certificate", "internal.ssl_certificate", ssl_certificate_lua,
 	/*
 	 * Metrics uses checks. Module components order is also important here
 	 * (see https://github.com/tarantool/metrics/issues/433
