@@ -2551,6 +2551,8 @@ srv_accept_msg(struct cmsg *m)
 		fiber_set_audit_context(msg->fiber, msg->header.audit_context,
 					msg->header.audit_context_len);
 	}
+	msg->fiber->storage.span_id =
+		msg->header.trace_context_span_id;
 	return msg;
 }
 
@@ -2615,6 +2617,7 @@ srv_end_msg(struct iproto_msg *msg)
 	rlist_del(&msg->in_inprogress);
 	msg->fiber->storage.runtime_credentials = NULL;
 	fiber_set_audit_context(msg->fiber, NULL, 0);
+	msg->fiber->storage.span_id = 0;
 	msg->fiber = NULL;
 }
 
