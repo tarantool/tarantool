@@ -6,6 +6,7 @@ on:
       - 'master'
       - 'release/**'
       - '**full-ci**'
+      - 'gh_10560_ipv6_test'
     tags:
       - '**'
   pull_request:
@@ -89,6 +90,8 @@ jobs:
         with:
           submodule: ${{ inputs.submodule }}
           revision: ${{ inputs.revision }}
+      - name: Enable IPv6 for tests
+        run: sysctl -w net.ipv6.conf.all.disable_ipv6=0
       - name: test
         run: make -f .test.mk test-release
       - name: artifacts
