@@ -175,6 +175,26 @@ g.test_snap_inprogress_is_ignored = function(cg)
     end, {baseline_lsn})
 end
 
+g.test_temporary_file_cleanup_ignores_directories = function(cg)
+    cg.server = server:new()
+    cg.server:start()
+    cg.server:stop()
+
+    local file = fio.pathjoin(cg.server.workdir, 'file.inprogress')
+    local dir = fio.pathjoin(cg.server.workdir, 'dir.inprogress')
+    local nested_file = fio.pathjoin(dir, 'file.inprogress')
+    t.assert(fio.mkdir(dir))
+    write_file(file, 'incomplete file')
+    write_file(nested_file, 'keep this file')
+
+    cg.server:start()
+    t.assert_not(fio.path.exists(file))
+    t.assert(fio.path.is_dir(dir))
+    t.assert_equals(read_file(nested_file), 'keep this file')
+    t.assert_not(cg.server:grep_log('error while removing', nil,
+                                    {reset = false}))
+end
+
 -- gh-4033: tarantool must cope with huge LSNs.
 --
 -- NB: There is no public API to jump the LSN, so inject one by rewriting the
