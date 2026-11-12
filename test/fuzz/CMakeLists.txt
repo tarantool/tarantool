@@ -278,6 +278,11 @@ if (NOT ENABLE_UB_SANITIZER)
                    LIBRARIES core fuzzer_config)
 endif ()
 
+create_fuzz_test(PREFIX xlog
+                 SOURCES xlog_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
+                 LIBRARIES xlog xrow fuzzer_config)
+
 include(ProtobufMutator)
 
 add_subdirectory(luaL_loadbuffer)
