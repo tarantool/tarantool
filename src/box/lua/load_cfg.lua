@@ -965,7 +965,13 @@ local function reload_cfg(oldcfg, cfg)
         end
     end
 
-    reconfig_modules(module_keys, oldcfg, newcfg, nil)
+    local ok, err = pcall(reconfig_modules, module_keys, oldcfg, newcfg, nil)
+    -- Reconfiguration isn't atomic: a failure may leave some options, e.g.
+    -- a new listen URI, applied, so check the certificates anyway.
+    require('internal.ssl_certificate').apply()
+    if not ok then
+        error(err, 0)
+    end
 
     if type(box.on_reload_configuration) == 'function' then
         box.on_reload_configuration()
@@ -1176,6 +1182,8 @@ local function load_cfg(cfg)
             'schema.upgrade().', schema_version_str, box.info.version)
         log.warn(msg)
     end
+
+    require('internal.ssl_certificate').apply()
 end
 box.cfg = locked(load_cfg)
 
