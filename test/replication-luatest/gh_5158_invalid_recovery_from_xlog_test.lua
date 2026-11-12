@@ -41,7 +41,12 @@ g.test_invalid_recovery_from_xlog = function(cg)
     end)
 
     -- Delete all *.xlogs on the replica
-    cg.replica:stop()
+    cg.replica:start()
+    cg.replica:exec(function()
+        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 2)
+        box.cfg{wal_queue_max_size = 1}
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+    end)
     local glob = fio.pathjoin(cg.replica.workdir, '*.xlog')
     local xlogs = fio.glob(glob)
     for _, file in pairs(xlogs) do fio.unlink(file) end

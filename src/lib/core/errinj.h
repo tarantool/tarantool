@@ -136,9 +136,11 @@ struct errinj {
 	_(ERRINJ_RELAY_TIMEOUT, ERRINJ_DOUBLE, {.dparam = 0}) \
 	_(ERRINJ_RELAY_TX_STATUS_UPDATE_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_RELAY_WAL_START_DELAY, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_RELAY_INITIAL_JOIN_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_RELAY_READ_ACK_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_REPLICASET_VCLOCK, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_REPLICA_JOIN_DELAY, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_REPLICA_REGISTER_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SIGILL_MAIN_THREAD, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SIGILL_NONMAIN_THREAD, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SIO_READ_MAX, ERRINJ_INT, {.iparam = -1}) \

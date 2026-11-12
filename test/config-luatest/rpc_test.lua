@@ -1238,8 +1238,17 @@ g.test_tries_to_reconnect = function()
              roles = { 'replication' },
              privileges = {{permissions = {'execute'}, universe = true}}})
         :set_global_option('iproto.advertise.peer.login', 'myuser')
-        :add_instance('i-001', { database = { mode = 'rw' } })
-        :add_instance('i-002', {})
+        :add_instance('i-001', {
+            database = {
+                mode = 'rw',
+                instance_uuid = '11111111-1111-1111-1111-111111111111',
+            },
+        })
+        :add_instance('i-002', {
+            database = {
+                instance_uuid = '22222222-2222-2222-2222-222222222222',
+            },
+        })
         :config()
 
     local cluster = cluster:new(config)

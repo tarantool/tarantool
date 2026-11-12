@@ -798,6 +798,14 @@ replicaset_check_quorum(void);
 int64_t
 replicaset_max_instance_lsn(void);
 
+/**
+ * Check if any connected applier's ballot lists the given UUID
+ * among registered_replica_uuids. Used to detect the transient
+ * state when a replica is named by config but anonymous locally.
+ */
+bool
+replicaset_is_registered_remotely(const struct tt_uuid *uuid);
+
 #endif /* defined(__cplusplus) */
 
 #endif

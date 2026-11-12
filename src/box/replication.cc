@@ -2051,3 +2051,22 @@ replicaset_collect_confirmed_vclock(struct vclock *confirmed_vclock,
 	}
 	return 0;
 }
+
+bool
+replicaset_is_registered_remotely(const struct tt_uuid *uuid)
+{
+	replicaset_foreach(replica) {
+		struct applier *applier = replica->applier;
+		if (applier == NULL)
+			continue;
+		const struct ballot *ballot = &applier->ballot;
+		int ballot_size = ballot->registered_replica_uuids_size;
+		for (int i = 0; i < ballot_size; i++) {
+			const struct tt_uuid *replica_uuid =
+				&ballot->registered_replica_uuids[i];
+			if (tt_uuid_is_equal(uuid, replica_uuid))
+				return true;
+		}
+	}
+	return false;
+}

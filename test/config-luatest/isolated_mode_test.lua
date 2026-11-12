@@ -18,6 +18,25 @@ g.after_each(function(g)
     end
 end)
 
+-- Wait until the instance name is persisted in the snapshot so
+-- that restart in isolated mode won't fail with "Instance name
+-- is not set in snapshot and UUID is missing in the config".
+-- The initial bootstrap snapshot may be created before names are
+-- assigned to _cluster, so we wait for the name and then force
+-- a new checkpoint.
+local function ensure_name_in_snapshot(server)
+    t.helpers.retrying({timeout = 60}, function()
+        server:exec(function()
+            local id = box.info.id
+            local row = box.space._cluster:get({id})
+            assert(row ~= nil and row[3] ~= nil)
+        end)
+    end)
+    server:exec(function()
+        box.snapshot()
+    end)
+end
+
 -- Connect to the given server's console and wait for "ready"
 -- configuration status.
 --
@@ -84,6 +103,8 @@ g.test_startup_with_snap = function(g)
     local cluster = cluster:new(config)
     cluster:start()
 
+    ensure_name_in_snapshot(cluster['i-003'])
+
     -- Stop i-003. It leaves a local snapshot.
     cluster['i-003']:stop()
 
@@ -138,6 +159,8 @@ g.test_read_only = function(g)
 
     local cluster = cluster:new(config)
     cluster:start()
+
+    ensure_name_in_snapshot(cluster['i-001'])
 
     -- Use the console connection, because an instance in the
     -- isolated mode doesn't accept iproto requests.
@@ -419,6 +442,8 @@ g.test_replication_to = function(g)
     local cluster = cluster:new(config)
     cluster:start()
 
+    ensure_name_in_snapshot(cluster['i-003'])
+
     -- Use the console connection, because an instance in the
     -- isolated mode doesn't accept iproto requests.
     g.it = it.connect(cluster['i-003'])
@@ -612,6 +637,8 @@ g.test_alert_on_startup = function(g)
 
     local cluster = cluster:new(config)
     cluster:start()
+
+    ensure_name_in_snapshot(cluster['i-001'])
 
     -- Stop i-001. It leaves a local snapshot, so it can be
     -- started in the isolated mode.
