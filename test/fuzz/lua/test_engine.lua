@@ -1936,6 +1936,7 @@ local errinj_blacklist = {
     ERRINJ_HTTP_RESPONSE_ADD_WAIT = true,
     ERRINJ_INDEX_RESERVE = true,
     ERRINJ_LOG_ROTATE = true,
+    ERRINJ_SIO_GETADDRINFO_ADDRCONFIG = true,
     ERRINJ_SIO_READ_MAX = true,
     ERRINJ_TUPLE_FIELD = true,
     ERRINJ_WAL_DELAY_COUNTDOWN = true,

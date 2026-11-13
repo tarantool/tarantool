@@ -39,6 +39,7 @@
 #include <sys/socket.h>
 
 #include "fiber.h"
+#include "sio.h"
 #include <tarantool_ev.h>
 
 /*
@@ -334,10 +335,6 @@ struct async_getaddrinfo_task {
 	struct addrinfo hints;
 };
 
-#ifndef EAI_ADDRFAMILY
-#define EAI_ADDRFAMILY EAI_BADFLAGS /* EAI_ADDRFAMILY is deprecated on BSD */
-#endif
-
 /*
  * Resolver function, run in separate thread by
  * coio (libeio).
@@ -348,21 +345,8 @@ getaddrinfo_cb(struct coio_task *ptr)
 	struct async_getaddrinfo_task *task =
 		(struct async_getaddrinfo_task *) ptr;
 
-	task->rc = getaddrinfo(task->host, task->port, &task->hints,
-			     &task->result);
-
-	/* getaddrinfo can return EAI_ADDRFAMILY on attempt
-	 * to resolve ::1, if machine has no public ipv6 addresses
-	 * configured. Retry without AI_ADDRCONFIG flag set.
-	 *
-	 * See for details: https://bugs.launchpad.net/tarantool/+bug/1160877
-	 */
-	if ((task->rc == EAI_BADFLAGS || task->rc == EAI_ADDRFAMILY) &&
-	    (task->hints.ai_flags & AI_ADDRCONFIG)) {
-		task->hints.ai_flags &= ~AI_ADDRCONFIG;
-		task->rc = getaddrinfo(task->host, task->port, &task->hints,
-			     &task->result);
-	}
+	task->rc = sio_getaddrinfo(task->host, task->port, &task->hints,
+				   &task->result);
 	return 0;
 }
 
