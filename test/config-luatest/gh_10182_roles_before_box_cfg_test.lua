@@ -372,3 +372,35 @@ tg.test_app_with_early_load_tag_in_work_dir = function()
         t.assert_str_contains(res.stdout, 'on_load_status: unconfigured')
     end
 end
+
+tg.test_app_thread_group_with_early_load_tag = function()
+    local opts_template, opts
+
+    opts_template = {
+        script = early_load_script,
+        options = {
+            app = {
+                thread_group = 'app',
+            },
+            threads = {
+                groups = {
+                    {name = 'app', size = 2},
+                },
+            },
+        },
+    }
+
+    opts = table.deepcopy(opts_template)
+    opts.options.app.file = 'main.lua'
+    opts.exp_err = 'App "main.lua" cannot be loaded on thread group "app" ' ..
+                   'because it has the "early_load" tag'
+    helpers.failure_case(opts)
+
+    opts = table.deepcopy(opts_template)
+    opts.options.app.module = 'main'
+    opts.setsearchroot = false
+    opts.env = {LUA_PATH = LUA_PATH}
+    opts.exp_err = 'App "main" cannot be loaded on thread group "app" ' ..
+                   'because it has the "early_load" tag'
+    helpers.failure_case(opts)
+end

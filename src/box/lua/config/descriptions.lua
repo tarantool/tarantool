@@ -151,6 +151,15 @@ I['app.file'] = 'A path to a Lua file to load an application from.'
 
 I['app.module'] = 'A Lua module to load an application from.'
 
+I['app.thread_group'] = format_text([[
+    Thread group to use for loading the application.
+
+    By default, the application is loaded on the main thread ("tx").
+    If this option is set, it will instead be loaded on each thread of
+    the specified group. The specified thread group must be defined via
+    the `threads.groups` configuration option.
+]])
+
 -- }}} app configuration
 
 -- {{{ audit_log configuration

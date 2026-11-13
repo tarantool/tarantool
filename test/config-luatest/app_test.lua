@@ -201,3 +201,66 @@ g.test_tarantool_version_check = function(g)
         setsearchroot = false,
     })
 end
+
+g.test_app_thread_group = function()
+    local opts_template, opts
+
+    helpers.failure_case({
+        options = {
+            app = {
+                thread_group = 'app',
+            },
+        },
+        exp_err = 'app.thread_group must be defined in threads.groups',
+    })
+
+    opts_template = {
+        script = [[_G.foo = 42]],
+        options = {
+            app = {
+                thread_group = 'app',
+            },
+            threads = {
+                groups = {
+                    {name = 'app', size = 2},
+                },
+            },
+        },
+        verify = function()
+            local threads = require('threads')
+            t.assert_equals(threads.eval('app', [[return _G.foo]]),
+                            {{42}, {42}})
+        end,
+    }
+
+    opts = table.deepcopy(opts_template)
+    opts.options.app.file = 'main.lua'
+    helpers.success_case(g, opts)
+
+    opts = table.deepcopy(opts_template)
+    opts.options.app.module = 'main'
+    helpers.success_case(g, opts)
+
+    opts_template = {
+        script = [[error('foobar', 0)]],
+        options = {
+            app = {
+                thread_group = 'app',
+            },
+            threads = {
+                groups = {
+                    {name = 'app', size = 2},
+                },
+            },
+        },
+        exp_err = 'foobar',
+    }
+
+    opts = table.deepcopy(opts_template)
+    opts.options.app.file = 'main.lua'
+    helpers.failure_case(opts)
+
+    opts = table.deepcopy(opts_template)
+    opts.options.app.module = 'main'
+    helpers.failure_case(opts)
+end
