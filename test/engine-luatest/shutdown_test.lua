@@ -1,4 +1,5 @@
 local server = require('luatest.server')
+local cluster = require('luatest.replica_set')
 local utils = require('luatest.utils')
 local justrun = require('luatest.justrun')
 local fio = require('fio')
@@ -84,4 +85,67 @@ g_crash.test_shutdown_with_active_txn = function(cg)
                                      {nojson = true, quote_args = true,
                                       stderr = true})
     t.assert_covers(result, {exit_code = 0, stderr = ''})
+end
+
+local g_shutdown = t.group('shutdown_applier')
+
+g_shutdown.before_each(function(cg)
+    t.tarantool.skip_if_not_debug()
+    cg.cluster = cluster:new{}
+    local box_cfg = {
+        replication = {
+            server.build_listen_uri('master', cg.cluster.id),
+            server.build_listen_uri('replica', cg.cluster.id),
+        },
+    }
+    cg.master = cg.cluster:build_and_add_server({
+        alias = 'master',
+        box_cfg = box_cfg,
+    })
+    box_cfg.read_only = true
+    cg.replica = cg.cluster:build_and_add_server({
+        alias = 'replica',
+        box_cfg = box_cfg,
+    })
+    cg.cluster:start()
+end)
+
+g_shutdown.after_each(function(cg)
+    cg.cluster:drop()
+end)
+
+-- Test shutdown when a replica is applying a transaction whose WAL write is
+-- still in flight (#10881). The applier commits it with SUBMIT, so no fiber
+-- owns it; the WAL completion callback is what normally frees it. If the
+-- process exits before the callback runs, the transaction stays in the global
+-- txns list. Before commit 86e74a15e7db ("box: free formerly in-progress
+-- txns on tarantool exit") nothing freed it at exit and LeakSanitizer
+-- reported the txn region allocations; now box_storage_free() frees them.
+--
+-- The delay must outlast the shutdown from SIGTERM to wal_free(). Ten seconds
+-- is far more than the round trips below; the stop is issued as soon as the
+-- WAL write is queued, while the WAL thread is still sleeping.
+g_shutdown.test_applier_txn_pending_at_shutdown = function(cg)
+    cg.replica:exec(function()
+        box.error.injection.set('ERRINJ_WAL_DELAY_DURATION', 10)
+    end)
+    local wal_cnt = cg.replica:exec(function()
+        return box.error.injection.get('ERRINJ_WAL_WRITE_COUNT')
+    end)
+    local replica_id = cg.replica:get_instance_id()
+    -- on_replace_dd_cluster() allocates from the txn region, the allocation
+    -- the issue reports.
+    cg.master:exec(function(id)
+        box.space._cluster:delete{id}
+    end, {replica_id})
+    cg.replica:exec(function(cnt)
+        t.helpers.retrying({timeout = 10}, function()
+            local count =
+                box.error.injection.get('ERRINJ_WAL_WRITE_COUNT')
+            t.assert_gt(count, cnt)
+        end)
+    end, {wal_cnt})
+    -- Luatest's stop() checks the server log for LeakSanitizer reports and
+    -- fails the test if one appears.
+    cg.replica:stop()
 end
