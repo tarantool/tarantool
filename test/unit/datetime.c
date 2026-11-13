@@ -21,6 +21,7 @@
 
 /** Minimum supported date - -5879610-06-22. */
 #define MIN_DATE_YEAR -5879610
+#define MAX_DATE_YEAR 5879611
 
 #define TZOFFSET_H_MIN (TZOFFSET_MIN / 60)
 #define TZOFFSET_H_MAX (TZOFFSET_MAX / 60)
@@ -774,6 +775,58 @@ datetime_from_map_overflow_test(void)
 }
 
 static void
+datetime_from_map_range_test(void)
+{
+	plan(8);
+	header();
+
+	struct datetime dt;
+	char buffer[128];
+	int rc = mp_format(buffer, sizeof(buffer), "{%s%d%s%d%s%d}",
+			   "year", MIN_DATE_YEAR, "month", 6, "day", 21);
+	fail_if(rc >= (int)sizeof(buffer));
+	is(datetime_from_map(&dt, buffer), -1, "before min date");
+
+	rc = mp_format(buffer, sizeof(buffer), "{%s%d%s%d%s%d}",
+		       "year", MIN_DATE_YEAR, "month", 6, "day", 22);
+	fail_if(rc >= (int)sizeof(buffer));
+	is(datetime_from_map(&dt, buffer), 0, "min date");
+
+	rc = mp_format(buffer, sizeof(buffer), "{%s%d%s%d%s%d}",
+		       "year", MAX_DATE_YEAR, "month", 7, "day", 12);
+	fail_if(rc >= (int)sizeof(buffer));
+	is(datetime_from_map(&dt, buffer), -1, "after max date");
+
+	rc = mp_format(buffer, sizeof(buffer), "{%s%d%s%d%s%d}",
+		       "year", MAX_DATE_YEAR, "month", 7, "day", 11);
+	fail_if(rc >= (int)sizeof(buffer));
+	is(datetime_from_map(&dt, buffer), 0, "max date");
+
+	rc = mp_format(buffer, sizeof(buffer), "{%s%lld}", "timestamp",
+		       (long long)MAX_EPOCH_SECS_VALUE + 1);
+	fail_if(rc >= (int)sizeof(buffer));
+	is(datetime_from_map(&dt, buffer), -1, "timestamp after max");
+
+	rc = mp_format(buffer, sizeof(buffer), "{%s%lld}", "timestamp",
+		       (long long)MIN_EPOCH_SECS_VALUE - 1);
+	fail_if(rc >= (int)sizeof(buffer));
+	is(datetime_from_map(&dt, buffer), -1, "timestamp before min");
+
+	rc = mp_format(buffer, sizeof(buffer), "{%s%lld}", "timestamp",
+		       (long long)MIN_EPOCH_SECS_VALUE);
+	fail_if(rc >= (int)sizeof(buffer));
+	is(datetime_from_map(&dt, buffer), 0, "min timestamp");
+
+	rc = mp_format(buffer, sizeof(buffer), "{%s%lld}", "timestamp",
+		       (long long)MAX_EPOCH_SECS_VALUE);
+	fail_if(rc >= (int)sizeof(buffer));
+	is(datetime_from_map(&dt, buffer), 0, "max timestamp");
+
+	footer();
+	check_plan();
+}
+
+static void
 snprint_test(void)
 {
 	plan(4);
@@ -810,7 +863,7 @@ snprint_test(void)
 int
 main(void)
 {
-	plan(14);
+	plan(15);
 	datetime_parse_full_ok_test();
 	datetime_parse_full_fail_test();
 	tostring_datetime_test();
@@ -824,6 +877,7 @@ main(void)
 	mp_print_test();
 	interval_from_map_test();
 	datetime_from_map_overflow_test();
+	datetime_from_map_range_test();
 	snprint_test();
 
 	return check_plan();
