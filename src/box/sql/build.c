@@ -2874,6 +2874,9 @@ sql_create_index(struct Parse *parse, struct Token *table, struct Token *name,
 			if (idx_type == SQL_INDEX_TYPE_CONSTRAINT_PK &&
 			    iid != 0 && !is_named) {
 				existing_idx->def->iid = 0;
+				if (i != 0) {
+					SWAP(space->index[0], space->index[i]);
+				}
 				goto exit_create_index;
 			}
 

@@ -511,3 +511,15 @@ g.test_index_from_lua = function()
         s:drop()
     end)
 end
+
+--
+-- gh-13358 CREATE TABLE with PRIMARY KEY matching a non-first UNIQUE
+--
+g.test_13358_primary_key_matching_a_non_first_unique = function()
+    g.server:exec(function()
+        local sql = "CREATE TABLE t (a INT, b INT, UNIQUE (a), UNIQUE (b), "..
+                    "PRIMARY KEY (b));"
+        local _, err = box.execute(sql)
+        t.assert_equals(err, nil)
+    end)
+end
