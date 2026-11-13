@@ -56,8 +56,15 @@ local function gen_path_builder(basepath_fn, templates, need_traverse)
     assert(type(templates) == 'table', 'templates must be a table')
 
     return function()
-        local base = basepath_fn() or '.'
-        local dirs = need_traverse and traverse_path(base) or { base }
+        local base = basepath_fn()
+        local dirs = { base or '.' }
+        -- package.searchroot() returns nil if getcwd() fails, for
+        -- example, if the current directory is removed. Then search
+        -- only in '.': the traversal up to '/' needs an absolute
+        -- path to start from.
+        if base ~= nil and need_traverse then
+            dirs = traverse_path(base)
+        end
 
         local searchpaths = {}
 
