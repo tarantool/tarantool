@@ -12,9 +12,9 @@ test:test("Simple test", function(test)
     space:create_index('pk')
     space:before_replace(function() end)
     local status = pcall(function() space:insert({}) end)
-    test:is(status, false)
+    test:is(status, false, 'insert with no fields fails')
     local status = pcall(function() space:insert({0}) end)
-    test:is(status, true)
+    test:is(status, true, 'insert with a field succeeds')
     space:drop{}
 end)
 
@@ -31,9 +31,9 @@ test:test("Reproducer from issue", function(test)
     })
     space:before_replace(function() end)
     local status = pcall(function() space:insert({2}) end)
-    test:is(status, false)
+    test:is(status, false, 'insert with an invalid format fails')
     local status = pcall(function() space:insert({}) end)
-    test:is(status, false)
+    test:is(status, false, 'insert with no fields fails')
     space:drop{}
 end)
 
@@ -54,7 +54,7 @@ test:test("Test for suitable format after every trigger", function(test)
     -- tuple format will match space format, after the second trigger tuple format
     -- will not be suitable so insertion must fail.
     local status = pcall(function() space:insert({1}) end)
-    test:is(status, false)
+    test:is(status, false, 'insert fails after triggers change format')
     space:drop{}
 end)
 
