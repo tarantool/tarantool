@@ -6839,6 +6839,9 @@ box_storage_shutdown()
 		diag_log();
 		panic("cannot gracefully shutdown iproto");
 	}
+
+	wal_start_shutdown();
+	txn_shutdown();
 	replication_shutdown();
 	box_raft_shutdown();
 	txn_limbo_shutdown();
