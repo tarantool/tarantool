@@ -25,8 +25,62 @@ local BUF_SIZE = 64
 
 local conv_rv_error = ffi.cast('void *', -1)
 
-local function iconv_convert(iconv, data)
-    if not ffi.istype(iconv_t, iconv) then
+---The `iconv` module provides a way to convert a string with one encoding
+---to a string with another encoding, for example from ASCII to UTF-8. It is
+---based on the POSIX iconv routines.
+---
+---An exact list of the available encodings may depend on environment.
+---Typically the list includes ASCII, BIG5, KOI8R, LATIN8, MS-GREEK, SJIS,
+---and about 100 others. For a complete list, type `iconv --list` on a
+---terminal.
+local iconv = {}
+
+---@class iconv.converter: ffi.cdata*
+---
+---An `iconv` converter object that converts a string from one encoding to
+---another. Call it as a function to convert a string.
+---
+---If anything in `input_string` cannot be converted, there will be an error
+---message and the result string will be unchanged.
+---
+---**Example:**
+---
+---The Unicode code point U+0414 (CYRILLIC CAPITAL LETTER DE) is encoded in
+---UTF-8 as the bytes D0 94. Tarantool uses UTF-8, so use
+---`string.hex(string.char(208, 148))` to show the UTF-8 source bytes, then
+---convert the character to UTF-16BE and check the result. The result 0414
+---shows that iconv conversion works. (Different iconv implementations might
+---use different names, for example UTF-16BE instead of UTF16BE.)
+---
+---```tarantoolsession
+---tarantool> string.hex(string.char(208, 148))
+-----
+---- d094
+---...
+---
+---tarantool> converter = require('iconv').new('UTF16BE', 'UTF8')
+-----
+---...
+---
+---tarantool> utf16_string = converter(string.char(208, 148))
+-----
+---...
+---
+---tarantool> string.hex(utf16_string)
+-----
+---- '0414'
+---...
+---```
+---@field __tostring fun(
+---    self: iconv.converter
+---): string Returns a string representation of the converter.
+---@operator call(string): string
+
+---@param data string the string to be converted (the "from" string)
+---@return string res_string the string that results from the conversion
+---    (the "to" string)
+local function iconv_convert(converter, data)
+    if not ffi.istype(iconv_t, converter) then
         error("Usage: iconv:convert(data: string)")
     end
     local data_len   = data:len()
@@ -42,13 +96,13 @@ local function iconv_convert(iconv, data)
     while data_left[0] > 0 do
         buf_ptr[0]  = buf:reserve(output_len)
         buf_left[0] = buf:unused()
-        local res = ffi.C.tnt_iconv(iconv, data_ptr, data_left,
+        local res = ffi.C.tnt_iconv(converter, data_ptr, data_left,
                                 buf_ptr, buf_left)
         if res == ffi.cast('size_t', -1) then
             local err = errno()
             if err ~= E2BIG then
                 cord_ibuf_put(buf)
-                ffi.C.tnt_iconv(iconv, nil, nil, nil, nil)
+                ffi.C.tnt_iconv(converter, nil, nil, nil, nil)
                 if err == EINVAL then
                     error('Invalid multibyte sequence')
                 end
@@ -62,7 +116,7 @@ local function iconv_convert(iconv, data)
     end
 
     -- iconv function sets cd's conversion state to the initial state
-    ffi.C.tnt_iconv(iconv, nil, nil, nil, nil)
+    ffi.C.tnt_iconv(converter, nil, nil, nil, nil)
     local result = ffi.string(buf.rpos, buf:size())
     cord_ibuf_put(buf)
     return result
@@ -70,23 +124,38 @@ end
 
 local iconv_mt = {
     __call = iconv_convert,
-    __tostring = function(iconv) return string.format("iconv: %p", iconv) end
+    __tostring = function(converter)
+        return string.format("iconv: %p", converter)
+    end
 }
 
 ffi.metatype(iconv_t, iconv_mt)
 
-local function iconv_new(to, from)
+---Construct a new `iconv` instance.
+---
+---If either parameter is not a valid name, there will be an error message.
+---
+---**Example:**
+---
+---```tarantoolsession
+---tarantool> converter = require('iconv').new('UTF8', 'ASCII')
+-----
+---...
+---```
+---@param to string The name of the encoding that we will convert to.
+---@param from string The name of the encoding that we will convert from.
+---@return iconv.converter converter A new iconv instance -- in effect, a
+---    callable function.
+function iconv.new(to, from)
     if type(to) ~= 'string' or type(from) ~= 'string' then
         error('Usage: iconv.new("CP1251", "KOI8-R")')
     end
-    local iconv = ffi.C.tnt_iconv_open(to, from)
-    if iconv == conv_rv_error then
+    local converter = ffi.C.tnt_iconv_open(to, from)
+    if converter == conv_rv_error then
         error('iconv: '..errno.strerror())
     end
-    ffi.gc(iconv, ffi.C.tnt_iconv_close)
-    return iconv;
+    ffi.gc(converter, ffi.C.tnt_iconv_close)
+    return converter
 end
 
-return {
-    new = iconv_new,
-}
+return iconv
