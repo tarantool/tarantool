@@ -5135,6 +5135,7 @@ box_process_vote(struct ballot *ballot)
 	vclock_copy(&ballot->vclock, instance_vclock);
 	vclock_copy(&ballot->gc_vclock, &gc.vclock);
 	ballot->bootstrap_leader_uuid = bootstrap_leader_uuid;
+	ballot->replicaset_uuid = *replicaset_get_uuid();
 	if (*INSTANCE_NAME != '\0') {
 		strlcpy(ballot->instance_name, INSTANCE_NAME,
 			NODE_NAME_SIZE_MAX);
@@ -5919,6 +5920,8 @@ box_cfg_xc(void)
 		diag_raise();
 	box_set_replication_sync_timeout();
 	if (box_check_instance_name(cfg_instance_name) != 0)
+		diag_raise();
+	if (box_check_replicaset_uuid(&cfg_replicaset_uuid) != 0)
 		diag_raise();
 	if (box_set_wal_queue_max_size() != 0)
 		diag_raise();

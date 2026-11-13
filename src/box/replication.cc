@@ -73,6 +73,7 @@ char cfg_bootstrap_leader_name[NODE_NAME_SIZE_MAX];
 bool is_supervised_bootstrap_leader = false;
 bool is_graceful_supervised_bootstrap_requested = false;
 char cfg_instance_name[NODE_NAME_SIZE_MAX];
+struct tt_uuid cfg_replicaset_uuid;
 
 bool replication_synchro_timeout_rollback_enabled = true;
 TWEAK_BOOL(replication_synchro_timeout_rollback_enabled);
@@ -1262,7 +1263,8 @@ replicaset_is_connected(struct replicaset_connect_state *state,
 			return true;
 		}
 	}
-	if (state->connected == count)
+	/* Stopped appliers cannot make any more progress. */
+	if (state->connected + state->failed == count)
 		return true;
 	/*
 	 * After a quorum is reached, it is considered enough to proceed. Except
@@ -1593,6 +1595,12 @@ replicaset_max_instance_lsn(void)
 	int64_t max_lsn = 0;
 	replicaset_foreach(replica) {
 		if (replica->applier == NULL)
+			continue;
+		const struct tt_uuid *uuid =
+			&replica->applier->ballot.replicaset_uuid;
+		/* The local UUID may have been assigned after connecting. */
+		if (!tt_uuid_is_nil(uuid) &&
+		    !tt_uuid_is_equal(uuid, &REPLICASET_UUID))
 			continue;
 		struct vclock *remote_vclock = &replica->applier->ballot.vclock;
 		max_lsn = MAX(max_lsn, vclock_get(remote_vclock, instance_id));

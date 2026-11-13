@@ -384,7 +384,7 @@ g.test_internal_ballot = function(cg)
     vclock[0] = nil
     old_vclock[0] = nil
     local ballot_key = box.iproto.ballot_key
-    local expected = {
+    local expected = setmetatable({
         [ballot_key.IS_RO_CFG] = true,
         [ballot_key.VCLOCK] = vclock,
         [ballot_key.GC_VCLOCK] = old_vclock,
@@ -393,8 +393,11 @@ g.test_internal_ballot = function(cg)
         [ballot_key.IS_BOOTED] = true,
         [ballot_key.CAN_LEAD] = false,
         [ballot_key.BOOTSTRAP_LEADER_UUID] = cg.master:get_instance_uuid(),
+        [ballot_key.REPLICASET_UUID] = cg.master:exec(function()
+            return box.info.replicaset.uuid
+        end),
         [ballot_key.REGISTERED_REPLICA_UUIDS] = {cg.master:get_instance_uuid()},
-    }
+    }, {__serialize = 'map'})
     cg.replica:exec(wait_ballot_updated_to, {expected})
 
     cg.replica:exec(function() box.snapshot() end)

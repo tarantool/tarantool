@@ -45,7 +45,8 @@ assert(not repl_info.downstream and not repl_info.upstream)
  | ---
  | - true
  | ...
-assert(info.status == 'orphan')
+-- A peer rejected on connect does not contribute to the sync quorum.
+assert(info.status == 'running')
  | ---
  | - true
  | ...

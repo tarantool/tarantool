@@ -603,6 +603,8 @@ struct ballot {
 	struct vclock gc_vclock;
 	/** The uuid of the instance this node considers a bootstrap leader. */
 	struct tt_uuid bootstrap_leader_uuid;
+	/** Replicaset UUID, or nil if it is not known yet. */
+	struct tt_uuid replicaset_uuid;
 	/** The name of this node. */
 	char instance_name[NODE_NAME_SIZE_MAX];
 	/** Replica uuids registered in the replica set. */
