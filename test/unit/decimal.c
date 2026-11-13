@@ -483,10 +483,37 @@ test_mp_print(void)
 static void
 test_mp_validate(void)
 {
-	plan(1);
+	plan(6);
 	header();
 
 	ok(mp_validate_decimal("", 0) != 0, "reading scale type is checked");
+
+	/*
+	 * A scale that does not fit in int32_t must be rejected rather than
+	 * truncated: otherwise "1E-77" and a scale of 2^32 + 77 decode to the
+	 * same number.
+	 */
+	char b[16];
+	char *e = mp_encode_uint(b, (uint64_t)UINT32_MAX + 1 + 77);
+	*e++ = 0x1c;
+	ok(mp_validate_decimal(b, e - b) != 0, "scale 2^32 + 77 is rejected");
+
+	e = mp_encode_uint(b, (uint64_t)INT32_MAX + 1);
+	*e++ = 0x1c;
+	ok(mp_validate_decimal(b, e - b) != 0, "scale 2^31 is rejected");
+
+	e = mp_encode_int(b, INT32_MIN);
+	*e++ = 0x1c;
+	ok(mp_validate_decimal(b, e - b) != 0, "scale INT32_MIN is rejected");
+
+	/* A representable scale is still accepted. */
+	e = mp_encode_uint(b, 77);
+	*e++ = 0x1c;
+	ok(mp_validate_decimal(b, e - b) == 0, "scale 77 is accepted");
+
+	e = mp_encode_int(b, -1);
+	*e++ = 0x1c;
+	ok(mp_validate_decimal(b, e - b) == 0, "scale -1 is accepted");
 
 	footer();
 	check_plan();
