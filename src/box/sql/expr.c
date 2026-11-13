@@ -148,6 +148,7 @@ sql_expr_type(struct Expr *pExpr)
 	}
 	case TK_LT:
 	case TK_GT:
+	case TK_GE:
 	case TK_EQ:
 	case TK_LE:
 	case TK_NE:
