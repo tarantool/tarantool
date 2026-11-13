@@ -97,7 +97,7 @@ void
 test_errors()
 {
 	header();
-	plan(22);
+	plan(24);
 	const char *path;
 	int len;
 	struct json_lexer lexer;
@@ -121,6 +121,9 @@ test_errors()
 		{"['field", 8},
 		{"['field'", 9},
 		{"[123", 5},
+		/* Integer index out of the supported range. */
+		{"[2147483648]", 2},
+		{"[4294967298]", 2},
 		{"['']", 3},
 		/*
 		 * Not trivial error: can not write
