@@ -383,7 +383,7 @@ g.test_context_var_file_process_work_dir = function(g)
     -- foo.txt
     -- w/
     --   var/
-    helpers.success_case(g, {
+    helpers.reload_success_case(g, {
         dir = dir,
         options = {
             ['process.work_dir'] = 'w',
@@ -405,7 +405,7 @@ g.test_context_var_file_process_work_dir = function(g)
     -- w/
     --   foo.txt
     --   var/
-    helpers.success_case(g, {
+    helpers.reload_success_case(g, {
         dir = dir,
         options = {
             ['process.work_dir'] = 'w',

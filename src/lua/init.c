@@ -432,6 +432,16 @@ lbox_tarantool_package_searchroot(struct lua_State *L)
 	return 1;
 }
 
+/** Return the configured search root, or nil if it follows cwd. */
+static int
+lbox_package_get_searchroot(struct lua_State *L)
+{
+	tt_pthread_mutex_lock(&package_searchroot_mutex);
+	lua_pushstring(L, package_searchroot);
+	tt_pthread_mutex_unlock(&package_searchroot_mutex);
+	return 1;
+}
+
 /**
  * package.setsearchroot() - sets the path to the search root directory.
  *
@@ -869,6 +879,12 @@ tarantool_lua_init_minimal_impl(lua_State *L)
 	tarantool_lua_minifio_init(L);
 	luaT_set_module_from_source(L, "internal.minifio", minifio_lua);
 	luaT_set_module_from_source(L, "internal.loaders", loaders_lua);
+	lua_getglobal(L, "require");
+	lua_pushliteral(L, "internal.loaders");
+	lua_call(L, 1, 1);
+	lua_pushcfunction(L, lbox_package_get_searchroot);
+	lua_setfield(L, -2, "get_searchroot");
+	lua_pop(L, 1);
 
 	/* Initialize ffi to enable luaL_pushcdata/luaL_checkcdata functions */
 	luaL_loadstring(L, "return require('ffi')");

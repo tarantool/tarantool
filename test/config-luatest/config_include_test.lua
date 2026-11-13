@@ -392,6 +392,7 @@ end
 
 g.test_include_relative = function()
     local config = table.deepcopy(common_config)
+    config.process = {work_dir = 'wd'}
     config.include = {'conf.d/included_config_1.yaml'}
     local config_file = treegen.write_file(
         g.dir, 'config.yaml', yaml.encode(config))
@@ -456,6 +457,16 @@ g.test_include_relative = function()
                 value_3 = 'from included_config_1.yaml',
             }
         )
+    end)
+    included_config_2.groups['group-001'].replicasets['replicaset-001']
+        .instances['instance-001'].labels.value_2 = 'reloaded nested include'
+    treegen.write_file(g.dir, 'conf.d/included_config_2.yaml',
+                       yaml.encode(included_config_2))
+    g.server:exec(function()
+        local config = require('config')
+        config:reload()
+        t.assert_equals(config:get('labels.value_2'), 'reloaded nested include')
+        t.assert_equals(config:info().alerts, {})
     end)
 end
 
