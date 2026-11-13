@@ -171,9 +171,18 @@ local function test_api(test, s)
         {
             'encode: nil opts',
             func = s.encode,
-            args = {{}, nil},
+            args = {'a', nil},
             args_len = 2,
             exp_err = nil,
+            exp_res = '--- a\n...\n',
+        },
+        {
+            'encode: nil third argument',
+            func = s.encode,
+            args = {'a', {}, nil},
+            args_len = 3,
+            exp_err = nil,
+            exp_res = '--- a\n...\n',
         },
         {
             'decode: no args',
@@ -199,6 +208,7 @@ local function test_api(test, s)
             args = {'', nil},
             args_len = 2,
             exp_err = nil,
+            exp_res = nil,
         },
     }
 
@@ -208,11 +218,138 @@ local function test_api(test, s)
         local args_len = case.args_len or table.maxn(case.args)
         local ok, err = pcall(case.func, unpack(case.args, 1, args_len))
         if case.exp_err == nil then
-            test:ok(ok, case[1])
+            test:is_deeply({ok, err}, {true, case.exp_res}, case[1])
         else
             test:is_deeply({ok, err}, {false, case.exp_err}, case[1])
         end
     end
+end
+
+local function test_encode_key_order(test, serializer)
+    test:plan(21)
+
+    local map_1 = {a = 1, c = 100, b = 2}
+    local map_2 = {a = 1, c = 100, b = 2, inner = {a = 1, c = 100, b = 2}}
+    local map_3 = {[12] = 'number', a = 1, b = 2}
+
+    test:is(serializer.encode(map_1, {encode_key_order = {'a', 'b', 'c'}}),
+            '---\na: 1\nb: 2\nc: 100\n...\n',
+            'custom order')
+    test:is(serializer.encode(map_1, {encode_key_order = {'a', 'b'}}),
+            '---\na: 1\nb: 2\nc: 100\n...\n',
+            'partial custom order')
+    test:is(serializer.encode(map_1, {encode_key_order = {'a', 'b', 'd'}}),
+            '---\na: 1\nb: 2\nc: 100\n...\n',
+            'unknown key in custom order')
+
+    test:is(serializer.encode(map_2, {encode_key_order = {'a', 'b', 'c'}}),
+            '---\na: 1\nb: 2\nc: 100\ninner:\n  a: 1\n  b: 2\n  c: 100\n...\n',
+            'partial custom order with nested map')
+    test:is(serializer.encode(map_2, {encode_key_order = {'a', 'b', 'inner'}}),
+            '---\na: 1\nb: 2\ninner:\n  a: 1\n  b: 2\n  c: 100\nc: 100\n...\n',
+            'nested map in custom order')
+
+    test:is(serializer.encode(map_3, {encode_key_order = {'a', 'b'}}),
+            '---\na: 1\nb: 2\n12: number\n...\n',
+            'partial custom order with number key')
+    test:is(serializer.encode(map_3, {encode_key_order = {12, 'a', 'b'}}),
+            '---\n12: number\na: 1\nb: 2\n...\n',
+            'number key in custom order')
+    test:is(serializer.encode(map_3, {encode_key_order = {{}, 'a', {},'b'}}),
+            '---\na: 1\nb: 2\n12: number\n...\n',
+            'non-string key in custom order')
+
+    local y = serializer.new()
+    test:is(y.encode(map_1, {encode_key_order = {'a', 'b', 'c'}}),
+            '---\na: 1\nb: 2\nc: 100\n...\n',
+            'custom order with new instance')
+    test:is(y.encode(map_1, {encode_key_order = {'a', 'b'}}),
+            '---\na: 1\nb: 2\nc: 100\n...\n',
+            'partial custom order with new instance')
+
+    y.cfg({encode_key_order = {'a', 'b'}})
+    test:is(y.encode(map_1),
+            '---\na: 1\nb: 2\nc: 100\n...\n',
+            'custom order with .cfg')
+    test:is(y.encode(map_1, {encode_key_order = {'b', 'c'}}),
+            '---\nb: 2\nc: 100\na: 1\n...\n',
+            'custom order with .cfg and .encode')
+    test:is(y.encode(map_1),
+            '---\na: 1\nb: 2\nc: 100\n...\n',
+            'custom order with .cfg after .encode')
+    test:is(y.encode(map_1, {}),
+            '---\na: 1\nb: 2\nc: 100\n...\n',
+            'custom order with .cfg after .encode and empty options in .encode')
+
+    local function new_mobj(v)
+        return setmetatable({v = v}, {__serialize = function(o)
+            return tostring(o.v)
+        end})
+    end
+    local m1, m2, m3, m4 = new_mobj(1), new_mobj(2), new_mobj(3), new_mobj(4)
+    test:is(y.encode({[m1] = 'a', [m2] = 'b', [m3] = 'c', [m4] = 'd'},
+                     {encode_key_order = {m1, m2, m3, m4}}),
+            "---\n'1': a\n'2': b\n'3': c\n'4': d\n...\n",
+            'custom order for objects')
+
+    test:is(y.encode({['1'] = 'a', [1] = 'b'}, {encode_key_order = {1, '1'}}),
+            "---\n1: b\n'1': a\n...\n",
+            'custom order for number and string which serialized identically')
+
+    collectgarbage()
+    test:is_deeply(y.cfg.encode_key_order, {'a', 'b'},
+                   'cfg option is persistent')
+
+    -- Test possible Lua reference leak.
+    local alive = 0
+    local function make_marker()
+        local ud = newproxy(true)
+        getmetatable(ud).__gc = function()
+            alive = alive - 1
+        end
+        alive = alive + 1
+        return ud
+    end
+
+    -- luacheck: no unused
+    local yleak = serializer.new()
+    local m1 = make_marker()
+    yleak.cfg({encode_key_order = {m1}})
+
+    -- Overwrite `encode_key_order`. Now table with `m1` should
+    -- be unref-ed.
+    local m2 = make_marker()
+    yleak.cfg({encode_key_order = {m2}})
+    -- Registry holds `{m2}`.
+
+    -- Remove markers.
+    m1 = nil
+    m2 = nil
+    collectgarbage()
+    collectgarbage()
+
+    -- `{m2}` is still alive. Test that `{m1}` is collected.
+    test:is(alive, 1, 'Only one instance (with m2) is alive')
+
+    -- Test that we release all objects.
+    yleak = nil
+    collectgarbage()
+    collectgarbage()
+
+    test:is(alive, 0, 'all objects deleted')
+
+    local map_4 = {[-1] = -1, [0] = 0, [1] = 1}
+    local function sort_ascending(a, b)
+        return a < b
+    end
+    local function sort_descending(a, b)
+        return a > b
+    end
+    test:is(y.encode(map_4, {encode_key_order = sort_ascending}),
+            '---\n-1: -1\n0: 0\n1: 1\n...\n', 'custom order function ascending')
+    test:is(y.encode(map_4, {encode_key_order = sort_descending}),
+            '---\n1: 1\n0: 0\n-1: -1\n...\n',
+            'custom order function descending')
 end
 
 local test = tap.test("yaml")
@@ -220,7 +357,7 @@ local test = tap.test("yaml")
 test:plan(1)
 test:test("yaml", function(test)
     local serializer = require('yaml')
-    test:plan(12)
+    test:plan(13)
     test:test("unsigned", common.test_unsigned, serializer)
     test:test("signed", common.test_signed, serializer)
     test:test("double", common.test_double, serializer)
@@ -233,6 +370,7 @@ test:test("yaml", function(test)
     test:test("output", test_output, serializer)
     test:test("tagged", test_tagged, serializer)
     test:test("api", test_api, serializer)
+    test:test("encode_key_order", test_encode_key_order, serializer)
 end)
 
 os.exit(test:check() == true and 0 or 1)

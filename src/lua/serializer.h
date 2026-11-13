@@ -143,8 +143,11 @@ struct luaL_serializer {
 	int encode_invalid_as_nil;
 	/** Encode error object as MP_ERROR extension (MsgPack only). */
 	int encode_error_as_ext;
-	/** Array of keys to sort map serialization. */
-	char **encode_key_order;
+	/**
+	 * Index in registry table for the array of keys to sort
+	 * map serialization.
+	 */
+	int encode_key_order;
 
 	/** Enables decoding NaN and Inf numbers */
 	int decode_invalid_numbers;
@@ -202,9 +205,8 @@ luaL_newserializer(struct lua_State *L, const char *modname,
  * This will try to free memory allocated for the options in @a dst. If @a dst
  * has been just allocated, it should be initialized with 0s.
  *
- * This may allocate memory on heap for some of the options, your @a dst
- * is created in C code, don't forget to call luaL_serializer_options_delete
- * when the serializer object is not needed anymore to prevent memory leaks.
+ * If copied config contains a reference of a Lua table, don't
+ * forget to unref before redefining this table.
  * Or you can use luaL_newserializer_config function to create a new serializer
  * configuration on Lua stack. It will be garbage collected automatically.
  *
@@ -220,10 +222,12 @@ luaL_serializer_copy_options(struct luaL_serializer *dst,
 
 /**
  * Delete the serializer options and free the memory allocated for them.
+ * @param L Lua stack.
  * @param cfg Serializer.
  */
 void
-luaL_serializer_options_delete(struct luaL_serializer *cfg);
+luaL_serializer_options_delete(struct lua_State *L,
+			       struct luaL_serializer *cfg);
 
 static inline struct luaL_serializer *
 luaL_checkserializer(struct lua_State *L)
