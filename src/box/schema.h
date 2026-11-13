@@ -35,14 +35,18 @@
 #include <stdio.h> /* snprintf */
 #include "error.h"
 #include "func_cache.h"
+#include "node_name.h"
 #include "space_cache.h"
 #include "schema_def.h"
+#include "tt_uuid.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct func;
+struct region;
+struct tuple;
 
 /**
  * See `box_schema_version`.
@@ -137,6 +141,41 @@ sequence_by_id(uint32_t id);
 int
 schema_find_id(uint32_t system_space_id, uint32_t index_id, const char *name,
 	       uint32_t len, uint32_t *object_id);
+
+/** Decode an optional node name field from the tuple. */
+int
+tuple_field_node_name(char *out, struct tuple *tuple, uint32_t fieldno,
+		      const char *field_name);
+
+/** Replica definition. */
+struct replica_def {
+	/** Instance ID. */
+	uint32_t id;
+	/** Instance UUID. */
+	struct tt_uuid uuid;
+	/** Instance name. */
+	char name[NODE_NAME_SIZE_MAX];
+};
+
+/** Build replica definition from a _cluster's tuple. */
+struct replica_def *
+replica_def_new_from_tuple(struct tuple *tuple, struct region *region);
+
+/**
+ * Find a definition by UUID, excluding the given ID (0 for all).
+ * Set result->id to REPLICA_ID_NIL if absent.
+ */
+int
+schema_find_replica_by_uuid(const struct tt_uuid *uuid, uint32_t exclude_id,
+			    struct replica_def *result);
+
+/**
+ * Find a definition by name, excluding the given ID (0 for all).
+ * Set result->id to REPLICA_ID_NIL if absent.
+ */
+int
+schema_find_replica_by_name(const char *name, uint32_t exclude_id,
+			    struct replica_def *result);
 
 #if defined(__cplusplus)
 } /* extern "C" */
