@@ -133,19 +133,6 @@ function(file_is_in_directory varname file dir)
     endif()
 endfunction()
 
-# list() has TRANSFORM option but only since 3.12.
-function(list_add_prefix
-    list_in
-    prefix
-    list_out
-)
-    set(result "")
-    foreach(i ${${list_in}})
-        list(APPEND result "${prefix}${i}")
-    endforeach()
-    set(${list_out} ${result} PARENT_SCOPE)
-endfunction()
-
 # ${EP_MAKE_COMMAND} is the make command for ExternalProject_Add() steps
 # of a library that has its own makefiles. Such a library is configured
 # by its own configure script, and its build and install steps are make
