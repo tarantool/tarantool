@@ -1,8 +1,27 @@
 local ffi = require('ffi')
 local buffer = require('buffer')
 local fio = require('fio')
+local minifio = require('internal.minifio')
 local yaml = require('yaml')
 local loaders = require('internal.loaders')
+
+-- Unlike fio.mktree(), preserve traversal through symlink/.. paths.
+local function mktree(path)
+    if not path:startswith('/') then
+        path = fio.cwd() .. '/' .. path
+    end
+    local prefix = ''
+    for component in path:gmatch('[^/]+') do
+        prefix = prefix .. '/' .. component
+        if not fio.path.is_dir(prefix) then
+            local ok, err = fio.mkdir(prefix)
+            if not ok and not fio.path.is_dir(prefix) then
+                return nil, err, prefix
+            end
+        end
+    end
+    return true
+end
 
 -- Read the file block by block till EOF.
 local function stream_read(fh)
@@ -57,9 +76,8 @@ local function universal_read(file_name, file_kind)
     return data
 end
 
--- Interpret the given path as relative to the given base
--- directory. And return the absolute path.
-local function rebase_file_abspath(base_dir, path)
+-- Join a path to its base without discarding filesystem traversal.
+local function rebase_file(base_dir, path)
     -- fio.pathjoin('/foo', '/bar') gives '/foo/bar/', see
     -- gh-8816.
     --
@@ -69,36 +87,24 @@ local function rebase_file_abspath(base_dir, path)
         path = fio.pathjoin(base_dir, path)
     end
 
-    -- Let's consider the following example.
-    --
-    -- config:
-    --   context:
-    --     foo:
-    --       from: file
-    --       file: ../foo.txt
-    -- process:
-    --   work_dir: x
-    --
-    -- In such a case we get correct "x/../foo.txt" on
-    -- startup, but fio.open() complains if there is no "x"
-    -- directory.
-    --
-    -- The working directory is created at startup if needed,
-    -- so a user is not supposed to create it manually before
-    -- first tarantool startup.
-    --
-    -- Let's strip all these ".." path components using
-    -- fio.abspath().
-    path = fio.abspath(path)
-
+    if not path:startswith('/') then
+        path = fio.cwd() .. '/' .. path
+    end
     return path
+end
+
+-- Include traversal uses lexical absolute paths to identify repeated files.
+local function rebase_file_abspath(base_dir, path)
+    return fio.abspath(rebase_file(base_dir, path))
 end
 
 -- Interpret the given path as relative to the given base
 -- directory. If the resulting path is inside CWD, then
 -- return a relative path, otherwise return an absolute.
 local function rebase_file_path(base_dir, path)
-    path = rebase_file_abspath(base_dir, path)
+    -- Context files are read before workdir creation. Cancel missing/..
+    -- so those files remain accessible, but preserve symlink/.. traversal.
+    path = minifio.normalize_missing_parents(rebase_file(base_dir, path))
 
     -- If possible, use a relative path. Sometimes an
     -- absolute path overruns the Unix socket path length limit
@@ -233,6 +239,7 @@ local function get_module_metadata(module_name)
 end
 
 return {
+    mktree = mktree,
     universal_read = universal_read,
     rebase_file_abspath = rebase_file_abspath,
     rebase_file_path = rebase_file_path,

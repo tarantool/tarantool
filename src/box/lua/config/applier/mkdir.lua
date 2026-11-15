@@ -1,5 +1,6 @@
 local fio = require('fio')
 local log = require('internal.config.utils.log')
+local file = require('internal.config.utils.file')
 
 -- Create a directory if it doesn't exist.
 local function safe_mkdir(prefix, dir, work_dir)
@@ -21,7 +22,7 @@ local function safe_mkdir(prefix, dir, work_dir)
 
     if stat == nil then
         log.verbose('%s: create directory: %s', prefix, dir)
-        local _, err = fio.mktree(dir)
+        local _, err = file.mktree(dir)
         if err ~= nil then
             error(('%s: failed to create directory %s: %s'):format(prefix,
                 dir, err))

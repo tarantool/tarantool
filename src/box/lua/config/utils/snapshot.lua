@@ -1,6 +1,7 @@
 local fio = require('fio')
 local xlog = require('xlog')
 local instance_config = require('internal.config.instance_config')
+local minifio = require('internal.minifio')
 
 local snapshot_path = nil
 
@@ -38,11 +39,11 @@ local function effective_snapshot_dir(iconfig)
     if work_dir == nil then
         work_dir = '.'
     end
-    work_dir = fio.abspath(work_dir)
-
-    -- Now we know the absolute path to the configured working
-    -- directory. Let's determine the snapshot directory path.
-    return fio.abspath(fio.pathjoin(work_dir, snap_dir))
+    -- Lexical normalization would change the target of symlink/.. .
+    if not work_dir:startswith('/') then
+        work_dir = fio.cwd() .. '/' .. work_dir
+    end
+    return minifio.normalize_missing_parents(work_dir .. '/' .. snap_dir)
 end
 
 -- Determine whether the instance will be recovered from an existing

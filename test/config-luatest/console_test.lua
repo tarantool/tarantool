@@ -6,6 +6,10 @@ local cbuilder = require('luatest.cbuilder')
 local cluster = require('luatest.cluster')
 
 local g = t.group()
+local g_missing_parent = t.group('missing_console_parent', {
+    {reload = false},
+    {reload = true},
+})
 
 -- Connect to a text console.
 local function connect(cluster, instance_name, config, timeout)
@@ -126,6 +130,26 @@ g.test_parent_dir_in_socket_path = function()
 
     cluster:reload(config)
     assert_console_works(cluster, config)
+end
+
+-- Verify missing console parents follow symlink/.. at startup and reload.
+g_missing_parent.test_symlink_parent_creation = function(cg)
+    local config = cbuilder:new()
+        :set_global_option('console.socket', 'link/../new/nested/c.sock')
+        :add_instance('i-001', {})
+        :config()
+    local initial = cg.params.reload and cbuilder:new(config)
+        :set_global_option('console.socket', 'initial.sock'):config() or config
+    local cluster = cluster:new(initial)
+    t.assert(fio.mktree(cluster._dir .. '/target/child'))
+    t.assert(fio.symlink('target/child', cluster._dir .. '/link'))
+    cluster:start()
+    if cg.params.reload then
+        cluster:reload(config)
+    end
+    assert_console_works(cluster, config)
+    t.assert(fio.path.is_dir(cluster._dir .. '/target/new/nested'))
+    t.assert_not(fio.path.exists(cluster._dir .. '/new'))
 end
 
 -- Re-open console by setting enable to false and true

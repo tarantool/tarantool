@@ -1,4 +1,5 @@
 local instance_config = require('internal.config.instance_config')
+local fio = require('fio')
 local justrun = require('luatest.justrun')
 local server = require('luatest.server')
 local yaml = require('yaml')
@@ -420,6 +421,83 @@ g.test_context_var_file_process_work_dir = function(g)
         verify = verify_option('process.title', 'needle'),
         verify_2 = verify_option('process.title', 'needle'),
     })
+end
+
+local g_context_file = helpers.group('context_file_paths', {
+    {parent = 'symlink', decoy = true},
+    {parent = 'symlink'},
+    {parent = 'symlink', absolute_file = true},
+    {parent = 'symlink', missing_file_parent = true},
+    {parent = 'symlink', missing_workdir = true},
+    {parent = 'missing'},
+    {parent = 'mixed'},
+})
+
+-- Verify context files follow physical paths on startup and reload.
+g_context_file.test_startup_and_reload = function(cg)
+    local dir = treegen.prepare_directory({}, {})
+    local workdirs = {
+        symlink = 'link/../wd',
+        missing = 'missing/../wd',
+        mixed = 'link/../missing/inner/../../wd',
+    }
+    local work_dir = workdirs[cg.params.parent]
+    local physical_dir = 'wd'
+    if cg.params.parent ~= 'missing' then
+        treegen.write_file(dir, 'target/child/.keep', '')
+        t.assert(fio.symlink('target/child', dir .. '/link'))
+        physical_dir = 'target/wd'
+    end
+    local marker_path = physical_dir .. '/marker.txt'
+    local context_file = 'marker.txt'
+    if cg.params.missing_workdir then
+        marker_path = 'target/marker.txt'
+        context_file = '../marker.txt'
+    elseif cg.params.missing_file_parent then
+        context_file = 'missing/../marker.txt'
+    elseif cg.params.absolute_file then
+        context_file = dir .. '/' .. work_dir .. '/marker.txt'
+    end
+    treegen.write_file(dir, marker_path, 'physical\n')
+    if cg.params.decoy then
+        treegen.write_file(dir, 'wd/marker.txt', 'lexical\n')
+    end
+    local context = {
+        marker = {from = 'file', file = context_file, rstrip = true},
+    }
+    local script = treegen.write_file(dir, 'main.lua', [[
+        if rawget(_G, 'reload_started') then return end
+        rawset(_G, 'reload_started', true)
+        local config = require('config')
+        local function check()
+            assert(config:get('process.title') == 'physical')
+            assert(config:get('process.title', {instance = 'instance-001'})
+                   == 'physical')
+            assert(require('fio').cwd() == os.getenv('EXPECTED_WORKDIR'))
+        end
+        check()
+        require('fiber').new(function()
+            config:wait_status('ready')
+            config:reload()
+            check()
+            assert(#config:info().alerts == 0)
+            print('physical context file survives reload')
+            os.exit(0)
+        end)
+    ]])
+    local config = table.deepcopy(helpers.simple_config)
+    config.iproto = nil
+    config.process = {work_dir = work_dir, title = '{{ context.marker }}'}
+    config.config = {context = context}
+    config.app = {file = script}
+    treegen.write_file(dir, 'config.yaml', yaml.encode(config))
+    local res = justrun.tarantool(dir, {
+        EXPECTED_WORKDIR = dir .. '/' .. physical_dir,
+    }, {'--name', 'instance-001', '--config', 'config.yaml'},
+        {nojson = true, stderr = true, setsearchroot = false})
+    t.assert_equals(res.exit_code, 0, res.stderr)
+    t.assert_str_contains(res.stdout, 'physical context file survives reload')
+    t.assert(fio.path.is_dir(dir .. '/' .. physical_dir))
 end
 
 -- Verify a config.context variable with a scalar value.
