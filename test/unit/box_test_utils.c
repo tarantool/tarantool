@@ -25,4 +25,7 @@ double
 tarantool_uptime(void) { return 0; }
 
 void
-load_cfg(void) {}
+load_cfg(const char *work_dir)
+{
+	(void)work_dir;
+}

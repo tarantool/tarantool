@@ -1,6 +1,7 @@
 local schema = require('experimental.config.utils.schema')
 local descriptions = require('internal.config.descriptions')
 local urilib = require('uri')
+local minifio = require('internal.minifio')
 local file = require('internal.config.utils.file')
 local log = require('internal.config.utils.log')
 local validators = require('internal.config.validators')
@@ -9,6 +10,7 @@ local funcutils = require('internal.config.utils.funcutils')
 local network = require('internal.config.utils.network')
 local loaders = require('internal.loaders')
 local expression = require('internal.config.utils.expression')
+local workdir = require('internal.config.utils.workdir')
 
 local TIMEOUT_INFINITY = 500 * 365 * 86400
 
@@ -259,34 +261,64 @@ local function apply_vars_f(data, w, vars)
     return data
 end
 
--- The file path is interpreted as relative to `process.work_dir`.
--- The first box.cfg() call sets a current working directory to this path.
---
--- However, we should prepend paths manually before the first
--- box.cfg() call.
---
--- This function returns the prefix to add into config's paths.
---
--- TODO: Glue all such code from applier/mkdir.lua and
--- utils/snapshot.lua.
+-- Initial validation reads context files before entering process.work_dir.
 local function base_dir(self, iconfig)
     local work_dir = self:get(iconfig, 'process.work_dir')
-    return type(box.cfg) == 'function' and work_dir or nil
+    return not workdir.is_prepared() and work_dir or nil
 end
 
 -- Interpret the given path as relative to the given working
 -- directory from the config.
 --
--- This function takes care to the chdir performed by the first
--- box.cfg() call if the working directory is set.
+-- Before directory preparation, rebase against process.work_dir.
 local function prepare_file_path(self, iconfig, path)
     local base_dir = self:base_dir(iconfig)
     return file.rebase_file_path(base_dir, path)
 end
 
--- Read a config.context[name] variable depending on its "from"
--- type.
-local function read_context_var_noexc(base_dir, def)
+-- Pin the configured source before following its final symlink. Also share
+-- reads through physical aliases, without making replacement links reread it.
+local function read_context_file(base_dir, path, context_cache)
+    local absolute = path
+    if not absolute:startswith('/') then
+        absolute = minifio.pathjoin(base_dir or '.', absolute)
+    end
+    if not absolute:startswith('/') then
+        absolute = minifio.pathjoin(minifio.cwd(), absolute)
+    end
+    local source_key = 'source:' .. absolute
+    if context_cache[source_key] ~= nil then
+        return true, context_cache[source_key]
+    end
+    path = file.rebase_file_path(base_dir, path)
+    local parent = minifio.realpath(minifio.dirname(path))
+    local name = path:match('([^/]+)$')
+    local alias_key = parent and name and 'source:' .. parent .. '/' .. name
+    local res = alias_key and context_cache[alias_key]
+    if res == nil then
+        local target = minifio.realpath(path)
+        local file_key = target and 'file:' .. target
+        res = file_key and context_cache[file_key]
+        if res == nil then
+            local ok
+            ok, res = pcall(file.universal_read, path, 'file')
+            if not ok then
+                return false, res
+            end
+        end
+        if file_key ~= nil then
+            context_cache[file_key] = res
+        end
+    end
+    context_cache[source_key] = res
+    if alias_key ~= nil then
+        context_cache[alias_key] = res
+    end
+    return true, res
+end
+
+-- Read a config.context[name] variable depending on its "from" type.
+local function read_context_var_noexc(base_dir, def, context_cache)
     -- Scalar shorthand: the value is defined right in
     -- config.context.
     if type(def) ~= 'table' then
@@ -300,37 +332,80 @@ local function read_context_var_noexc(base_dir, def)
     end
     -- Record form: resolve the value from env/file.
     if def.from == 'env' then
-        local value = os.getenv(def.env)
+        local key = 'env:' .. def.env
+        local value = context_cache[key]
+        if value == nil then
+            value = os.getenv(def.env)
+        end
         if value == nil then
             return false, ('no %q environment variable'):format(def.env)
         end
+        context_cache[key] = value
         return true, value
     elseif def.from == 'file' then
-        local path = file.rebase_file_path(base_dir, def.file)
-        return pcall(file.universal_read, path, 'file')
+        return read_context_file(base_dir, def.file, context_cache)
     else
         assert(false)
     end
 end
 
-local function apply_vars(self, iconfig, vars)
-    vars = table.copy(vars)
+-- Reuse values read for workdir lookup during later variable substitution.
+local function read_context_var(base_dir, name, def, vars, context_cache)
+    local key = 'context.' .. name
+    if vars[key] ~= nil then
+        return vars[key]
+    end
+    local ok, res = read_context_var_noexc(base_dir, def, context_cache)
+    if not ok then
+        error(('Unable to read config.context.%s variable value: ' ..
+            '%s'):format(name, res), 0)
+    end
+    if type(def) == 'table' and def.rstrip then
+        res = res:rstrip()
+    end
+    vars[key] = res
+    return res
+end
 
-    local base_dir = self:base_dir(iconfig)
+-- Fill vars with workdir context values before default calculation. Share
+-- raw external reads through context_cache, not instance-specific variables.
+local function resolve_work_dir(self, iconfig, vars, context_cache)
+    context_cache = context_cache or {}
+    local work_dir = self:get(iconfig, 'process.work_dir')
+    if work_dir == nil then
+        return
+    end
+    local context = self:get(iconfig, 'config.context') or {}
+    return (work_dir:gsub('{{ *(.-) *}}', function(var_name)
+        if vars[var_name] ~= nil then
+            return vars[var_name]
+        end
+        local name = var_name:match('^context%.(.+)$')
+        local def = context[name]
+        if def == nil then
+            return
+        end
+        -- A relative file cannot determine the workdir that contains it.
+        if not workdir.is_prepared() and type(def) == 'table' and
+           def.from == 'file' and not def.file:startswith('/') then
+            return
+        end
+        return read_context_var(nil, name, def, vars, context_cache)
+    end))
+end
+
+local function apply_vars(self, iconfig, vars, context_cache)
+    vars = table.copy(vars)
+    context_cache = context_cache or {}
+
+    local work_dir = self:resolve_work_dir(iconfig, vars, context_cache)
+    local base_dir = not workdir.is_prepared() and work_dir or nil
 
     -- Read config.context.* variables and add them into the
     -- variables list.
     local context_vars = self:get(iconfig, 'config.context')
     for name, def in pairs(context_vars or {}) do
-        local ok, res = read_context_var_noexc(base_dir, def)
-        if not ok then
-            error(('Unable to read config.context.%s variable value: ' ..
-                '%s'):format(name, res), 0)
-        end
-        if type(def) == 'table' and def.rstrip then
-            res = res:rstrip()
-        end
-        vars['context.' .. name] = res
+        read_context_var(base_dir, name, def, vars, context_cache)
     end
 
     return self:map(iconfig, apply_vars_f, vars)
@@ -543,10 +618,8 @@ return schema.new('instance_config', schema.record({
             type = 'string',
             box_cfg = 'work_dir',
             box_cfg_nondynamic = true,
-            -- The mkdir annotation is not present here, because
-            -- otherwise the directory would be created
-            -- unconditionally. Instead, mkdir applier creates it
-            -- only before the first box.cfg() call.
+            -- No mkdir annotation: the workdir is prepared once before
+            -- startup appliers, not on every configuration application.
             default = box.NULL,
         }),
         pid_file = schema.scalar({
@@ -2516,6 +2589,7 @@ return schema.new('instance_config', schema.record({
     methods = {
         instance_uri = instance_uri,
         apply_vars = apply_vars,
+        resolve_work_dir = resolve_work_dir,
         base_dir = base_dir,
         prepare_file_path = prepare_file_path,
         enhance_uri_ssl_params = enhance_uri_ssl_params,

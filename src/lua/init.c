@@ -123,7 +123,13 @@ __thread struct lua_State *tarantool_L;
 static char *package_searchroot;
 
 /**
- * Mutex protecting package_searchroot.
+ * Identifies a search root setting, including same-value explicit re-pins.
+ * Temporary lookup must not clear a setting installed by a later setter.
+ */
+static uint64_t package_searchroot_revision;
+
+/**
+ * Mutex protecting package_searchroot and package_searchroot_revision.
  */
 static pthread_mutex_t package_searchroot_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -432,6 +438,54 @@ lbox_tarantool_package_searchroot(struct lua_State *L)
 	return 1;
 }
 
+/** Return the configured search root, or nil if it follows cwd. */
+static int
+lbox_package_get_searchroot(struct lua_State *L)
+{
+	tt_pthread_mutex_lock(&package_searchroot_mutex);
+	lua_pushstring(L, package_searchroot);
+	tt_pthread_mutex_unlock(&package_searchroot_mutex);
+	return 1;
+}
+
+/**
+ * Install a temporary root if unset and return its revision,
+ * or nil and the existing root.
+ */
+static int
+lbox_package_set_searchroot_if_unset(struct lua_State *L)
+{
+	char *new_root = abspath(luaL_checkstring(L, 1));
+	tt_pthread_mutex_lock(&package_searchroot_mutex);
+	if (package_searchroot != NULL) {
+		lua_pushnil(L);
+		lua_pushstring(L, package_searchroot);
+		tt_pthread_mutex_unlock(&package_searchroot_mutex);
+		free(new_root);
+		return 2;
+	}
+	package_searchroot = new_root;
+	uint64_t revision = ++package_searchroot_revision;
+	tt_pthread_mutex_unlock(&package_searchroot_mutex);
+	luaL_pushuint64(L, revision);
+	return 1;
+}
+
+/** Clear a temporary root only if no successful setter has replaced it. */
+static int
+lbox_package_clear_searchroot_if_unchanged(struct lua_State *L)
+{
+	uint64_t revision = luaL_checkuint64(L, 1);
+	tt_pthread_mutex_lock(&package_searchroot_mutex);
+	if (package_searchroot_revision == revision) {
+		free(package_searchroot);
+		package_searchroot = NULL;
+		++package_searchroot_revision;
+	}
+	tt_pthread_mutex_unlock(&package_searchroot_mutex);
+	return 0;
+}
+
 /**
  * package.setsearchroot() - sets the path to the search root directory.
  *
@@ -465,6 +519,7 @@ lbox_tarantool_package_setsearchroot(struct lua_State *L)
 	tt_pthread_mutex_lock(&package_searchroot_mutex);
 	free(package_searchroot);
 	package_searchroot = new_root;
+	++package_searchroot_revision;
 	tt_pthread_mutex_unlock(&package_searchroot_mutex);
 	return 0;
 }
@@ -869,6 +924,16 @@ tarantool_lua_init_minimal_impl(lua_State *L)
 	tarantool_lua_minifio_init(L);
 	luaT_set_module_from_source(L, "internal.minifio", minifio_lua);
 	luaT_set_module_from_source(L, "internal.loaders", loaders_lua);
+	lua_getglobal(L, "require");
+	lua_pushliteral(L, "internal.loaders");
+	lua_call(L, 1, 1);
+	lua_pushcfunction(L, lbox_package_get_searchroot);
+	lua_setfield(L, -2, "get_searchroot");
+	lua_pushcfunction(L, lbox_package_set_searchroot_if_unset);
+	lua_setfield(L, -2, "set_searchroot_if_unset");
+	lua_pushcfunction(L, lbox_package_clear_searchroot_if_unchanged);
+	lua_setfield(L, -2, "clear_searchroot_if_unchanged");
+	lua_pop(L, 1);
 
 	/* Initialize ffi to enable luaL_pushcdata/luaL_checkcdata functions */
 	luaL_loadstring(L, "return require('ffi')");

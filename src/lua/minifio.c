@@ -5,7 +5,9 @@
  */
 #include "lua/minifio.h"
 
+#include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <lua.h>
 #include <lauxlib.h>
@@ -105,6 +107,30 @@ lbox_minifio_dirname(struct lua_State *L)
 	return 1;
 }
 
+/** Return whether lstat() fails with ENOENT for the given path. */
+static int
+lbox_minifio_is_enoent(struct lua_State *L)
+{
+	const char *path = luaL_checkstring(L, 1);
+	struct stat st;
+	bool is_enoent = lstat(path, &st) != 0 && errno == ENOENT;
+	lua_pushboolean(L, is_enoent);
+	return 1;
+}
+
+/** Resolve an existing path without requiring initialized Lua error types. */
+static int
+lbox_minifio_realpath(struct lua_State *L)
+{
+	const char *path = luaL_checkstring(L, 1);
+	char resolved[PATH_MAX];
+	if (realpath(path, resolved) == NULL)
+		lua_pushnil(L);
+	else
+		lua_pushstring(L, resolved);
+	return 1;
+}
+
 /**
  * minifio.script() -- get path of the main script.
  *
@@ -133,6 +159,8 @@ tarantool_lua_minifio_init(struct lua_State *L)
 	static const struct luaL_Reg minifio_methods[] = {
 		{"cwd", lbox_minifio_cwd},
 		{"dirname", lbox_minifio_dirname},
+		{"is_enoent", lbox_minifio_is_enoent},
+		{"realpath", lbox_minifio_realpath},
 		{"script", lbox_minifio_script},
 		{NULL, NULL}
 	};

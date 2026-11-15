@@ -58,7 +58,7 @@ static int
 lbox_cfg_load(struct lua_State *L)
 {
 	try {
-		load_cfg();
+		load_cfg(luaL_optstring(L, 1, NULL));
 	} catch (Exception *) {
 		luaT_error(L);
 	}

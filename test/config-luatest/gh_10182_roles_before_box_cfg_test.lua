@@ -290,15 +290,22 @@ tg.test_app_with_early_load_tag_added = function(g)
         1024, {filename = g.server.chdir .. '/tarantool.log'}))
 end
 
--- A role installed into the configured process.work_dir becomes
--- resolvable before box.cfg(): the config module points the
--- module search root to the working directory before the early
--- load occurs. Verify that a role with the early_load tag is
--- loaded before box.cfg() in this scenario.
+-- Early loading uses the workdir for ordinary relative filesystem I/O,
+-- not just module lookup.
 tg.test_role_with_early_load_tag_in_work_dir = function()
     local dir = treegen.prepare_directory({}, {})
+    treegen.write_file(dir, 'fixture.txt', 'startup')
+    treegen.write_file(dir, 'wd/fixture.txt', 'workdir')
     treegen.write_file(dir, 'wd/.rocks/share/tarantool/myrole.lua',
-                       early_load_role)
+                       [[
+        -- --- #tarantool.metadata.v1
+        -- early_load: true
+        -- ...
+        assert(require('fio').cwd() == os.getenv('EXPECTED_WORKDIR'))
+        local f = assert(io.open('fixture.txt'))
+        assert(f:read('*a') == 'workdir')
+        f:close()
+    ]] .. simple_role)
     treegen.write_file(dir, 'wd/main.lua', [[
         print(('on_load_status: %s'):format(_G.on_load_status))
         print(('on_apply_status: %s'):format(_G.on_apply_status))
@@ -325,7 +332,9 @@ tg.test_role_with_early_load_tag_in_work_dir = function()
     -- Start tarantool in a directory from which the role module
     -- is not resolvable. LUA_PATH is emptied to not resolve
     -- anything from the testing environment.
-    local res = justrun.tarantool(dir, {LUA_PATH = ''},
+    local res = justrun.tarantool(dir, {
+        LUA_PATH = '', EXPECTED_WORKDIR = fio.pathjoin(dir, 'wd'),
+    },
         {'--name', 'instance-001', '--config', 'config.yaml'},
         {nojson = true, stderr = true, setsearchroot = false})
     t.assert_equals(res.exit_code, 0, res.stderr)
@@ -339,6 +348,10 @@ end
 -- respect to the configured working directory.
 tg.test_app_with_early_load_tag_in_work_dir = function()
     local script = early_load_script .. [[
+        assert(require('fio').cwd() == os.getenv('EXPECTED_WORKDIR'))
+        local f = assert(io.open('fixture.txt'))
+        assert(f:read('*a') == 'workdir')
+        f:close()
         print(('on_load_status: %s'):format(_G.on_load_status))
         os.exit(0)
     ]]
@@ -359,13 +372,17 @@ tg.test_app_with_early_load_tag_in_work_dir = function()
 
     for _, app in ipairs({'file: main.lua', 'module: main'}) do
         local dir = treegen.prepare_directory({}, {})
+        treegen.write_file(dir, 'fixture.txt', 'startup')
+        treegen.write_file(dir, 'wd/fixture.txt', 'workdir')
         treegen.write_file(dir, 'wd/main.lua', script)
         treegen.write_file(dir, 'config.yaml', config:format(app))
 
         -- Start tarantool in a directory from which the script
         -- is not resolvable. LUA_PATH is emptied to not resolve
         -- anything from the testing environment.
-        local res = justrun.tarantool(dir, {LUA_PATH = ''},
+        local res = justrun.tarantool(dir, {
+            LUA_PATH = '', EXPECTED_WORKDIR = fio.pathjoin(dir, 'wd'),
+        },
             {'--name', 'instance-001', '--config', 'config.yaml'},
             {nojson = true, stderr = true, setsearchroot = false})
         t.assert_equals(res.exit_code, 0, res.stderr)

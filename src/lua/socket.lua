@@ -8,6 +8,7 @@ local boxerrno = require('errno')
 local internal = require('socket.lib')
 local fiber = require('fiber')
 local fio = require('fio')
+local minifio = require('internal.minifio')
 local log = require('log')
 local buffer = require('buffer')
 local cord_ibuf_take = buffer.internal.cord_ibuf_take
@@ -1177,12 +1178,18 @@ end
 local function tcp_server_do_bind(s, addr)
     if socket_bind(s, addr.host, addr.port) then
         if addr.family == 'AF_UNIX' then
+            -- Keep the bind path short due to the limit of 100 bytes
+            -- in Unix socket adresses, but do not let later chdir() or
+            -- parent symlink changes redirect socket file cleanup.
+            local socket_path = minifio.realpath(addr.port)
             -- Make close() remove the unix socket file created
             -- by bind(). Note, this must be done before closing
             -- the socket fd so that no other tcp server can
             -- reuse the same path before we remove the file.
             s.close = function(self)
-                fio.unlink(addr.port)
+                if socket_path ~= nil then
+                    fio.unlink(socket_path)
+                end
                 return socket_close(self)
             end
         end
