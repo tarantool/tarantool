@@ -28,9 +28,29 @@ local function load_lua(file)
     return loadfile(file)
 end
 
+local function realpath_with_missing_dirs(path)
+    local suffix = ''
+    while true do
+        local resolved = minifio.realpath(path)
+        if resolved ~= nil then
+            return minifio.pathjoin(resolved, suffix)
+        end
+        -- Configuration creates the workdir only after validation. Strip
+        -- missing components, but not dangling links or lookup errors.
+        if not minifio.is_enoent(path) then
+            return nil
+        end
+        suffix = '/' .. path:match('([^/]+)/*$') .. suffix
+        path = minifio.dirname(path)
+    end
+end
+
 local function traverse_path(path)
-    path = minifio.abspath(path)
     local paths = { path }
+    path = realpath_with_missing_dirs(path)
+    if path == nil then
+        return paths
+    end
 
     while path ~= '/' do
         path = minifio.dirname(path)
@@ -56,7 +76,8 @@ local function gen_path_builder(basepath_fn, templates, need_traverse)
     assert(type(templates) == 'table', 'templates must be a table')
 
     return function()
-        local base = basepath_fn() or '.'
+        local base = basepath_fn() or minifio.cwd()
+        base = minifio.normalize_missing_parents(base)
         local dirs = need_traverse and traverse_path(base) or { base }
 
         local searchpaths = {}
