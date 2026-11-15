@@ -10,6 +10,7 @@ local funcutils = require('internal.config.utils.funcutils')
 local network = require('internal.config.utils.network')
 local loaders = require('internal.loaders')
 local expression = require('internal.config.utils.expression')
+local workdir = require('internal.config.utils.workdir')
 
 local TIMEOUT_INFINITY = 500 * 365 * 86400
 
@@ -263,7 +264,7 @@ end
 -- Initial validation reads context files before entering process.work_dir.
 local function base_dir(self, iconfig)
     local work_dir = self:get(iconfig, 'process.work_dir')
-    return type(box.cfg) == 'function' and work_dir or nil
+    return not workdir.is_prepared() and work_dir or nil
 end
 
 -- Interpret the given path as relative to the given working
@@ -385,7 +386,7 @@ local function resolve_work_dir(self, iconfig, vars, context_cache)
             return
         end
         -- A relative file cannot determine the workdir that contains it.
-        if type(box.cfg) == 'function' and type(def) == 'table' and
+        if not workdir.is_prepared() and type(def) == 'table' and
            def.from == 'file' and not def.file:startswith('/') then
             return
         end
@@ -398,7 +399,7 @@ local function apply_vars(self, iconfig, vars, context_cache)
     context_cache = context_cache or {}
 
     local work_dir = self:resolve_work_dir(iconfig, vars, context_cache)
-    local base_dir = type(box.cfg) == 'function' and work_dir or nil
+    local base_dir = not workdir.is_prepared() and work_dir or nil
 
     -- Read config.context.* variables and add them into the
     -- variables list.
@@ -617,10 +618,8 @@ return schema.new('instance_config', schema.record({
             type = 'string',
             box_cfg = 'work_dir',
             box_cfg_nondynamic = true,
-            -- The mkdir annotation is not present here, because
-            -- otherwise the directory would be created
-            -- unconditionally. Instead, mkdir applier creates it
-            -- only before the first box.cfg() call.
+            -- No mkdir annotation: the workdir is prepared once before
+            -- startup appliers, not on every configuration application.
             default = box.NULL,
         }),
         pid_file = schema.scalar({

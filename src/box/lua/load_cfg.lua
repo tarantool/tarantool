@@ -9,6 +9,7 @@ local fiber = require('fiber')
 local fio = require('fio')
 local compat = require('compat')
 local units = require('internal.config.utils.units')
+local workdir = require('internal.config.utils.workdir')
 
 local function nop() end
 
@@ -1263,6 +1264,10 @@ local function load_cfg(cfg)
 
     cfg = prepare_cfg(cfg, pre_load_cfg, default_cfg, template_cfg, modify_cfg)
 
+    -- The effective directory can differ from the public, authored value.
+    -- Use the same target for snapshot inspection and database recovery.
+    local effective_work_dir = workdir.box_cfg_path(cfg.work_dir)
+
     -- Save new box.cfg
     box.cfg = cfg
     local status, err = pcall(private.cfg_check)
@@ -1336,10 +1341,9 @@ local function load_cfg(cfg)
     -- When recovering from such an old snapshot, special recovery triggers on
     -- system spaces are needed in order to be able to recover and upgrade
     -- the schema then.
-    -- This code is executed before load_cfg, so work_dir is not yet set.
     local snap_dir = box.cfg.memtx_dir
-    if not snap_dir:startswith('/') and box.cfg.work_dir ~= nil then
-        snap_dir = fio.pathjoin(box.cfg.work_dir, snap_dir)
+    if not snap_dir:startswith('/') and effective_work_dir ~= nil then
+        snap_dir = fio.pathjoin(effective_work_dir, snap_dir)
     end
     local snap_version = private.get_snapshot_version(snap_dir)
     if snap_version then
@@ -1347,7 +1351,7 @@ local function load_cfg(cfg)
     end
 
     -- This call either succeeds or calls panic() / exit().
-    private.cfg_load()
+    private.cfg_load(effective_work_dir)
 
     if snap_version then
         private.clear_recovery_triggers()

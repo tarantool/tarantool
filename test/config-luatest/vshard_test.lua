@@ -1057,10 +1057,20 @@ g.test_vshard_since_default_in_work_dir = function()
         }
     ]])
     treegen.write_file(dir, wd .. '/main.lua', [[
+        if rawget(_G, 'reload_started') then
+            return
+        end
+        _G.reload_started = true
         local config = require('config')
         print(('rebalancer_bucket_send_timeout: %s'):format(
             config:get('sharding.rebalancer_bucket_send_timeout')))
-        os.exit(0)
+        require('fiber').new(function()
+            config:wait_status('ready')
+            config:reload()
+            print(('reloaded rebalancer_bucket_send_timeout: %s'):format(
+                config:get('sharding.rebalancer_bucket_send_timeout')))
+            os.exit(0)
+        end)
     ]])
     local config = ([[
     process:
@@ -1088,6 +1098,8 @@ g.test_vshard_since_default_in_work_dir = function()
     -- TIMEOUT_INFINITY, the option's default.
     t.assert_str_contains(res.stdout,
                           'rebalancer_bucket_send_timeout: 15768000000')
+    t.assert_str_contains(res.stdout,
+        'reloaded rebalancer_bucket_send_timeout: 15768000000')
 end
 
 local g_context_work_dir = helpers.group('vshard_context_work_dir', {
@@ -1211,6 +1223,93 @@ g_context_work_dir.test_defaults = function(g)
         {nojson = true, stderr = true, setsearchroot = false})
     t.assert_equals(res.exit_code, 0, res.stderr)
     t.assert_str_contains(res.stdout, 'context workdir defaults survive reload')
+end
+
+local g_work_dir = helpers.group('vshard_since_default_parent', {
+    {parent = 'symlink'},
+    {parent = 'missing'},
+    {parent = 'mixed'},
+    {parent = 'symlink', layout = 'direct'},
+    {parent = 'missing', layout = 'direct'},
+    {parent = 'mixed', layout = 'direct'},
+    {parent = 'symlink', rocks = 'ancestor', missing = false},
+    {parent = 'symlink', rocks = 'ancestor', missing = true},
+})
+
+-- Initial defaults must resolve modules through missing parents without
+-- confusing a symlink-parent workdir's lexical and filesystem targets.
+g_work_dir.test_vshard_since_default = function(g)
+    local dir = treegen.prepare_directory({}, {})
+    local wd = 'wd-instance-001'
+    local work_dirs = {
+        symlink = 'link/../wd-{{ instance_name }}',
+        missing = 'missing/../wd-{{ instance_name }}',
+        mixed = 'link/../missing/inner/../../wd-{{ instance_name }}',
+    }
+    local module_suffix = g.params.layout == 'direct' and '/vshard.lua' or
+                          '/.rocks/share/tarantool/vshard/init.lua'
+    local vshard = [[
+        return {
+            consts = {VERSION = %q},
+            router = {
+                cfg = function() end,
+                info = function() return {bucket = {unknown = 0}} end,
+            },
+        }
+    ]]
+    if g.params.parent ~= 'missing' then
+        treegen.write_file(dir, 'target/child/.keep', '')
+        t.assert(fio.symlink('target/child', dir .. '/link'))
+        treegen.write_file(dir, wd .. module_suffix,
+                           vshard:format('0.1.30'))
+        wd = 'target/' .. wd
+    end
+    local rocks_dir = wd
+    local script_dir = wd
+    if g.params.rocks == 'ancestor' then
+        rocks_dir = fio.dirname(wd)
+        script_dir = '.'
+        if not g.params.missing then
+            t.assert(fio.mkdir(dir .. '/' .. wd))
+        end
+    end
+    local module_path = rocks_dir .. module_suffix
+    treegen.write_file(dir, module_path,
+                       vshard:format('0.1.41'))
+    local script = treegen.write_file(dir, script_dir .. '/main.lua', [[
+        if rawget(_G, 'reload_started') then
+            return
+        end
+        _G.reload_started = true
+        local config = require('config')
+        assert(require('vshard').consts.VERSION == '0.1.41')
+        assert(config:get('sharding.rebalancer_bucket_send_timeout')
+               == 15768000000)
+        require('fiber').new(function()
+            config:wait_status('ready')
+            config:reload()
+            assert(config:get('sharding.rebalancer_bucket_send_timeout')
+                   == 15768000000)
+            assert(#config:info().alerts == 0)
+            print('filesystem workdir module defaults survive reload')
+            os.exit(0)
+        end)
+    ]])
+    local config = table.deepcopy(helpers.simple_config)
+    config.process = {work_dir = work_dirs[g.params.parent]}
+    config.sharding = {roles = {'router'}}
+    config.app = {file = g.params.rocks == 'ancestor' and script or 'main.lua'}
+    treegen.write_file(dir, 'config.yaml', require('yaml').encode(config))
+    if g.params.rocks == 'ancestor' then
+        t.assert_equals(fio.path.is_dir(dir .. '/' .. wd), not g.params.missing)
+    end
+    local res = justrun.tarantool(dir, {LUA_PATH = '', LUA_CPATH = ''},
+        {'--name', 'instance-001', '--config', 'config.yaml'},
+        {nojson = true, stderr = true, setsearchroot = false})
+    t.assert_equals(res.exit_code, 0, res.stderr)
+    t.assert(fio.path.is_dir(dir .. '/' .. wd))
+    t.assert_str_contains(res.stdout,
+        'filesystem workdir module defaults survive reload')
 end
 
 -- gh-12928: sharding options set on the global level (like

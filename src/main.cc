@@ -353,9 +353,8 @@ error:
 }
 
 extern "C" void
-load_cfg(void)
+load_cfg(const char *work_dir)
 {
-	const char *work_dir = cfg_gets("work_dir");
 	if (work_dir != NULL && chdir(work_dir) == -1)
 		panic_syserror("can't chdir to `%s'", work_dir);
 

@@ -10,6 +10,7 @@ local textutils = require('internal.config.utils.textutils')
 local log = require('internal.config.utils.log')
 local ssl_certificate = require('internal.ssl_certificate')
 local loaders = require('internal.loaders')
+local workdir = require('internal.config.utils.workdir')
 
 -- Tarantool Enterprise Edition has its own additions
 -- for config module.
@@ -61,23 +62,10 @@ end
 -- Defaults need workdir-installed modules before directory entry.
 -- Do not replace explicit pins, including a pin equal to startup cwd.
 local function set_searchroot(work_dir)
-    if type(box.cfg) ~= 'function' then
-        -- box.cfg() is already called, the current working
-        -- directory is process.work_dir. Nothing to do.
+    if workdir.is_prepared() then
         return
     end
     if work_dir == nil then
-        return
-    end
-    -- `package.setsearchroot()` is a public API and the root can
-    -- be pinned manually (e.g. luatest pins it for the test
-    -- servers it spawns). An unset root falls back to the
-    -- current directory. Respect explicit pins, including a pin
-    -- equal to the current directory.
-    local searchroot = loaders.get_searchroot()
-    if searchroot ~= nil then
-        log.verbose('the module search root is not set: it is already ' ..
-                    'pinned to %q', searchroot)
         return
     end
     if work_dir:find('{{', 1, true) then
@@ -87,9 +75,31 @@ local function set_searchroot(work_dir)
     end
     -- A relative process.work_dir is interpreted against the
     -- startup working directory, which is not changed yet.
-    work_dir = fio.abspath(work_dir)
-    package.setsearchroot(work_dir)
-    log.verbose('set the module search root to %q', work_dir)
+    work_dir = workdir.resolve(work_dir)
+    local revision, searchroot = loaders.set_searchroot_if_unset(work_dir)
+    if revision == nil then
+        log.verbose('the module search root is not set: it is already ' ..
+                    'pinned to %q', searchroot)
+    else
+        log.verbose('set the module search root to %q', work_dir)
+    end
+    return revision
+end
+
+local function with_searchroot(work_dir, func, ...)
+    local revision = set_searchroot(work_dir)
+    if revision == nil then
+        return func(...)
+    end
+    -- The search root is process-global, not fiber-local. Restore
+    -- the unset state even when validation fails, unless module code
+    -- has explicitly set the root, even to the same path.
+    local ok, res = pcall(func, ...)
+    loaders.clear_searchroot_if_unchanged(revision)
+    if not ok then
+        error(res, 0)
+    end
+    return res
 end
 
 -- }}} Helpers
@@ -525,9 +535,8 @@ function methods._store(self, iconfig, cconfig, source_info)
     local context_cache = {}
     local work_dir = instance_config:resolve_work_dir(iconfig, vars,
                                                      context_cache)
-    set_searchroot(work_dir)
-    self._configdata = configdata.new(iconfig, cconfig, self._instance_name,
-                                     context_cache)
+    self._configdata = with_searchroot(work_dir, configdata.new, iconfig,
+        cconfig, self._instance_name, context_cache)
 end
 
 -- Invoke the appliers depending on the phase. The first phase
@@ -605,8 +614,8 @@ function methods._startup_impl(self, instance_name, config_file)
 
     self._status = 'startup_in_progress'
     self._instance_name = instance_name
-    -- box.cfg() changes a current working directory that
-    -- invalidates relative paths.
+    workdir.initialize()
+    -- Entering process.work_dir invalidates relative paths.
     --
     -- Let's calculate an absolute path to access the file later
     -- on :reload().
@@ -624,6 +633,8 @@ function methods._startup_impl(self, instance_name, config_file)
     --
     -- This phase may take a long time due to recovery.
     self:_store(self:_collect({sync_source = 'all'}))
+    workdir.prepare(self._configdata:get('process.work_dir',
+                                       {use_default = true}))
     local needs_retry = self:_apply_on_startup({phase = 1})
 
     -- Startup phase 2/2.

@@ -4,6 +4,8 @@ local socket = require('socket')
 local t = require('luatest')
 local cbuilder = require('luatest.cbuilder')
 local cluster = require('luatest.cluster')
+local treegen = require('luatest.treegen')
+local justrun = require('luatest.justrun')
 
 local g = t.group()
 local g_missing_parent = t.group('missing_console_parent', {
@@ -191,6 +193,53 @@ g_missing_parent.test_symlink_parent_creation = function(cg)
     assert_console_works(cluster, alias, 2)
     t.assert_equals(fio.stat(cluster._dir .. '/target/new/nested/c.sock').inode,
                     inode)
+end
+
+-- Verify missing console parents keep short binds under a long workdir.
+g.test_missing_parent_under_long_work_dir = function()
+    local dir = treegen.prepare_directory({}, {})
+    local work_dir = dir .. '/' .. string.rep('w', 120)
+    t.assert(fio.mktree(work_dir .. '/target/child'))
+    t.assert(fio.symlink('target/child', work_dir .. '/link'))
+    local script = treegen.write_file(dir, 'main.lua', [[
+        if rawget(_G, 'console_check_started') then return end
+        rawset(_G, 'console_check_started', true)
+        local socket = require('socket')
+        local yaml = require('yaml')
+        local config = require('config')
+        local function verify()
+            local s = assert(socket.tcp_connect('unix/',
+                                                'target/new/c.sock', 2))
+            assert(s:read('\n', 2):find('Lua console', 1, true))
+            assert(s:read('\n', 2):find('interactive help', 1, true))
+            assert(s:write('return 123\n', 2))
+            assert(yaml.decode(s:read('...\n', 2))[1] == 123)
+            s:close()
+        end
+        verify()
+        require('fiber').new(function()
+            config:wait_status('ready')
+            config:reload()
+            verify()
+            print('long workdir console works')
+            os.exit(0)
+        end)
+    ]])
+    local config = cbuilder:new()
+        :set_global_option('process.work_dir', work_dir)
+        :set_global_option('console.socket', 'link/../new/c.sock')
+        :add_instance('i-001', {})
+        :config()
+    config.iproto = nil
+    config.app = {file = script}
+    treegen.write_file(dir, 'config.yaml', yaml.encode(config))
+    local res = justrun.tarantool(dir, {},
+        {'--name', 'i-001', '--config', 'config.yaml'},
+        {nojson = true, stderr = true})
+    t.assert_equals(res.exit_code, 0, {res.stdout, res.stderr})
+    t.assert_str_contains(res.stdout, 'long workdir console works')
+    t.assert(fio.path.is_dir(work_dir .. '/target/new'))
+    t.assert_not(fio.path.exists(work_dir .. '/new'))
 end
 
 -- Verify retargeting a socket parent moves the console and cleans up.

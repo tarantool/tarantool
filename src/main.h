@@ -49,8 +49,9 @@ extern char tarantool_path[];
  */
 extern long tarantool_start_time;
 
+/** Apply process configuration and enter the effective work directory. */
 void
-load_cfg(void);
+load_cfg(const char *work_dir);
 
 /* The type of sigint callback's pointer. */
 struct ev_loop;
