@@ -58,33 +58,14 @@ local function filter_out_private_fields(t)
     return res
 end
 
--- Point the module search root to process.work_dir.
---
--- The first box.cfg() call changes the current working directory
--- to process.work_dir and modules installed into it (for
--- example, into the .rocks subdirectory) become resolvable,
--- because the module search is relative to the current directory
--- by default.
---
--- However, modules are needed before box.cfg(): roles and an
--- application marked with the early_load tag and their metadata
--- scan, and the schema defaults that depend on an installed
--- module version (see the vshard_since annotation), which are
--- evaluated when the configdata object is constructed. Set the
--- search root as soon as the working directory is known to make
--- modules installed into it resolvable before the chdir occurs.
---
--- This is a stopgap that covers the module search only. It is
--- planned to enter process.work_dir right at this point instead,
--- so that everything before box.cfg() works as if the process was
--- started in the working directory, see gh-13086.
-local function set_searchroot(iconfig, vars)
+-- Defaults need workdir-installed modules before directory entry.
+-- Do not replace explicit pins, including a pin equal to startup cwd.
+local function set_searchroot(work_dir)
     if type(box.cfg) ~= 'function' then
         -- box.cfg() is already called, the current working
         -- directory is process.work_dir. Nothing to do.
         return
     end
-    local work_dir = instance_config:get(iconfig, 'process.work_dir')
     if work_dir == nil then
         return
     end
@@ -99,15 +80,6 @@ local function set_searchroot(iconfig, vars)
                     'pinned to %q', searchroot)
         return
     end
-    -- The variables are substituted later, when the configdata
-    -- object is constructed. Substitute the name variables here
-    -- in the same way. The other ones (config.context.*) can't be
-    -- resolved at this point: the context files are relative to
-    -- the working directory itself. Leave the module search as is
-    -- in this case.
-    work_dir = work_dir:gsub('{{ *(.-) *}}', function(var_name)
-        return vars[var_name]
-    end)
     if work_dir:find('{{', 1, true) then
         log.verbose('the module search root is not set: unable to ' ..
                     'resolve process.work_dir %q', work_dir)
@@ -545,12 +517,17 @@ function methods._store(self, iconfig, cconfig, source_info)
         ]]):format(action, self._instance_name, source_info_str), 0)
     end
 
-    set_searchroot(iconfig, {
+    local vars = {
         instance_name = self._instance_name,
         replicaset_name = found.replicaset_name,
         group_name = found.group_name,
-    })
-    self._configdata = configdata.new(iconfig, cconfig, self._instance_name)
+    }
+    local context_cache = {}
+    local work_dir = instance_config:resolve_work_dir(iconfig, vars,
+                                                     context_cache)
+    set_searchroot(work_dir)
+    self._configdata = configdata.new(iconfig, cconfig, self._instance_name,
+                                     context_cache)
 end
 
 -- Invoke the appliers depending on the phase. The first phase

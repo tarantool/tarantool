@@ -384,7 +384,7 @@ g.test_context_var_file_process_work_dir = function(g)
     -- foo.txt
     -- w/
     --   var/
-    helpers.success_case(g, {
+    helpers.reload_success_case(g, {
         dir = dir,
         options = {
             ['process.work_dir'] = 'w',
@@ -406,7 +406,7 @@ g.test_context_var_file_process_work_dir = function(g)
     -- w/
     --   foo.txt
     --   var/
-    helpers.success_case(g, {
+    helpers.reload_success_case(g, {
         dir = dir,
         options = {
             ['process.work_dir'] = 'w',
@@ -426,6 +426,7 @@ end
 local g_context_file = helpers.group('context_file_paths', {
     {parent = 'symlink', decoy = true},
     {parent = 'symlink'},
+    {parent = 'symlink', workdir_context = true},
     {parent = 'symlink', absolute_file = true},
     {parent = 'symlink', missing_file_parent = true},
     {parent = 'symlink', missing_workdir = true},
@@ -465,6 +466,10 @@ g_context_file.test_startup_and_reload = function(cg)
     local context = {
         marker = {from = 'file', file = context_file, rstrip = true},
     }
+    if cg.params.workdir_context then
+        context.wd = work_dir
+        work_dir = '{{ context.wd }}'
+    end
     local script = treegen.write_file(dir, 'main.lua', [[
         if rawget(_G, 'reload_started') then return end
         rawset(_G, 'reload_started', true)
@@ -498,6 +503,147 @@ g_context_file.test_startup_and_reload = function(cg)
     t.assert_equals(res.exit_code, 0, res.stderr)
     t.assert_str_contains(res.stdout, 'physical context file survives reload')
     t.assert(fio.path.is_dir(dir .. '/' .. physical_dir))
+end
+
+-- Verify early workdir resolution reads only the required context values.
+g.test_resolve_work_dir = helpers.run_as_script(function()
+    local instance_config = require('internal.config.instance_config')
+    local t = require('myluatest')
+    t.assert_equals(instance_config:resolve_work_dir({}, {}), nil)
+    for _, value in ipairs({'wd', '', 42, true, false}) do
+        local config = {
+            config = {context = {wd = value}},
+            process = {work_dir = '{{ context.wd }}/{{ instance_name }}'},
+        }
+        local vars = {instance_name = 'instance-001'}
+        local result = instance_config:resolve_work_dir(config, vars)
+        t.assert_equals(result, tostring(value) .. '/instance-001')
+        t.assert_equals(vars['context.wd'], tostring(value))
+    end
+    local config = {
+        config = {context = {
+            wd = 'wd',
+            unused = {from = 'file', file = 'missing.txt'},
+        }},
+        process = {work_dir = '{{ context.wd }}'},
+    }
+    local vars = {}
+    t.assert_equals(instance_config:resolve_work_dir(config, vars), 'wd')
+    t.assert_equals(vars['context.unused'], nil)
+    t.assert_error_msg_contains('Unable to read config.context.unused',
+                               instance_config.apply_vars,
+                               instance_config, config, vars)
+
+    for _, template in ipairs({'{{ unknown }}', '{{ context.unknown }}'}) do
+        config.process.work_dir = template
+        t.assert_equals(instance_config:resolve_work_dir(config, {}), template)
+    end
+    config.config.context = {
+        wd = {from = 'file', file = 'workdir.txt'},
+    }
+    config.process.work_dir = '{{ context.wd }}'
+    vars = {}
+    t.assert_equals(instance_config:resolve_work_dir(config, vars),
+                    '{{ context.wd }}')
+    t.assert_equals(vars['context.wd'], nil)
+
+    config.config.context.wd = '{{ instance_name }}'
+    vars = {instance_name = 'instance-001'}
+    t.assert_equals(instance_config:resolve_work_dir(config, vars),
+                    '{{ instance_name }}')
+    t.assert_equals(instance_config:apply_vars(config, vars).process.work_dir,
+                    '{{ instance_name }}')
+end)
+
+-- Verify one config build reuses raw context values across instance views.
+g.test_context_cache = helpers.run_as_script(function()
+    local fio = require('fio')
+    local instance_config = require('internal.config.instance_config')
+    local t = require('myluatest')
+    for _, source in ipairs({'env', 'file', 'symlink'}) do
+        local revision = 0
+        local function set_value(value)
+            if source == 'env' then
+                os.setenv('TEST_CONTEXT_CACHE', value)
+            else
+                revision = revision + 1
+                local path = source == 'symlink' and
+                    ('context-%d.txt'):format(revision) or 'context.txt'
+                local f = assert(io.open(path, 'w'))
+                f:write(value)
+                f:close()
+                if source == 'symlink' then
+                    if fio.path.lexists('context.txt') then
+                        assert(fio.unlink('context.txt'))
+                    end
+                    assert(fio.symlink(path, 'context.txt'))
+                end
+            end
+        end
+        set_value('wd\n')
+        local definition = {
+            from = source == 'env' and 'env' or 'file', rstrip = true,
+        }
+        if source == 'env' then
+            definition.env = 'TEST_CONTEXT_CACHE'
+        else
+            definition.file = fio.cwd() .. '/context.txt'
+        end
+        local config = {
+            config = {context = {wd = definition}},
+            process = {
+                work_dir = '{{ context.wd }}',
+                title = '{{ instance_name }}',
+            },
+        }
+        local cache = {}
+        local vars = {instance_name = 'current'}
+        t.assert_equals(instance_config:resolve_work_dir(config, vars, cache),
+                        'wd')
+        set_value('changed\n')
+        local current = instance_config:apply_vars(config, vars, cache)
+        t.assert_equals(current.process.work_dir, 'wd')
+        local peer = table.deepcopy(config)
+        peer.config.context.wd.rstrip = false
+        if source ~= 'env' then
+            peer.config.context.wd.file = fio.cwd() .. '/./context.txt'
+        end
+        local peer_vars = {instance_name = 'peer'}
+        local result = instance_config:apply_vars(peer, peer_vars, cache)
+        t.assert_equals(result.process.work_dir, 'wd\n')
+        t.assert_equals(result.process.title, 'peer')
+        peer.config.context.wd = 'peer-workdir'
+        result = instance_config:apply_vars(peer, peer_vars, cache)
+        t.assert_equals(result.process.work_dir, 'peer-workdir')
+        result = instance_config:apply_vars(config, peer_vars, {})
+        t.assert_equals(result.process.work_dir, 'changed')
+    end
+end)
+
+-- Verify missing workdir context sources report their read errors.
+g.test_work_dir_context_errors = function()
+    local dir = treegen.prepare_directory({}, {})
+    local cases = {
+        {
+            definition = {from = 'env', env = 'UNKNOWN_WORKDIR_ENV_VAR'},
+            error = 'no "UNKNOWN_WORKDIR_ENV_VAR" environment variable',
+        },
+        {
+            definition = {from = 'file', file = dir .. '/missing.txt'},
+            error = 'Unable to open file',
+        },
+    }
+    for _, case in ipairs(cases) do
+        helpers.failure_case({
+            dir = dir,
+            options = {
+                ['process.work_dir'] = '{{ context.wd }}',
+                ['config.context'] = {wd = case.definition},
+            },
+            exp_err = 'Unable to read config.context.wd variable value: ' ..
+                case.error,
+        })
+    end
 end
 
 -- Verify a config.context variable with a scalar value.

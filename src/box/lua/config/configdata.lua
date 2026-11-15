@@ -309,6 +309,17 @@ function methods.bootstrap_leader_name(self)
     return self._bootstrap_leader_name
 end
 
+local function prepare_iconfig(iconfig, vars, context_cache)
+    -- Module-dependent defaults need the context-resolved workdir.
+    instance_config:resolve_work_dir(iconfig, vars, context_cache)
+    local iconfig_def = instance_config:apply_default(iconfig)
+    iconfig = instance_config:normalize(
+        instance_config:apply_vars(iconfig, vars, context_cache))
+    iconfig_def = instance_config:normalize(
+        instance_config:apply_vars(iconfig_def, vars, context_cache))
+    return iconfig, iconfig_def
+end
+
 -- Calculate an instance configuration for the given instance
 -- object.
 local function build_iconfig(instance_def)
@@ -316,8 +327,6 @@ local function build_iconfig(instance_def)
     -- config. Build a config with applied defaults as well.
     local iconfig = cluster_config:instantiate(instance_def.cconfig,
         instance_def.instance_name)
-    local iconfig_def = instance_config:apply_default(iconfig)
-
     -- Substitute variables according to the instance,
     -- replicaset, group names.
     local vars = {
@@ -325,10 +334,8 @@ local function build_iconfig(instance_def)
         replicaset_name = instance_def.replicaset_name,
         group_name = instance_def.group_name,
     }
-    instance_def.iconfig = instance_config:normalize(
-        instance_config:apply_vars(iconfig, vars))
-    instance_def.iconfig_def = instance_config:normalize(
-        instance_config:apply_vars(iconfig_def, vars))
+    instance_def.iconfig, instance_def.iconfig_def = prepare_iconfig(
+        iconfig, vars, instance_def.context_cache)
 end
 
 -- Instance object metatable.
@@ -351,7 +358,7 @@ local instance_def_mt = {
 
 -- Create an instance definition object that provides access to
 -- instance properties and configuration.
-local function build_instances(cconfig)
+local function build_instances(cconfig, context_cache)
     assert(type(cconfig) == 'table')
 
     local res = {}
@@ -366,6 +373,7 @@ local function build_instances(cconfig)
                     instance_name = instance_name,
                     replicaset_name = replicaset_name,
                     group_name = group_name,
+                    context_cache = context_cache,
                     -- Instance configuration is evaluated lazily,
                     -- on access to these fields.
                     iconfig = nil,
@@ -1048,7 +1056,7 @@ local function validate_instance_names_are_unique(cconfig)
     end
 end
 
-local function new(iconfig, cconfig, instance_name)
+local function new(iconfig, cconfig, instance_name, context_cache)
     -- Find myself in a cluster config, determine peers in the same
     -- replicaset.
     local found = cluster_config:find_instance(cconfig, instance_name)
@@ -1059,22 +1067,18 @@ local function new(iconfig, cconfig, instance_name)
     validate_replicaset_names_are_unique(cconfig)
     validate_instance_names_are_unique(cconfig)
 
-    -- Precalculate configuration with applied defaults.
-    local iconfig_def = instance_config:apply_default(iconfig)
-
     -- Substitute {{ instance_name }} with actual instance name in
     -- the original config and in the config with defaults.
     --
     -- The same for {{ replicaset_name }} and {{ group_name }}.
+    context_cache = context_cache or {}
     local vars = {
         instance_name = instance_name,
         replicaset_name = found.replicaset_name,
         group_name = found.group_name,
     }
-    iconfig = instance_config:normalize(
-        instance_config:apply_vars(iconfig, vars))
-    iconfig_def = instance_config:normalize(
-        instance_config:apply_vars(iconfig_def, vars))
+    local iconfig_def
+    iconfig, iconfig_def = prepare_iconfig(iconfig, vars, context_cache)
 
     local replicaset_uuid = instance_config:get(iconfig_def,
         'database.replicaset_uuid')
@@ -1083,7 +1087,7 @@ local function new(iconfig, cconfig, instance_name)
 
     -- Save instance configs for all instances of the cluster and
     -- save instance from our replicaset separately.
-    local instances = build_instances(cconfig)
+    local instances = build_instances(cconfig, context_cache)
     local peers = build_peers(instances, found.replicaset_name)
 
     -- Make the order of the peers predictable and the same on all
