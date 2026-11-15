@@ -2,6 +2,7 @@ local console = require('console')
 local log = require('internal.config.utils.log')
 local instance_config = require('internal.config.instance_config')
 local fio = require('fio')
+local minifio = require('internal.minifio')
 
 -- Active socket and its location.
 local listening_socket = nil
@@ -37,13 +38,20 @@ local function apply(config)
         {use_default = true})
     assert(new_socket_file ~= nil)
 
-    -- The same socket file is pointed by different paths before
-    -- and after first box.cfg() if the `process.work_dir` option
-    -- is set.
+    -- Keep paths short enough for the Unix socket length limit.
     local iconfig_def = configdata._iconfig_def
     new_socket_file = instance_config:prepare_file_path(iconfig_def,
         new_socket_file)
-    local new_socket_abspath = fio.abspath(new_socket_file)
+    -- The socket may not exist yet. Resolve its parent, not the socket
+    -- itself, and keep this identity even if a parent symlink changes.
+    local socket_dir = fio.dirname(new_socket_file)
+    local physical_dir = minifio.realpath(socket_dir)
+    if physical_dir == nil then
+        error(('console.socket: unable to resolve parent directory %q')
+              :format(socket_dir), 0)
+    end
+    local new_socket_abspath = fio.pathjoin(physical_dir,
+                                           fio.basename(new_socket_file))
 
     -- If console.socket has changed we must close the listening socket.
     if listening_socket_abspath ~= new_socket_abspath then

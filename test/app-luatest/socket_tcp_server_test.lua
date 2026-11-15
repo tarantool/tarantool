@@ -29,18 +29,63 @@ local function wait_fiber_named(prefix)
 end
 
 g.before_each(function(cg)
+    cg.cwd = fio.cwd()
     cg.tmpdir = treegen.prepare_directory({}, {})
     cg.sock_path = fio.pathjoin(cg.tmpdir, 'tcp_server.sock')
 end)
 
 g.after_each(function(cg)
+    fio.chdir(cg.cwd)
     if cg.server ~= nil then
         pcall(cg.server.close, cg.server)
+    end
+    if cg.second_server ~= nil then
+        pcall(cg.second_server.close, cg.second_server)
     end
     if cg.tmpdir then
         fio.rmtree(cg.tmpdir)
     end
 end)
+
+-- Verify closing after chdir removes only the original socket file.
+g.test_close_after_chdir = function(cg)
+    local first = fio.pathjoin(cg.tmpdir, 'first')
+    local second = fio.pathjoin(cg.tmpdir, 'second')
+    t.assert(fio.mkdir(first))
+    t.assert(fio.mkdir(second))
+    t.assert(fio.chdir(first))
+    cg.server = socket.tcp_server_create('unix/', 'c.sock', {})
+    t.assert_not_equals(cg.server, nil)
+    t.assert(fio.chdir(second))
+    cg.second_server = socket.tcp_server_create('unix/', 'c.sock', {})
+    t.assert_not_equals(cg.second_server, nil)
+    local inode = fio.stat('c.sock').inode
+
+    cg.server:close()
+    cg.server = nil
+    t.assert_equals(fio.lstat(fio.pathjoin(first, 'c.sock')), nil)
+    t.assert_equals(fio.stat('c.sock').inode, inode)
+    local client = socket.tcp_connect('unix/', 'c.sock', 2)
+    t.assert_not_equals(client, nil)
+    client:close()
+end
+
+-- Verify short relative sockets work and clean up in long directory paths.
+g.test_close_long_relative_path = function(cg)
+    local dir = fio.pathjoin(cg.tmpdir, string.rep('d', 120))
+    t.assert(fio.mkdir(dir))
+    t.assert(fio.chdir(dir))
+    cg.server = socket.tcp_server_create('unix/', 'c.sock', {})
+    t.assert_not_equals(cg.server, nil)
+    local client = socket.tcp_connect('unix/', 'c.sock', 2)
+    t.assert_not_equals(client, nil)
+    client:close()
+
+    t.assert(fio.chdir(cg.cwd))
+    cg.server:close()
+    cg.server = nil
+    t.assert_equals(fio.lstat(fio.pathjoin(dir, 'c.sock')), nil)
+end
 
 g.test_create_and_loop = function(cg)
     local handler = function(sc)

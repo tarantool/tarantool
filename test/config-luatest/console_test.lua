@@ -53,8 +53,8 @@ local function eval(s, command)
     return unpack(reply, 1, table.maxn(reply))
 end
 
-local function assert_console_works(cluster, config)
-    local s = connect(cluster, 'i-001', config)
+local function assert_console_works(cluster, config, timeout)
+    local s = connect(cluster, 'i-001', config, timeout)
     t.assert_equals(eval(s, 'return 123'), 123)
 end
 
@@ -132,6 +132,38 @@ g.test_parent_dir_in_socket_path = function()
     assert_console_works(cluster, config)
 end
 
+-- Verify console reload compares physical locations, not path spellings.
+g.test_symlink_parent_socket_reload = function()
+    local config = cbuilder:new()
+        :set_global_option('console.socket', 'link/../c.sock')
+        :add_instance('i-001', {})
+        :config()
+    local cluster = cluster:new(config)
+    t.assert(fio.mktree(cluster._dir .. '/target/child'))
+    t.assert(fio.symlink('target/child', cluster._dir .. '/link'))
+    cluster:start()
+    assert_console_works(cluster, config)
+
+    local inode = fio.stat(cluster._dir .. '/target/c.sock').inode
+    local alias_config = cbuilder:new(config)
+        :set_global_option('console.socket', 'target/c.sock')
+        :config()
+    cluster:reload(alias_config)
+    assert_console_works(cluster, alias_config, 2)
+    t.assert_equals(fio.stat(cluster._dir .. '/target/c.sock').inode, inode)
+
+    local new_config = cbuilder:new(config)
+        :set_global_option('console.socket', 'c.sock')
+        :config()
+    cluster:reload(new_config)
+    assert_console_works(cluster, new_config, 2)
+    assert_console_closed(cluster, config)
+
+    cluster:reload(config)
+    assert_console_works(cluster, config, 2)
+    assert_console_closed(cluster, new_config)
+end
+
 -- Verify missing console parents follow symlink/.. at startup and reload.
 g_missing_parent.test_symlink_parent_creation = function(cg)
     local config = cbuilder:new()
@@ -147,9 +179,80 @@ g_missing_parent.test_symlink_parent_creation = function(cg)
     if cg.params.reload then
         cluster:reload(config)
     end
-    assert_console_works(cluster, config)
+    assert_console_works(cluster, config, 2)
     t.assert(fio.path.is_dir(cluster._dir .. '/target/new/nested'))
     t.assert_not(fio.path.exists(cluster._dir .. '/new'))
+
+    local inode = fio.stat(cluster._dir .. '/target/new/nested/c.sock').inode
+    local alias = cbuilder:new(config)
+        :set_global_option('console.socket', 'target/new/nested/c.sock')
+        :config()
+    cluster:reload(alias)
+    assert_console_works(cluster, alias, 2)
+    t.assert_equals(fio.stat(cluster._dir .. '/target/new/nested/c.sock').inode,
+                    inode)
+end
+
+-- Verify retargeting a socket parent moves the console and cleans up.
+g.test_retargeted_socket_parent = function()
+    local config = cbuilder:new()
+        :set_global_option('console.socket', 'link/c.sock')
+        :add_instance('i-001', {})
+        :config()
+    local cluster = cluster:new(config)
+    t.assert(fio.mktree(cluster._dir .. '/first'))
+    t.assert(fio.mktree(cluster._dir .. '/second'))
+    t.assert(fio.symlink('first', cluster._dir .. '/link'))
+    cluster:start()
+    assert_console_works(cluster, config)
+
+    local old_location = cbuilder:new(config)
+        :set_global_option('console.socket', 'first/c.sock')
+        :config()
+    t.assert(fio.unlink(cluster._dir .. '/link'))
+    t.assert(fio.symlink('second', cluster._dir .. '/link'))
+    cluster:reload(config)
+    assert_console_works(cluster, config, 2)
+    assert_console_closed(cluster, old_location)
+    t.assert_equals(fio.lstat(cluster._dir .. '/first/c.sock'), nil)
+end
+
+-- Verify retargeting a socket parent preserves another live listener.
+g.test_retargeted_socket_parent_occupied = function()
+    local config = cbuilder:new()
+        :set_global_option('console.socket', 'link/c.sock')
+        :add_instance('i-001', {})
+        :config()
+    local cluster = cluster:new(config)
+    t.assert(fio.mktree(cluster._dir .. '/first'))
+    t.assert(fio.mktree(cluster._dir .. '/second'))
+    t.assert(fio.symlink('first', cluster._dir .. '/link'))
+    cluster:start()
+    assert_console_works(cluster, config)
+
+    cluster['i-001']:exec(function()
+        local config = require('config')
+        local fio = require('fio')
+        local socket = require('socket')
+        local victim = socket.tcp_server('unix/', 'second/c.sock', function(s)
+            s:write('VICTIM\n')
+        end)
+        t.assert_not_equals(victim, nil)
+        local inode = fio.stat('second/c.sock').inode
+        t.assert(fio.unlink('link'))
+        t.assert(fio.symlink('second', 'link'))
+        t.assert_error_msg_contains('Address already in use',
+                                   config.reload, config)
+        t.assert_equals(fio.lstat('first/c.sock'), nil)
+        t.assert_equals(fio.stat('second/c.sock').inode, inode)
+        local s = socket.tcp_connect('unix/', 'second/c.sock', 2)
+        t.assert_not_equals(s, nil)
+        t.assert_equals(s:read('\n', 2), 'VICTIM\n')
+        s:close()
+        victim:close()
+        config:reload()
+    end)
+    assert_console_works(cluster, config, 2)
 end
 
 -- Re-open console by setting enable to false and true
