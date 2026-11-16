@@ -4,7 +4,7 @@ dependencies:
   - name: c-ares
     version: 1.18.1
   - name: c-dt
-    version: 5bd1b4e651b597c106976f08d4c05b9ccb3efabd
+    version: 753d528649b2cdecf346df71eacd0f14abcc29c5
   - name: decNumber
     version: 7a598bf5fc24e3abdc2062e3530e70a7591e4363
   - name: libcurl
