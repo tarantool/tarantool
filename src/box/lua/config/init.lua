@@ -609,12 +609,13 @@ function methods._apply(self)
 end
 
 function methods._post_apply(self)
+    -- Certificate reads may yield; finish them before application fibers start.
+    ssl_certificate.apply(self)
     for _, applier in ipairs(self._appliers) do
         if applier.post_apply ~= nil then
             applier.post_apply(self)
         end
     end
-    ssl_certificate.apply(self)
 end
 
 -- Set proper status depending on received alerts.
