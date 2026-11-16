@@ -1260,15 +1260,39 @@ local function interval_cmp(lhs, rhs, is_raising)
             return nil
         end
     end
-    local tags = {
-        'year', 'month', 'week', 'day',
-        'hour', 'min', 'sec', 'nsec'
-    }
-    for _, key in pairs(tags) do
-        local diff = lhs[key] - rhs[key]
-        if diff ~= 0 then
-            return diff
-        end
+    -- Unrolled on purpose: a table of tags allocated per call and iterated
+    -- with pairs() is slow and makes LuaJIT abort the trace (NYI ISNEXT).
+    local diff = lhs.year - rhs.year
+    if diff ~= 0 then
+        return diff
+    end
+    diff = lhs.month - rhs.month
+    if diff ~= 0 then
+        return diff
+    end
+    diff = lhs.week - rhs.week
+    if diff ~= 0 then
+        return diff
+    end
+    diff = lhs.day - rhs.day
+    if diff ~= 0 then
+        return diff
+    end
+    diff = lhs.hour - rhs.hour
+    if diff ~= 0 then
+        return diff
+    end
+    diff = lhs.min - rhs.min
+    if diff ~= 0 then
+        return diff
+    end
+    diff = lhs.sec - rhs.sec
+    if diff ~= 0 then
+        return diff
+    end
+    diff = lhs.nsec - rhs.nsec
+    if diff ~= 0 then
+        return diff
     end
     return 0
 end
