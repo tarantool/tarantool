@@ -9,7 +9,8 @@ local log = require('log')
 local uri = require('uri')
 
 ffi.cdef([[
-    int ssl_cert_get_not_after(const char *path, int64_t *timestamp);
+    int ssl_cert_get_not_after(const char *data, size_t size,
+                               int64_t *timestamp);
 ]])
 
 local CHECK_INTERVAL = 12 * 60 * 60
@@ -48,8 +49,29 @@ end
 
 local function read_expiration(path)
     checks('string')
+    local fh, err = fio.open(path, {'O_RDONLY'})
+    if fh == nil then
+        return nil, tostring(err)
+    end
+    local chunks = {}
+    while true do
+        local chunk
+        chunk, err = fh:read(4096)
+        if chunk == nil or chunk == '' then
+            break
+        end
+        table.insert(chunks, chunk)
+    end
+    local ok, close_err = fh:close()
+    if err ~= nil then
+        return nil, tostring(err)
+    end
+    if not ok then
+        return nil, tostring(close_err)
+    end
+    local data = table.concat(chunks)
     local timestamp = ffi.new('int64_t[1]')
-    if ffi.C.ssl_cert_get_not_after(path, timestamp) ~= 0 then
+    if ffi.C.ssl_cert_get_not_after(data, #data, timestamp) ~= 0 then
         local err = box.error.last()
         return nil, err ~= nil and tostring(err) or 'unknown error'
     end
@@ -115,7 +137,9 @@ local function new(opts)
         })
     end
 
-    local function check(now)
+    local check_lock = fiber.channel(1)
+
+    local function check_impl(now)
         checks('?number')
         local records = discover()
         now = now or clock.time()
@@ -138,6 +162,15 @@ local function new(opts)
         alert_keys = next_alert_keys
         if alerts_changed and opts.on_change ~= nil then
             opts.on_change(config)
+        end
+    end
+
+    local function check(now)
+        check_lock:put(true)
+        local ok, err = pcall(check_impl, now)
+        check_lock:get()
+        if not ok then
+            error(err, 0)
         end
     end
 
