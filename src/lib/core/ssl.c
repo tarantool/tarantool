@@ -7,6 +7,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <limits.h>
 #include <openssl/crypto.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
@@ -107,19 +108,23 @@ ssl_free(void)
 #endif
 }
 
-/** Read the first PEM certificate expiry time as a Unix timestamp. */
+/** Parse the first PEM certificate expiry time as a Unix timestamp. */
 int
-ssl_cert_get_not_after(const char *path, int64_t *timestamp)
+ssl_cert_get_not_after(const char *data, size_t size, int64_t *timestamp)
 {
 	*timestamp = 0;
-	BIO *bio = BIO_new_file(path, "r");
+	if (size > INT_MAX) {
+		diag_set(IllegalParams, "SSL certificate is too large");
+		return -1;
+	}
+	BIO *bio = BIO_new_mem_buf(data, (int)size);
 	if (bio == NULL) {
-		diag_set(SSLError, "Error opening SSL certificate '%s'", path);
+		diag_set(SSLError, "Error creating SSL certificate BIO");
 		return -1;
 	}
 	X509 *cert = PEM_read_bio_X509(bio, NULL, NULL, NULL);
 	if (cert == NULL) {
-		diag_set(SSLError, "Error loading SSL certificate '%s'", path);
+		diag_set(SSLError, "Error loading SSL certificate");
 		BIO_free(bio);
 		return -1;
 	}
@@ -141,8 +146,7 @@ ssl_cert_get_not_after(const char *path, int64_t *timestamp)
 	int seconds;
 	if (ASN1_TIME_diff(&days, &seconds, asn1_now,
 			   X509_get0_notAfter(cert)) != 1) {
-		diag_set(SSLError,
-			 "Invalid expiry time in SSL certificate '%s'", path);
+		diag_set(SSLError, "Invalid expiry time in SSL certificate");
 		ASN1_TIME_free(asn1_now);
 		X509_free(cert);
 		BIO_free(bio);
