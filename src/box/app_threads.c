@@ -116,8 +116,8 @@ app_thread_process_call(struct call_request *request, struct port *port)
 	uint32_t name_len = mp_decode_strl(&name);
 	struct runtime_credentials *runtime_cr =
 			fiber()->storage.runtime_credentials;
-	const char *uname = runtime_cr->user_name != NULL ?
-			    runtime_cr->user_name : "guest";
+	assert(runtime_cr != NULL);
+	const char *uname = runtime_cr->user_name;
 	uint32_t uname_len = strlen(uname);
 	if (strcmp(uname, "admin") != 0 &&
 	    !box_lua_call_runtime_priv_is_granted(uname, uname_len,
@@ -144,8 +144,8 @@ app_thread_process_eval(struct call_request *request, struct port *port)
 {
 	struct runtime_credentials *runtime_cr =
 			fiber()->storage.runtime_credentials;
-	const char *uname = runtime_cr->user_name != NULL ?
-			    runtime_cr->user_name : "guest";
+	assert(runtime_cr != NULL);
+	const char *uname = runtime_cr->user_name;
 	if (strcmp(uname, "admin") != 0) {
 		diag_set(AccessDeniedError, priv_name(PRIV_X),
 			 schema_object_name(SC_UNIVERSE), "", uname);

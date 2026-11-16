@@ -3930,11 +3930,11 @@ iproto_thread_accept(struct iproto_thread *iproto_thread, struct iostream *io,
 	memcpy(&msg->connect.addrstorage, addr, addrlen);
 	msg->connect.addrlen = addrlen;
 	msg->connect.session = session;
-	if (user_name != NULL) {
-		for (int i = 0; i < iproto_thread->srv_count; i++) {
-			con->srv[i].runtime_credentials.user_name =
-						(char *)xstrdup(user_name);
-		}
+	if (user_name == NULL)
+		user_name = "guest";
+	for (int i = 0; i < iproto_thread->srv_count; i++) {
+		con->srv[i].runtime_credentials.user_name =
+					(char *)xstrdup(user_name);
 	}
 	iostream_move(&con->io, io);
 	cmsg_init(&msg->base, iproto_thread->connect_route);
