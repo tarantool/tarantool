@@ -187,8 +187,7 @@ access_check_lua_call(const char *name, uint32_t name_len)
 	struct runtime_credentials *runtime_cr =
 			fiber()->storage.runtime_credentials;
 	if (runtime_cr != NULL) {
-		const char *uname = runtime_cr->user_name != NULL ?
-				    runtime_cr->user_name : "guest";
+		const char *uname = runtime_cr->user_name;
 		uint32_t uname_len = strlen(uname);
 		if (box_lua_call_runtime_priv_is_granted(uname, uname_len, name,
 							 name_len))

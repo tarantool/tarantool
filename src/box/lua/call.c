@@ -1293,8 +1293,8 @@ lbox_runtime_user(struct lua_State *L)
 {
 	struct runtime_credentials *runtime_cr =
 			fiber()->storage.runtime_credentials;
-	const char *uname = runtime_cr->user_name != NULL ?
-			    runtime_cr->user_name : "guest";
+	const char *uname = runtime_cr != NULL ?
+			    runtime_cr->user_name : "admin";
 	lua_pushstring(L, uname);
 	return 1;
 }
