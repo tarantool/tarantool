@@ -6,6 +6,7 @@
 #pragma once
 
 #include "iostream.h"
+#include <stddef.h>
 #include <stdint.h>
 
 #if defined(__cplusplus)
@@ -24,13 +25,13 @@ void
 ssl_free(void);
 
 /**
- * Read the first PEM certificate expiry time as a Unix timestamp.
+ * Parse the first PEM certificate in @a data (@a size bytes).
  *
  * On success returns 0 and stores the timestamp in @a timestamp.
  * On error returns -1 and sets diag.
  */
 int
-ssl_cert_get_not_after(const char *path, int64_t *timestamp);
+ssl_cert_get_not_after(const char *data, size_t size, int64_t *timestamp);
 
 /**
  * Creates and returns an SSL context.

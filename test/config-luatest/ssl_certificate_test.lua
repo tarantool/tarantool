@@ -5,6 +5,7 @@ local datetime = require('datetime')
 local t = require('luatest')
 local cbuilder = require('luatest.cbuilder')
 local cluster = require('luatest.cluster')
+local server = require('luatest.server')
 
 local g = t.group()
 
@@ -42,6 +43,17 @@ g.before_each(function(g)
     set_upvalue(ssl_certificate.apply, 'alerts', nil)
     set_upvalue(ssl_certificate.register_discovery, 'discoveries',
                 table.copy(g.default_discoveries))
+end)
+
+g.after_each(function(g)
+    if g.server ~= nil then
+        g.server:drop()
+        g.server = nil
+    end
+    if g.temp_dir ~= nil then
+        fio.rmtree(g.temp_dir)
+        g.temp_dir = nil
+    end
 end)
 
 local function new_fake_config()
@@ -254,6 +266,10 @@ g.test_config_startup_and_reload = function()
         :config()
     local script = [[
         local config = require('config')
+        -- The reload below executes this file again.
+        if config:info().status == 'reload_in_progress' then
+            return
+        end
         local function check()
             local info = config:info()
             assert(info.status == 'check_warnings')
@@ -265,12 +281,18 @@ g.test_config_startup_and_reload = function()
             end
             error('certificate warning is missing')
         end
-        require('fiber').create(function()
-            require('fiber').sleep(0)
-            check()
-            config:reload()
-            check()
-            os.exit(0)
+        local fiber = require('fiber')
+        fiber.create(function()
+            local ok, err = pcall(function()
+                fiber.sleep(0)
+                check()
+                config:reload()
+                check()
+            end)
+            if not ok then
+                io.stderr:write(tostring(err), '\n')
+            end
+            os.exit(ok and 0 or 1)
         end)
     ]]
     local dir = treegen.prepare_directory({}, {})
@@ -324,4 +346,101 @@ g.test_periodic_check_during_reload = function()
                              'configuration is already in progress')
         t.assert_equals(config:info().status, 'check_warnings')
     end)
+end
+
+g.test_certificate_read_does_not_block_event_loop = function(g)
+    local popen = require('popen')
+    g.server = server:new({alias = 'ssl_reader'})
+    g.server:start()
+    local fifo = fio.pathjoin(g.server.workdir, 'certificate.fifo')
+    local mkfifo = assert(popen.new({'/usr/bin/env', 'mkfifo', fifo}))
+    local status = mkfifo:wait()
+    mkfifo:close()
+    t.assert_equals(status.exit_code, 0)
+
+    local fh = assert(fio.open(CERT, {'O_RDONLY'}))
+    local pem = assert(fh:read())
+    assert(fh:close())
+    local expected = g.server:exec(function(cert)
+        return require('internal.ssl_certificate')._read_expiration(cert)
+    end, {CERT})
+
+    local future = g.server:eval([[
+        return require('internal.ssl_certificate')._read_expiration(...)
+    ]], {fifo}, {is_async = true})
+    local writer = assert(fio.open(fifo, {'O_WRONLY'}))
+    local pending = not future:is_ready()
+    local ok, value = pcall(g.server.eval, g.server, 'return 42', {},
+                           {timeout = 5})
+
+    -- Release the reader even if the second request timed out.
+    local written, write_err = writer:write(pem)
+    local closed, close_err = writer:close()
+    local result, read_err = future:wait_result(5)
+    t.assert(written, tostring(write_err))
+    t.assert(closed, tostring(close_err))
+    t.assert(pending, 'certificate read must still be pending')
+    t.assert(ok, tostring(value))
+    t.assert_equals(value, 42)
+    t.assert(result, tostring(read_err))
+    t.assert_equals(result[1], expected)
+end
+
+g.test_read_expiration_failures = function(g)
+    local ffi = require('ffi')
+    local ssl_certificate = require('internal.ssl_certificate')
+    g.temp_dir = fio.tempdir()
+    local path = fio.pathjoin(g.temp_dir, 'invalid.pem')
+    for _, contents in ipairs({'', 'not a certificate'}) do
+        local fh = assert(fio.open(path, {'O_CREAT', 'O_TRUNC', 'O_WRONLY'},
+                                  tonumber('600', 8)))
+        assert(fh:write(contents))
+        assert(fh:close())
+        local expiration, err = ssl_certificate._read_expiration(path)
+        t.assert_equals(expiration, nil)
+        t.assert_str_contains(err, 'Error loading SSL certificate')
+    end
+
+    for _, unreadable in ipairs({g.temp_dir, MISSING_CERT}) do
+        local expiration, err = ssl_certificate._read_expiration(unreadable)
+        t.assert_equals(expiration, nil)
+        t.assert_equals(type(err), 'string')
+    end
+
+    local timestamp = ffi.new('int64_t[1]', 42)
+    t.assert_equals(ffi.C.ssl_cert_get_not_after('', 2147483648, timestamp), -1)
+    t.assert_equals(tonumber(timestamp[0]), 0)
+    t.assert_str_contains(tostring(box.error.last()), 'too large')
+end
+
+g.test_checks_are_serialized = function()
+    local fiber = require('fiber')
+    local ssl_certificate, state = apply_fake_config()
+    local started = fiber.channel(1)
+    local release = fiber.channel(1)
+    local calls = 0
+    local get = state.config.get
+    function state.config:get(path)
+        calls = calls + 1
+        if calls == 1 then
+            started:put(true)
+            release:get()
+        end
+        return get(self, path)
+    end
+
+    local first = fiber.new(ssl_certificate._check)
+    first:set_joinable(true)
+    started:get()
+    local second = fiber.new(ssl_certificate._check)
+    second:set_joinable(true)
+    fiber.sleep(0)
+    local calls_before_release = calls
+    release:put(true)
+    local first_ok, first_err = first:join()
+    local second_ok, second_err = second:join()
+    t.assert(first_ok, tostring(first_err))
+    t.assert(second_ok, tostring(second_err))
+    t.assert_equals(calls_before_release, 1)
+    t.assert_equals(calls, 2)
 end
