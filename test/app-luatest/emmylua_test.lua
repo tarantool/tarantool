@@ -69,6 +69,30 @@ local modules = {
             },
         },
     },
+    {
+        name = 'checks',
+        source = 'third_party/checks/annotations.lua',
+        extra_sources = {
+            {src = 'third_party/checks/checks.lua', dst = 'checks_source.lua'},
+        },
+        fixtures = 'test/app-luatest/emmylua/checks',
+        type_name = 'checks',
+        fields = {
+            checks = 'Checks that the arguments',
+        },
+        objects = {
+            {
+                fixture = 'object.lua',
+                type_name = 'checks.checkers',
+                fields = {
+                    datetime = 'Check that the value is a datetime object',
+                    uint64 = 'Check whether the specified value is a ' ..
+                        '`uint64` value',
+                    uuid = 'Check that the value is a uuid object',
+                },
+            },
+        },
+    },
 }
 
 local function normalize(value)
@@ -173,6 +197,10 @@ local function run_module_test(spec)
         emmylua.copy_file(
             fio.pathjoin(root, spec.source),
             fio.pathjoin(workspace, spec.name .. '.lua'))
+        for _, item in ipairs(spec.extra_sources or {}) do
+            emmylua.copy_file(fio.pathjoin(root, item.src),
+                              fio.pathjoin(workspace, item.dst))
+        end
         copy_fixtures(workspace, spec)
 
         client = emmylua.new_client({

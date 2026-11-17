@@ -55,7 +55,8 @@ looks like this:
 For each specification the test:
 
 1. Copies the module source and fixtures into a temporary
-   workspace.
+   workspace. `extra_sources` copies additional files that are not part
+   of the module source tree.
 2. Starts `emmylua_ls` with the fixture `.emmyrc.json`.
 3. Opens `module.lua` and checks that hover on the module variable
    returns a type, and that this type contains the expected fields.

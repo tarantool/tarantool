@@ -134,7 +134,9 @@ lua_source(lua_sources ../third_party/metrics/metrics/version.lua metrics_versio
 # Export EmmyLua annotations of the bundled Lua modules into stubs.
 lua_stub(checks FILES
     ../third_party/checks/checks.lua
-    ../third_party/checks/checks/version.lua)
+    ../third_party/checks/checks/version.lua
+    ../third_party/checks/annotations.lua
+    RETURN checks)
 file(GLOB_RECURSE METRICS_SOURCE_FILES
     "${PROJECT_SOURCE_DIR}/third_party/metrics/metrics/*.lua"
 )
