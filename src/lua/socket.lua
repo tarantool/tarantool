@@ -1,5 +1,76 @@
 -- socket.lua (internal file)
 
+---The `socket` module allows exchanging data via BSD sockets with a local
+---or remote host in connection-oriented (TCP) or datagram-oriented (UDP)
+---mode. Semantics of the calls in the `socket` API closely follow semantics
+---of the corresponding POSIX calls.
+---
+---The functions for setting up and connecting are `socket`, `sysconnect`,
+---`socket.tcp_connect`. The functions for sending data are `send`, `sendto`,
+---`write`, `syswrite`. The functions for receiving data are `recv`,
+---`recvfrom`, `read`. The functions for waiting before sending/receiving
+---data are `wait`, `readable`, `writable`. The functions for setting flags
+---are `nonblock`, `setsockopt`. The functions for stopping and disconnecting
+---are `shutdown`, `close`. The functions for error checking are `errno`,
+---`error`.
+---
+---The module table is callable: `socket(domain, stype, proto)` creates a
+---socket object.
+---@class socket_module
+---@operator call(string, string, string|number): socket_object?
+local socket = {}
+
+---@class socket_object
+---@field private _errno integer? The last error code of the socket, or
+---    `nil` if there is no error.
+local socket_methods = {}
+
+---@class socket.addrinfo
+---@field host string The host name or IP address.
+---@field family string The address family, e.g. `'AF_INET'` or
+---    `'AF_INET6'`.
+---@field type string The socket type, e.g. `'SOCK_STREAM'` or
+---    `'SOCK_DGRAM'`.
+---@field protocol string The protocol, e.g. 'tcp' or 'udp'.
+---@field port number The port number.
+
+---@alias socket.tcp_server_handler_fn
+---| fun(client: socket_object, from: socket.addrinfo)
+
+---@class socket.tcp_server_handler
+---@field handler socket.tcp_server_handler_fn Client handler, executed once
+---    per accepted connection. The client socket is closed when it returns.
+---@field prepare? fun(server: socket_object): number? Executed once on the
+---    server socket before `bind()` and `listen()`; returns a backlog value
+---    or nothing.
+---@field name? string Server name used in fiber names, `'server'` by default.
+
+---@class socket.luasocket: socket_object
+---@field close fun(self: socket.luasocket): 1? Close the socket (LuaSocket
+---    `close`).
+---@field getsockname fun(self: socket.luasocket): string, string, string?
+---    Return the local socket address.
+---@field getpeername fun(self: socket.luasocket): string, string, string?
+---    Return the remote socket address.
+---@field settimeout fun(self: socket.luasocket, value: number): 1
+---    Set the timeout value for subsequent operations.
+---@field setoption fun(self: socket.luasocket, option: string, value: any):
+---    1? Set a socket option.
+---@field receive fun(self: socket.luasocket, pattern?: number|string,
+---    prefix?: string): string? Receive data from the socket.
+---@field send fun(self: socket.luasocket, data: string, i?: number,
+---    j?: number): number? Send data over the socket.
+---@field accept fun(self: socket.luasocket): socket.luasocket? Accept a new
+---    client connection.
+---@field shutdown fun(self: socket.luasocket, how?: number|string): 1?
+---    Shut down the socket.
+---@field bind fun(self: socket.luasocket, address: string, port: number):
+---    1? Bind the socket to an address.
+---@field listen fun(self: socket.luasocket, backlog?: number): 1? Put the
+---    socket into listen mode.
+---@field connect fun(self: socket.luasocket, host: string, port: number):
+---    1? Connect the socket to a remote host.
+
 local TIMEOUT_INFINITY      = 500 * 365 * 86400
 local LIMIT_INFINITY = 2147483647
 
@@ -88,6 +159,10 @@ local function check_socket(socket)
     end
 end
 
+---@private
+---@param fd number a file descriptor.
+---@param itype number a socket type.
+---@return socket_object socket the socket object.
 local function make_socket(fd, itype)
     assert(itype ~= nil)
     local socket = {
@@ -104,22 +179,35 @@ local function do_detach(socket)
     ffi.copy(socket._gc_socket, gc_socket_sentinel, ffi.sizeof(gc_socket_t))
 end
 
-local function socket_close(socket)
-    local fd = check_socket(socket)
-    socket._errno = nil
+---Close (destroy) a socket.
+---
+---A closed socket should not be used any more. A socket is closed
+---automatically when the Lua garbage collector removes its user data.
+---
+---@return boolean success true on success, false on error. For example, if
+---    `sock` is already closed, `sock:close()` returns false.
+function socket_methods:close()
+    local fd = check_socket(self)
+    self._errno = nil
     local r = ffi.C.coio_close(fd)
-    do_detach(socket)
+    do_detach(self)
     if r ~= 0 then
-        socket._errno = boxerrno()
+        self._errno = boxerrno()
         return false
     end
     return true
 end
 
-local function socket_detach(socket)
-    check_socket(socket)
-    socket._errno = nil
-    do_detach(socket)
+---Detach the socket from its file descriptor without closing it.
+---
+---The socket object can no longer be used after this call, but the file
+---descriptor remains open.
+---
+---@return nil
+function socket_methods:detach()
+    check_socket(self)
+    self._errno = nil
+    do_detach(self)
 end
 
 local soname_mt = {
@@ -138,7 +226,15 @@ local soname_mt = {
     end
 }
 
-local function socket_name(self)
+---Get information about the near side of the connection.
+---
+---If a socket was bound to `xyz.com:45`, then `sock:name()` will return
+---information about `[host:xyz.com, port:45]`. The equivalent POSIX
+---function is `getsockname()`.
+---
+---@return socket.addrinfo? info a table containing "host", "family", "type",
+---    "protocol", "port" fields, or nil on error.
+function socket_methods:name()
     local fd = check_socket(self)
     local aka = internal.name(fd)
     if aka == nil then
@@ -150,7 +246,16 @@ local function socket_name(self)
     return aka
 end
 
-local function socket_peer(self)
+---Get information about the far side of a connection.
+---
+---If a TCP connection has been made to a distant host `tarantool.org:80`,
+---`sock:peer()` will return information about
+---`[host:tarantool.org, port:80]`. The equivalent POSIX function is
+---`getpeername()`.
+---
+---@return socket.addrinfo? info a table containing "host", "family", "type",
+---    "protocol", "port" fields, or nil on error.
+function socket_methods:peer()
     local fd = check_socket(self)
     local peer = internal.peer(fd)
     if peer == nil then
@@ -162,7 +267,10 @@ local function socket_peer(self)
     return peer
 end
 
-local function socket_fd(self)
+---Returns file descriptor of the socket.
+---
+---@return number fd file descriptor
+function socket_methods:fd()
     return check_socket(self)
 end
 
@@ -211,7 +319,14 @@ local function getprotobyname(name)
     return num
 end
 
-local function socket_errno(self)
+---Retrieve information about the last error that occurred on a socket, if
+---any.
+---
+---Errors do not cause throwing of exceptions so these functions are usually
+---necessary.
+---
+---@return number errno if no error, 0 is returned.
+function socket_methods:errno()
     check_socket(self)
     if self['_errno'] == nil then
         return 0
@@ -220,7 +335,14 @@ local function socket_errno(self)
     end
 end
 
-local function socket_error(self)
+---Retrieve information about the last error that occurred on a socket, if
+---any.
+---
+---Errors do not cause throwing of exceptions so these functions are usually
+---necessary.
+---
+---@return string? errstr the error string, or nil if there is no error.
+function socket_methods:error()
     check_socket(self)
     if self['_errno'] == nil then
         return nil
@@ -233,7 +355,25 @@ end
 local addrbuf = ffi.new('char[128]') -- enough to fit any address
 local addr = ffi.cast('struct sockaddr *', addrbuf)
 local addr_len = ffi.new('socklen_t[1]')
-local function socket_sysconnect(self, host, port)
+---Connect an existing socket to a remote host.
+---
+---The argument values are the same as in `socket.tcp_connect()`. The host
+---must be an IP address.
+---
+---* Either: host - a string representation of an IPv4 address or an IPv6
+---  address; port - a number.
+---* Or: host - a string containing "unix/"; port - a string containing a
+---  path to a unix socket.
+---* Or: host - a number, 0 (zero), meaning "all local interfaces"; port - a
+---  number. If a port number is 0 (zero), the socket will be bound to a
+---  random local port.
+---
+---@param host string|number representation of an IPv4 address or an IPv6
+---    address; or "unix/"; or number, 0 (zero), meaning "all local
+---    interfaces".
+---@param port number|string port number; or path to a unix socket.
+---@return boolean success true on success.
+function socket_methods:sysconnect(host, port)
     local fd = check_socket(self)
     self._errno = nil
 
@@ -264,7 +404,14 @@ local function syswrite(self, charptr, size)
     return tonumber(done)
 end
 
-local function socket_syswrite(self, arg1, arg2)
+---Write as much data as possible to the socket buffer if non-blocking.
+---
+---Rarely used.
+---
+---@param arg1 string|ffi.cdata* what is to be sent.
+---@param arg2? number size of the data, if `arg1` is a cdata.
+---@return number|nil bytes the number of bytes sent, or nil on error.
+function socket_methods:syswrite(arg1, arg2)
     -- TODO: ffi.istype('char *', arg1) doesn't work for ffi.new('char[256]')
     if type(arg1) == 'cdata' and arg2 ~= nil then
         return syswrite(self, arg1, arg2)
@@ -288,7 +435,18 @@ local function sysread(self, charptr, size)
     return tonumber(res)
 end
 
-local function socket_sysread(self, arg1, arg2)
+---Return data from the socket buffer if non-blocking.
+---
+---In case the socket is blocking, `sysread()` can block the calling
+---process. Rarely used.
+---
+---@param arg1? number|ffi.cdata* maximum number of bytes to read, or a
+---    cdata buffer to read into.
+---@param arg2? number size of the buffer.
+---@return string|number|nil data the data read, an empty string if there is
+---    nothing more to read, the number of bytes read when a cdata buffer is
+---    passed, or nil on error.
+function socket_methods:sysread(arg1, arg2)
     -- TODO: ffi.istype('char *', arg1) doesn't work for ffi.new('char[256]')
     if type(arg1) == 'cdata' and arg2 ~= nil then
         return sysread(self, arg1, arg2)
@@ -310,7 +468,18 @@ local function socket_sysread(self, arg1, arg2)
     return res
 end
 
-local function socket_nonblock(self, nb)
+---Get or set the current `O_NONBLOCK` value.
+---
+---* `sock:nonblock()` returns the current flag value.
+---* `sock:nonblock(false)` sets the flag to false and returns false.
+---* `sock:nonblock(true)` sets the flag to true and returns true.
+---
+---This function may be useful before invoking a function which might
+---otherwise block indefinitely.
+---
+---@param nb? boolean the new flag value, or nil to get the current value.
+---@return boolean|nil nonblock_flag the current or new flag value.
+function socket_methods:nonblock(nb)
     local fd = check_socket(self)
     self._errno = nil
 
@@ -355,19 +524,42 @@ local function do_wait(self, what, timeout)
     return 0
 end
 
-local function socket_readable(self, timeout)
+---Wait until something is readable, or until a timeout value expires.
+---
+---@param timeout? number timeout in seconds.
+---@return boolean is_readable true if the socket is now readable, false if
+---    timeout expired.
+function socket_methods:readable(timeout)
     return do_wait(self, 1, timeout) ~= 0
 end
 
-local function socket_writable(self, timeout)
+---Wait until something is writable, or until a timeout value expires.
+---
+---@param timeout? number timeout in seconds.
+---@return boolean is_writable true if the socket is now writable, false if
+---    timeout expired.
+function socket_methods:writable(timeout)
     return do_wait(self, 2, timeout) ~= 0
 end
 
-local function socket_wait(self, timeout)
+---Wait until something is either readable or writable, or until a timeout
+---value expires.
+---
+---@param timeout? number timeout in seconds.
+---@return "R"|"W"|"RW"|0 result 'R' if the socket is now readable, 'W' if
+---    the socket is now writable, 'RW' if the socket is now both readable
+---    and writable, 0 if timeout expired.
+function socket_methods:wait(timeout)
     return do_wait(self, 'RW', timeout)
 end
 
-local function socket_listen(self, backlog)
+---Start listening for incoming connections.
+---
+---@param backlog? number on Linux the listen backlog may be from
+---    /proc/sys/net/core/somaxconn, on BSD the backlog may be SOMAXCONN.
+---    Default is 256.
+---@return boolean success true for success, false for error.
+function socket_methods:listen(backlog)
     local fd = check_socket(self)
     self._errno = nil
     if backlog == nil then
@@ -381,7 +573,18 @@ local function socket_listen(self, backlog)
     return true
 end
 
-local function socket_bind(self, host, port)
+---Bind a socket to the given host/port.
+---
+---A UDP socket after binding can be used to receive data (see
+---`socket_object:recvfrom()`). A TCP socket can be used to accept new
+---connections, after it has been put in listen mode.
+---
+---@param host string URL or IP address.
+---@param port? number port number.
+---@return boolean success true for success, false for error. If return is
+---    false, use `socket_object:errno()` or `socket_object:error()` to see
+---    details.
+function socket_methods:bind(host, port)
     local fd = check_socket(self)
     self._errno = nil
 
@@ -401,7 +604,13 @@ local function socket_bind(self, host, port)
     return false
 end
 
-local function socket_shutdown(self, how)
+---Shut down a reading end, a writing end, or both ends of a socket.
+---
+---@param how? number|string `'R'`/`'READ'`/`'receive'` (0),
+---    `'W'`/`'WRITE'`/`'send'` (1), or
+---    `'RW'`/`'READ_WRITE'`/`'both'` (2). Default is 2.
+---@return boolean success true for success, false for error.
+function socket_methods:shutdown(how)
     local fd = check_socket(self)
     local hvariants = {
         ['R']           = 0,
@@ -450,7 +659,16 @@ local function getsol(level)
     return level
 end
 
-local function socket_setsockopt(self, level, name, value)
+---Set socket flags.
+---
+---The argument values are the same as in the Linux setsockopt(2) man page.
+---Setting `SO_LINGER` is done with `sock:linger(active)`.
+---
+---@param level any socket level, for example `'SOL_SOCKET'`.
+---@param name any option name, for example `'SO_REUSEADDR'`.
+---@param value any option value.
+---@return boolean success true on success.
+function socket_methods:setsockopt(level, name, value)
     local fd = check_socket(self)
 
     level = getsol(level)
@@ -506,7 +724,14 @@ local function socket_setsockopt(self, level, name, value)
     error(format("Unsupported socket option: %s", name))
 end
 
-local function socket_getsockopt(self, level, name)
+---Get socket flags.
+---
+---For a list of possible flags see `sock:setsockopt()`.
+---
+---@param level any socket level, for example `'SOL_SOCKET'`.
+---@param name any option name.
+---@return any value the option value.
+function socket_methods:getsockopt(level, name)
     local fd = check_socket(self)
 
     level = getsol(level)
@@ -559,7 +784,18 @@ local function socket_getsockopt(self, level, name)
     error(format("Unsupported socket option: %s", name))
 end
 
-local function socket_linger(self, active, timeout)
+---Set or clear the `SO_LINGER` flag.
+---
+---For a description of the flag, see the Linux man page.
+---
+---@param active? boolean the new active value, or nil to get the current
+---    value.
+---@param timeout? number the linger timeout.
+---@return boolean|nil active the new or current active value.
+---@return number|nil timeout the new or current timeout value.
+---@return_overload boolean, number
+---@return_overload nil
+function socket_methods:linger(active, timeout)
     local fd = check_socket(self)
 
     local level = internal.SOL_SOCKET
@@ -604,7 +840,16 @@ local function socket_linger(self, active, timeout)
     return active, timeout
 end
 
-local function socket_accept(self)
+---Accept a new client connection and create a new connected socket.
+---
+---It is good practice to set the socket's blocking mode explicitly after
+---accepting.
+---
+---@return socket_object|nil client new socket if success, or nil if error.
+---@return socket.addrinfo? from information about the client.
+---@return_overload socket_object, socket.addrinfo
+---@return_overload nil
+function socket_methods:accept()
     local server_fd = check_socket(self)
     self._errno = nil
 
@@ -726,11 +971,30 @@ local function read(self, limit, timeout, check, ...)
         elseif not errno_is_transient[self._errno] then
             return nil
         end
-    until not socket_readable(self, deadline - fiber.clock())
+    until not socket_methods.readable(self, deadline - fiber.clock())
     return nil
 end
 
-local function socket_read(self, opts, timeout)
+---Read from a connected socket until some condition is true, and return
+---the bytes that were read.
+---
+---Reading goes on until `limit` bytes have been read, or a delimiter has
+---been read, or a timeout has expired. Unlike `socket_object:recv` (which
+---uses an internal read-ahead buffer), `socket_object:read` depends on the
+---socket's buffer.
+---
+---@overload fun(self: socket_object, limit: integer, timeout?: number):
+---    string|nil
+---@overload fun(self: socket_object, delimiter: string, timeout?: number):
+---    string|nil
+---@overload fun(self: socket_object, options: { chunk?: integer,
+---    delimiter?: string|string[] }, timeout?: number): string|nil
+---@param opts integer|string|table either the maximum number of bytes to
+---    read, a delimiter, or a table `{chunk=..., delimiter=...}`.
+---@param timeout? number maximum number of seconds to wait.
+---@return string|nil data in case of success; an empty string if there is
+---    nothing more to read; or nil on error.
+function socket_methods:read(opts, timeout)
     check_socket(self)
     timeout = timeout or TIMEOUT_INFINITY
     if type(opts) == 'number' then
@@ -751,7 +1015,15 @@ local function socket_read(self, opts, timeout)
     error('Usage: s:read(delimiter|chunk|{delimiter = x, chunk = x}, timeout)')
 end
 
-local function socket_write(self, octets, timeout)
+---Write data over a connected socket.
+---
+---The write is performed until all the data is written or a timeout
+---expires.
+---
+---@param octets string what is to be sent.
+---@param timeout? number seconds to wait, infinite by default.
+---@return number|nil bytes the number of bytes sent, or nil on error.
+function socket_methods:write(octets, timeout)
     check_socket(self)
     if timeout == nil then
         timeout = TIMEOUT_INFINITY
@@ -779,11 +1051,16 @@ local function socket_write(self, octets, timeout)
             return nil
         end
 
-    until not socket_writable(self, deadline - fiber.clock())
+    until not socket_methods.writable(self, deadline - fiber.clock())
     return nil
 end
 
-local function socket_send(self, octets, flags)
+---Send data over a connected socket.
+---
+---@param octets string what is to be sent.
+---@param flags? string[]|string additional send flags.
+---@return number|nil bytes the number of bytes sent, or nil on error.
+function socket_methods:send(octets, flags)
     local fd = check_socket(self)
     local iflags = get_iflags(internal.SEND_FLAGS, flags)
 
@@ -845,7 +1122,20 @@ local function get_recv_size(self, size)
     return size
 end
 
-local function socket_recv(self, size, flags)
+---Read `size` bytes from a connected socket. An internal read-ahead buffer
+---is used to reduce the cost of this call.
+---
+---For `recv` and `recvfrom`: use the optional `size` parameter to limit the
+---number of bytes to receive. If `size` is not stated: Tarantool will make
+---an extra call to calculate how many bytes are necessary. If `size` is
+---stated: on a UDP socket, excess bytes are discarded. On a TCP socket,
+---excess bytes are not discarded and can be received by the next call.
+---
+---@param size? integer maximum number of bytes to receive.
+---@param flags? string[]|string additional send flags.
+---@return string|nil result a string of the requested length on success,
+---    nil on error.
+function socket_methods:recv(size, flags)
     local fd = check_socket(self)
     local iflags = get_iflags(internal.SEND_FLAGS, flags)
     if iflags == nil then
@@ -873,7 +1163,16 @@ local function socket_recv(self, size, flags)
     return buf
 end
 
-local function socket_recvfrom(self, size, flags)
+---Receive a message on a UDP socket.
+---
+---@param size? integer maximum number of bytes to receive.
+---@param flags? string[]|string additional send flags.
+---@return string|nil message the message content on success, nil on error.
+---@return socket.addrinfo? source a table containing "host", "family" and
+---    "port" fields.
+---@return_overload string, socket.addrinfo
+---@return_overload nil
+function socket_methods:recvfrom(size, flags)
     local fd = check_socket(self)
     local iflags = get_iflags(internal.SEND_FLAGS, flags)
     if iflags == nil then
@@ -895,7 +1194,15 @@ local function socket_recvfrom(self, size, flags)
     return res, from
 end
 
-local function socket_sendto(self, host, port, octets, flags)
+---Send a message on a UDP socket to a specified host.
+---
+---@param host string URL or IP address.
+---@param port number port number.
+---@param octets string what is to be sent.
+---@param flags? string[]|string additional send flags.
+---@return number|boolean|nil bytes the number of bytes sent, true if there
+---    is nothing to send, or nil on error.
+function socket_methods:sendto(host, port, octets, flags)
     local fd = check_socket(self)
     local iflags = get_iflags(internal.SEND_FLAGS, flags)
 
@@ -963,7 +1270,17 @@ local function socket_new(domain, stype, proto)
     end
 end
 
-local function socket_socketpair(domain, stype, proto)
+---Create a pair of connected sockets.
+---
+---@param domain string the domain, for example `'AF_INET'` or
+---    `'AF_UNIX'`.
+---@param stype string the socket type, for example `'SOCK_STREAM'`.
+---@param proto string|number the protocol.
+---@return socket_object|nil s1 the first socket, or nil.
+---@return socket_object|nil s2 the second socket.
+---@return_overload socket_object, socket_object
+---@return_overload nil
+function socket.socketpair(domain, stype, proto)
     local idomain, itype, iproto = check_socket_args(domain, stype, proto)
     if idomain == nil then
         return nil
@@ -982,7 +1299,11 @@ local function socket_socketpair(domain, stype, proto)
     return s1, s2
 end
 
-local function socket_from_fd(fd)
+---Create a socket object from an existing file descriptor.
+---
+---@param fd number a file descriptor.
+---@return socket_object s the socket object.
+function socket.from_fd(fd)
     if type(fd) ~= 'number' then
         error('fd must be a number')
     end
@@ -998,7 +1319,25 @@ local function socket_from_fd(fd)
     return make_socket(fd, itype)
 end
 
-local function getaddrinfo(host, port, timeout, opts)
+---The `socket.getaddrinfo()` function is useful for finding information
+---about a remote site so that the correct arguments for `sock:sysconnect()`
+---can be passed.
+---
+---This function may use the `worker_pool_threads` configuration parameter.
+---
+---@overload fun(host: string, port: number|string, options?: table):
+---    socket.addrinfo[]?, string?
+---@param host string URL or IP address.
+---@param port number|string port number as a numeric or string.
+---@param timeout? number maximum number of seconds to wait.
+---@param opts? { type?: string, family?: string, flags?: any,
+---    protocol?: string } additional options.
+---@return socket.addrinfo[]|nil result a table of addresses, each
+---    containing "host", "family", "type", "protocol", "port" fields.
+---@return string? error_message on error.
+---@return_overload socket.addrinfo[], nil
+---@return_overload nil, string
+function socket.getaddrinfo(host, port, timeout, opts)
     if type(timeout) == 'table' and opts == nil then
         opts = timeout
         timeout = TIMEOUT_INFINITY
@@ -1051,7 +1390,7 @@ end
 
 -- tcp connector
 local function socket_tcp_connect(s, address, port, timeout)
-    local res = socket_sysconnect(s, address, port)
+    local res = socket_methods.sysconnect(s, address, port)
     if res then
         -- Even through the socket is nonblocking, if the server to which we
         -- are connecting is on the same host, the connect is normally
@@ -1064,8 +1403,8 @@ local function socket_tcp_connect(s, address, port, timeout)
     -- Wait until the connection is established or ultimately fails.
     -- In either condition the socket becomes writable. To tell these
     -- conditions appart SO_ERROR must be consulted (man connect).
-    if socket_writable(s, timeout) then
-        s._errno = socket_getsockopt(s, 'SOL_SOCKET', 'SO_ERROR')
+    if socket_methods.writable(s, timeout) then
+        s._errno = socket_methods.getsockopt(s, 'SOL_SOCKET', 'SO_ERROR')
     end
     if s._errno ~= 0 then
         return nil
@@ -1074,7 +1413,25 @@ local function socket_tcp_connect(s, address, port, timeout)
     return true
 end
 
-local function tcp_connect(host, port, timeout)
+---Connect a socket to a remote host.
+---
+---**Example:**
+---
+--- ```lua
+--- sock, e = socket.tcp_connect('127.0.0.1', 3301)
+--- if sock == nil then print(e) end
+--- ```
+---
+---@param host string URL or IP address. Use 'unix/' to connect to a Unix
+---    domain socket.
+---@param port? number|string port number, a path to a unix socket, or
+---    nil if the host is a URI.
+---@param timeout? number seconds to wait, infinite by default.
+---@return socket_object|nil s a new socket object.
+---@return string? error_message on error.
+---@return_overload socket_object, nil
+---@return_overload nil, string
+function socket.tcp_connect(host, port, timeout)
     if host == 'unix/' then
         local s = socket_new('AF_UNIX', 'SOCK_STREAM', 0)
         if not s then
@@ -1092,7 +1449,7 @@ local function tcp_connect(host, port, timeout)
     end
     local timeout = timeout or TIMEOUT_INFINITY
     local stop = fiber.clock() + timeout
-    local dns, err = getaddrinfo(host, port, timeout, {
+    local dns, err = socket.getaddrinfo(host, port, timeout, {
         protocol = 'tcp',
         type = 'SOCK_STREAM',
         flags = 'AI_ADDRCONFIG',
@@ -1136,20 +1493,20 @@ local function tcp_server_handler(server, sc, from)
 end
 
 local function tcp_server_loop_impl(server, s, addr)
-    addr = addr or socket_name(s) or { host = '?', port = '?' }
+    addr = addr or socket_methods.name(s) or { host = '?', port = '?' }
 
     fiber.name(format("%s/%s:%s", server.name, addr.host, addr.port), {truncate = true})
     log.info("started")
-    while socket_readable(s) do
+    while socket_methods.readable(s) do
         if socket_is_closed(s) then
             break
         end
-        local sc, from = socket_accept(s)
+        local sc, from = socket_methods.accept(s)
         if sc == nil then
             local errno = s._errno
             if not errno_is_transient[errno] then
                 log.error('accept(%s) failed: %s', tostring(s),
-                          socket_error(s))
+                          socket_methods.error(s))
             end
             if  errno_is_fatal[errno] then
                 break
@@ -1175,7 +1532,7 @@ local function tcp_server_loop_usage()
 end
 
 local function tcp_server_do_bind(s, addr)
-    if socket_bind(s, addr.host, addr.port) then
+    if socket_methods.bind(s, addr.host, addr.port) then
         if addr.family == 'AF_UNIX' then
             -- Make close() remove the unix socket file created
             -- by bind(). Note, this must be done before closing
@@ -1183,7 +1540,7 @@ local function tcp_server_do_bind(s, addr)
             -- reuse the same path before we remove the file.
             s.close = function(self)
                 fio.unlink(addr.port)
-                return socket_close(self)
+                return socket_methods.close(self)
             end
         end
         return true
@@ -1206,7 +1563,7 @@ local function tcp_server_bind_addr(s, addr)
 
     local save_errno = boxerrno()
 
-    local sc = tcp_connect(addr.host, addr.port)
+    local sc = socket.tcp_connect(addr.host, addr.port)
     if sc ~= nil then
         sc:close()
         boxerrno(save_errno)
@@ -1234,7 +1591,7 @@ local function tcp_server_bind(host, port, prepare, timeout)
         dns = {{host = host, port = port, family = 'AF_UNIX', protocol = 0,
             type = 'SOCK_STREAM' }}
     else
-        dns, err = getaddrinfo(host, port, timeout, {
+        dns, err = socket.getaddrinfo(host, port, timeout, {
             protocol = 'tcp',
             type = 'SOCK_STREAM',
             flags = {'AI_ADDRCONFIG', 'AI_PASSIVE'},
@@ -1251,11 +1608,12 @@ local function tcp_server_bind(host, port, prepare, timeout)
             if prepare then
                 backlog = prepare(s)
             else
-                socket_setsockopt(s, 'SOL_SOCKET', 'SO_REUSEADDR', 1) -- ignore error
+                -- ignore error
+                socket_methods.setsockopt(s, 'SOL_SOCKET', 'SO_REUSEADDR', 1)
             end
             if not tcp_server_bind_addr(s, addr) or not s:listen(backlog) then
                 local save_errno = boxerrno()
-                socket_close(s)
+                socket_methods.close(s)
                 boxerrno(save_errno)
                 return nil, boxerrno.strerror()
             end
@@ -1276,7 +1634,21 @@ local function tcp_server_create_impl(host, port, prepare, timeout)
     return s, addr
 end
 
-local function tcp_server_create(host, port, opts, timeout)
+---Create a TCP server socket and bind it to a host/port, without starting
+---the server loop.
+---
+---@param host string host name or IP.
+---@param port number host port, may be 0.
+---@param opts fun(socket: socket_object): number? |
+---    { prepare?: fun(socket: socket_object): number? }
+---    a prepare function or a table with a `prepare` field.
+---@param timeout? number host resolving timeout in seconds.
+---@return socket_object|nil s the bound server socket.
+---@return socket.addrinfo|string|nil addr information about the bind, or an
+---    error message.
+---@return_overload socket_object, socket.addrinfo
+---@return_overload nil, string
+function socket.tcp_server_create(host, port, opts, timeout)
     local prepare
     if type(opts) == 'function' then
         prepare = opts
@@ -1292,7 +1664,16 @@ local function tcp_server_create(host, port, opts, timeout)
     return tcp_server_create_impl(host, port, prepare, timeout)
 end
 
-local function tcp_server_loop(s, opts)
+---Start the accept loop for an already bound server socket.
+---
+---The `opts` is either a handler function or a table
+---`{handler = ..., name = ...}`. The handler is executed once per
+---connection.
+---
+---@param s socket_object|number the bound server socket, or a file descriptor.
+---@param opts socket.tcp_server_handler_fn|socket.tcp_server_handler
+---    the handler or a table with a `handler` field.
+function socket.tcp_server_loop(s, opts)
     local server = {}
     if type(opts) == 'function' then
         server.handler = opts
@@ -1312,12 +1693,44 @@ local function tcp_server_loop(s, opts)
     server.name = server.name or 'server'
 
     if type(s) == 'number' then
-        s = socket_from_fd(s)
+        s = socket.from_fd(s)
     end
     return tcp_server_loop_impl(server, s)
 end
 
-local function tcp_server(host, port, opts, timeout)
+---The `socket.tcp_server()` function makes Tarantool act as a server that
+---can accept connections.
+---
+---Usually the same objective is accomplished with `box.cfg{listen=...}`.
+---
+---The `opts` may be simply a handler function, or a table:
+---
+---```lua
+---{handler = handler_function [, prepare = prepare_function] [, name = name]}
+---```
+---
+---`handler_function` is mandatory; it is executed once after accept()
+---happens (once per connection). `prepare_function` is optional; it is
+---executed only once before bind() on the listening socket; it should
+---return either a backlog value or nothing.
+---
+---**Example:**
+---
+--- ```lua
+--- socket.tcp_server('localhost', 3302, {handler=hfunc, name='name'})
+--- ```
+---
+---@param host string host name or IP.
+---@param port number host port, may be 0.
+---@param opts socket.tcp_server_handler_fn|socket.tcp_server_handler what to
+---    execute when a connection occurs.
+---@param timeout? number host resolving timeout in seconds.
+---@return socket_object|nil s a new server socket.
+---@return socket.addrinfo|string|nil addr information about the bind, or an
+---    error message.
+---@return_overload socket_object, socket.addrinfo
+---@return_overload nil, string
+function socket.tcp_server(host, port, opts, timeout)
     local server = {}
     if type(opts) == 'function' then
         server.handler = opts
@@ -1350,45 +1763,17 @@ local function tcp_server(host, port, opts, timeout)
 end
 
 socket_mt   = {
-    __index = {
-        close = socket_close;
-        detach = socket_detach;
-        errno = socket_errno;
-        error = socket_error;
-        sysconnect = socket_sysconnect;
-        syswrite = socket_syswrite;
-        sysread = socket_sysread;
-        nonblock = socket_nonblock;
-        readable = socket_readable;
-        writable = socket_writable;
-        wait = socket_wait;
-        listen = socket_listen;
-        bind = socket_bind;
-        shutdown = socket_shutdown;
-        setsockopt = socket_setsockopt;
-        getsockopt = socket_getsockopt;
-        linger = socket_linger;
-        accept = socket_accept;
-        read = socket_read;
-        write = socket_write;
-        send = socket_send;
-        recv = socket_recv;
-        recvfrom = socket_recvfrom;
-        sendto = socket_sendto;
-        name = socket_name;
-        peer = socket_peer;
-        fd = socket_fd;
-    };
+    __index = socket_methods,
     __tostring  = function(self)
         local fd = check_socket(self)
 
         local save_errno = self._errno
         local name = format("fd %d", fd)
-        local aka = socket_name(self)
+        local aka = socket_methods.name(self)
         if aka ~= nil then
             name = format("%s, aka %s:%s", name, aka.host, aka.port)
         end
-        local peer = socket_peer(self)
+        local peer = socket_methods.peer(self)
         if peer ~= nil then
             name = format("%s, peer %s:%s", name, peer.host, peer.port)
         end
@@ -1398,7 +1783,11 @@ socket_mt   = {
     __serialize = function(self)
         -- Allow YAML, MsgPack and JSON to dump objects with sockets
         local fd = check_socket(self)
-        return { fd = fd, peer = socket_peer(self), name = socket_name(self) }
+        return {
+            fd = fd,
+            peer = socket_methods.peer(self),
+            name = socket_methods.name(self),
+        }
     end
 }
 
@@ -1420,24 +1809,24 @@ local function lsocket_tcp_tostring(self)
 end
 
 local function lsocket_tcp_close(self)
-    if not socket_close(self) then
-        return nil, socket_error(self)
+    if not socket_methods.close(self) then
+        return nil, socket_methods.error(self)
     end
     return 1
 end
 
 local function lsocket_tcp_getsockname(self)
-    local aka = socket_name(self)
+    local aka = socket_methods.name(self)
     if aka == nil then
-        return nil, socket_error(self)
+        return nil, socket_methods.error(self)
     end
     return aka.host, tostring(aka.port), aka.family:match("AF_(.*)"):lower()
 end
 
 local function lsocket_tcp_getpeername(self)
-    local peer = socket_peer(self)
+    local peer = socket_methods.peer(self)
     if peer == nil then
-        return nil, socket_error(self)
+        return nil, socket_methods.error(self)
     end
     return peer.host, tostring(peer.port), peer.family:match("AF_(.*)"):lower()
 end
@@ -1452,34 +1841,34 @@ end
 local function lsocket_tcp_setoption(self, option, value)
     local r
     if option == 'reuseaddr' then
-        r = socket_setsockopt(self, 'socket', 'SO_REUSEADDR', value)
+        r = socket_methods.setsockopt(self, 'socket', 'SO_REUSEADDR', value)
     elseif option == 'keepalive' then
-        r = socket_setsockopt(self, 'socket', 'SO_KEEPALIVE', value)
+        r = socket_methods.setsockopt(self, 'socket', 'SO_KEEPALIVE', value)
     elseif option == 'linger' then
         value = type(value) == 'table' and value.on or value
         -- Sic: value.timeout is ignored
-        r = socket_linger(self, value)
+        r = socket_methods.linger(self, value)
     elseif option == 'tcp-nodelay' then
-        r = socket_setsockopt(self, 'tcp', 'TCP_NODELAY', value)
+        r = socket_methods.setsockopt(self, 'tcp', 'TCP_NODELAY', value)
     else
         error(format("Unknown socket option name: %s", tostring(option)))
     end
     if not r then
-        return nil, socket_error(self)
+        return nil, socket_methods.error(self)
     end
     return 1
 end
 
 local function lsocket_tcp_bind(self, address, port)
-    if not socket_bind(self, address, port) then
-        return nil, socket_error(self)
+    if not socket_methods.bind(self, address, port) then
+        return nil, socket_methods.error(self)
     end
     return 1
 end
 
 local function lsocket_tcp_listen(self, backlog)
-    if not socket_listen(self, backlog) then
-        return nil, socket_error(self)
+    if not socket_methods.listen(self, backlog) then
+        return nil, socket_methods.error(self)
     end
     setmetatable(self, lsocket_tcp_server_mt)
     return 1
@@ -1491,14 +1880,14 @@ local function lsocket_tcp_connect(self, host, port)
     -- This function is broken by design
     local ga_opts = { family = 'AF_INET', type = 'SOCK_STREAM' }
     local timeout = deadline - fiber.clock()
-    local dns, err = getaddrinfo(host, port, timeout, ga_opts)
+    local dns, err = socket.getaddrinfo(host, port, timeout, ga_opts)
     if dns == nil then
         self._errno = boxerrno.EINVAL
         return nil, err
     end
     if #dns == 0 then
         self._errno = boxerrno.EINVAL
-        return nil, socket_error(self)
+        return nil, socket_methods.error(self)
     end
     for _, remote in ipairs(dns) do
         timeout = deadline - fiber.clock()
@@ -1506,7 +1895,7 @@ local function lsocket_tcp_connect(self, host, port)
             return 1
         end
     end
-    return nil, socket_error(self)
+    return nil, socket_methods.error(self)
 end
 
 lsocket_tcp_mt = {
@@ -1537,17 +1926,17 @@ local function lsocket_tcp_accept(self)
     check_socket(self)
     local deadline = fiber.clock() + (self.timeout or TIMEOUT_INFINITY)
     repeat
-        local client = socket_accept(self)
+        local client = socket_methods.accept(self)
         if client then
             setmetatable(client, lsocket_tcp_client_mt)
             return client
         end
-        local errno = socket_errno(self)
+        local errno = socket_methods.errno(self)
         if not errno_is_transient[errno] then
             break
         end
-    until not socket_readable(self, deadline - fiber.clock())
-    return nil, socket_error(self)
+    until not socket_methods.readable(self, deadline - fiber.clock())
+    return nil, socket_methods.error(self)
 end
 
 lsocket_tcp_server_mt = {
@@ -1580,7 +1969,7 @@ local function lsocket_tcp_receive(self, pattern, prefix)
     if type(pattern) == 'number' then
         data = read(self, pattern, timeout, check_limit)
         if data == nil then
-            return nil, socket_error(self)
+            return nil, socket_methods.error(self)
         elseif #data < pattern then
             -- eof
             return nil, 'closed', prefix..data
@@ -1590,7 +1979,7 @@ local function lsocket_tcp_receive(self, pattern, prefix)
     elseif pattern == "*l" or pattern == nil then
         data = read(self, LIMIT_INFINITY, timeout, check_delimiter, {"\n"})
         if data == nil then
-            return nil, socket_error(self)
+            return nil, socket_methods.error(self)
         elseif #data > 0 and data:byte(#data) == 10 then
             -- remove '\n'
             return prefix..data:sub(1, #data - 1)
@@ -1605,14 +1994,14 @@ local function lsocket_tcp_receive(self, pattern, prefix)
             local data = read(self, LIMIT_INFINITY, timeout, check_infinity)
             if data == nil then
                 if not errno_is_transient[self._errno] then
-                    return nil, socket_error(self)
+                    return nil, socket_methods.error(self)
                 end
             elseif data == '' then
                 break
             else
                 table.insert(result, data)
             end
-        until not socket_readable(self, deadline - fiber.clock())
+        until not socket_methods.readable(self, deadline - fiber.clock())
         if #result == 1 then
             return nil, 'closed', table.concat(result)
         end
@@ -1626,16 +2015,16 @@ local function lsocket_tcp_send(self, data, i, j)
     if i ~= nil then
         data = string.sub(data, i, j)
     end
-    local sent = socket_write(self, data, self.timeout)
+    local sent = socket_methods.write(self, data, self.timeout)
     if not sent then
-        return nil, socket_error(self)
+        return nil, socket_methods.error(self)
     end
     return (i or 1) + sent - 1
 end
 
 local function lsocket_tcp_shutdown(self, how)
-    if not socket_shutdown(self, how) then
-        return nil, socket_error(self)
+    if not socket_methods.shutdown(self, how) then
+        return nil, socket_methods.error(self)
     end
     return 1
 end
@@ -1670,26 +2059,51 @@ lsocket_tcp_mt.__index.send = lsocket_tcp_send;
 -- TCP Constructor and Shortcuts
 --
 
+---Create a TCP master socket (LuaSocket `tcp`).
+---
+---@return socket.luasocket|nil s the master socket, or nil on error.
+---@return string? error_message on error.
+---@return_overload socket.luasocket, nil
+---@return_overload nil, string
 local function lsocket_tcp(self)
     local s = socket_new('AF_INET', 'SOCK_STREAM', 'tcp')
     if not s then
-        return nil, socket_error(self)
+        return nil, socket_methods.error(self)
     end
     return setmetatable(s, lsocket_tcp_mt)
 end
 
+---Connect to a remote host (LuaSocket `connect`).
+---
+---@param host string the remote host.
+---@param port number the remote port.
+---@return socket.luasocket|nil s the connected client socket, or nil on
+---    error.
+---@return string? error_message on error.
+---@return_overload socket.luasocket, nil
+---@return_overload nil, string
 local function lsocket_connect(host, port)
     if host == nil or port == nil then
         error("Usage: luasocket.connect(host, port)")
     end
-    local s, err = tcp_connect(host, port)
+    local s, err = socket.tcp_connect(host, port)
     if not s then
         return nil, err
     end
     setmetatable(s, lsocket_tcp_client_mt)
+    ---@cast s socket.luasocket
     return s
 end
 
+---Bind a socket to a host/port (LuaSocket `bind`).
+---
+---@param host string the address to bind to.
+---@param port number the port to bind to.
+---@param backlog? number the listen backlog.
+---@return socket.luasocket|nil s the server socket, or nil on error.
+---@return string? error_message on error.
+---@return_overload socket.luasocket, nil
+---@return_overload nil, string
 local function lsocket_bind(host, port, backlog)
     if host == nil or port == nil then
         error("Usage: luasocket.bind(host, port [, backlog])")
@@ -1706,17 +2120,10 @@ end
 -- Module Definition
 --------------------------------------------------------------------------------
 
-return setmetatable({
-    from_fd = socket_from_fd;
-    socketpair = socket_socketpair;
-    getaddrinfo = getaddrinfo,
-    tcp_connect = tcp_connect,
-    tcp_server = tcp_server,
-    tcp_server_create = tcp_server_create,
-    tcp_server_loop = tcp_server_loop,
-    iowait = internal.iowait,
-    internal = internal,
-}, {
+socket.iowait = internal.iowait
+socket.internal = internal
+
+setmetatable(socket, {
     __call = function(self, ...) return socket_new(...) end;
     __index = {
         tcp = lsocket_tcp;
@@ -1724,3 +2131,5 @@ return setmetatable({
         bind = lsocket_bind;
     }
 })
+
+return socket
