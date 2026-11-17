@@ -35,6 +35,7 @@
 #include "json/json.h"
 #include "fiber.h"
 #include "tt_static.h"
+#include "key_def_raw.h"
 
 const char *index_type_strs[] = { "HASH", "TREE", "BITSET", "RTREE" };
 
@@ -232,6 +233,8 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	if (engine_name != NULL)
 		strlcpy(def->engine_name, engine_name, ENGINE_NAME_MAX);
 	def->key_def = key_def_dup(key_def);
+	def->key_def_rv = key_def_dup(key_def);
+	key_def_set_func_raw(def->key_def_rv);
 	if (iid != 0) {
 		assert(pk_def != NULL);
 		def->pk_def = key_def_dup(pk_def);
@@ -243,11 +246,14 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 		def->cmp_def = key_def_dup(key_def);
 		def->pk_def = key_def_dup(key_def);
 	}
+	def->cmp_def_rv = key_def_dup(def->cmp_def);
+	key_def_set_func_raw(def->cmp_def_rv);
 	def->type = type;
 	def->space_id = space_id;
 	def->iid = iid;
 	index_opts_dup(opts, &def->opts);
 	index_opts_normalize(&def->opts, def->cmp_def);
+	def->refs = 0;
 	return def;
 }
 
@@ -261,28 +267,28 @@ index_def_dup(const struct index_def *def)
 		dup->space_name = xstrdup(def->space_name);
 	strlcpy(dup->engine_name, def->engine_name, ENGINE_NAME_MAX);
 	dup->key_def = key_def_dup(def->key_def);
+	dup->key_def_rv = key_def_dup(def->key_def_rv);
 	dup->cmp_def = key_def_dup(def->cmp_def);
+	dup->cmp_def_rv = key_def_dup(def->cmp_def_rv);
 	dup->pk_def = key_def_dup(def->pk_def);
 	rlist_create(&dup->link);
 	index_opts_dup(&def->opts, &dup->opts);
+	dup->refs = 0;
 	return dup;
 }
 
 void
 index_def_delete(struct index_def *index_def)
 {
+	assert(index_def->refs == 0);
 	index_opts_destroy(&index_def->opts);
 	free(index_def->name);
 	free(index_def->space_name);
-
-	if (index_def->key_def)
-		key_def_delete(index_def->key_def);
-
-	if (index_def->cmp_def)
-		key_def_delete(index_def->cmp_def);
-
-	if (index_def->pk_def)
-		key_def_delete(index_def->pk_def);
+	key_def_delete(index_def->key_def);
+	key_def_delete(index_def->key_def_rv);
+	key_def_delete(index_def->cmp_def);
+	key_def_delete(index_def->cmp_def_rv);
+	key_def_delete(index_def->pk_def);
 
 	TRASH(index_def);
 	free(index_def);

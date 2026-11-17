@@ -723,9 +723,7 @@ static void
 hash_read_view_reset_key_def(struct hash_read_view *rv)
 {
 	struct index_def *def = rv->base.def;
-	key_def_set_func_raw(def->key_def);
-	key_def_set_func_raw(def->cmp_def);
-	rv->view.common.arg = def->key_def;
+	rv->view.common.arg = def->key_def_rv;
 }
 
 /** Implementation of create_iterator index_read_view callback. */
