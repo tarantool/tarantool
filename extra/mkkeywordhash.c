@@ -162,6 +162,7 @@ static Keyword aKeywordTable[] = {
   { "SIMPLE",                 "TK_STANDARD",    true  },
   { "START",                  "TK_START",       true  },
   { "STRING",                 "TK_STRING_KW",   true  },
+  { "SUBSTRING",              "TK_SUBSTRING",   false },
   { "TABLE",                  "TK_TABLE",       true  },
   { "THEN",                   "TK_THEN",        true  },
   { "TO",                     "TK_TO",          true  },
