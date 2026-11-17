@@ -312,6 +312,7 @@ enum {
 	/**
 	 * Set if checkpointing is implemented by the memtx engine.
 	 * Engine setting this flag must support read views.
+	 * Works only if schema version is lower than 3.10.0.
 	 */
 	ENGINE_CHECKPOINT_BY_MEMTX = 1 << 2,
 	/**

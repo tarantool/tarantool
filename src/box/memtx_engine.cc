@@ -1082,8 +1082,13 @@ static bool
 checkpoint_space_filter(struct space *space, void *arg)
 {
 	(void)arg;
-	return (space->engine->flags & ENGINE_CHECKPOINT_BY_MEMTX) != 0 &&
-		space_index(space, 0) != NULL;
+
+	/* Snapshot with other engines is supported only before 3.10.0. */
+	bool checkpoint_by_memtx = strcmp(space->engine->name, "memtx") == 0 ||
+		((space->engine->flags & ENGINE_CHECKPOINT_BY_MEMTX) != 0 &&
+		 dd_version_id < version_id(3, 10, 0));
+
+	return checkpoint_by_memtx && space_index(space, 0) != NULL;
 }
 
 /**
