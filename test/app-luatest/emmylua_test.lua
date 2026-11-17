@@ -227,6 +227,40 @@ local modules = {
             },
         },
     },
+    {
+        name = 'ulid',
+        source = 'src/lua/ulid.lua',
+        fixtures = 'test/app-luatest/emmylua/ulid',
+        fields = {
+            NULL = 'A nil ULID object',
+            new = 'Create a new ULID object',
+            fromstr = 'Create a ULID object from a 26-character string',
+            frombin = 'Create a ULID object from a 16-byte binary string',
+            bin = 'return its binary representation',
+            str = 'return its string representation',
+            is_ulid = 'Check if the given value is a ULID cdata object',
+        },
+        objects = {
+            {
+                fixture = 'object.lua',
+                type_name = 'ulid',
+                fields = {
+                    bin = 'Return the ULID as a 16-byte binary string',
+                    str = 'Return the ULID as a 26-character string',
+                    isnil = 'Check if the ULID is the nil ULID',
+                },
+            },
+            {
+                fixture = 'call.lua',
+                type_name = 'ulid',
+                fields = {
+                    bin = 'Return the ULID as a 16-byte binary string',
+                    str = 'Return the ULID as a 26-character string',
+                    isnil = 'Check if the ULID is the nil ULID',
+                },
+            },
+        },
+    },
 }
 
 local function normalize(value)
