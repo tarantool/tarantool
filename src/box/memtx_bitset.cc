@@ -359,9 +359,8 @@ memtx_bitset_index_replace(struct index *base, struct tuple *old_tuple,
 		assert(result->tuple == NULL);
 		return -1;
 	}
-	uint32_t value;
-	if (!memtx_bitset_index_tuple_to_value(index, new_tuple, &value))
-		unreachable();
+	uint32_t value = 0;
+	VERIFY(memtx_bitset_index_tuple_to_value(index, new_tuple, &value));
 #else /* #ifndef OLD_GOOD_BITSET */
 	uint32_t value = tuple_to_value(new_tuple);
 #endif /* #ifndef OLD_GOOD_BITSET */
