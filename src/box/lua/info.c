@@ -166,6 +166,19 @@ lbox_pushrelay(lua_State *L, struct relay *relay)
 		lua_pushnumber(L, relay_txn_lag(relay));
 		lua_settable(L, -3);
 		break;
+	case RELAY_JOIN:
+		/*
+		 * The replica is receiving a read view. Its vclock and lag
+		 * aren't tracked yet: the persistent relay is not running, only
+		 * the last activity time is published to it.
+		 */
+		lua_pushstring(L, "joining");
+		lua_settable(L, -3);
+		lua_pushstring(L, "idle");
+		lua_pushnumber(L, ev_monotonic_now(loop()) -
+			       relay_last_row_time(relay));
+		lua_settable(L, -3);
+		break;
 	case RELAY_STOPPED:
 	{
 		lua_pushstring(L, "stopped");
