@@ -164,6 +164,7 @@ space_def_dup(const struct space_def *src)
 		ret->format_data = NULL;
 		ret->format_data_len = 0;
 	}
+	ret->refs = 0;
 	return ret;
 }
 
@@ -199,6 +200,7 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 		def->format_data = NULL;
 		def->format_data_len = 0;
 	}
+	def->refs = 0;
 	return def;
 }
 
@@ -225,6 +227,7 @@ space_def_new_ephemeral(uint32_t exact_field_count, struct field_def *fields)
 void
 space_def_delete(struct space_def *def)
 {
+	assert(def->refs == 0);
 	field_def_array_delete(def->fields, def->field_count);
 	free(def->opts.sql);
 	free(def->opts.constraint_def);

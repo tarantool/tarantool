@@ -151,9 +151,9 @@ lbox_push_space_read_view(struct lua_State *L,
 			  struct space_read_view_handle *space)
 {
 	lua_newtable(L);
-	lua_pushinteger(L, space->ptr->id);
+	lua_pushinteger(L, space->ptr->def->id);
 	lua_setfield(L, -2, "id");
-	lua_pushstring(L, space->ptr->name);
+	lua_pushstring(L, space->ptr->def->name);
 	lua_setfield(L, -2, "name");
 	lua_newtable(L);
 	for (uint32_t i = 0; i <= space->ptr->index_id_max; i++) {
@@ -237,8 +237,8 @@ lbox_new_read_view(struct lua_State *L, struct read_view *rv)
 	read_view_foreach_space(space, rvh) {
 		lbox_push_space_read_view(L, space);
 		lua_pushvalue(L, -1);
-		lua_rawseti(L, -3, space->ptr->id);
-		lua_setfield(L, -2, space->ptr->name);
+		lua_rawseti(L, -3, space->ptr->def->id);
+		lua_setfield(L, -2, space->ptr->def->name);
 	}
 	lua_setfield(L, -2, "space");
 
@@ -261,7 +261,6 @@ lbox_read_view_open(struct lua_State *L)
 	opts.name = name;
 	opts.filter_space = box_read_view_filter_space_cb;
 	opts.filter_index = box_read_view_filter_index_cb;
-	opts.enable_field_names = true;
 	opts.enable_space_upgrade = true;
 	opts.enable_data_temporary_spaces = true;
 	if (read_view_throttle() != 0)

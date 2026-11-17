@@ -1379,7 +1379,7 @@ checkpoint_f(va_list ap)
 		FiberGCChecker gc_check;
 		bool skip = false;
 		ERROR_INJECT(ERRINJ_SNAP_SKIP_DDL_ROWS, {
-			skip = space_id_is_system(space_rv->id);
+			skip = space_id_is_system(space_rv->def->id);
 		});
 		if (skip)
 			continue;
@@ -1389,7 +1389,8 @@ checkpoint_f(va_list ap)
 		 * needed to acquire states from the checkpoint, which is used
 		 * during checkpoint join.
 		 */
-		if (!is_synchro_written && !space_id_is_system(space_rv->id)) {
+		if (!is_synchro_written &&
+		    !space_id_is_system(space_rv->def->id)) {
 			if (checkpoint_write_system_data(
 					snap, &ckpt->box->raft_local,
 					&ckpt->box->limbo) != 0)
@@ -1409,7 +1410,7 @@ checkpoint_f(va_list ap)
 		/* Start dumping PK data into the sort data file if required. */
 		if (dump_sort_data &&
 		    memtx_sort_data_writer_begin(ckpt->sort_data_writer,
-						 space_rv->id, 0) != 0)
+						 space_rv->def->id, 0) != 0)
 			return -1;
 
 		struct index_read_view *index_rv =
@@ -1431,12 +1432,12 @@ checkpoint_f(va_list ap)
 			if (tuple.data == NULL)
 				break;
 			if (is_tuple_temporary(tuple.data,
-					       space_rv->id,
+					       space_rv->def->id,
 					       temp_space_ids))
 				continue;
 
 			/* Write the tuple into the snapshot. */
-			if (checkpoint_write_tuple(snap, space_rv->id,
+			if (checkpoint_write_tuple(snap, space_rv->def->id,
 						   space_rv->group_id,
 						   tuple.data, tuple.size) != 0)
 				return -1;
@@ -1469,8 +1470,9 @@ checkpoint_f(va_list ap)
 			if (space_rv->index_map[i] == NULL)
 				continue;
 
-			if (memtx_sort_data_writer_begin(ckpt->sort_data_writer,
-							 space_rv->id, i) != 0)
+			if (memtx_sort_data_writer_begin(
+					ckpt->sort_data_writer,
+					space_rv->def->id, i) != 0)
 				return -1;
 
 			bool have_more;
@@ -1767,11 +1769,12 @@ memtx_join_f(va_list ap)
 			if (rc != 0 || result.data == NULL)
 				break;
 			if (is_tuple_temporary(result.data,
-					       space_rv->id,
+					       space_rv->def->id,
 					       temp_space_ids))
 				continue;
-			rc = memtx_join_send_tuple(ctx->stream, space_rv->id,
-						   result.data, result.size);
+			rc = memtx_join_send_tuple(
+					ctx->stream, space_rv->def->id,
+					result.data, result.size);
 			if (rc != 0)
 				break;
 		}
