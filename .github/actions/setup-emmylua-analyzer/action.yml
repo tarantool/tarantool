@@ -19,12 +19,19 @@ inputs:
     description: Version of the EmmyLua tools to install
     required: false
     default: "0.25.1"
+  # emmylua_doc_cli 0.25.1 does not render Markdown tables in the
+  # generated HTML documentation. The fix is merged upstream but not
+  # released yet, so build the tool from the merged revision.
+  emmylua-doc-cli-rev:
+    description: Revision of emmylua-analyzer-rust to build emmylua_doc_cli from
+    required: false
+    default: "567a5a228e673ad2e2e15a7af0d933c40afe4740"
 
 runs:
   using: composite
   steps:
     - name: Setup Rust toolchain
-      if: inputs.check == 'true'
+      if: inputs.check == 'true' || inputs.doc-cli == 'true'
       uses: actions-rust-lang/setup-rust-toolchain@v1
       with:
         toolchain: stable
@@ -98,5 +105,9 @@ runs:
 
     - name: Setup emmylua_doc_cli
       if: inputs.doc-cli == 'true'
-      run: cargo install emmylua_doc_cli --version ${{ inputs.emmylua-version }}
+      run: >
+        cargo install --locked
+        --git https://github.com/EmmyLuaLs/emmylua-analyzer-rust
+        --rev ${{ inputs.emmylua-doc-cli-rev }}
+        emmylua_doc_cli
       shell: bash
