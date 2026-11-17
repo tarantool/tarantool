@@ -509,19 +509,23 @@ send_join_meta(struct xstream *stream, const struct box_checkpoint *ckpt)
 }
 
 void
-relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
-		   uint32_t replica_version_id,
+relay_initial_join(struct replica *replica, struct iostream *io, uint64_t sync,
+		   struct vclock *vclock, uint32_t replica_version_id,
 		   struct checkpoint_cursor *cursor)
 {
-	struct relay *relay = relay_new(NULL);
+	struct relay *relay = replica != NULL ?
+		replica->relay : relay_new(NULL);
+	assert(relay->state == RELAY_OFF || relay->state == RELAY_STOPPED);
 	relay_start(relay, io, sync, relay_send_initial_join_row, relay_yield,
 		    UINT64_MAX);
+	relay->state = RELAY_JOIN;
 	xrow_stream_create(&relay->xrow_stream);
 	relay->version_id = replica_version_id;
 	auto relay_guard = make_scoped_guard([=] {
 		xrow_stream_destroy(&relay->xrow_stream);
 		relay_stop(relay);
-		relay_delete(relay);
+		if (replica == NULL)
+			relay_delete(relay);
 	});
 
 	/* Freeze a read view in engines. */
