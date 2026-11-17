@@ -140,7 +140,7 @@ lua_stub(checks FILES
 file(GLOB_RECURSE METRICS_SOURCE_FILES
     "${PROJECT_SOURCE_DIR}/third_party/metrics/metrics/*.lua"
 )
-lua_stub(metrics FILES ${METRICS_SOURCE_FILES})
+lua_stub(metrics FILES ${METRICS_SOURCE_FILES} RETURN metrics)
 lua_stub(strict FILES lua/strict.lua RETURN strict)
 
 # LuaJIT jit.* library

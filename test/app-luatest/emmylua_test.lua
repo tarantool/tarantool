@@ -70,6 +70,32 @@ local modules = {
         },
     },
     {
+        name = 'metrics',
+        source = 'third_party/metrics/metrics/annotations.lua',
+        source_dir = 'third_party/metrics/metrics',
+        fixtures = 'test/app-luatest/emmylua/metrics',
+        type_name = 'metrics',
+        fields = {
+            counter = 'Register a new counter',
+            gauge = 'Register a new gauge',
+            histogram = 'Register a new histogram',
+            summary = 'Register a new summary',
+            collect = 'Collect observations from each collector',
+            set_global_labels = 'Set global labels applied to every ' ..
+                'observation',
+        },
+        objects = {
+            {
+                fixture = 'object.lua',
+                type_name = 'metrics.collector.counter',
+                fields = {
+                    inc = 'Increment the observation',
+                    reset = 'Set the observation',
+                },
+            },
+        },
+    },
+    {
         name = 'checks',
         source = 'third_party/checks/annotations.lua',
         extra_sources = {
@@ -159,6 +185,20 @@ local function copy_fixtures(workspace, spec)
         fio.pathjoin(workspace, '.emmyrc.json'))
 end
 
+local function copy_source_tree(dst, src)
+    local names = assert(fio.listdir(src))
+    for _, name in ipairs(names) do
+        local src_path = fio.pathjoin(src, name)
+        local dst_path = fio.pathjoin(dst, name)
+        if fio.path.is_dir(src_path) then
+            fio.mktree(dst_path)
+            copy_source_tree(dst_path, src_path)
+        elseif name:sub(-4) == '.lua' then
+            emmylua.copy_file(src_path, dst_path)
+        end
+    end
+end
+
 local function open_fixture(client, workspace, name)
     local path = fio.pathjoin(workspace, name)
     local text = emmylua.read_file(path)
@@ -197,6 +237,11 @@ local function run_module_test(spec)
         emmylua.copy_file(
             fio.pathjoin(root, spec.source),
             fio.pathjoin(workspace, spec.name .. '.lua'))
+        if spec.source_dir ~= nil then
+            local dir = fio.pathjoin(workspace, spec.name)
+            fio.mktree(dir)
+            copy_source_tree(dir, fio.pathjoin(root, spec.source_dir))
+        end
         for _, item in ipairs(spec.extra_sources or {}) do
             emmylua.copy_file(fio.pathjoin(root, item.src),
                               fio.pathjoin(workspace, item.dst))
