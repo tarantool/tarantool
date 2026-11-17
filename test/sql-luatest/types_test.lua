@@ -373,8 +373,8 @@ g.test_integer_floating_point_comparison = function(cg)
         format[1] = {name = 'id', type = 'unsigned'}
         format[2] = {name = 'a', type = 'unsigned'}
         local s = box.schema.create_space('t1', {format = format})
-        local _ = s:create_index('pk')
-        _ = s:create_index('sk', {parts = {'a'}})
+        s:create_index('pk')
+        s:create_index('sk', {parts = {'a'}})
         s:insert({1, 1})
         res = box.execute("SELECT a FROM t1 WHERE a IN (1.1, 2.1);")
         metadata = {{name = "a", type = "unsigned"}}
@@ -894,7 +894,7 @@ end
 -- Make sure that the array/map conversion to scalar error is
 -- displayed correctly.
 --
-g.test_4189 = function(cg)
+g.test_4189_array_map_conversion_to_scalar_error = function(cg)
     cg.server:exec(function()
         box.execute([[CREATE TABLE t1(i INT PRIMARY KEY AUTOINCREMENT,
                                       a SCALAR);]])
