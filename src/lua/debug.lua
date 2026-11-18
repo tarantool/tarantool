@@ -1,3 +1,23 @@
+---The `debug` library provides an interface for debugging Lua programs.
+---Tarantool adds `debug.sourcedir()`, `debug.sourcefile()` and the
+---`debug.__dir__` / `debug.__file__` shortcuts.
+---
+---**Example:**
+---
+---```lua
+---print(debug.sourcedir())
+---print(debug.sourcefile())
+---print(debug.traceback())
+---```
+---
+---@class debug
+---@field sourcefile fun(level?: integer): string? Return the source file
+---    name.
+---@field sourcedir fun(level?: integer): string? Return the source
+---    directory name.
+---@field __file__ string? The source file name.
+---@field __dir__ string? The source directory name.
+
 local debug = require('debug')
 
 local function sourcefile(level)
