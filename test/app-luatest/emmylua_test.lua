@@ -227,6 +227,56 @@ local modules = {
             },
         },
     },
+    {
+        name = 'tarantool',
+        source = 'src/lua/tarantool_stub.lua',
+        fixtures = 'test/app-luatest/emmylua/tarantool',
+        fields = {
+            version = 'The Tarantool version',
+            package = 'The package name',
+            build = 'Build information',
+            debug = 'Debug information',
+            pid = 'Return the process ID',
+            uptime = 'Return the server uptime',
+        },
+        objects = {
+            {
+                fixture = 'object.lua',
+                type_name = 'tarantool',
+                fields = {
+                    version = 'The Tarantool version',
+                    package = 'The package name',
+                    build = 'Build information',
+                    debug = 'Debug information',
+                    pid = 'Return the process ID',
+                    uptime = 'Return the server uptime',
+                },
+            },
+            {
+                fixture = 'build.lua',
+                type_name = 'tarantool.build',
+                fields = {
+                    target = 'The build target',
+                    options = 'The CMake options',
+                    compiler = 'The compiler used for the build',
+                    mod_format = 'The module file extension',
+                    flags = 'The compiler flags',
+                    linking = "'static' or 'dynamic'",
+                    tzdata_version = 'The bundled tzdata version',
+                    asan = 'Whether the build has AddressSanitizer enabled',
+                    test_build = 'Whether this is a test build',
+                    mimalloc = "The mimalloc scope: 'cpp' or 'none'",
+                },
+            },
+            {
+                fixture = 'debug.lua',
+                type_name = 'tarantool.debug',
+                fields = {
+                    getsources = 'Return the source',
+                },
+            },
+        },
+    },
 }
 
 local function normalize(value)

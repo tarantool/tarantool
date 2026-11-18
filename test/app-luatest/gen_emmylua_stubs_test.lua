@@ -102,6 +102,45 @@ return mod
     fio.rmtree(dir)
 end
 
+g.test_only_annotated_string_field = function()
+    local dir = fio.tempdir()
+    local source = fio.pathjoin(dir, 'module.lua')
+    local output = fio.pathjoin(dir, 'module-stub.lua')
+    local fh = assert(io.open(source, 'w'))
+    fh:write([[
+local mod = {}
+
+---@type string
+mod.version = ''
+
+return mod
+]])
+    fh:close()
+
+    local ph = assert(popen.new({
+        arg[-1], TOOL,
+        '--out', output,
+        '--return', 'mod',
+        source,
+    }, {
+        stdout = popen.opts.PIPE,
+        stderr = popen.opts.DEVNULL,
+    }))
+    local out = read_all(ph)
+    local st = ph:wait()
+    ph:close()
+    t.assert_equals(st.exit_code, 0, out)
+
+    local stub = assert(io.open(output, 'r'))
+    local text = stub:read('*a')
+    stub:close()
+    t.assert_str_contains(text, 'local mod = {}')
+    t.assert_str_contains(text, '---@type string\nmod.version = nil')
+    t.assert_str_contains(text, 'return mod')
+
+    fio.rmtree(dir)
+end
+
 g.test_module_table_with_comments = function()
     local dir = fio.tempdir()
     local source = fio.pathjoin(dir, 'module.lua')
