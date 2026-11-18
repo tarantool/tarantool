@@ -69,6 +69,34 @@ local modules = {
             },
         },
     },
+    {
+        name = 'decimal',
+        source = 'src/lua/decimal_stub.lua',
+        fixtures = 'test/app-luatest/emmylua/decimal',
+        fields = {
+            abs = 'Returns absolute value of a decimal number',
+            exp = 'Returns e raised to the power of a decimal number',
+            is_decimal = 'if the specified value is a decimal',
+            ln = 'Returns natural logarithm of a decimal number',
+            log10 = 'Returns base-10 logarithm of a decimal number',
+            new = 'Returns the value of the input as a decimal number',
+            precision = 'Returns the number of digits in a decimal number',
+            rescale = 'Returns the number after possible rounding or padding',
+            scale = 'Returns the number of post-decimal digits',
+            sqrt = 'Returns the square root of a decimal number',
+            trim = 'Returns a decimal number after possible removing',
+            round = 'Rounds a decimal number to a specified number of',
+        },
+        objects = {
+            {
+                fixture = 'object.lua',
+                type_name = 'decimal',
+                fields = {
+                    __tostring = 'Return the decimal as a string',
+                },
+            },
+        },
+    },
 }
 
 local function normalize(value)
