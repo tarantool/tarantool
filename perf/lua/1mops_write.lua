@@ -146,7 +146,7 @@ index_config.type = params.index or 'HASH'
 index_config.type = string.upper(index_config.type)
 
 local hints_msg = ''
-if params.index == 'TREE' then
+if index_config.type == 'TREE' then
     hints_msg = ' with hints'
     if params.nohint then
         index_config.hint = false
