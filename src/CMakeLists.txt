@@ -82,6 +82,7 @@ if(ENABLE_LUA_EXTRAS)
 endif()
 
 lua_stub(varbinary FILES lua/varbinary.lua RETURN varbinary)
+lua_stub(tarantool FILES lua/tarantool_stub.lua RETURN tarantool)
 
 # 3rd party lua sources
 lua_source(lua_sources ../third_party/luafun/fun.lua fun_lua)
