@@ -1,7 +1,7 @@
 	*** main ***
 1..6
 	*** test_basic ***
-    1..71
+    1..74
     ok 1 - parse <[1]>
     ok 2 - <[1]> is num
     ok 3 - <[1]> is 0
@@ -53,30 +53,33 @@
     ok 49 - parse <[1234]>
     ok 50 - <[1234]> is num
     ok 51 - <[1234]> is 1233
-    ok 52 - parse empty path
-    ok 53 - is str
-    ok 54 - parse <field1>
-    ok 55 - <field1> is str
-    ok 56 - len is 6
-    ok 57 - str is field1
-    ok 58 - parse <[2]>
-    ok 59 - <[2]> is num
-    ok 60 - <[2]> is 1
-    ok 61 - parse <[6]>
-    ok 62 - <[6]> is num
-    ok 63 - <[6]> is 5
-    ok 64 - parse <привет中国world>
-    ok 65 - <привет中国world> is str
-    ok 66 - len is 23
-    ok 67 - str is привет中国world
-    ok 68 - parse <中国a>
-    ok 69 - <中国a> is str
-    ok 70 - len is 7
-    ok 71 - str is 中国a
+    ok 52 - parse <[2147483647]>
+    ok 53 - <[2147483647]> is num
+    ok 54 - <[2147483647]> is 2147483646
+    ok 55 - parse empty path
+    ok 56 - is str
+    ok 57 - parse <field1>
+    ok 58 - <field1> is str
+    ok 59 - len is 6
+    ok 60 - str is field1
+    ok 61 - parse <[2]>
+    ok 62 - <[2]> is num
+    ok 63 - <[2]> is 1
+    ok 64 - parse <[6]>
+    ok 65 - <[6]> is num
+    ok 66 - <[6]> is 5
+    ok 67 - parse <привет中国world>
+    ok 68 - <привет中国world> is str
+    ok 69 - len is 23
+    ok 70 - str is привет中国world
+    ok 71 - parse <中国a>
+    ok 72 - <中国a> is str
+    ok 73 - len is 7
+    ok 74 - str is 中国a
 ok 1 - subtests
 	*** test_basic: done ***
 	*** test_errors ***
-    1..22
+    1..24
     ok 1 - error on position 2 for <[[>
     ok 2 - error on position 2 for <[field]>
     ok 3 - error on position 1 for <'field1'.field2>
@@ -88,17 +91,19 @@ ok 1 - subtests
     ok 9 - error on position 8 for <['field>
     ok 10 - error on position 9 for <['field'>
     ok 11 - error on position 5 for <[123>
-    ok 12 - error on position 3 for <['']>
-    ok 13 - error on position 2 for <.[123]>
-    ok 14 - error on position 2 for <[.]>
-    ok 15 - error on position 6 for <['aaa��']>
-    ok 16 - error on position 2 for <.��>
-    ok 17 - can not write <field.[index]>
-    ok 18 - can not omit '.' before not a first key out of []
-    ok 19 - error in leading <.>
-    ok 20 - space inside identifier
-    ok 21 - tab inside identifier
-    ok 22 - invalid token for index_base 1
+    ok 12 - error on position 2 for <[2147483648]>
+    ok 13 - error on position 2 for <[4294967298]>
+    ok 14 - error on position 3 for <['']>
+    ok 15 - error on position 2 for <.[123]>
+    ok 16 - error on position 2 for <[.]>
+    ok 17 - error on position 6 for <['aaa��']>
+    ok 18 - error on position 2 for <.��>
+    ok 19 - can not write <field.[index]>
+    ok 20 - can not omit '.' before not a first key out of []
+    ok 21 - error in leading <.>
+    ok 22 - space inside identifier
+    ok 23 - tab inside identifier
+    ok 24 - invalid token for index_base 1
 ok 2 - subtests
 	*** test_errors: done ***
 	*** test_tree ***

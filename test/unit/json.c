@@ -29,7 +29,7 @@ void
 test_basic()
 {
 	header();
-	plan(71);
+	plan(74);
 	const char *path;
 	int len;
 	struct json_lexer lexer;
@@ -61,6 +61,10 @@ test_basic()
 	/* Long number. */
 	reset_to_new_path("[1234]");
 	is_next_index(6, 1233);
+
+	/* The largest supported index. */
+	reset_to_new_path("[2147483647]");
+	is_next_index(12, 2147483646);
 
 	/* Empty path. */
 	reset_to_new_path("");
@@ -97,7 +101,7 @@ void
 test_errors()
 {
 	header();
-	plan(22);
+	plan(24);
 	const char *path;
 	int len;
 	struct json_lexer lexer;
@@ -121,6 +125,9 @@ test_errors()
 		{"['field", 8},
 		{"['field'", 9},
 		{"[123", 5},
+		/* Integer index out of the supported range. */
+		{"[2147483648]", 2},
+		{"[4294967298]", 2},
 		{"['']", 3},
 		/*
 		 * Not trivial error: can not write
