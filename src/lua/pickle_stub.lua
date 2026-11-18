@@ -1,0 +1,107 @@
+---@meta
+
+---The `pickle` module provides functions for converting Lua variables
+---to and from Tarantool binary protocol primitives.
+---
+---`pickle.pack()` is prototyped after Perl `pack`.
+local pickle = {}
+
+---Convert Lua variables to binary format.
+---
+---Format specifiers:
+---
+---* `b`, `B` - 1-byte integer.
+---* `s`, `S` - 2-byte integer, low byte first.
+---* `i`, `I` - 4-byte integer, low byte first.
+---* `l`, `L` - 8-byte integer, low byte first.
+---* `n` - 2-byte integer, big endian.
+---* `N` - 4-byte integer, big endian.
+---* `q`, `Q` - 8-byte integer, big endian.
+---* `f` - 4-byte float.
+---* `d` - 8-byte double.
+---* `a`, `A` - sequence of bytes.
+---
+---For integer fields, `pack()` writes the low bits that fit in the field.
+---`unpack()` interprets those bits as an unsigned integer.
+---
+---A scalar value can be either a variable or a literal. Large integers
+---should be entered with `tonumber64()` or `LL`/`ULL` suffixes.
+---
+---**Example:**
+---
+---```tarantoolsession
+---tarantool> pickle = require('pickle')
+--- ---
+--- ...
+---
+---tarantool> pickle.pack('iiA', 0, 3, 'hello')
+--- ---
+--- - "\0\0\0\0\x03\0\0\0hello"
+--- ...
+---```
+---
+---Possible errors:
+---
+---* Too few values for the format. Extra values are ignored.
+---* Expected 8/16/32/64-bit int.
+---* Unsupported pack format specifier.
+---
+---@param format string format specifiers.
+---@param ... any scalar values to be formatted.
+---@return string result a binary string.
+function pickle.pack(format, ...) end
+
+---Convert Lua variables back from binary format.
+---
+---Counterpart to `pickle.pack()`.
+---
+---Format specifiers:
+---
+---* `b` - 1-byte integer.
+---* `s` - 2-byte integer, low byte first.
+---* `i` - 4-byte integer, low byte first.
+---* `l` - 8-byte integer, low byte first.
+---* `n` - 2-byte integer, big endian.
+---* `N` - 4-byte integer, big endian.
+---* `q` - 8-byte integer, big endian.
+---* `f` - 4-byte float.
+---* `d` - 8-byte double.
+---* `a`, `A` - sequence of bytes.
+---
+---Unlike `pickle.pack()`, `pickle.unpack()` does not support the
+---uppercase integer specifiers `B`, `S`, `I`, `L` and `Q`. Use the
+---corresponding lowercase specifier instead; for example, data packed
+---with `B` can be unpacked with `b`.
+---
+---Warning: if format specifier `a` or `A` is used, it must be the last
+---item.
+---
+---**Example:**
+---
+---```tarantoolsession
+---tarantool> pickle.unpack('bsi', pickle.pack('bsi', 255, 65535, 4294967295))
+--- ---
+--- - 255
+--- - 65535
+--- - 4294967295
+--- ...
+---
+---tarantool> num, num64, str = pickle.unpack('slA',
+---         >     pickle.pack('slA', 666, tonumber64('666666666666666'),
+---         >     'string'))
+--- ---
+--- ...
+---```
+---
+---Possible errors:
+---
+---* Too many bytes: unpacked X, total Y, where X < Y.
+---* Got X bytes (expected: Y+), where X < Y.
+---* Unsupported format specifier.
+---
+---@param format string format specifiers.
+---@param binary_string string binary string to unpack.
+---@return any ...
+function pickle.unpack(format, binary_string) end
+
+return pickle
