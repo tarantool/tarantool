@@ -72,6 +72,7 @@ box.schema.user.revoke('guest', 'execute', 'universe')
 --
 box.schema.user.grant('guest', 'read, write', 'space', '_func')
 box.schema.user.grant('guest', 'create', 'function')
+box.schema.user.grant('guest', 'execute', 'universe')
 box.session.su('guest')
 box.schema.func.create("test3", {                                   \
     language = 'LUA', returns = 'string',                           \
@@ -79,6 +80,7 @@ box.schema.func.create("test3", {                                   \
     is_deterministic = true, param_list = {}, setuid = true         \
 })
 box.session.su('admin')
+box.schema.user.revoke('guest', 'execute', 'universe')
 -- Error, guest does not have access to 'test2' called from
 -- 'test3'.
 box.func.test3:call()
