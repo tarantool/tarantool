@@ -519,3 +519,39 @@ g.test_empty_stmt_tuple_ref = function(cg)
         t.assert_equals(s:select{}, {{1}, {2}, {3}, {4}, {5}})
     end)
 end
+
+-- gh-13674
+for _, index_type in ipairs({'tree', 'hash'}) do
+    g['test_tuple_stat_after_delete_and_truncate_' .. index_type] = function(cg)
+        t.tarantool.skip_if_not_debug()
+        cg.server:exec(function(pk_type)
+            local fiber = require('fiber')
+            local s = box.schema.space.create('s')
+            s:create_index('pk', {type = pk_type})
+            local empty_stat = s:stat().tuple
+            s:insert{1}
+            s:insert{2}
+
+            box.error.injection.set('ERRINJ_WAL_DELAY', true)
+            local delete = fiber.create(function() s:delete{1} end)
+            delete:set_joinable(true)
+            local truncate = fiber.create(function() s:truncate() end)
+            truncate:set_joinable(true)
+
+            box.error.injection.set('ERRINJ_WAL_DELAY', false)
+            t.assert(delete:join(5))
+            t.assert(truncate:join(5))
+
+            s = box.space.s
+            t.assert_equals(s:select(), {})
+            t.assert_equals(s:bsize(), 0)
+            t.assert_equals(s:stat().tuple, empty_stat)
+
+            local tuple = s:insert{3}
+            t.assert_equals(s:bsize(), tuple:bsize())
+            s:delete{3}
+            t.assert_equals(s:bsize(), 0)
+            t.assert_equals(s:stat().tuple, empty_stat)
+        end, {index_type})
+    end
+end
