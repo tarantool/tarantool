@@ -84,6 +84,12 @@ files["src/lua/decimal_stub.lua"] = {
         "212",
     },
 }
+files["src/lua/pickle_stub.lua"] = {
+    ignore = {
+        -- Unused arguments in annotation-only stub functions.
+        "212",
+    },
+}
 files["test/box/box.lua"] = {
     globals = {
         "cfg_filter",
