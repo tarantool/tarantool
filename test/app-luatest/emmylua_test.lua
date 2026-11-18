@@ -69,6 +69,19 @@ local modules = {
             },
         },
     },
+    {
+        name = 'debug',
+        source = 'src/lua/debug_stub.lua',
+        fixtures = 'test/app-luatest/emmylua/debug',
+        requires_stdlib_merge = true,
+        fields = {
+            sourcefile = 'Return the source file',
+            sourcedir = 'Return the source directory',
+            __file__ = 'The source file name',
+            __dir__ = 'The source directory name',
+        },
+        objects = {},
+    },
 }
 
 local function normalize(value)
@@ -186,6 +199,26 @@ local function run_module_test(spec)
             open_fixture(client, workspace, 'module.lua')
         local module_uri = emmylua.file_uri(module_path)
 
+        if spec.requires_stdlib_merge then
+            local position = emmylua.marker_position(
+                module_text, 'module_fields')
+            local ok, items = pcall(client.request_until, client,
+                'textDocument/completion', {
+                    textDocument = {uri = module_uri},
+                    position = position,
+                }, function(result)
+                    return has_any_label(result, spec.fields)
+                end, 5)
+            local labels = {}
+            if ok and type(items) == 'table' then
+                for _, item in ipairs(items) do
+                    labels[item.label] = true
+                end
+            end
+            t.assert(labels.sourcefile and labels.traceback,
+                'emmylua_ls does not merge stdlib and workspace classes')
+        end
+
         local hover = client:request_until('textDocument/hover', {
             textDocument = {uri = module_uri},
             position = emmylua.marker_position(module_text, 'module', -1),
@@ -248,7 +281,9 @@ local function run_module_test(spec)
             assert_fields(client, object_items, object.fields,
                 object.type_name)
         end
-    end, debug.traceback)
+    end, function(err)
+        return err
+    end)
 
     if client ~= nil then
         pcall(function()
@@ -257,7 +292,10 @@ local function run_module_test(spec)
     end
     pcall(fio.rmtree, workspace)
     if not ok then
-        error(err)
+        if type(err) == 'table' and err.class == 'LuatestError' then
+            error(err)
+        end
+        error(debug.traceback(tostring(err), 2))
     end
 end
 
