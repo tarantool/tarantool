@@ -69,6 +69,16 @@ local modules = {
             },
         },
     },
+    {
+        name = 'pickle',
+        source = 'src/lua/pickle_stub.lua',
+        fixtures = 'test/app-luatest/emmylua/pickle',
+        fields = {
+            pack = 'Convert Lua variables to binary format',
+            unpack = 'Convert Lua variables back from binary format',
+        },
+        objects = {},
+    },
 }
 
 local function normalize(value)
