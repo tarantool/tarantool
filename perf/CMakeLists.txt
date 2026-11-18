@@ -113,7 +113,8 @@ function(create_perf_test_target)
   set(BENCH_RESULTS ${BENCH_RESULT_TARGET} ${BENCH_RESULTS} PARENT_SCOPE)
   set(test_title "perf/${PERF_TARGET}.cc")
   add_test(NAME ${test_title}
-           COMMAND "$<TARGET_FILE:${PERF_TARGET}.perftest>"
+           COMMAND ${BENCH_CMD_SEPARATE}
+                   "$<TARGET_FILE:${PERF_TARGET}.perftest>"
                    --benchmark_out_format=json
                    --benchmark_out=${BENCH_RESULT}
   )

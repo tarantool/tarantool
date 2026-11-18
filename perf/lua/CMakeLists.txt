@@ -52,7 +52,7 @@ function(create_perf_lua_test)
   set(BENCH_RESULTS ${BENCH_RESULT_TARGET} ${BENCH_RESULTS}  PARENT_SCOPE)
   set(test_title "perf/lua/${PERF_NAME}.lua")
   add_test(NAME ${test_title}
-           COMMAND ${TARANTOOL_BIN}
+           COMMAND ${BENCH_CMD_SEPARATE} ${TARANTOOL_BIN}
                    ${CMAKE_CURRENT_SOURCE_DIR}/${PERF_NAME}.lua
                    --output=${BENCH_RESULT} --output_format=json
   )
