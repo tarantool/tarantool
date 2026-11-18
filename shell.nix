@@ -116,6 +116,11 @@ pkgs.mkShell {
       ninja
       stdenv.cc.cc.lib
       taskset
+      # libprotobuf-mutator in lua-tests is pinned to a revision that is
+      # incompatible with protobuf >= 22.
+      protobuf_21
+      # libprotobuf-mutator examples use find_package(LibLZMA).
+      xz
 
       # Python environment with packages required for regression
       # testing.
