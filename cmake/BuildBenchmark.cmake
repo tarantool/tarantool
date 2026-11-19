@@ -18,6 +18,15 @@ list(APPEND BENCHMARK_CMAKE_FLAGS
      "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
 )
 
+# The library builds with -pedantic-errors. Clang 22 reports __COUNTER__ in an
+# #if as a C2y extension, so such diagnostics become errors.
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag(-Wno-c2y-extensions CXX_HAS_WNO_C2Y_EXTENSIONS)
+if(CXX_HAS_WNO_C2Y_EXTENSIONS)
+    list(APPEND BENCHMARK_CMAKE_FLAGS
+         "-DCMAKE_CXX_FLAGS=-Wno-c2y-extensions")
+endif()
+
 include(ExternalProject)
 ExternalProject_Add(bundled-benchmark-project
     PREFIX ${BENCHMARK_INSTALL_DIR}
