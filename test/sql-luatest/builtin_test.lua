@@ -36,3 +36,40 @@ g.test_integer_overflow_in_printf = function(cg)
         t.assert_equals(err.message, exp)
     end)
 end
+
+--
+-- gh-13683: Introduce CURRENT_TIMESTAMP [(p)]
+--
+g.test_current_timestamp_types = function(cg)
+    cg.server:exec(function()
+        local res
+        
+        res = box.execute([[SELECT typeof(CURRENT_TIMESTAMP);]])
+        t.assert_equals(res.rows[1][1], 'datetime')
+        
+        res = box.execute([[SELECT typeof(CURRENT_TIMESTAMP(3));]])
+        t.assert_equals(res.rows[1][1], 'datetime')
+        
+        res = box.execute([[SELECT typeof(CURRENT_TIMESTAMP(0));]])
+        t.assert_equals(res.rows[1][1], 'datetime')
+    end)
+end
+
+g.test_current_timestamp_errors = function(cg)
+    cg.server:exec(function()
+        local _, err
+        
+        _, err = box.execute([[SELECT CURRENT_TIMESTAMP();]])
+        t.assert_equals(err.message, "Syntax error at line 1 near ')'")
+        
+        _, err = box.execute([[SELECT CURRENT_TIMESTAMP(?);]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '?'")
+        
+        _, err = box.execute([[SELECT CURRENT_TIMESTAMP(1+1);]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '+'")
+        
+        _, err = box.execute([[SELECT CURRENT_TIMESTAMP(10);]])
+        t.assert_equals(err.message, "Failed to execute SQL statement: " ..
+                    "CURRENT_TIMESTAMP precision must be between 0 and 9")
+    end)
+end
