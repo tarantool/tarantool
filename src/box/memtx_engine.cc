@@ -819,7 +819,8 @@ memtx_engine_prepare(struct engine *engine, struct txn *txn)
 			if (stmt->engine != engine)
 				continue;
 			assert(stmt->space->engine == engine);
-			memtx_tx_history_prepare_stmt(stmt);
+			if (stmt->space->def->id != BOX_SEQUENCE_DATA_ID)
+				memtx_tx_history_prepare_stmt(stmt);
 		}
 	}
 	return 0;
