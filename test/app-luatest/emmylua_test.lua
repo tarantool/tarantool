@@ -69,6 +69,32 @@ local modules = {
             },
         },
     },
+    {
+        name = 'uuid',
+        source = 'src/lua/uuid.lua',
+        fixtures = 'test/app-luatest/emmylua/uuid',
+        fields = {
+            NULL = 'A nil UUID object',
+            new = 'Create a UUID',
+            fromstr = 'Create a UUID from a 36-byte hexadecimal string',
+            frombin = 'Create a UUID from a 16-byte binary string',
+            bin = 'Create a UUID and return its 16-byte binary form',
+            str = 'Create a UUID and return its 36-byte hexadecimal form',
+            is_uuid = 'Check if the specified value has the UUID type',
+        },
+        objects = {
+            {
+                fixture = 'object.lua',
+                type_name = 'uuid',
+                fields = {
+                    bin = 'Return the UUID as a 16-byte binary string',
+                    str = 'Return the UUID as a 36-byte hexadecimal string',
+                    isnil = 'Check if the UUID is an all-zero value',
+                    __tostring = 'Return the UUID as a 36-byte hexadecimal',
+                },
+            },
+        },
+    },
 }
 
 local function normalize(value)
