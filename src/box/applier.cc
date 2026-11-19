@@ -386,6 +386,19 @@ applier_connection_init(struct iostream *io, const struct uri *uri,
 	}
 }
 
+/** Reject a known foreign UUID before its ballot can affect local state. */
+static void
+applier_check_replicaset_uuid(const struct applier *applier)
+{
+	const struct tt_uuid *local = replicaset_get_uuid();
+	const struct tt_uuid *remote = &applier->ballot.replicaset_uuid;
+	if (!tt_uuid_is_nil(local) && !tt_uuid_is_nil(remote) &&
+	    !tt_uuid_is_equal(local, remote)) {
+		tnt_raise(ClientError, ER_REPLICASET_UUID_MISMATCH,
+			  tt_uuid_str(local), tt_uuid_str(remote));
+	}
+}
+
 /**
  * Determine if the remote peer is already booted, in which case this is not a
  * bootstrap but rather a join to an existing replica set.
@@ -402,6 +415,7 @@ applier_check_join(const struct applier *applier)
 static void
 applier_run_ballot_triggers(struct applier *applier)
 {
+	applier_check_replicaset_uuid(applier);
 	applier_check_join(applier);
 	trigger_run(&applier->on_state, applier);
 }
@@ -529,7 +543,7 @@ applier_ballot_watcher_f(va_list ap)
 			return 0;
 		} catch (Exception *) {
 			diag_log();
-			applier_run_ballot_triggers(applier);
+			trigger_run(&applier->on_state, applier);
 			diag_clear(diag_get());
 			break;
 		}
@@ -719,6 +733,7 @@ applier_connect(struct applier *applier)
 	if (method_default == NULL)
 		method_default = AUTH_METHOD_DEFAULT;
 
+	applier->ballot.replicaset_uuid = uuid_nil;
 	applier->ballot_watcher = applier_fiber_new(applier, "ballot_watcher",
 						    applier_ballot_watcher_f,
 						    false);
@@ -2602,6 +2617,14 @@ applier_f(va_list ap)
 			 */
 			fiber_testcancel();
 			applier_connect(applier);
+			/*
+			 * The first ballot may arrive before the local UUID is
+			 * known. applier_connect() can pause when it sets
+			 * APPLIER_CONNECTED, allowing bootstrap or recovery to
+			 * assign it. Recheck after resuming: the remote ballot
+			 * need not change, and VOTE fetches it only once.
+			 */
+			applier_check_replicaset_uuid(applier);
 			if (tt_uuid_is_nil(&REPLICASET_UUID)) {
 				/*
 				 * Execute JOIN if this is a bootstrap.
