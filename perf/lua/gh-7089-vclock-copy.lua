@@ -172,7 +172,7 @@ local function test(num_fibers)
     return dt_realtime, dt_cputime, num_replaces / dt_realtime
 end
 
-local num_iters = 40
+local num_iters = bench.dry_run and 1 or 40
 
 -- Fiber count > 1 makes no sense for `wal_mode = 'none'`. There
 -- are no yields on replace when there are no WAL writes.
