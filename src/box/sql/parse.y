@@ -87,6 +87,24 @@ struct LimitVal {
   struct ast_expr *offset;
 };
 
+static struct ast_expr *
+ast_expr_new_substr(struct region *region, struct ast_expr *str,
+                    struct ast_expr *start, struct ast_expr *length)
+{
+    Token name;
+    name.z = "SUBSTR";
+    name.n = 6;
+    name.isReserved = false;
+
+    struct ast_expr_list *args = ast_expr_list_append(region, NULL, str);
+    args = ast_expr_list_append(region, args, start);
+    if (length != NULL)
+        args = ast_expr_list_append(region, args, length);
+
+    return ast_expr_new_function(region, &name, false, args);
+}
+
+
 } // end %include
 
 // Input is a single SQL command
@@ -245,7 +263,7 @@ column_def(A) ::= nm(N) typedef(Y) column_property_list(L) autoinc(I). {
   CONFLICT DEFERRED END ENGINE FAIL
   IGNORE INITIALLY INSTEAD NO MATCH PLAN
   QUERY KEY OFFSET RAISE RELEASE REPLACE RESTRICT
-  RENAME CTIME_KW IF ENABLE DISABLE UUID SHOW
+  RENAME CTIME_KW IF ENABLE DISABLE UUID SHOW SUBSTRING
   .
 %wildcard WILDCARD.
 
@@ -982,6 +1000,13 @@ nmaplist(A) ::= nmaplist(A) COMMA expr(X) COLON expr(Y). {
 nmaplist(A) ::= expr(X) COLON expr(Y). {
   A = ast_expr_list_append(ctx->region, NULL, X);
   A = ast_expr_list_append(ctx->region, A, Y);
+}
+
+expr(A) ::= SUBSTRING LP expr(Y) FROM expr(Z) RP. {
+  A = ast_expr_new_substr(ctx->region, Y, Z, NULL);
+}
+expr(A) ::= SUBSTRING LP expr(Y) FROM expr(Z) FOR expr(W) RP. {
+  A = ast_expr_new_substr(ctx->region, Y, Z, W);
 }
 
 expr(A) ::= TRIM(X) LP trim_operands(Y) RP. {
