@@ -1015,7 +1015,8 @@ index_inject_oom(void)
 {
 	struct errinj *e = errinj(ERRINJ_INDEX_OOM, ERRINJ_BOOL);
 	ERROR_INJECT_COUNTDOWN(ERRINJ_INDEX_OOM_COUNTDOWN, e->bparam = true);
-	if (e->bparam && !txn_has_flag(in_txn(), TXN_STMT_ROLLBACK)) {
+	if (e->bparam &&
+	    (in_txn() == NULL || !txn_has_flag(in_txn(), TXN_STMT_ROLLBACK))) {
 		diag_set(OutOfMemory, 0,
 			 "errinj", "errinj");
 		return -1;

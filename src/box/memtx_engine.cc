@@ -385,10 +385,13 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 				  struct xlog_entry *entry,
 				  bool recovering_system_spaces);
 
-int
-memtx_engine_recover_snapshot(struct memtx_engine *memtx,
+/** MemTX engine snapshot recovery. */
+static int
+memtx_engine_recover_snapshot(struct engine *engine,
 			      const struct vclock *vclock)
 {
+	struct memtx_engine *memtx = (struct memtx_engine *)engine;
+
 	/* Process existing snapshot */
 	say_info("recovery start");
 	int64_t signature = vclock_sum(vclock);
@@ -1079,8 +1082,13 @@ static bool
 checkpoint_space_filter(struct space *space, void *arg)
 {
 	(void)arg;
-	return (space->engine->flags & ENGINE_CHECKPOINT_BY_MEMTX) != 0 &&
-		space_index(space, 0) != NULL;
+
+	/* Snapshot with other engines is supported only before 3.10.0. */
+	bool checkpoint_by_memtx = strcmp(space->engine->name, "memtx") == 0 ||
+		((space->engine->flags & ENGINE_CHECKPOINT_BY_MEMTX) != 0 &&
+		 dd_version_id < version_id(3, 10, 0));
+
+	return checkpoint_by_memtx && space_index(space, 0) != NULL;
 }
 
 /**
@@ -1848,6 +1856,7 @@ static const struct engine_vtab memtx_engine_vtab = {
 	/* .abort_with_conflict = */ memtx_engine_abort_with_conflict,
 	/* .bootstrap = */ memtx_engine_bootstrap,
 	/* .begin_initial_recovery = */ memtx_engine_begin_initial_recovery,
+	/* .recover_snapshot = */ memtx_engine_recover_snapshot,
 	/* .begin_final_recovery = */ memtx_engine_begin_final_recovery,
 	/* .begin_hot_standby = */ memtx_engine_begin_hot_standby,
 	/* .end_recovery = */ memtx_engine_end_recovery,
