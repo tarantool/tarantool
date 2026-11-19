@@ -26,7 +26,8 @@ local USAGE = [[
               in Arrow mode columns are randomly chosen for every batch.
    column_count_total <number, 1000> - number of columns in the test space
    column_count_batch <number, 100>  - number of columns in the record batch
-   row_count_total <number, 1000000> - number of inserted rows
+   row_count_total <number, 1000000> - number of inserted rows (1000 in
+                                       a dry run)
    row_count_batch <number, 1000>    - number of rows per record batch
    use_arrow_api <boolean, false>    - use the Arrow API for batch insertion
    secondary_index <boolean, false>  - whether secondary index present
@@ -47,12 +48,14 @@ local params = benchmark.argparse(arg, {
     {'secondary_covers', 'number'},
 }, USAGE)
 
+local bench = benchmark.new(params)
+
 local DEFAULT_ENGINE = 'memtx'
 local DEFAULT_WAL_MODE = 'write'
 local DEFAULT_SPARSE_MODE = 'rand'
 local DEFAULT_COLUMN_COUNT_TOTAL = 1000
 local DEFAULT_COLUMN_COUNT_BATCH = 100
-local DEFAULT_ROW_COUNT_TOTAL = 1000 * 1000
+local DEFAULT_ROW_COUNT_TOTAL = bench.dry_run and 1000 or 1000 * 1000
 local DEFAULT_ROW_COUNT_BATCH = 1000
 local DEFAULT_SECONDARY_COVERS = 0
 
@@ -74,8 +77,6 @@ assert(params.column_count_batch < 1000 * 1000)
 assert(params.row_count_batch <= params.row_count_total)
 assert(params.row_count_total % params.row_count_batch == 0)
 assert(params.secondary_covers >= 0)
-
-local bench = benchmark.new(params)
 
 local BUILDDIR = fio.abspath(fio.pathjoin(os.getenv('BUILDDIR') or '.'))
 local MODULEPATH = fio.pathjoin(BUILDDIR, 'perf', 'lua',
