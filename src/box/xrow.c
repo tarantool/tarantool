@@ -255,6 +255,9 @@ xrow_decode(struct xrow_header *header, const char **pos,
 			header->audit_context = mp_decode_str(
 				pos, &header->audit_context_len);
 			break;
+		case IPROTO_TRACE_CONTEXT_SPAN_ID:
+			header->trace_context_span_id = mp_decode_uint(pos);
+			break;
 		default:
 			/* unknown header */
 			mp_next(pos);
@@ -439,6 +442,7 @@ xrow_header_encode(const struct xrow_header *header, uint64_t sync, char *data)
 		map_size++;
 	}
 	assert(header->audit_context == NULL);
+	assert(header->trace_context_span_id == 0);
 	assert(d <= data + XROW_HEADER_LEN_MAX);
 	mp_encode_map(data, map_size);
 	ERROR_INJECT(ERRINJ_XLOG_WRITE_INVALID_HEADER, {

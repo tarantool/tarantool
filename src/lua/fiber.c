@@ -966,6 +966,36 @@ lbox_fiber_set_managed_shutdown(struct lua_State *L)
 	return 0;
 }
 
+/** Set the `storage.span_id` value for the fiber. */
+static int
+lbox_fiber_set_span_id(struct lua_State *L)
+{
+	if (lua_gettop(L) != 2) {
+		diag_set(IllegalParams,
+			 "fiber.set_span_id(id, span_id): bad arguments");
+		luaT_error(L);
+	}
+	struct fiber *fiber = lbox_checkfiber(L, 1);
+	uint64_t span_id = luaL_touint64(L, 2);
+	fiber->storage.span_id = span_id;
+	return 0;
+}
+
+/** Get the `storage.span_id` value of the fiber. */
+static int
+lbox_fiber_get_span_id(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1) {
+		diag_set(IllegalParams,
+			 "fiber.get_span_id(id): bad arguments");
+		luaT_error(L);
+	}
+	struct fiber *fiber = lbox_checkfiber(L, 1);
+	uint64_t span_id = fiber->storage.span_id;
+	luaL_pushuint64(L, span_id);
+	return 1;
+}
+
 /** Helper for fiber slice parsing. */
 static struct fiber_slice
 lbox_fiber_slice_parse(struct lua_State *L, int idx)
@@ -1115,6 +1145,8 @@ static const struct luaL_Reg fiberlib[] = {
 	{"stall", lbox_fiber_stall},
 	{"set_system", lbox_fiber_set_system},
 	{"set_managed_shutdown", lbox_fiber_set_managed_shutdown},
+	{"set_span_id", lbox_fiber_set_span_id},
+	{"get_span_id", lbox_fiber_get_span_id},
 	{NULL, NULL}
 };
 
