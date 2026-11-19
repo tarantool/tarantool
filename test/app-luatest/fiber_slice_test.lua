@@ -189,7 +189,7 @@ g.test_compat = function()
         t.assert_equals(compat.fiber_slice_default.current, 'default')
         t.assert_equals(compat.fiber_slice_default.default, 'new')
         local max_slice
-        if not tarantool.build.asan then
+        if not tarantool.build.asan and not tarantool.build.tsan then
             max_slice = {warn = 0.5, err = 1.0}
         end
         t.assert_equals(fiber.self():info().max_slice, max_slice)

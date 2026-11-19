@@ -3,7 +3,8 @@
 local server = require('luatest.server')
 local t = require('luatest')
 
-local is_asan = require('tarantool').build.asan
+local build = require('tarantool').build
+local is_slow_build = build.asan or build.tsan
 
 local g = t.group()
 
@@ -35,7 +36,7 @@ g.test_zeroblob = function()
 end
 
 g.test_replace = function()
-    t.skip(is_asan, 'the testcase is too slow with enabled ASAN')
+    t.skip(is_slow_build, 'the testcase is too slow with enabled ASAN/TSAN')
     g.server:exec(function()
         local a = string.rep('1', 50000)
         local b = string.rep('2', 50000)
@@ -69,7 +70,7 @@ g.test_hex = function()
 end
 
 g.test_group_concat = function()
-    t.skip(is_asan, 'the testcase is too slow with enabled ASAN')
+    t.skip(is_slow_build, 'the testcase is too slow with enabled ASAN/TSAN')
     g.server:exec(function()
         box.execute([[CREATE TABLE t(i INT PRIMARY KEY, s VARBINARY);]])
         box.execute([[INSERT INTO t VALUES(1, zeroblob(10000));]])
