@@ -291,6 +291,7 @@ sql_space_info_new(uint32_t field_count, uint32_t part_count)
 		info->sort_orders[i] = SORT_ORDER_ASC;
 
 	}
+	info->is_lite = false;
 	return info;
 }
 
