@@ -113,6 +113,7 @@ lua_source(lua_sources ../third_party/metrics/metrics/tarantool/clock.lua metric
 lua_source(lua_sources ../third_party/metrics/metrics/tarantool/config.lua metrics_tarantool_config_lua)
 lua_source(lua_sources ../third_party/metrics/metrics/tarantool/cpu.lua metrics_tarantool_cpu_lua)
 lua_source(lua_sources ../third_party/metrics/metrics/tarantool/event_loop.lua metrics_tarantool_event_loop_lua)
+lua_source(lua_sources ../third_party/metrics/metrics/tarantool/failover.lua metrics_tarantool_failover_lua)
 lua_source(lua_sources ../third_party/metrics/metrics/tarantool/fibers.lua metrics_tarantool_fibers_lua)
 lua_source(lua_sources ../third_party/metrics/metrics/tarantool/info.lua metrics_tarantool_info_lua)
 lua_source(lua_sources ../third_party/metrics/metrics/tarantool/luajit.lua metrics_tarantool_luajit_lua)
