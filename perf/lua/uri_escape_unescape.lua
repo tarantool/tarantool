@@ -26,7 +26,7 @@ local str = "A$B$C$D$E$F$G$H$I$J$K$L$M$N$O$P$Q$R$S$T$U$V$W$X$Y$Z$ #"
 local encode_sample = string.rep(str, 10^3)
 local decode_sample = uri.escape(encode_sample, escape_opts)
 
-local CYCLES = 10^4
+local CYCLES = bench.dry_run and 1 or 10^4
 
 local tests = {{
     name = "uri.escape",
