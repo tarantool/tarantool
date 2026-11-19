@@ -50,13 +50,13 @@ do -- check basic table.copy (deepcopy)
     )
 end
 
-do -- check basic table.copy (deepcopy)
+do -- check basic table.copy (shallow)
     local example_table = {
         {1, 2, 3},
         {"help, I'm very nested", {{{ }}} }
     }
 
-    local copy_table = table.copy(example_table, true)
+    local copy_table = table.copy(example_table)
 
     test:is_deeply(
         example_table,
@@ -170,7 +170,7 @@ do -- check usage of __copy metamethod + shallow
         end
     }
     local one_self = setmetatable({ a = 2 }, copy_mt)
-    local another_self = table.copy(one_self, true)
+    local another_self = table.copy(one_self)
 
     test:isnt(
         one_self,
@@ -197,7 +197,7 @@ do -- check usage of not __copy metamethod on second level + shallow
         end
     }
     local one_self = { setmetatable({ a = 2 }, copy_mt) }
-    local another_self = table.copy(one_self, true)
+    local another_self = table.copy(one_self)
 
     test:isnt(
         one_self, another_self,

@@ -77,6 +77,8 @@ lua_source(lua_sources lua/protobuf_wireformat.lua protobuf_wireformat_lua)
 lua_source(lua_sources lua/protobuf.lua protobuf_lua)
 lua_source(lua_sources lua/version.lua version_lua)
 
+lua_stub(table FILES lua/table.lua lua/table_stub.lua)
+
 if(ENABLE_LUA_EXTRAS)
     lua_multi_source(lua_sources ${EXTRA_LUA_SOURCES})
 endif()
