@@ -13,7 +13,11 @@
 -- }, USAGE)
 -- local bench = benchmark.new(opts)
 --
--- local ITERATIONS = 10
+-- -- A dry run checks that the benchmark works, not how fast it
+-- -- is: one iteration of each measured loop, no warm-up loops, no
+-- -- minimum run time. It is requested by the BENCHMARK_DRY_RUN
+-- -- environment variable, the same as for Google Benchmark.
+-- local ITERATIONS = bench.dry_run and 1 or 10
 --
 -- local start_time = {
 --     time = clock.time(),
@@ -106,6 +110,9 @@ local GENERAL_HELP = [[
  Options can be used with '--', followed by the value if it's not a boolean
  option.
 
+ Set the BENCHMARK_DRY_RUN environment variable to true to run the benchmark
+ once instead of measuring it, as for Google Benchmark.
+
  There are a bunch of suggestions how to achieve the most stable results:
  https://github.com/tarantool/tarantool/wiki/Benchmarking
 ]]
@@ -161,25 +168,46 @@ local function iso_8061_timestamp()
     return datetime.new(dt):format('%Y-%m-%dT%H:%M:%S%z')
 end
 
-local function perf_context()
+local function perf_context(dry_run)
     return {
         build_flags = tarantool.build.flags,
         build_target = tarantool.build.target,
         date = iso_8061_timestamp(),
+        -- The same mark as in the Google Benchmark output.
+        dry_run = dry_run and 'true' or nil,
         host_name = io.popen('hostname'):read(),
         load_avg = load_average(),
         tarantool_version = tarantool.version,
     }
 end
 
+-- Read a boolean environment variable the way Google Benchmark
+-- does [1], so BENCHMARK_DRY_RUN means the same for the C++ and
+-- the Lua benchmarks.
+--
+-- 1. https://github.com/google/benchmark/blob/v1.10.0/src/commandlineflags.cc#L308-L323
+local function env_flag(name)
+    local value = os.getenv(name)
+    if value == nil then
+        return false
+    end
+    if #value == 1 then
+        return value:find('^%w$') ~= nil and value:find('^[0fFnN]$') == nil
+    end
+    value = value:lower()
+    return value ~= 'false' and value ~= 'no' and value ~= 'off'
+end
+
 function M.new(opts)
     assert(type(opts) == 'table', 'given argument should be a table')
     local output_format = opts.output_format or 'console'
+    local dry_run = env_flag('BENCHMARK_DRY_RUN')
     return setmetatable({
         output = opts.output,
         output_format = output_format:lower(),
         results = {},
-        context = perf_context(),
+        context = perf_context(dry_run),
+        dry_run = dry_run,
     }, {__index = {
         add_result = add_result,
         dump_results = dump_results,
