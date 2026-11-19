@@ -1120,6 +1120,23 @@ resolveOrderGroupBy(NameContext * pNC,	/* The name context of the SELECT stateme
 	return sqlResolveOrderGroupBy(pParse, pSelect, pOrderBy, zType);
 }
 
+/**
+ * This function sets types in subquery early.
+ * Without this, the types will not be passed to the external function.
+ */
+static void
+sql_add_column_type_in_subquery(Parse *parse, struct SrcList_item *item)
+{
+	if (item->pSelect == 0 || item->space == 0 ||
+	    item->space->def->id != 0)
+		return;
+	/* A sub-query in the FROM clause of a SELECT */
+	Select *sel = item->pSelect;
+	while (sel->pPrior)
+		sel = sel->pPrior;
+	sqlSelectAddColumnTypeAndCollation(parse, item->space->def, sel);
+}
+
 /*
  * Resolve names in the SELECT statement p and all of its descendants.
  */
@@ -1210,7 +1227,7 @@ resolveSelectStep(Walker * pWalker, Select * p)
 							  pOuterNC);
 				if (pParse->is_aborted)
 					return WRC_Abort;
-
+				sql_add_column_type_in_subquery(pParse, pItem);
 				for (pNC = pOuterNC; pNC; pNC = pNC->pNext)
 					nRef -= pNC->nRef;
 				assert(pItem->fg.isCorrelated == 0

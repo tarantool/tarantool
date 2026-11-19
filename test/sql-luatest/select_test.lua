@@ -95,3 +95,78 @@ g.test_13133_no_table_value_functions = function(cg)
         t.assert_equals(err.message, exp_err)
     end)
 end
+
+--
+-- Make sure that metadata type when aggregate over a subquery is correct.
+--
+g.test_13358_aggregate_over_subqueny_metadata_type = function(cg)
+    cg.server:exec(function()
+        box.execute([[CREATE TABLE t (a INT PRIMARY KEY, b INT);]])
+        box.execute([[INSERT INTO t VALUES (1, 1), (2, 1), (3, 2);]])
+        box.execute([[SET SESSION "sql_seq_scan" = true;]])
+
+        local exp = {
+            {
+                name = "COLUMN_1",
+                type = "integer",
+            },
+        }
+        local sql = "SELECT SUM(n) FROM "..
+                    "(SELECT b, COUNT(*) AS n FROM t GROUP BY b);"
+        local res = box.execute(sql)
+        t.assert_equals(res.metadata, exp)
+
+        sql = "SELECT MIN(n) FROM "..
+              "(SELECT b, COUNT(*) AS n FROM t GROUP BY b);"
+        res = box.execute(sql)
+        t.assert_equals(res.metadata, exp)
+
+        sql = "SELECT MAX(n) FROM "..
+              "(SELECT b, COUNT(*) AS n FROM t GROUP BY b);"
+        res = box.execute(sql)
+        t.assert_equals(res.metadata, exp)
+
+        sql = "SELECT AVG(n) FROM "..
+              "(SELECT b, COUNT(*) AS n FROM t GROUP BY b);"
+        res = box.execute(sql)
+        t.assert_equals(res.metadata, exp)
+
+        res = box.execute([[SELECT SUM(b) FROM t;]])
+        t.assert_equals(res.metadata, exp)
+
+        res = box.execute([[SELECT MIN(b) FROM t;]])
+        t.assert_equals(res.metadata, exp)
+
+        res = box.execute([[SELECT MAX(b) FROM t;]])
+        t.assert_equals(res.metadata, exp)
+
+        res = box.execute([[SELECT AVG(b) FROM t;]])
+        t.assert_equals(res.metadata, exp)
+
+        sql = "SELECT SUM(m) FROM "..
+              "(SELECT n1, MIN(n) as m FROM "..
+              "(SELECT b as n1, COUNT(*) AS n FROM t GROUP BY b) GROUP BY n1);"
+        res = box.execute(sql)
+        t.assert_equals(res.metadata, exp)
+
+        sql = "SELECT MIN(m) FROM "..
+              "(SELECT n1, MIN(n) as m FROM "..
+              "(SELECT b as n1, COUNT(*) AS n FROM t GROUP BY b) GROUP BY n1);"
+        res = box.execute(sql)
+        t.assert_equals(res.metadata, exp)
+
+        sql = "SELECT MAX(m) FROM "..
+              "(SELECT n1, MIN(n) as m FROM "..
+              "(SELECT b as n1, COUNT(*) AS n FROM t GROUP BY b) GROUP BY n1);"
+        res = box.execute(sql)
+        t.assert_equals(res.metadata, exp)
+
+        sql = "SELECT AVG(m) FROM "..
+              "(SELECT n1, MIN(n) as m FROM "..
+              "(SELECT b as n1, COUNT(*) AS n FROM t GROUP BY b) GROUP BY n1);"
+        res = box.execute(sql)
+        t.assert_equals(res.metadata, exp)
+
+        box.execute([[DROP TABLE t;]])
+    end)
+end
