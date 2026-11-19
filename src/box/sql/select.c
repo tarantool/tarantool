@@ -2671,6 +2671,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 				pPrior->iOffset = p->iOffset;
 				pPrior->pLimit = p->pLimit;
 				pPrior->pOffset = p->pOffset;
+				pPrior->selFlags |= p->selFlags & SF_SingleRow;
 				iSub1 = pParse->iNextSelectId;
 				rc = sqlSelect(pParse, pPrior, &dest);
 				p->pLimit = 0;

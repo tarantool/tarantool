@@ -95,3 +95,26 @@ g.test_13133_no_table_value_functions = function(cg)
         t.assert_equals(err.message, exp_err)
     end)
 end
+
+--
+-- Make sure that correct compound scalar subquery returning a single row
+-- doesn't throw an error.
+--
+g.test_13358_compound_scalar_subquery_returning_a_single_row = function(cg)
+    cg.server:exec(function()
+        local sql = [[SELECT (SELECT 1 UNION ALL SELECT 2 WHERE false);]]
+        local res, err = box.execute(sql)
+        t.assert_equals(res.rows, {{1}})
+        t.assert_equals(err, nil)
+
+        sql = [[SELECT (SELECT 1 WHERE false UNION ALL SELECT 2);]]
+        res, err = box.execute(sql)
+        t.assert_equals(res.rows, {{2}})
+        t.assert_equals(err, nil)
+
+        sql = [[SELECT (SELECT 1 WHERE false UNION ALL SELECT 2 WHERE false);]]
+        res, err = box.execute(sql)
+        t.assert_equals(res.rows, {{nil}})
+        t.assert_equals(err, nil)
+    end)
+end
