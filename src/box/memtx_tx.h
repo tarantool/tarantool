@@ -569,6 +569,14 @@ void
 memtx_tx_clean_txn(struct txn *txn);
 
 /**
+ * Account for prepared statements and the DDL owner's statements before DDL
+ * discards their stories. Call once right before invalidation.
+ */
+void
+memtx_tx_space_account_uncommitted_tuple_stat(struct space *space,
+					      struct txn *ddl_owner);
+
+/**
  * Invalidate space in memtx tx: abort all concurrent transactions interacting
  * with the space and remove all the objects associated with the space and its
  * schema. The indexes are populated with tuples according to what `ddl_owner`

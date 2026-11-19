@@ -3355,12 +3355,18 @@ memtx_tx_history_rollback_empty_stmt(struct txn_stmt *stmt)
 			}
 		});
 	}
-	/* We have no stories here so reference bare tuples instead. */
+	/*
+	 * DDL already materialized these changes, including their statistics.
+	 * We have no stories here so reference bare tuples instead.
+	 */
 	memtx_tuple_list_foreach(old_tuples, old_tuple, {
+		memtx_space_update_tuple_stat(stmt->space, NULL, old_tuple);
 		tuple_ref(old_tuple);
 	});
-	if (new_tuple != NULL)
+	if (new_tuple != NULL) {
+		memtx_space_update_tuple_stat(stmt->space, new_tuple, NULL);
 		tuple_unref(new_tuple);
+	}
 }
 
 void
@@ -4036,6 +4042,34 @@ memtx_tx_abort_space_schema_readers(struct space *space, struct txn *ddl_owner)
 				break;
 			}
 		}
+	}
+}
+
+void
+memtx_tx_space_account_uncommitted_tuple_stat(struct space *space,
+					      struct txn *ddl_owner)
+{
+	struct memtx_story *story;
+	rlist_foreach_entry(story, &space->memtx_stories, in_space_stories) {
+		struct txn_stmt *stmt = story->add_stmt;
+		bool is_added = stmt != NULL &&
+			(stmt->txn == ddl_owner || stmt->txn->psn != 0);
+		bool is_deleted = false;
+		stmt = story->del_stmt;
+		while (stmt != NULL) {
+			if (stmt->txn == ddl_owner || stmt->txn->psn != 0) {
+				is_deleted = true;
+				break;
+			}
+			struct memtx_del_story_link *link =
+				memtx_tx_stmt_del_story_find(stmt, story);
+			stmt = link->next_del_stmt;
+		}
+		if (is_added == is_deleted)
+			continue;
+		memtx_space_update_tuple_stat(story->space,
+					      is_deleted ? story->tuple : NULL,
+					      is_added ? story->tuple : NULL);
 	}
 }
 
