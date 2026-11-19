@@ -391,10 +391,11 @@ evio_service_bind_uri(struct evio_service *service, const struct uri *u)
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
 
-	if (getaddrinfo(u->host, u->service, &hints, &res) != 0 ||
-	    res == NULL) {
+	int rc = sio_getaddrinfo(u->host, u->service, &hints, &res);
+	if (rc != 0 || res == NULL) {
 		diag_set(SocketError, sio_socketname(-1),
-			 "can't resolve uri for bind");
+			 "can't resolve uri for bind: %s",
+			 rc != 0 ? gai_strerror(rc) : "no addresses");
 		return -1;
 	}
 	for (struct addrinfo *ai = res; ai != NULL; ai = ai->ai_next) {

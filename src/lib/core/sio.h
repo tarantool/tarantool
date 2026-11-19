@@ -275,6 +275,21 @@ sio_getprotobyname(const char *name);
 char *
 sio_getprotobynumber(int proto);
 
+/**
+ * getaddrinfo() which retries without AI_ADDRCONFIG if the first call
+ * fails with EAI_BADFLAGS or EAI_ADDRFAMILY.
+ * glibc ignores loopback addresses for AI_ADDRCONFIG, so:
+ * 1) ::1 can't be resolved on a host without non-loopback IPv6
+ *    addresses;
+ * 2) 127.0.0.1 can't be resolved on a host whose only non-loopback
+ *    addresses are IPv6.
+ * @see https://sourceware.org/bugzilla/show_bug.cgi?id=4599
+ * @see https://bugs.launchpad.net/tarantool/+bug/1160877
+ */
+int
+sio_getaddrinfo(const char *host, const char *service,
+		const struct addrinfo *hints, struct addrinfo **res);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
