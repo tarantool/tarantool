@@ -8,7 +8,11 @@
 # With flakes, `nix develop' imports this file; see flake.nix.
 #
 {
-  pkgs ? import <nixpkgs> { },
+  # Use the nixpkgs revision pinned in flake.lock, so that `nix-shell' and
+  # `nix develop' provide the same toolchain.
+  pkgs ? import (builtins.fetchTree (builtins.fromJSON (
+    builtins.readFile ./flake.lock
+  )).nodes.nixpkgs.locked) { },
   # Taken from the upstream flake through flake.nix to get a version
   # newer than the one in nixpkgs. The defaults keep `nix-shell` usable.
   emmyluaCheck ? pkgs.emmylua-check,
