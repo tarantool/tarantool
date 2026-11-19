@@ -16,7 +16,8 @@ local USAGE = [[
    engine <string, 'memtx'>          - space engine to use for the test
    wal_mode <string, 'write'>        - write-ahead log mode to use for the test
    column_count <number, 1000>       - number of columns in the test space
-   row_count <number, 1000000>       - number of inserted rows
+   row_count <number, 1000000>       - number of inserted rows (1000 in
+                                       a dry run)
    secondary_indexes <number, 0>     - amount of secondary indexes,
                                        each is built over the second field
    update_fields <string, "2">       - comma-separated list of update fields
@@ -36,10 +37,12 @@ local params = benchmark.argparse(arg, {
     {'minimum_run_time', 'number'},
 }, USAGE)
 
+local bench = benchmark.new(params)
+
 local DEFAULT_ENGINE = 'memtx'
 local DEFAULT_WAL_MODE = 'write'
 local DEFAULT_COLUMN_COUNT = 1000
-local DEFAULT_ROW_COUNT = 1000 * 1000
+local DEFAULT_ROW_COUNT = bench.dry_run and 1000 or 1000 * 1000
 local DEFAULT_SECONDARY_INDEXES = 0
 local DEFAULT_UPDATE_FIELDS = '2'
 local DEFAULT_UPDATE_COUNT = 1000
@@ -56,8 +59,6 @@ params.minimum_run_time = params.minimum_run_time or 5
 
 assert(params.secondary_indexes >= 0)
 params.update_fields = csv.load(params.update_fields)[1]
-
-local bench = benchmark.new(params)
 
 local test_dir = fio.tempdir()
 
