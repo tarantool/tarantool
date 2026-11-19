@@ -339,6 +339,10 @@ say_get_module_log_level(const char *name);
 void
 say_set_flightrec_log_level(int new_level);
 
+/** Suppress colors in the current thread; return the previous state. */
+bool
+say_set_color_suppressed(bool suppressed);
+
 /**
  * Return say format by name.
  *
