@@ -48,7 +48,7 @@ repeat
     rv:close()
     delta_real = clock.time() - start_time.time
     count = count + 1
-until delta_real > params.minimum_run_time
+until bench.dry_run or delta_real > params.minimum_run_time
 
 bench:add_result('open_close', {
     items = count,

@@ -303,7 +303,7 @@ local function run_test(test)
         end
         delta_real = clock.time() - real_time_start
         count = count + 1
-    until delta_real > params.minimum_run_time
+    until bench.dry_run or delta_real > params.minimum_run_time
     local delta_cpu = clock.proc() - cpu_time_start
     bench:add_result(test.name, {
         real_time = delta_real,
