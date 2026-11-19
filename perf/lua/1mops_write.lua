@@ -148,6 +148,12 @@ warmup_thr = warmup_thr > 100 and 100 or warmup_thr
 warmup_thr = warmup_thr < 0 and 0 or warmup_thr
 -- END OF TUNABLE OPTIONS
 
+if bench.dry_run then
+    -- One transaction per fiber, no warm-up.
+    num_ops = num_fibers * ops_per_txn
+    warmup_thr = 0
+end
+
 -- transactions per fiber
 local trans_per_fiber = math.floor(num_ops/ops_per_txn/num_fibers)
 assert(trans_per_fiber > 0, 'transaction count is less than fiber count')

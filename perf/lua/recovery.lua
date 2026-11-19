@@ -69,7 +69,7 @@ params.column_count = params.column_count or 1 + params.sk_count
 assert(params.column_count >= 1 + params.sk_count)
 
 -- Number of checkpoints to create.
-params.recovery_count = params.recovery_count or 1
+params.recovery_count = bench.dry_run and 1 or params.recovery_count or 1
 assert(params.recovery_count >= 1)
 
 -- The index sort thread number.

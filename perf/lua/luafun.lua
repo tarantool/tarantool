@@ -23,7 +23,7 @@ math.randomseed(42)
 -- Data for `drop_while` benchmark.
 --
 
-local DROP_WHILE_CYCLES = 10^3
+local DROP_WHILE_CYCLES = bench.dry_run and 1 or 10^3
 local DROP_WHILE_N = 10^7
 
 local function DROP_WHILE_FILTER(x)
