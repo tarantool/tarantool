@@ -12,7 +12,7 @@ local params = benchmark.argparse(arg, {}, USAGE)
 local bench = benchmark.new(params)
 
 -- Some significant amount of time to run (each test >30 seconds).
-local CYCLES = 3e8
+local CYCLES = bench.dry_run and 1 or 3e8
 
 local decimal_value = decimal.new(1)
 
