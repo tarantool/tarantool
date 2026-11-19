@@ -595,3 +595,12 @@ g.test_gh_8448_box_stat_memtx_func = function()
         t.assert_equals(box.stat.memtx().tx, box.stat.memtx.tx())
     end)
 end
+
+g.test_gh_13502_memtx_tx_gc_zero = function()
+    g.server:exec(function()
+        t.assert_error_covers({
+            type = "IllegalParams",
+            message = "step_num must be a number not less than 1",
+        }, box.internal.memtx_tx_gc, 0)
+    end)
+end
