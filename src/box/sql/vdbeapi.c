@@ -267,13 +267,9 @@ sql_stmt_get_id(const struct Vdbe *stmt)
 int
 sql_bind_type(struct Vdbe *v, uint32_t position, const char *type)
 {
-	if (position > (uint32_t)v->nVar) {
-		diag_set(ClientError, ER_SQL_EXECUTE,
-			 "The number of parameters is too large");
-		return -1;
-	}
-	if (v->res_var_count < position)
+	if (position > (uint32_t)v->nVar || v->res_var_count < position) {
 		return 0;
+	}
 	int rc = 0;
 	if (vdbe_metadata_set_col_type(v, v->var_pos[position - 1], type) != 0)
 		rc = -1;
