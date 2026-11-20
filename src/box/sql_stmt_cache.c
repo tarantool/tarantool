@@ -51,14 +51,14 @@ void
 sql_stmt_cache_stat(struct info_handler *h)
 {
 	info_begin(h);
-	info_table_begin(h, "cache");
-	info_append_int(h, "size", sql_stmt_cache.mem_used);
+	info_begin_key_table(h, "cache");
+	info_set_key_int(h, "size", sql_stmt_cache.mem_used);
 	uint32_t entry_count = 0;
 	mh_int_t i;
 	mh_foreach(sql_stmt_cache.hash, i)
 		entry_count++;
-	info_append_int(h, "stmt_count", entry_count);
-	info_table_end(h);
+	info_set_key_int(h, "stmt_count", entry_count);
+	info_end_table(h);
 	info_end(h);
 }
 

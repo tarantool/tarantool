@@ -46,10 +46,18 @@ luaT_info_end(struct info_handler *info)
 }
 
 static void
-luaT_info_begin_table(struct info_handler *info, const char *key)
+luaT_info_begin_key_table(struct info_handler *info, const char *key)
 {
 	lua_State *L = (lua_State *) info->ctx;
 	lua_pushstring(L, key);
+	lua_newtable(L);
+}
+
+static void
+luaT_info_begin_idx_table(struct info_handler *info, int64_t idx)
+{
+	lua_State *L = (lua_State *) info->ctx;
+	luaL_pushint64(L, idx);
 	lua_newtable(L);
 }
 
@@ -61,8 +69,8 @@ luaT_info_end_table(struct info_handler *info)
 }
 
 static void
-luaT_info_append_double(struct info_handler *info,
-			const char *key, double value)
+luaT_info_set_key_double(struct info_handler *info,
+			 const char *key, double value)
 {
 	lua_State *L = (lua_State *) info->ctx;
 	lua_pushstring(L, key);
@@ -71,8 +79,8 @@ luaT_info_append_double(struct info_handler *info,
 }
 
 static void
-luaT_info_append_int(struct info_handler *info, const char *key,
-		     int64_t value)
+luaT_info_set_key_int(struct info_handler *info, const char *key,
+		      int64_t value)
 {
 	lua_State *L = (lua_State *) info->ctx;
 	lua_pushstring(L, key);
@@ -81,8 +89,8 @@ luaT_info_append_int(struct info_handler *info, const char *key,
 }
 
 static void
-luaT_info_append_str(struct info_handler *info, const char *key,
-		   const char *value)
+luaT_info_set_key_str(struct info_handler *info, const char *key,
+		      const char *value)
 {
 	lua_State *L = (lua_State *) info->ctx;
 	lua_pushstring(L, key);
@@ -92,11 +100,20 @@ luaT_info_append_str(struct info_handler *info, const char *key,
 
 /** Appends {key: boolean_value} to the table on the Lua stack. */
 static void
-luaT_info_append_bool(struct info_handler *info, const char *key, bool value)
+luaT_info_set_key_bool(struct info_handler *info, const char *key, bool value)
 {
 	lua_State *L = (lua_State *)info->ctx;
 	lua_pushstring(L, key);
 	lua_pushboolean(L, value);
+	lua_settable(L, -3);
+}
+
+static void
+luaT_info_set_idx_int(struct info_handler *info, int64_t idx, int64_t value)
+{
+	lua_State *L = (lua_State *)info->ctx;
+	luaL_pushint64(L, idx);
+	luaL_pushint64(L, value);
 	lua_settable(L, -3);
 }
 
@@ -106,12 +123,14 @@ luaT_info_handler_create(struct info_handler *h, struct lua_State *L)
 	static struct info_handler_vtab lua_vtab = {
 		.begin = luaT_info_begin,
 		.end = luaT_info_end,
-		.begin_table = luaT_info_begin_table,
+		.begin_key_table = luaT_info_begin_key_table,
+		.begin_idx_table = luaT_info_begin_idx_table,
 		.end_table = luaT_info_end_table,
-		.append_int = luaT_info_append_int,
-		.append_str = luaT_info_append_str,
-		.append_double = luaT_info_append_double,
-		.append_bool = luaT_info_append_bool,
+		.set_key_str = luaT_info_set_key_str,
+		.set_key_int = luaT_info_set_key_int,
+		.set_key_double = luaT_info_set_key_double,
+		.set_key_bool = luaT_info_set_key_bool,
+		.set_idx_int = luaT_info_set_idx_int,
 	};
 	h->vtab = &lua_vtab;
 	h->ctx = L;

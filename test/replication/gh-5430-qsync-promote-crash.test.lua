@@ -44,9 +44,13 @@ test_run:switch('master1')
 box.cfg{replication = {test_run:eval('master3', 'return box.cfg.listen')[1]}}
 
 --
--- Master3 fills the limbo and dies.
+-- Master3 fills the limbo and dies. It stops replicating from master1 first,
+-- not to report its vclock there. Otherwise master1 would know that the
+-- synchronous transaction is on two nodes already, master1 and master3, and
+-- would have the quorum for it even with master2 blocked.
 --
 test_run:switch('master3')
+box.cfg{replication = {}}
 box.ctl.promote()
 s = box.schema.create_space('test', {is_sync = true})
 _ = s:create_index('pk')
