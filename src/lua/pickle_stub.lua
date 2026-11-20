@@ -1,0 +1,88 @@
+---@meta
+
+---# Builtin `pickle` module
+---
+---The `pickle` module provides functions for converting Lua variables
+---to and from Tarantool binary protocol primitives.
+---
+---`pickle.pack()` is prototyped after Perl `pack`.
+local pickle = {}
+
+---Convert Lua variables to binary format.
+---
+---Format specifiers:
+---
+---* `b`, `B` - 1-byte integer.
+---* `s`, `S` - 2-byte integer, low byte first.
+---* `i`, `I` - 4-byte integer, low byte first.
+---* `l`, `L` - 8-byte integer, low byte first.
+---* `n` - 2-byte integer, big endian.
+---* `N` - 4-byte integer, big endian.
+---* `q`, `Q` - 8-byte integer, big endian.
+---* `f` - 4-byte float.
+---* `d` - 8-byte double.
+---* `a`, `A` - sequence of bytes.
+---
+---A scalar value can be either a variable or a literal. Large integers
+---should be entered with `tonumber64()` or `LL`/`ULL` suffixes.
+---
+---**Example:**
+---
+---```tarantoolsession
+---tarantool> pickle = require('pickle')
+--- ---
+--- ...
+---
+---tarantool> pickle.pack('iiA', 0, 3, 'hello')
+--- ---
+--- - "\0\0\0\0\x03\0\0\0hello"
+--- ...
+---```
+---
+---Possible errors:
+---
+---* Argument count does not match the format. Excess values are
+---  ignored.
+---* Expected 8/16/32/64-bit int.
+---* Unsupported pack format specifier.
+---
+---@param format string format specifiers.
+---@param ... any scalar values to be formatted.
+---@return string result a binary string.
+function pickle.pack(format, ...) end
+
+---Convert Lua variables back from binary format.
+---
+---Counterpart to `pickle.pack()`.
+---
+---Warning: if format specifier `A` is used, it must be the last item.
+---
+---**Example:**
+---
+---```tarantoolsession
+---tarantool> pickle.unpack('bsi', pickle.pack('bsi', 255, 65535, 4294967295))
+--- ---
+--- - 255
+--- - 65535
+--- - 4294967295
+--- ...
+---
+---tarantool> num, num64, str = pickle.unpack('slA',
+---         >     pickle.pack('slA', 666, tonumber64('666666666666666'),
+---         >     'string'))
+--- ---
+--- ...
+---```
+---
+---Possible errors:
+---
+---* Too many bytes: unpacked X, total Y, where X < Y.
+---* Got X bytes (expected: Y+), where X < Y.
+---* Unsupported format specifier.
+---
+---@param format string format specifiers.
+---@param binary_string string binary string to unpack.
+---@return any ...
+function pickle.unpack(format, binary_string) end
+
+return pickle
