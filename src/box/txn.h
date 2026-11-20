@@ -132,6 +132,8 @@ enum txn_flag {
 	 * read-only so no writes should be committed.
 	 */
 	TXN_IS_ABORTED_RO_NODE = 0x2000,
+	/** A deprecated API call aborted the transaction. */
+	TXN_IS_ABORTED_BY_DEPRECATED_API = 0x4000,
 };
 
 enum {
@@ -589,6 +591,8 @@ txn_clear_flags(struct txn *txn, unsigned int flags)
 static inline enum box_error_code
 txn_flags_to_error_code(struct txn *txn)
 {
+	if (txn_has_flag(txn, TXN_IS_ABORTED_BY_DEPRECATED_API))
+		return ER_TXN_ROLLBACK;
 	if (txn_has_flag(txn, TXN_IS_ABORTED_RO_NODE))
 		return ER_READONLY;
 	if (txn_has_flag(txn, TXN_IS_CONFLICTED))

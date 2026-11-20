@@ -682,6 +682,16 @@ box_raft_on_wal_error_f(struct watcher *watcher)
 bool
 box_raft_is_ro(void)
 {
+	/*
+	 * Old compat permits box.ctl.promote() with election_mode = 'off'.
+	 * Enabling async through compat leaves election_mode unchanged,
+	 * so the limbo may remain in TXN_LIMBO_STATE_LEADER with matching Raft
+	 * and limbo terms. In order to force RO in such case, the check below
+	 * is needed.
+	 */
+	if (replication_mode == REPLICATION_MODE_ASYNC &&
+	    txn_limbo_has_owner(&txn_limbo))
+		return true;
 	if (txn_limbo.state == TXN_LIMBO_STATE_REPLICA)
 		return true;
 	struct raft *raft = box_raft();

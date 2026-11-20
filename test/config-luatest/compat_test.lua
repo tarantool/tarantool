@@ -7,6 +7,10 @@ local t = require('luatest')
 local cbuilder = require('luatest.cbuilder')
 local cluster = require('luatest.cluster')
 
+-- This compatibility option has no declarative configuration schema.
+local exposed_compat_options = table.copy(compat._options())
+exposed_compat_options.box_cfg_replication_mode = nil
+
 local g = t.group()
 
 -- These options can't be changed on reload.
@@ -31,7 +35,7 @@ g.test_parity = function()
     end):tomap()
 
     -- Mapping option name -> default value.
-    local compat_options = fun.iter(compat._options()):map(function(k, v)
+    local compat_options = fun.iter(exposed_compat_options):map(function(k, v)
         return k, v.default
     end):tomap()
 
@@ -207,7 +211,7 @@ local function gen_reload_success_case(option_name, startup_value, reload_value)
 end
 
 -- Walk over the compat options and generate test cases for them.
-for option_name, _ in pairs(compat._options()) do
+for option_name, _ in pairs(exposed_compat_options) do
     -- Start with the given option value.
     local case_name_prefix = ('test_startup_%s_'):format(option_name)
     for _, v in ipairs({'default', 'old', 'new'}) do

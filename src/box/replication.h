@@ -122,6 +122,21 @@ enum bootstrap_strategy {
 /** Instance's bootstrap strategy. Controls replication reconfiguration. */
 extern enum bootstrap_strategy bootstrap_strategy;
 
+/**
+ * Effective replication policy. The sync and async values are used in ballots.
+ * Legacy also denotes an unknown peer mode.
+ */
+enum replication_mode {
+	REPLICATION_MODE_LEGACY = 0,
+	REPLICATION_MODE_ASYNC = 1,
+	REPLICATION_MODE_SYNC = 2,
+};
+
+/** Whether dedicated replication modes are enabled by compatibility. */
+extern bool replication_mode_enable;
+/** Effective local replication mode. */
+extern enum replication_mode replication_mode;
+
 enum replicaset_state {
 	REPLICASET_BOOTSTRAP,
 	REPLICASET_JOIN,

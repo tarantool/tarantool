@@ -253,6 +253,10 @@ local begin_options = {
     end,
     txn_isolation = normalize_txn_isolation_level,
     is_sync = function(is_sync, level)
+        if compat.box_cfg_replication_mode:is_new() then
+            box.error(box.error.ILLEGAL_PARAMS, "unexpected option 'is_sync'",
+                      level + 1)
+        end
         if type(is_sync) ~= "boolean" then
             box.error(box.error.ILLEGAL_PARAMS, "is_sync must be a boolean",
                       level + 1)
@@ -427,7 +431,7 @@ box.schema.space.create = function(name, options)
         type = 'string',
         is_local = 'boolean',
         temporary = 'boolean',
-        is_sync = 'boolean',
+        is_sync = compat.box_cfg_replication_mode:is_old() and 'boolean' or nil,
         defer_deletes = 'boolean',
         constraint = 'string, table',
         foreign_key = 'table',
@@ -602,6 +606,8 @@ box.schema.space.alter = function(space_id, options)
     if not space then
         box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id), 2)
     end
+    alter_space_template.is_sync =
+        compat.box_cfg_replication_mode:is_old() and 'boolean' or nil
     check_param_table(options, alter_space_template, 2)
 
     local _space = box.space._space

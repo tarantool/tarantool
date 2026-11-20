@@ -568,6 +568,10 @@ lbox_commit(lua_State *L)
 	}
 	lua_getfield(L, 1, "is_sync");
 	if (!lua_isnil(L, -1)) {
+		if (replication_mode_enable) {
+			diag_set(IllegalParams, "unexpected option 'is_sync'");
+			return luaT_error(L);
+		}
 		if (!lua_isboolean(L, -1)) {
 			diag_set(IllegalParams, "is_sync must be a boolean");
 			return luaT_error(L);

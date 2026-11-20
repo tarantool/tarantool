@@ -2676,6 +2676,10 @@ tx_inject_delay(void)
 static int
 tx_check_is_sync(int is_sync)
 {
+	if (is_sync != -1 && replication_mode_enable) {
+		diag_set(IllegalParams, "unexpected option 'is_sync'");
+		return -1;
+	}
 	if (is_sync == 0) {
 		diag_set(IllegalParams, "is_sync can only be true");
 		return -1;

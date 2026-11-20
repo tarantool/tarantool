@@ -199,8 +199,8 @@ for _, mode in ipairs({'candidate', 'manual', 'voter'}) do
         function(lg)
             lg.replica:exec(function(election_mode)
                 local err_msg = "Incorrect value for option " ..
-                    "'election_mode': the value may only be set to 'off' " ..
-                    "when 'replication_anon' is set to true"
+                    "'replication_anon': the value may be set to true only " ..
+                    "when 'election_mode' is set to 'off'"
                 t.assert_error_msg_equals(err_msg, box.cfg,
                     {election_mode = election_mode})
             end, {mode})

@@ -30,6 +30,11 @@ local options_format = {
     action         = 'function/nil',
 }
 
+local BOX_CFG_REPLICATION_MODE_BRIEF = [[
+Enable dedicated synchronous or asynchronous replication with replication_mode.
+The old behavior permits per-space and per-transaction is_sync options.
+]]
+
 local JSON_ESCAPE_BRIEF = [[
 Whether to escape the forward slash symbol '/' using a backslash in a
 json.encode() result. The old and the new behavior produce a result, which
@@ -359,6 +364,14 @@ local options = {
         obsolete = nil,
         brief = BOX_ERROR_SERIALIZE_VERBOSE,
         action = tweak_action('box_error_serialize_verbose', false, true),
+    },
+    box_cfg_replication_mode = {
+        default = 'old',
+        obsolete = nil,
+        brief = BOX_CFG_REPLICATION_MODE_BRIEF,
+        action = function(is_new)
+            box.internal.cfg_set_replication_mode_compat(is_new)
+        end,
     },
     box_consider_system_spaces_synchronous = {
       default = 'old',

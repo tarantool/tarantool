@@ -65,6 +65,8 @@ double replication_synchro_timeout = 5.0; /* seconds */
 double replication_sync_timeout = 300.0; /* seconds */
 bool replication_skip_conflict = false;
 int replication_threads = 1;
+bool replication_mode_enable = false;
+enum replication_mode replication_mode = REPLICATION_MODE_LEGACY;
 
 bool cfg_replication_anon = true;
 struct tt_uuid cfg_bootstrap_leader_uuid;
