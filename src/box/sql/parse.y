@@ -24,6 +24,7 @@
 %token_type {Token}
 %default_type {Token}
 
+
 // The generated parser function takes a 4th argument as follows:
 %extra_argument {struct sql_parser_context *ctx}
 
@@ -1164,6 +1165,24 @@ nexprlist(A) ::= nexprlist(A) COMMA expr(Y). {
 }
 nexprlist(A) ::= expr(Y). {
   A = ast_expr_list_append(ctx->region, NULL, Y);
+}
+
+expr(A) ::= CURRENT_TIMESTAMP(X). {
+  A = ast_expr_new_function(ctx->region, &X, false, NULL);
+}
+
+expr(A) ::= CURRENT_TIMESTAMP(X) LP INTEGER(Y) RP. {
+  int64_t val;
+  bool is_neg;
+  if (sql_atoi64(Y.z, &val, &is_neg, Y.n) != 0 || is_neg || val < 0 || val > 9) {
+    diag_set(ClientError, ER_SQL_SYNTAX_NEAR_TOKEN, ctx->line, tt_cstr(Y.z, Y.n));
+    ctx->is_aborted = true;
+    A = NULL;
+  } else {
+    struct ast_expr *arg = ast_expr_new_leaf(ctx->region, TK_INTEGER, Y.z, Y.n);
+    struct ast_expr_list *args = ast_expr_list_append(ctx->region, NULL, arg);
+    A = ast_expr_new_function(ctx->region, &X, false, args);
+  }
 }
 
 ///////////////////////////// The CREATE INDEX command ///////////////////////

@@ -196,7 +196,7 @@ static Keyword aKeywordTable[] = {
   { "CURSOR",                 "TK_STANDARD",    true  },
   { "CURRENT_DATE",           "TK_STANDARD",    true  },
   { "CURRENT_TIME",           "TK_STANDARD",    true  },
-  { "CURRENT_TIMESTAMP",      "TK_STANDARD",    true  },
+  { "CURRENT_TIMESTAMP",      "TK_CURRENT_TIMESTAMP", true},
   { "DATE",                   "TK_STANDARD",    true  },
   { "DATETIME",               "TK_DATETIME",    true  },
   { "DEC",                    "TK_DECIMAL",     true  },

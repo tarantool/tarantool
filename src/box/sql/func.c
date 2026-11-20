@@ -155,6 +155,28 @@ step_count(struct sql_context *ctx, int argc, const struct Mem *argv)
 	++ctx->pOut->u.u;
 }
 
+/** Implementation of the CURRENT_TIMESTAMP() function. */
+static void
+func_current_timestamp(struct sql_context *ctx, int argc, const struct Mem *argv)
+{
+	struct datetime dt;
+	datetime_ev_now(&dt);
+	if (argc == 1) {
+		uint64_t p = argv[0].u.u; 
+		if (p > 9) {
+			ctx->is_aborted = true;
+			diag_set(ClientError, ER_SQL_EXECUTE, 
+			         "CURRENT_TIMESTAMP precision must be between 0 and 9");
+			return;
+		}
+		int32_t divisor = 1;
+		for (uint64_t i = 0; i < 9 - p; ++i)
+			divisor *= 10;
+		dt.nsec = (dt.nsec / divisor) * divisor;
+	}	
+	mem_set_datetime(ctx->pOut, &dt);
+}
+
 /** Finalizer for the COUNT() function. */
 static int
 fin_count(struct Mem *mem)
@@ -1844,6 +1866,7 @@ static struct sql_func_dictionary dictionaries[] = {
 	{"CHAR_LENGTH", 1, 1, 0, true, 0, NULL},
 	{"COALESCE", 2, SQL_MAX_FUNCTION_ARG, SQL_FUNC_COALESCE, true, 0, NULL},
 	{"COUNT", 0, 1, SQL_FUNC_AGG, false, 0, NULL},
+	{"CURRENT_TIMESTAMP", 0, 1, 0, true, 0, NULL},
 	{"DATE_PART", 2, 2, 0, true, 0, NULL},
 	{"GREATEST", 2, SQL_MAX_FUNCTION_ARG, SQL_FUNC_NEEDCOLL, true, 0, NULL},
 	{"GROUP_CONCAT", 1, 2, SQL_FUNC_AGG, false, 0, NULL},
@@ -1934,6 +1957,10 @@ static struct sql_func_definition definitions[] = {
 	{"COUNT", 0, {}, FIELD_TYPE_INTEGER, step_count, fin_count},
 	{"COUNT", 1, {field_type_MAX}, FIELD_TYPE_INTEGER, step_count,
 	 fin_count},
+	{"CURRENT_TIMESTAMP", 0, {}, FIELD_TYPE_DATETIME, func_current_timestamp,
+	 NULL},
+	{"CURRENT_TIMESTAMP", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_DATETIME,
+	 func_current_timestamp, NULL},
 	{"DATE_PART", 2, {FIELD_TYPE_STRING, FIELD_TYPE_DATETIME},
 	 FIELD_TYPE_INTEGER, func_date_part, NULL},
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(66)
+test:plan(75)
 
 --
 -- Make sure that number of arguments check is checked properly for SQL built-in
@@ -660,6 +660,61 @@ test:do_test(
         return {tostring(res[3])}
     end, {
         "Type mismatch: can not convert integer(1) to string"
+    })
+
+-- gh-13683: Introduce CURRENT_TIMESTAMP [(p)]
+test:do_execsql_test(
+    "current_timestamp-1.1",
+    [[ SELECT typeof(CURRENT_TIMESTAMP); ]], {
+        "datetime"
+    })
+
+test:do_execsql_test(
+    "current_timestamp-1.2",
+    [[ SELECT typeof(CURRENT_TIMESTAMP(3)); ]], {
+        "datetime"
+    })
+
+test:do_execsql_test(
+    "current_timestamp-1.3",
+    [[ SELECT typeof(CURRENT_TIMESTAMP(0)); ]], {
+        "datetime"
+    })
+
+test:do_catchsql_test(
+    "current_timestamp-1.4",
+    [[ SELECT CURRENT_TIMESTAMP(); ]], {
+        1, "Syntax error at line 1 near ')'"
+    })
+
+test:do_catchsql_test(
+    "current_timestamp-1.5",
+    [[ SELECT CURRENT_TIMESTAMP(10); ]], {
+        1, "Syntax error at line 1 near '10'"
+    })
+
+test:do_catchsql_test(
+    "current_timestamp-1.6",
+    [[ SELECT CURRENT_TIMESTAMP(?); ]], {
+        1, "Syntax error at line 1 near '?'"
+    })
+
+test:do_catchsql_test(
+    "current_timestamp-1.7",
+    [[ SELECT CURRENT_TIMESTAMP(1+1); ]], {
+        1, "Syntax error at line 1 near '+'"
+    })
+
+test:do_catchsql_test(
+    "current_timestamp-1.8",
+    [[ SELECT CURRENT_TIMESTAMP(0.6); ]], {
+        1, "Syntax error at line 1 near '0.6'"
+    })
+
+test:do_catchsql_test(
+    "current_timestamp-1.9",
+    [[ SELECT CURRENT_TIMESTAMP(-4); ]], {
+        1, "Syntax error at line 1 near '-'"
     })
 
 test:finish_test()
