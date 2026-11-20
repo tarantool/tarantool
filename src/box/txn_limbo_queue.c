@@ -633,8 +633,11 @@ txn_limbo_queue_bump_confirmed_lsn(struct txn_limbo_queue *queue, int64_t lsn)
 void
 txn_limbo_queue_apply_confirm(struct txn_limbo_queue *queue, int64_t lsn)
 {
-	assert(queue->owner_id != REPLICA_ID_NIL ||
-	       txn_limbo_queue_is_empty(queue));
+	if (queue->owner_id == REPLICA_ID_NIL) {
+		assert(txn_limbo_queue_is_empty(queue));
+		/* JOIN metadata must not confirm vclock component zero. */
+		return;
+	}
 	if (queue->confirmed_lsn >= lsn)
 		return;
 
