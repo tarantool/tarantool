@@ -308,6 +308,11 @@ local function emit_function(
         prefix = name ~= nil and 'function' or nil
     end
     if name == nil then
+        name, rest =
+            statement:match('^local%s+([%w_]+)%s*=%s*function%s*%((.*)$')
+        prefix = name ~= nil and 'local function' or nil
+    end
+    if name == nil then
         return
     end
 
@@ -327,6 +332,60 @@ local function emit_function(
     end
 end
 
+-- The contiguous block of annotating comments above the line `index`,
+-- skipping blank lines. Return a list of lines.
+local function doc_above(lines, index)
+    local i = index - 1
+    while i >= 1 and strip(lines[i]) == '' do
+        i = i - 1
+    end
+    local block = {}
+    while i >= 1 and lines[i]:sub(1, 3) == '---' do
+        table.insert(block, 1, lines[i])
+        i = i - 1
+    end
+    return block
+end
+
+-- Whether the statement is a top-level `<return_name>.<name> = <value>`
+-- assignment that the export pass rewrites. Function literals are
+-- declared by emit_function() and are not handled by the export pass.
+local function is_export_statement(statement, return_name)
+    if return_name == nil or statement == nil then
+        return false
+    end
+    if statement:match('^' .. return_name .. '%.[%a_][%w_]*%s*=') == nil then
+        return false
+    end
+    return statement:match('=%s*function%s*%(') == nil
+end
+
+-- The value of a top-level `<return_name>.<name> = <value>` assignment,
+-- normalized to a name declared in the stub, or nil when the value is
+-- not supported. Wrapper calls such as `export1(fun)` are reduced to the
+-- wrapped function.
+local function export_value(expr, assigned, declared, names, return_name)
+    local name = expr:match('^' .. return_name .. '%.([%a_][%w_]*)$')
+    if name ~= nil then
+        if assigned[name] or names[return_name .. '.' .. name] then
+            return return_name .. '.' .. name
+        end
+        return nil
+    end
+    -- Lua Fun wraps exported functions into `exportN()`/`methodN()`
+    -- helpers that adapt the argument list; the stub only needs the
+    -- wrapped name.
+    name = expr:match('^export%d+%(([%a_][%w_]*)%s*%)$') or
+        expr:match('^method%d+%(([%a_][%w_]*)%s*%)$')
+    if name == nil then
+        name = expr:match('^([%a_][%w_]*)$')
+    end
+    if name ~= nil and (declared[name] or names[name]) then
+        return name
+    end
+    return nil
+end
+
 local function generate(out_file, files, return_name)
     local body = {}
     local declared = {}
@@ -334,11 +393,28 @@ local function generate(out_file, files, return_name)
     local roots = {}
     local order = {}
     local return_emitted = false
+    local export_assignments = {}
 
     for _, path in ipairs(files) do
         local lines = split_lines(read_file(path))
         local nlines = #lines
         local i = 1
+        if return_name ~= nil then
+            for index, line in ipairs(lines) do
+                local name, expr = line:match(
+                    '^' .. return_name ..
+                    '%.([%a_][%w_]*)%s*=%s*(.+)$')
+                if name ~= nil then
+                    table.insert(export_assignments, {
+                        name = name,
+                        expr = strip(expr),
+                        doc = doc_above(lines, index),
+                        path = path,
+                        line = index,
+                    })
+                end
+            end
+        end
         while i <= nlines do
             if lines[i]:sub(1, 3) ~= '---' then
                 i = i + 1
@@ -378,7 +454,11 @@ local function generate(out_file, files, return_name)
                 end
 
                 local statement, statement_index = find_statement(lines, j)
-                if has_dir and not code_only then
+                -- The export pass emits the block together with the
+                -- assignment it documents.
+                local export_block =
+                    is_export_statement(statement, return_name)
+                if has_dir and not code_only and not export_block then
                     for k = i, j - 1 do
                         table.insert(body, lines[k])
                     end
@@ -413,6 +493,34 @@ local function generate(out_file, files, return_name)
                 end
 
                 i = j
+            end
+        end
+    end
+
+    if return_name ~= nil and not return_emitted and
+            declared[return_name] and #export_assignments > 0 then
+        local assigned = {}
+        local first = true
+        for _, item in ipairs(export_assignments) do
+            local value = export_value(
+                item.expr, assigned, declared, names, return_name)
+            if value ~= nil then
+                if first then
+                    if body[#body] ~= '' then
+                        table.insert(body, '')
+                    end
+                    first = false
+                end
+                for _, line in ipairs(item.doc) do
+                    table.insert(body, line)
+                end
+                table.insert(body,
+                             return_name .. '.' .. item.name .. ' = ' .. value)
+                assigned[item.name] = true
+            elseif item.expr:match('^function%s*%(') == nil then
+                io.stderr:write(string.format(
+                    "gen-emmylua-stubs: %s:%d: cannot resolve '%s.%s = %s'\n",
+                    item.path, item.line, return_name, item.name, item.expr))
             end
         end
     end
