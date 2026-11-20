@@ -117,8 +117,11 @@ txn_checkpoint_build(struct box_checkpoint *out, bool do_journal_rotation)
 	 * For async txns the persistence means commit. For sync txns need to
 	 * wait for their confirmation explicitly.
 	 */
-	if (txn_journal_flush(&out->journal, do_journal_rotation) != 0)
+	if (txn_journal_flush(&out->journal, do_journal_rotation) != 0) {
+		trigger_clear(&on_commit);
+		trigger_clear(&on_rollback);
 		return -1;
+	}
 	/*
 	 * The synchronous transactions, persisted above, might still be not
 	 * committed. Lets make sure they are, so the checkpoint won't have any
