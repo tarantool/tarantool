@@ -766,11 +766,22 @@ recovery_journal_write(struct journal *base,
 	return 0;
 }
 
+/** Recovery journal writes complete immediately. */
+static int
+recovery_journal_sync(struct journal *base, struct vclock *out)
+{
+	struct recovery_journal *journal = (struct recovery_journal *)base;
+	if (out != NULL)
+		vclock_copy(out, journal->vclock);
+	return 0;
+}
+
 static void
 recovery_journal_create(struct vclock *v)
 {
 	static struct recovery_journal journal;
-	journal_create(&journal.base, recovery_journal_write, NULL, NULL, NULL);
+	journal_create(&journal.base, recovery_journal_write,
+		       recovery_journal_sync, NULL, NULL);
 	journal.vclock = v;
 	journal_set(&journal.base);
 }
@@ -4457,21 +4468,19 @@ static void
 box_register_replica(const struct tt_uuid *uuid,
 		     const char *name)
 {
-	struct replica *replica = replica_by_uuid(uuid);
 	/*
 	 * Find required changes.
 	 */
-	bool need_name = false;
-	bool need_id = false;
-	if (replica == NULL) {
-		need_name = *name != 0;
-		need_id = true;
-	} else {
-		need_name = strcmp(replica->name, name) != 0;
-		need_id = replica->id == REPLICA_ID_NIL;
-	}
-	if (!need_name && !need_id)
+	struct replica_def def;
+	if (schema_find_replica_by_uuid(uuid, REPLICA_ID_NIL, &def) != 0)
+		diag_raise();
+	bool need_id = def.id == REPLICA_ID_NIL;
+	if (!need_id && strcmp(def.name, name) == 0) {
+		struct box_checkpoint checkpoint;
+		if (box_checkpoint_build_in_memory(&checkpoint) != 0)
+			diag_raise();
 		return;
+	}
 	/*
 	 * Apply the changes.
 	 */
@@ -4480,21 +4489,23 @@ box_register_replica(const struct tt_uuid *uuid,
 		int rc;
 		if (*name == 0) {
 			rc = boxk(IPROTO_UPDATE, BOX_CLUSTER_ID,
-				  "[%u][[%s%dNIL]]", (unsigned)replica->id, "=",
+				  "[%u][[%s%dNIL]]", (unsigned)def.id, "=",
 				  BOX_CLUSTER_FIELD_NAME);
 		} else {
 			rc = boxk(IPROTO_UPDATE, BOX_CLUSTER_ID,
-				  "[%u][[%s%d%s]]", (unsigned)replica->id, "=",
+				  "[%u][[%s%d%s]]", (unsigned)def.id, "=",
 				  BOX_CLUSTER_FIELD_NAME, name);
 		}
 		if (rc != 0)
 			diag_raise();
 		return;
 	}
-	struct replica *other = replica_by_name(name);
-	if (other != NULL && other != replica) {
+	struct replica_def other;
+	if (schema_find_replica_by_name(name, REPLICA_ID_NIL, &other) != 0)
+		diag_raise();
+	if (other.id != REPLICA_ID_NIL) {
 		if (boxk(IPROTO_UPDATE, BOX_CLUSTER_ID, "[%u][[%s%d%s]]",
-			 (unsigned)other->id, "=", BOX_CLUSTER_FIELD_UUID,
+			 (unsigned)other.id, "=", BOX_CLUSTER_FIELD_UUID,
 			 tt_uuid_str(uuid)) != 0)
 			diag_raise();
 		return;
@@ -4884,7 +4895,7 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	     strcmp(replica->name, req.instance_name) != 0)) {
 		struct replica *other = replica_by_name(req.instance_name);
 		if (other != NULL && other != replica &&
-		    replica_has_connections(other)) {
+		    replica_has_alive_connections(other)) {
 			tnt_raise(ClientError, ER_INSTANCE_NAME_DUPLICATE,
 				  node_name_str(req.instance_name),
 				  tt_uuid_str(&other->uuid));

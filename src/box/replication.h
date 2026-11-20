@@ -36,6 +36,7 @@
 #include <small/rb.h> /* replicaset_t */
 #include <small/rlist.h>
 #include "applier.h"
+#include "bit/bit.h"
 #include "fiber_cond.h"
 #include "node_name.h"
 #include "tt_uuid.h"
@@ -421,6 +422,8 @@ struct replicaset {
 	struct rlist on_relay_thread_start;
 	/** Map of all known replica_id's to correspponding replica's. */
 	struct replica *replica_by_id[VCLOCK_MAX];
+	/** Replica IDs reserved by pending registrations. */
+	uint32_t reserved_ids;
 	/**
 	 * Signaled whenever a replication configuration option is changed
 	 * (currently used only for `replication_linearizable_quorum`).
@@ -529,7 +532,26 @@ replica_to_string(const struct replica *replica, const char *addr);
 struct replica *
 replica_by_id(uint32_t replica_id);
 
-/** Find the smallest empty replica ID in the available range. */
+static inline bool
+replica_id_is_reserved(uint32_t id)
+{
+	return bit_test(&replicaset.reserved_ids, id);
+}
+
+/** Reserve a replica ID until its registration commits or rolls back. */
+static inline void
+replica_reserve_id(uint32_t id)
+{
+	bit_set(&replicaset.reserved_ids, id);
+}
+
+static inline void
+replica_release_id(uint32_t id)
+{
+	bit_clear(&replicaset.reserved_ids, id);
+}
+
+/** Find the smallest empty replica ID that is not reserved. */
 int
 replica_find_new_id(uint32_t *replica_id);
 
@@ -562,7 +584,7 @@ void
 replica_set_name(struct replica *replica, const char *name);
 
 /*
- * Clear the numeric replica-set-local id of a replica.
+ * Clear the numeric replica-set-local id and name of a replica.
  *
  * The replica is removed from the replication vector clock.
  */
@@ -575,6 +597,18 @@ replica_clear_id(struct replica *replica);
  */
 bool
 replica_has_connections(const struct replica *replica);
+
+/**
+ * Check for incoming connections or a non-stopped applier.
+ * This includes disconnected appliers.
+ */
+bool
+replica_has_alive_connections(const struct replica *replica);
+
+/** Transfer a stopped applier, or log its error if the destination has one. */
+void
+replica_rebind_stopped_applier(struct replica *old_replica,
+			       struct replica *new_replica);
 
 /**
  * Collects garbage of a replica that is gone for a while: removes associated

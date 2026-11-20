@@ -1169,7 +1169,6 @@ relay_subscribe(struct replica *replica, struct iostream *io, uint64_t sync,
 		const struct vclock *start_vclock, uint32_t replica_version_id,
 		uint32_t replica_id_filter, uint64_t sent_raft_term)
 {
-	assert(replica->anon || replica->id != REPLICA_ID_NIL);
 	struct relay *relay = replica->relay;
 	assert(relay->state != RELAY_FOLLOW);
 	if (replica_version_id < version_id(2, 6, 0) || replica->anon)
