@@ -1,7 +1,54 @@
---- tap.lua internal file
+-- tap.lua internal file
+--
+-- The Test Anything Protocol version 13 producer
+--
+
+---The Test Anything Protocol version 13 producer.
 ---
---- The Test Anything Protocol vesion 13 producer
+---The `tap` module streamlines the testing of other modules. It allows
+---writing of tests in the
+---[TAP protocol](https://en.wikipedia.org/wiki/Test_Anything_Protocol).
+---The results from the tests can be parsed by standard TAP-analyzers so they
+---can be passed to utilities such as
+---[prove](https://metacpan.org/pod/distribution/Test-Harness/bin/prove).
+---Thus, one can run tests and then use the results for statistics,
+---decision-making, and so on.
 ---
+---**Example**
+---
+---To run this example: put the script in a file named `./tap.lua`, then make
+---`tap.lua` executable by saying `chmod a+x ./tap.lua`, then execute using
+---Tarantool as a script processor by saying `./tap.lua`.
+---
+---```lua
+---#!/usr/bin/tarantool
+---local tap = require('tap')
+---test = tap.test("my test name")
+---test:plan(2)
+---test:ok(2 * 2 == 4, "2 * 2 is 4")
+---test:test("some subtests for test2", function(test)
+---     test:plan(2)
+---     test:is(2 + 2, 4, "2 + 2 is 4")
+---     test:isnt(2 + 3, 4, "2 + 3 is not 4")
+---end)
+---test:check()
+---```
+---
+---The output from the above script will look approximately like this:
+---
+---```
+---TAP version 13
+---1..2
+---ok - 2 * 2 is 4
+---     # some subtests for test2
+---     1..2
+---     ok - 2 + 2 is 4
+---     ok - 2 + 3 is not 4
+---     # some subtests for test2: end
+---ok - some subtests for test2
+---```
+---
+local tap = {}
 
 -- yaml formatter must be able to encode any Lua variable
 local yaml = require('yaml').new()
@@ -36,23 +83,110 @@ local function traceback(level)
     return trace
 end
 
-local function diag(test, fmt, ...)
-    io.write(string.rep(' ', 4 * test.level), "# ", string.format(fmt, ...),
+---A test object returned by `tap.test()`. It has methods for performing
+---tests, printing diagnostic messages, and planning the number of checks.
+---
+---@class taptest
+---@field strict boolean Flag, true if comparisons with `nil` should be strict.
+---
+---    Set `taptest.strict=true` if `taptest:is()`, `taptest:isnt()` and
+---    `taptest:is_deeply()` must be compared strictly with `nil`. Set
+---    `taptest.strict=false` if `nil` and `box.NULL` both have the same
+---    effect. The default is false.
+---
+---    For example, if and only if `taptest.strict=true` has happened, then
+---    `taptest:is_deeply({a = box.NULL}, {})` will return `false`.
+---
+---    Since v. 2.8.3, `taptest.strict` is inherited in all subtests:
+---
+---```lua
+---t = require('tap').test('123')
+---t.strict = true
+---
+---t:is_deeply({a = box.NULL}, {}) -- false
+---
+---t:test('subtest', function(t)
+---    t:is_deeply({a = box.NULL}, {}) -- also false
+---end)
+---```
+---@field private parent taptest?
+---@field private name string
+---@field private level number
+---@field private total number
+---@field private failed number
+---@field private planned number
+---@field private trace boolean
+---@field private checked boolean?
+local taptest = {}
+
+local test_mt = {__index = taptest}
+
+---Display a diagnostic message.
+---
+---    Parameters:
+---
+---    * `fmt` -- the format string of the message to be displayed.
+---    * `...` -- optional arguments for the format string.
+---
+---@param fmt string
+---@param ... any
+---@return nil
+function taptest:diag(fmt, ...)
+    io.write(string.rep(' ', 4 * self.level), "# ", string.format(fmt, ...),
         "\n")
 end
 
-local function ok(test, cond, message, extra)
-    test.total = test.total + 1
-    io.write(string.rep(' ', 4 * test.level))
+---This is a basic function which is used by other functions.
+---
+---    Depending on the value of `cond`, print 'ok' or 'not ok' along with
+---    debugging information. Displays the message.
+---
+---    Parameters:
+---
+---    * `cond` -- an expression which is true or false.
+---    * `message` -- name of the test.
+---    * `extra` -- extra information to print in case of failure.
+---
+---    Returns true if the condition is true, otherwise false.
+---
+---    **Example:**
+---
+---```
+---tarantool> taptest:ok(true, 'x')
+---ok - x
+------
+---- true
+---...
+---tarantool> tap = require('tap')
+------
+---...
+---tarantool> taptest = tap.test('test-name')
+---TAP version 13
+------
+---...
+---tarantool> taptest:ok(1 + 1 == 2, 'X')
+---ok - X
+------
+---- true
+---...
+---```
+---
+---@param cond boolean
+---@param message string
+---@param extra? table
+---@return boolean
+function taptest:ok(cond, message, extra)
+    self.total = self.total + 1
+    io.write(string.rep(' ', 4 * self.level))
     if cond then
         io.write(string.format("ok - %s\n", message))
         return true
     end
 
-    test.failed = test.failed + 1
+    self.failed = self.failed + 1
     io.write(string.format("not ok - %s\n", message))
     extra = extra or {}
-    if test.trace then
+    if self.trace then
         extra.trace = traceback()
         extra.filename = extra.trace[#extra.trace].filename
         extra.line = extra.trace[#extra.trace].line
@@ -62,17 +196,56 @@ local function ok(test, cond, message, extra)
     end
     -- print aligned yaml output
     for line in yaml.encode(extra):gmatch("[^\n]+") do
-        io.write(string.rep(' ', 2 + 4 * test.level), line, "\n")
+        io.write(string.rep(' ', 2 + 4 * self.level), line, "\n")
     end
     return false
 end
 
-local function fail(test, message, extra)
-    return ok(test, false, message, extra)
+---`taptest:fail('x')` is equivalent to `taptest:ok(false, 'x')`.
+---
+---    Displays the message.
+---
+---    Parameters:
+---
+---    * `message` -- name of the test.
+---    * `extra` -- extra information to print in case of failure.
+---
+---    Returns false.
+---
+---@param message string
+---@param extra? table
+---@return boolean
+function taptest:fail(message, extra)
+    return self:ok(false, message, extra)
 end
 
-local function skip(test, message, extra)
-    ok(test, true, message.." # skip", extra)
+---`taptest:skip('x')` is equivalent to
+---    `taptest:ok(true, 'x' .. '# skip')`.
+---
+---    Displays the message.
+---
+---    Parameters:
+---
+---    * `message` -- name of the test.
+---    * `extra` -- extra information.
+---
+---    Returns nil.
+---
+---    **Example:**
+---
+---```
+---tarantool> taptest:skip('message')
+---ok - message # skip
+------
+---- true
+---...
+---```
+---
+---@param message string
+---@param extra? table
+---@return nil
+function taptest:skip(message, extra)
+    self:ok(true, message.." # skip", extra)
 end
 
 local function cmpdeeply(got, expected, extra)
@@ -125,97 +298,347 @@ local function cmpdeeply(got, expected, extra)
     return true
 end
 
-local function like(test, got, pattern, message, extra)
+---Verify a string against a pattern. Ok if match is found.
+---
+---    **Example:**
+---
+---```lua
+---test:like(tarantool.version, '^[1-9]', "version")
+---```
+---
+---    Parameters:
+---
+---    * `got` -- actual result.
+---    * `pattern` -- the pattern to search for.
+---    * `message` -- name of the test.
+---    * `extra` -- extra information to print in case of failure.
+---
+---    Returns true if the pattern matches, otherwise false.
+---
+---@param got any
+---@param pattern string
+---@param message string
+---@param extra? table
+---@return boolean
+function taptest:like(got, pattern, message, extra)
     extra = extra or {}
     extra.got = got
     extra.expected = pattern
-    return ok(test, string.match(tostring(got), pattern) ~= nil, message, extra)
+    return self:ok(string.match(tostring(got), pattern) ~= nil, message, extra)
 end
 
-local function unlike(test, got, pattern, message, extra)
+---This is the negation of `taptest:like()`.
+---
+---    Ok if no match is found.
+---
+---    Parameters:
+---
+---    * `got` -- actual result.
+---    * `pattern` -- the pattern to search for.
+---    * `message` -- name of the test.
+---    * `extra` -- extra information to print in case of failure.
+---
+---    Returns true if the pattern does not match, otherwise false.
+---
+---@param got any
+---@param pattern string
+---@param message string
+---@param extra? table
+---@return boolean
+function taptest:unlike(got, pattern, message, extra)
     extra = extra or {}
     extra.got = got
     extra.expected = pattern
-    return ok(test, string.match(tostring(got), pattern) == nil, message, extra)
+    return self:ok(string.match(tostring(got), pattern) == nil, message, extra)
 end
 
-local function is(test, got, expected, message, extra)
+---Check whether the first argument equals the second argument.
+---
+---    Displays an extensive message if the result is false.
+---
+---    Parameters:
+---
+---    * `got` -- actual result.
+---    * `expected` -- expected result.
+---    * `message` -- name of the test.
+---    * `extra` -- extra information to print in case of failure.
+---
+---    Returns true if the arguments are equal, otherwise false.
+---
+---@param got any
+---@param expected any
+---@param message string
+---@param extra? table
+---@return boolean
+function taptest:is(got, expected, message, extra)
     extra = extra or {}
     extra.got = got
     extra.expected = expected
-    local rc = (test.strict == false or type(got) == type(expected)) and
+    local rc = (self.strict == false or type(got) == type(expected)) and
                got == expected
-    return ok(test, rc, message, extra)
+    return self:ok(rc, message, extra)
 end
 
-local function isnt(test, got, unexpected, message, extra)
+---This is the negation of `taptest:is()`.
+---
+---    Parameters:
+---
+---    * `got` -- actual result.
+---    * `unexpected` -- unexpected result.
+---    * `message` -- name of the test.
+---    * `extra` -- extra information to print in case of failure.
+---
+---    Returns true if the arguments are different, otherwise false.
+---
+---@param got any
+---@param unexpected any
+---@param message string
+---@param extra? table
+---@return boolean
+function taptest:isnt(got, unexpected, message, extra)
     extra = extra or {}
     extra.got = got
     extra.unexpected = unexpected
-    local rc = (test.strict == true and type(got) ~= type(unexpected)) or
+    local rc = (self.strict == true and type(got) ~= type(unexpected)) or
                got ~= unexpected
-    return ok(test, rc, message, extra)
+    return self:ok(rc, message, extra)
 end
 
 
-local function is_deeply(test, got, expected, message, extra)
+---Recursive version of `taptest:is(...)`.
+---
+---    It can be used to compare tables as well as scalar values.
+---
+---    Parameters:
+---
+---    * `got` -- actual result.
+---    * `expected` -- expected result.
+---    * `message` -- name of the test.
+---    * `extra` -- extra information to print in case of failure.
+---
+---    Returns true if the arguments are equal, otherwise false.
+---
+---@param got any
+---@param expected any
+---@param message string
+---@param extra? table
+---@return boolean
+function taptest:is_deeply(got, expected, message, extra)
     extra = extra or {}
     extra.got = got
     extra.expected = expected
-    extra.strict = test.strict
-    return ok(test, cmpdeeply(got, expected, extra), message, extra)
+    extra.strict = self.strict
+    return self:ok(cmpdeeply(got, expected, extra), message, extra)
 end
 
-local function isnil(test, v, message, extra)
-    return is(test, not v and 'nil' or v, 'nil', message, extra)
+---Test whether a value is nil.
+---
+---    Displays a long message if the value is not of the specified type.
+---
+---    Parameters:
+---
+---    * `v` -- value the type of which is to be checked.
+---    * `message` -- text that will be shown to the user in case of failure.
+---    * `extra` -- extra information to print in case of failure.
+---
+---    Returns true if the value has the specified type.
+---
+---@param v any
+---@param message string
+---@param extra? table
+---@return boolean
+function taptest:isnil(v, message, extra)
+    return self:is(not v and 'nil' or v, 'nil', message, extra)
 end
 
-local function isnumber(test, v, message, extra)
-    return is(test, type(v), 'number', message, extra)
+---Test whether a value is a number.
+---
+---    Displays a long message if the value is not of the specified type.
+---
+---    Parameters:
+---
+---    * `v` -- value the type of which is to be checked.
+---    * `message` -- text that will be shown to the user in case of failure.
+---    * `extra` -- extra information to print in case of failure.
+---
+---    Returns true if the value has the specified type.
+---
+---@param v any
+---@param message string
+---@param extra? table
+---@return boolean
+function taptest:isnumber(v, message, extra)
+    return self:is(type(v), 'number', message, extra)
 end
 
-local function isstring(test, v, message, extra)
-    return is(test, type(v), 'string', message, extra)
+---Test whether a value is a string.
+---
+---    Displays a long message if the value is not of the specified type.
+---
+---    Parameters:
+---
+---    * `v` -- value the type of which is to be checked.
+---    * `message` -- text that will be shown to the user in case of failure.
+---    * `extra` -- extra information to print in case of failure.
+---
+---    Returns true if the value has the specified type.
+---
+---@param v any
+---@param message string
+---@param extra? table
+---@return boolean
+function taptest:isstring(v, message, extra)
+    return self:is(type(v), 'string', message, extra)
 end
 
-local function istable(test, v, message, extra)
-    return is(test, type(v), 'table', message, extra)
+---Test whether a value is a table.
+---
+---    Displays a long message if the value is not of the specified type.
+---
+---    Parameters:
+---
+---    * `v` -- value the type of which is to be checked.
+---    * `message` -- text that will be shown to the user in case of failure.
+---    * `extra` -- extra information to print in case of failure.
+---
+---    Returns true if the value has the specified type.
+---
+---@param v any
+---@param message string
+---@param extra? table
+---@return boolean
+function taptest:istable(v, message, extra)
+    return self:is(type(v), 'table', message, extra)
 end
 
-local function isboolean(test, v, message, extra)
-    return is(test, type(v), 'boolean', message, extra)
+---Test whether a value is a boolean.
+---
+---    Displays a long message if the value is not of the specified type.
+---
+---    Parameters:
+---
+---    * `v` -- value the type of which is to be checked.
+---    * `message` -- text that will be shown to the user in case of failure.
+---    * `extra` -- extra information to print in case of failure.
+---
+---    Returns true if the value has the specified type.
+---
+---@param v any
+---@param message string
+---@param extra? table
+---@return boolean
+function taptest:isboolean(v, message, extra)
+    return self:is(type(v), 'boolean', message, extra)
 end
 
-local function isfunction(test, v, message, extra)
-    return is(test, type(v), 'function', message, extra)
+---Test whether a value is a function.
+---
+---    Displays a long message if the value is not of the specified type.
+---
+---    Parameters:
+---
+---    * `v` -- value the type of which is to be checked.
+---    * `message` -- text that will be shown to the user in case of failure.
+---    * `extra` -- extra information to print in case of failure.
+---
+---    Returns true if the value has the specified type.
+---
+---@param v any
+---@param message string
+---@param extra? table
+---@return boolean
+function taptest:isfunction(v, message, extra)
+    return self:is(type(v), 'function', message, extra)
 end
 
-local function isudata(test, v, utype, message, extra)
+---Test whether a value is a userdata with the specified
+---    metatable type.
+---
+---    Displays a long message if the value is not of the specified type.
+---
+---    Parameters:
+---
+---    * `v` -- value the type of which is to be checked.
+---    * `utype` -- type of data that a passed value should have.
+---    * `message` -- text that will be shown to the user in case of failure.
+---    * `extra` -- extra information to print in case of failure.
+---
+---    Returns true if the value has the specified type.
+---
+---@param v any
+---@param utype string
+---@param message string
+---@param extra? table
+---@return boolean
+function taptest:isudata(v, utype, message, extra)
     extra = extra or {}
     extra.expected = 'userdata<'..utype..'>'
     if type(v) == 'userdata' then
         extra.got = 'userdata<'..getmetatable(v)..'>'
-        return ok(test, getmetatable(v) == utype, message, extra)
+        return self:ok(getmetatable(v) == utype, message, extra)
     else
         extra.got = type(v)
-        return fail(test, message, extra)
+        return self:fail(message, extra)
     end
 end
 
-local function iscdata(test, v, ctype, message, extra)
+---Test whether a value is a cdata of the specified type.
+---
+---    Displays a long message if the value is not of the specified type.
+---
+---    **Example:**
+---
+---```lua
+---test:iscdata(slab_info.quota_size, ffi.typeof('uint64_t'),
+---    'memcached.slab.info().quota_size returns a cdata')
+---```
+---
+---    Parameters:
+---
+---    * `v` -- value the type of which is to be checked.
+---    * `ctype` -- type of data that a passed value should have.
+---    * `message` -- text that will be shown to the user in case of failure.
+---    * `extra` -- extra information to print in case of failure.
+---
+---    Returns true if the value has the specified type.
+---
+---@param v any
+---@param ctype string
+---@param message string
+---@param extra? table
+---@return boolean
+function taptest:iscdata(v, ctype, message, extra)
     extra = extra or {}
     extra.expected = ffi.typeof(ctype)
     if type(v) == 'cdata' then
         extra.got = ffi.typeof(v)
-        return ok(test, ffi.istype(ctype, v), message, extra)
+        return self:ok(ffi.istype(ctype, v), message, extra)
     else
         extra.got = type(v)
-        return fail(test, message, extra)
+        return self:fail(message, extra)
     end
 end
 
-local test_mt
-local function test(parent, name, fun, ...)
+---boolean)) Create a subtest, or create a subtest, run the test
+---    function and print the result.
+---
+---    If no `fun` argument is specified, create a subtest. If all arguments
+---    are specified, create a subtest, run the test function and print the
+---    result.
+---
+---    Parameters:
+---
+---    * `name` -- an arbitrary name to give for the test outputs.
+---    * `fun` -- the test logic to run.
+---    * `...` -- optional arguments passed to `fun`.
+---
+---    Returns the created subtest, or the result of `taptest:check()` if
+---    `fun` is specified.
+---
+---@overload fun(name: string): taptest
+---@overload fun(name: string, fun: function, ...): boolean
+function taptest:test(name, fun, ...)
+    local parent = self
     local level = parent ~= nil and parent.level + 1 or 0
     local test = setmetatable({
         parent  = parent;
@@ -237,71 +660,93 @@ local function test(parent, name, fun, ...)
     end
 end
 
-local function plan(test, planned)
-    test.planned = planned
-    io.write(string.rep(' ', 4 * test.level), string.format("1..%d\n", planned))
+---Indicate how many tests will be performed.
+---
+---    Parameters:
+---
+---    * `planned` -- the number of tests to perform.
+---
+---@param planned number
+---@return nil
+function taptest:plan(planned)
+    self.planned = planned
+    io.write(string.rep(' ', 4 * self.level), string.format("1..%d\n", planned))
 end
 
-local function check(test)
-    if test.checked then
+---Checks the number of tests performed.
+---
+---    The result will be a display saying `# bad plan: ...` if the number
+---    of completed tests is not equal to the number of tests specified by
+---    `taptest:plan(...)`. (This is a purely Tarantool feature: "bad plan"
+---    messages are out of the TAP13 standard.)
+---
+---    This check should only be done after all planned tests are complete,
+---    so ordinarily `taptest:check()` will only appear at the end of a
+---    script. However, as a Tarantool extension, `taptest:check()` may
+---    appear at the end of any subtest. Therefore there are three ways to
+---    cause the check:
+---
+---    * by calling `taptest:check()` at the end of a script,
+---    * by calling a function which ends with a call to `taptest:check()`,
+---    * or by calling `taptest:test('...', subtest-function-name)` where
+---      subtest-function-name does not need to end with `taptest:check()`
+---      because it can be called after the subtest is complete.
+---
+---    Returns true if the number of completed tests equals the planned
+---    number and no tests failed, otherwise false.
+---
+---@return boolean
+function taptest:check()
+    if self.checked then
         error('check called twice')
     end
-    test.checked = true
-    if test.planned ~= test.total then
-        if test.parent ~= nil then
-            ok(test.parent, false, "bad plan", { planned = test.planned;
-                run = test.total})
+    self.checked = true
+    if self.planned ~= self.total then
+        if self.parent ~= nil then
+            self.parent:ok(false, "bad plan", { planned = self.planned;
+                run = self.total})
         else
-            diag(test, string.format("bad plan: planned %d run %d",
-                test.planned, test.total))
+            self:diag(string.format("bad plan: planned %d run %d",
+                self.planned, self.total))
         end
-    elseif test.failed > 0 then
-        if test.parent ~= nil then
-            ok(test.parent, false, "failed subtests", {
-                failed = test.failed;
-                planned = test.planned;
+    elseif self.failed > 0 then
+        if self.parent ~= nil then
+            self.parent:ok(false, "failed subtests", {
+                failed = self.failed;
+                planned = self.planned;
             })
         else
-            diag(test, "failed subtest: %d", test.failed)
+            self:diag("failed subtest: %d", self.failed)
         end
     else
-        if test.parent ~= nil then
-            ok(test.parent, true, test.name)
+        if self.parent ~= nil then
+            self.parent:ok(true, self.name)
         end
     end
-    return test.planned == test.total and test.failed == 0
+    return self.planned == self.total and self.failed == 0
 end
 
-test_mt = {
-    __index = {
-        test      = test;
-        plan      = plan;
-        check     = check;
-        diag      = diag;
-        ok        = ok;
-        fail      = fail;
-        skip      = skip;
-        is        = is;
-        isnt      = isnt;
-        isnil     = isnil;
-        isnumber  = isnumber;
-        isstring  = isstring;
-        istable   = istable;
-        isboolean = isboolean;
-        isfunction = isfunction;
-        isudata   = isudata;
-        iscdata   = iscdata;
-        is_deeply = is_deeply;
-        like      = like;
-        unlike    = unlike;
-    }
-}
-
-local function root_test(...)
+---Initialize a test.
+---
+---The result of `tap.test` is an object, which is necessary for
+---`taptest:plan()` and all the other methods.
+---
+---**Example:**
+---
+---```lua
+---tap = require('tap')
+---taptest = tap.test('test-name')
+---```
+---
+---@overload fun(name: string): taptest
+---@overload fun(name: string, fun: function, ...): boolean
+---@param name string an arbitrary name to give for the test outputs.
+---@param fun? function the test logic to run.
+---@param ... any optional arguments passed to `fun`.
+---@return taptest|boolean
+function tap.test(name, fun, ...)
     io.write('TAP version 13', '\n')
-    return test(nil, ...)
+    return taptest.test(nil, name, fun, ...)
 end
 
-return {
-    test = root_test;
-}
+return tap

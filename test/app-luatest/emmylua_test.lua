@@ -20,6 +20,45 @@ local modules = {
         objects = {},
     },
     {
+        name = 'tap',
+        source = 'src/lua/tap.lua',
+        fixtures = 'test/app-luatest/emmylua/tap',
+        type_name = 'tap',
+        fields = {
+            test = 'Initialize a test',
+        },
+        objects = {
+            {
+                fixture = 'object.lua',
+                type_name = 'taptest',
+                forbidden_types = {'boolean'},
+                fields = {
+                    strict = 'Flag, true if comparisons',
+                    test = 'Create a subtest',
+                    plan = 'Indicate how many tests',
+                    check = 'Checks the number of tests',
+                    diag = 'Display a diagnostic message',
+                    ok = 'This is a basic function',
+                    fail = 'is equivalent to',
+                    skip = 'is equivalent to',
+                    is = 'Check whether the first argument equals',
+                    isnt = 'This is the negation of',
+                    is_deeply = 'Recursive version of',
+                    like = 'Verify a string against a pattern',
+                    unlike = 'This is the negation of',
+                    isnil = 'Test whether a value is nil',
+                    isnumber = 'Test whether a value is a number',
+                    isstring = 'Test whether a value is a string',
+                    istable = 'Test whether a value is a table',
+                    isboolean = 'Test whether a value is a boolean',
+                    isfunction = 'Test whether a value is a function',
+                    isudata = 'Test whether a value is a userdata',
+                    iscdata = 'Test whether a value is a cdata',
+                },
+            },
+        },
+    },
+    {
         name = 'varbinary',
         source = 'src/lua/varbinary.lua',
         fixtures = 'test/app-luatest/emmylua/varbinary',
@@ -236,6 +275,14 @@ local function run_module_test(spec)
                 object_type, object.type_name, object.fields),
                 ('%s: object type is not inferred: %s'):format(
                     object.type_name, object_type))
+            for _, forbidden in ipairs(object.forbidden_types or {}) do
+                -- Only the inferred type in the header is checked, not the
+                -- field list in the hover body.
+                local header = object_type:match('^([^{]*)') or object_type
+                t.assert(not header:find(forbidden, 1, true),
+                    ('%s: object type contains %s: %s'):format(
+                        object.type_name, forbidden, header))
+            end
 
             local object_items = client:request_until(
                 'textDocument/completion', {
