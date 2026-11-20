@@ -379,25 +379,28 @@ local function generate(out_file, files, return_name)
 
                 local statement, statement_index = find_statement(lines, j)
                 if has_dir and not code_only then
-                    for k = i, j - 1 do
-                        table.insert(body, lines[k])
-                    end
-
-                    if visible and statement ~= nil then
-                        if has_type then
-                            emit_type(statement, declared, body)
-                        elseif has_function then
-                            emit_function(lines, statement_index, statement,
-                                          declared, names, roots, order, body)
-                        elseif has_value then
-                            return_emitted = emit_value(
-                                lines, statement_index, statement,
-                                declared, names, roots, order, body,
-                                return_name)
+                    if visible then
+                        for k = i, j - 1 do
+                            table.insert(body, lines[k])
                         end
-                    end
 
-                    table.insert(body, '')
+                        if statement ~= nil then
+                            if has_type then
+                                emit_type(statement, declared, body)
+                            elseif has_function then
+                                emit_function(lines, statement_index,
+                                              statement, declared, names,
+                                              roots, order, body)
+                            elseif has_value then
+                                return_emitted = emit_value(
+                                    lines, statement_index, statement,
+                                    declared, names, roots, order, body,
+                                    return_name)
+                            end
+                        end
+
+                        table.insert(body, '')
+                    end
                 elseif not has_dir and return_name ~= nil and
                         statement ~= nil and
                         statement:match('^local%s+' .. return_name ..

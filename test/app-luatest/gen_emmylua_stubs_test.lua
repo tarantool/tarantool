@@ -152,3 +152,57 @@ return mod
 
     fio.rmtree(dir)
 end
+
+g.test_private_annotations_are_not_exported = function()
+    local dir = fio.tempdir()
+    local source = fio.pathjoin(dir, 'module.lua')
+    local output = fio.pathjoin(dir, 'module-stub.lua')
+    local fh = assert(io.open(source, 'w'))
+    fh:write([[
+---@private
+---@class hidden
+---@field secret integer
+
+---@class visible
+---@field value integer
+
+---@private
+---@param x integer
+---@return integer
+local function hidden_fn(x)
+    return x
+end
+
+---@param x integer
+---@return integer
+local function visible_fn(x)
+    return x
+end
+]])
+    fh:close()
+
+    local ph = assert(popen.new({
+        arg[-1], TOOL,
+        '--out', output,
+        source,
+    }, {
+        stdout = popen.opts.PIPE,
+        stderr = popen.opts.DEVNULL,
+    }))
+    local out = read_all(ph)
+    local st = ph:wait()
+    ph:close()
+    t.assert_equals(st.exit_code, 0, out)
+
+    local stub = assert(io.open(output, 'r'))
+    local text = stub:read('*a')
+    stub:close()
+    t.assert(not text:find('hidden', 1, true))
+    t.assert(not text:find('secret', 1, true))
+    t.assert(not text:find('---@private', 1, true))
+    t.assert_str_contains(text, '---@class visible')
+    t.assert_str_contains(text, '---@field value integer')
+    t.assert_str_contains(text, 'local function visible_fn(x) end')
+
+    fio.rmtree(dir)
+end
