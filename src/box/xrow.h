@@ -733,10 +733,6 @@ struct join_request {
 	uint32_t version_id;
 };
 
-/** Encode JOIN request. */
-void
-xrow_encode_join(struct xrow_header *row, const struct join_request *req);
-
 /** Decode JOIN request. */
 int
 xrow_decode_join(const struct xrow_header *row, struct join_request *req);
