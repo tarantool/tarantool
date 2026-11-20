@@ -69,6 +69,51 @@ local modules = {
             },
         },
     },
+    {
+        name = 'misc',
+        source = 'src/lua/misc.lua',
+        fixtures = 'test/app-luatest/emmylua/misc',
+        type_name = 'misc',
+        fields = {
+            getmetrics = 'Get the LuaJIT metrics values',
+            sysprof = 'The LuaJIT sampling profiler',
+            memprof = 'The LuaJIT memory profiler',
+        },
+        objects = {
+            {
+                fixture = 'metrics.lua',
+                type_name = 'misc.metrics',
+                fields = {
+                    gc_allocated = 'The number of bytes of allocated memory',
+                    gc_freed = 'The number of bytes of freed memory',
+                },
+            },
+            {
+                fixture = 'report.lua',
+                type_name = 'misc.sysprof.report',
+                fields = {
+                    samples = 'The number of collected samples',
+                    vmstate = 'Profiling counters',
+                },
+            },
+            {
+                fixture = 'vmstate.lua',
+                type_name = 'misc.sysprof.vmstate',
+                fields = {
+                    INTERP = 'The interpreter state',
+                    TRACE = 'The trace execution state',
+                },
+            },
+            {
+                fixture = 'options.lua',
+                type_name = 'misc.sysprof.options',
+                fields = {
+                    mode = 'A profiling mode',
+                    interval = 'A sampling interval',
+                },
+            },
+        },
+    },
 }
 
 local function normalize(value)
