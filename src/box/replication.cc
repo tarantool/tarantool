@@ -1404,6 +1404,11 @@ replicaset_connect(const struct uri_set *uris,
 	}
 	replicaset_connect_wakeup_cond = NULL;
 	cond_guard.is_active = false;
+	for (int i = 0; i < count; i++) {
+		if (!box_is_configured() &&
+		    applier_check_replication_mode(appliers[i]) != 0)
+			diag_raise();
+	}
 	if (state.connected < count) {
 		say_crit("failed to connect to %d out of %d replicas",
 			 count - state.connected, count);

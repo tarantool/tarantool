@@ -5309,6 +5309,7 @@ box_process_vote(struct ballot *ballot)
 	assert(i < VCLOCK_MAX);
 
 	ballot->registered_replica_uuids_size = i;
+	ballot->replication_mode = replication_mode;
 }
 
 /** Fill _schema space with initial data on bootstrap. */

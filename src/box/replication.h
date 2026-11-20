@@ -137,6 +137,14 @@ extern bool replication_mode_enable;
 /** Effective local replication mode. */
 extern enum replication_mode replication_mode;
 
+/** Return the name of a replication mode. */
+static inline const char *
+replication_mode_str(enum replication_mode mode)
+{
+	return mode == REPLICATION_MODE_SYNC ? "sync" :
+		mode == REPLICATION_MODE_ASYNC ? "async" : "legacy";
+}
+
 enum replicaset_state {
 	REPLICASET_BOOTSTRAP,
 	REPLICASET_JOIN,

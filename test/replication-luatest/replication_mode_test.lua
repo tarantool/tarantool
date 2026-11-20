@@ -287,6 +287,7 @@ anon.test_registration_failure_and_retry = function(cg)
             local ballot = box.watch_once('internal.ballot')[iproto.key.BALLOT]
             t.assert(ballot[iproto.ballot_key.IS_ANON])
             t.assert_not(ballot[iproto.ballot_key.CAN_LEAD])
+            t.assert_equals(ballot[iproto.ballot_key.REPLICATION_MODE], 2)
         end
     end)
     cg.master:exec(function()
@@ -417,4 +418,170 @@ promotion.test_cancel_during_election_releases_guard = function(cg)
         box.ctl.demote()
         t.assert_not(box.info.ro)
     end)
+end
+
+local ballot = t.group('replication_mode_ballot')
+
+ballot.before_all(function(cg)
+    cg.master = server:new({alias = 'master', box_cfg = {
+        replication_mode = 'async', replication_timeout = 0.1,
+    }, env = {TARANTOOL_RUN_BEFORE_BOX_CFG = new_compat}})
+    cg.master:start()
+end)
+
+ballot.after_all(function(cg)
+    cg.master:drop()
+end)
+
+--
+-- Recovery and reconnect cases register a replica before rejecting its mode.
+-- Remove that registration so the next bootstrap starts with the same peers.
+--
+local function drop_ballot_replica(cg)
+    cg.replica:drop()
+    cg.replica = nil
+    cg.master:exec(function()
+        for _, tuple in box.space._cluster:pairs() do
+            if tuple[1] ~= box.info.id then
+                box.space._cluster:delete{tuple[1]}
+            end
+        end
+    end)
+end
+
+local function assert_startup_mismatch(cg)
+    t.helpers.retrying({}, function()
+        t.assert_not(cg.replica.process:is_alive())
+        t.assert(cg.replica:grep_log('Replication mode mismatch'))
+        t.assert_not(cg.replica:grep_log('recover from'))
+        t.assert_not(cg.replica:grep_log('building secondary indexes'))
+    end)
+end
+
+for _, strategy in ipairs({'auto', 'legacy'}) do
+    ballot['test_bootstrap_mismatch_' .. strategy] = function(cg)
+        cg.replica = server:new({alias = 'replica', box_cfg = {
+            replication = cg.master.net_box_uri,
+            replication_mode = 'sync', election_mode = 'voter',
+            bootstrap_strategy = strategy,
+            replication_connect_quorum = strategy == 'legacy' and 0 or nil,
+            replication_connect_timeout = 0.5,
+        }, env = {TARANTOOL_RUN_BEFORE_BOX_CFG = new_compat}})
+        cg.replica:start({wait_until_ready = false})
+        assert_startup_mismatch(cg)
+        drop_ballot_replica(cg)
+    end
+end
+
+ballot.test_recovery_mismatch = function(cg)
+    cg.replica = server:new({alias = 'replica', box_cfg = {
+        replication = cg.master.net_box_uri,
+        read_only = true,
+    }, env = {TARANTOOL_RUN_BEFORE_BOX_CFG = new_compat}})
+    cg.replica:start()
+    cg.replica:restart({box_cfg = {
+        replication = cg.master.net_box_uri,
+        replication_mode = 'sync', election_mode = 'voter',
+        replication_connect_timeout = 0.5,
+    }}, {wait_until_ready = false})
+    assert_startup_mismatch(cg)
+    drop_ballot_replica(cg)
+end
+
+--
+-- Legacy recovery with a zero connection quorum need not receive any ballots.
+-- The applier detects the mismatch after recovery.
+--
+ballot.test_recovery_with_zero_quorum = function(cg)
+    cg.replica = server:new({alias = 'replica', box_cfg = {
+        replication = cg.master.net_box_uri,
+        read_only = true,
+    }, env = {TARANTOOL_RUN_BEFORE_BOX_CFG = new_compat}})
+    cg.replica:start()
+    cg.replica:restart({box_cfg = {
+        replication = cg.master.net_box_uri,
+        replication_mode = 'sync',
+        election_mode = 'voter',
+        bootstrap_strategy = 'legacy',
+        replication_connect_quorum = 0,
+    }})
+    cg.replica:exec(function()
+        t.assert_equals(box.info.status, 'running')
+    end)
+    t.helpers.retrying({}, function()
+        t.assert(cg.replica:grep_log('Replication mode mismatch'))
+    end)
+    drop_ballot_replica(cg)
+end
+
+ballot.test_runtime_retry_and_legacy_peer = function(cg)
+    cg.replica = server:new({alias = 'replica', box_cfg = {
+        replication = cg.master.net_box_uri,
+        read_only = true, replication_timeout = 0.1,
+    }, env = {TARANTOOL_RUN_BEFORE_BOX_CFG = new_compat}})
+    cg.replica:start()
+    cg.replica:exec(function()
+        box.cfg{
+            replication_mode = 'sync',
+            election_mode = 'voter',
+        }
+        t.assert_equals(box.info.replication[1].upstream.status, 'follow')
+    end)
+    cg.master:restart()
+    cg.replica:exec(function()
+        t.helpers.retrying({}, function()
+            local upstream = box.info.replication[1].upstream
+            t.assert_equals(upstream.status, 'loading')
+            t.assert_str_contains(upstream.message, 'Replication mode mismatch')
+        end)
+    end)
+    -- Omission means legacy, even after a dedicated mode was advertised.
+    cg.master:exec(function()
+        require('compat').box_cfg_replication_mode = 'old'
+    end)
+    cg.replica:exec(function()
+        t.helpers.retrying({}, function()
+            t.assert_equals(box.info.replication[1].upstream.status, 'follow')
+        end)
+    end)
+    drop_ballot_replica(cg)
+    cg.master:exec(function()
+        require('compat').box_cfg_replication_mode = 'new'
+    end)
+end
+
+--
+-- Hot standby recovers local data before connecting to peers. Keep an upstream
+-- alive after takeover to check that the mode mismatch is still rejected then.
+--
+ballot.test_hot_standby_checks_ballot_after_takeover = function(cg)
+    cg.replica = server:new({alias = 'replica', box_cfg = {
+        replication = cg.master.net_box_uri,
+        read_only = true,
+    }, env = {TARANTOOL_RUN_BEFORE_BOX_CFG = new_compat}})
+    cg.replica:start()
+    cg.replica:exec(function() box.snapshot() end)
+    local standby = server:new({alias = 'standby', box_cfg = {
+        memtx_dir = cg.replica.workdir,
+        wal_dir = cg.replica.workdir,
+        vinyl_dir = cg.replica.workdir,
+        hot_standby = true,
+        replication = cg.master.net_box_uri,
+        replication_mode = 'sync',
+        election_mode = 'voter',
+        replication_connect_timeout = 0.5,
+    }, env = {TARANTOOL_RUN_BEFORE_BOX_CFG = new_compat}})
+    standby:start({wait_until_ready = false})
+    t.helpers.retrying({}, function()
+        t.assert(standby:grep_log('Entering hot standby mode'))
+    end)
+    t.assert(standby.process:is_alive())
+    t.assert_not(standby:grep_log('Replication mode mismatch'))
+    cg.replica:stop()
+    t.helpers.retrying({}, function()
+        t.assert_not(standby.process:is_alive())
+        t.assert(standby:grep_log('Replication mode mismatch'))
+    end)
+    standby:drop()
+    drop_ballot_replica(cg)
 end

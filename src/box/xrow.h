@@ -609,6 +609,8 @@ struct ballot {
 	struct tt_uuid registered_replica_uuids[VCLOCK_MAX];
 	/** Number of replicas registered in the replica set. */
 	int registered_replica_uuids_size;
+	/** One of enum replication_mode values; legacy/unknown if absent. */
+	uint32_t replication_mode;
 };
 
 /**

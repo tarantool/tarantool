@@ -45,6 +45,7 @@
 #include "mp_extension_types.h"
 #include "iproto_constants.h"
 #include "iproto_features.h"
+#include "replication.h"
 #include "mpstream/mpstream.h"
 #include "errinj.h"
 
@@ -614,7 +615,7 @@ mp_sizeof_ballot_max(const struct ballot *ballot)
 {
 	int registered_uuids_size = ballot->registered_replica_uuids_size;
 	return mp_sizeof_map(1) + mp_sizeof_uint(IPROTO_BALLOT) +
-	       mp_sizeof_map(10) + mp_sizeof_uint(IPROTO_BALLOT_IS_RO_CFG) +
+	       mp_sizeof_map(11) + mp_sizeof_uint(IPROTO_BALLOT_IS_RO_CFG) +
 	       mp_sizeof_bool(ballot->is_ro_cfg) +
 	       mp_sizeof_uint(IPROTO_BALLOT_IS_RO) +
 	       mp_sizeof_bool(ballot->is_ro) +
@@ -634,7 +635,9 @@ mp_sizeof_ballot_max(const struct ballot *ballot)
 	       mp_sizeof_str(NODE_NAME_LEN_MAX) +
 	       mp_sizeof_uint(IPROTO_BALLOT_REGISTERED_REPLICA_UUIDS) +
 	       mp_sizeof_array(registered_uuids_size) +
-	       registered_uuids_size * mp_sizeof_str(UUID_STR_LEN);
+	       registered_uuids_size * mp_sizeof_str(UUID_STR_LEN) +
+	       mp_sizeof_uint(IPROTO_BALLOT_REPLICATION_MODE) +
+	       mp_sizeof_uint(ballot->replication_mode);
 
 }
 
@@ -644,7 +647,12 @@ mp_encode_ballot(char *data, const struct ballot *ballot)
 	data = mp_encode_map(data, 1);
 	data = mp_encode_uint(data, IPROTO_BALLOT);
 	bool has_name = *ballot->instance_name != '\0';
-	data = mp_encode_map(data, has_name ? 10 : 9);
+	bool has_mode = ballot->replication_mode != REPLICATION_MODE_LEGACY;
+	data = mp_encode_map(data, 9 + has_name + has_mode);
+	if (has_mode) {
+		data = mp_encode_uint(data, IPROTO_BALLOT_REPLICATION_MODE);
+		data = mp_encode_uint(data, ballot->replication_mode);
+	}
 	data = mp_encode_uint(data, IPROTO_BALLOT_IS_RO_CFG);
 	data = mp_encode_bool(data, ballot->is_ro_cfg);
 	data = mp_encode_uint(data, IPROTO_BALLOT_IS_RO);
@@ -2118,6 +2126,7 @@ mp_decode_ballot(const char *data, const char *end,
 	/* Decode BALLOT map. */
 	if (mp_typeof(*data) != MP_MAP)
 		return -1;
+	ballot->replication_mode = REPLICATION_MODE_LEGACY;
 	map_size = mp_decode_map(&data);
 	for (uint32_t i = 0; i < map_size; i++) {
 		if (mp_typeof(*data) != MP_UINT) {
@@ -2127,6 +2136,17 @@ mp_decode_ballot(const char *data, const char *end,
 		}
 		uint32_t key = mp_decode_uint(&data);
 		switch (key) {
+		case IPROTO_BALLOT_REPLICATION_MODE: {
+			if (mp_typeof(*data) != MP_UINT)
+				return -1;
+			uint64_t value = mp_decode_uint(&data);
+			if (value != REPLICATION_MODE_ASYNC &&
+			    value != REPLICATION_MODE_SYNC)
+				return -1;
+			ballot->replication_mode = value;
+			*is_empty = false;
+			break;
+		}
 		case IPROTO_BALLOT_IS_RO_CFG:
 			if (mp_typeof(*data) != MP_BOOL)
 				return -1;

@@ -329,6 +329,10 @@ applier_new(const struct uri *uri);
 void
 applier_delete(struct applier *applier);
 
+/** Validate a peer's latest directly received replication mode ballot. */
+int
+applier_check_replication_mode(const struct applier *applier);
+
 /**
  * Recreates the IO stream context from the applier's URI.
  *

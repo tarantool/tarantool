@@ -247,6 +247,18 @@ connections, before loading the snapshot, replaying local WAL, or building
 indexes. An explicit mismatch must fail `box.cfg()`. An unavailable peer or a
 missing mode cannot be validated at this stage.
 
+Mode validation does not extend the initial connection wait. The bootstrap
+strategy, connection quorum, and timeout retain their existing semantics. In
+particular, local recovery with `bootstrap_strategy = 'legacy'` and
+`replication_connect_quorum = 0` can proceed before receiving any ballots.
+Peers that connect later are checked by their appliers, which retry on a
+mismatch without failing local recovery.
+
+Hot standby does not support this early check. It recovers the local snapshot
+and follows local WAL without connecting to peers. Modes are checked when it
+acquires the WAL directory lock and starts network replication. An explicit
+mismatch at that point still fails the initial `box.cfg()`.
+
 Check the mode on every connection and reconnect. If both nodes report a mode,
 the values must match, regardless of version. If either omits the field, allow
 the connection: it means legacy behavior, not `'async'`.

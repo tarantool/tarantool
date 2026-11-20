@@ -650,6 +650,20 @@ err:
 	diag_raise();
 }
 
+int
+applier_check_replication_mode(const struct applier *applier)
+{
+	enum replication_mode remote =
+		(enum replication_mode)applier->ballot.replication_mode;
+	if (replication_mode == REPLICATION_MODE_LEGACY ||
+	    remote == REPLICATION_MODE_LEGACY || remote == replication_mode)
+		return 0;
+	diag_set(ClientError, ER_REPLICATION_MODE_MISMATCH,
+		 replication_mode_str(replication_mode),
+		 replication_mode_str(remote));
+	return -1;
+}
+
 /**
  * Connect to a remote host and authenticate the client.
  */
@@ -726,6 +740,8 @@ applier_connect(struct applier *applier)
 	fiber_wakeup(applier->ballot_watcher);
 
 	applier_wait_first_ballot(applier);
+	if (applier_check_replication_mode(applier) != 0)
+		diag_raise();
 
 	applier_set_state(applier, APPLIER_CONNECTED);
 
@@ -2681,6 +2697,8 @@ applier_f(va_list ap)
 				 */
 				applier_next_state = APPLIER_LOADING;
 			} else if (e->errcode() == ER_CFG ||
+				   e->errcode() ==
+				   ER_REPLICATION_MODE_MISMATCH ||
 				   e->errcode() == ER_ACCESS_DENIED ||
 				   e->errcode() == ER_NO_SUCH_USER ||
 				   e->errcode() == ER_CREDS_MISMATCH) {
