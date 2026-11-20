@@ -1,0 +1,49 @@
+# DO NOT MERGE: tarantool/luajit tests its branches by calling
+# luajit-integration.yml of master, with tarantool's master checked out
+# for tarantool/master and release/2.11 for tarantool/release/2.11 (its
+# tarantool/release/3.8 and 3.9 pass no release, so they get master).
+# This workflow makes the same calls to the luajit-integration.yml of its
+# own commit, so that the jobs run where the change under test puts them.
+# Linux/x86_64 only: the change moves no other job.
+name: luajit-dry-run
+
+on:
+  push:
+
+jobs:
+  test-tarantool:
+    strategy:
+      fail-fast: false
+      matrix:
+        ARCH: [x86_64]
+        BUILDTYPE: [Debug, Release]
+        GC64: [ON, OFF]
+        OS: [Linux]
+        RELEASE: [master, release/2.11]
+        include:
+          - BUILDTYPE: Debug
+            CMAKEFLAGS: -DCMAKE_BUILD_TYPE=Debug
+          - BUILDTYPE: Release
+            CMAKEFLAGS: -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          # DO NOT MERGE: the LuaJIT commit each tarantool branch pins, so
+          # the bump changes nothing.
+          - RELEASE: master
+            REVISION: 8af934d93cf26fb1e9b08b28a8b51833d55fc8e8
+          - RELEASE: release/2.11
+            REVISION: 8e3feb909136fc0232fd8f062ddc27429c763a74
+    name: >
+      Tarantool
+      (${{ matrix.OS }}/${{ matrix.ARCH }})
+      ${{ matrix.BUILDTYPE }}
+      GC64:${{ matrix.GC64 }}
+      ${{ matrix.RELEASE }}
+    uses: ./.github/workflows/luajit-integration.yml
+    with:
+      CMAKE_EXTRA_PARAMS: >
+        -G Ninja
+        ${{ matrix.CMAKEFLAGS }}
+        -DLUAJIT_ENABLE_GC64=${{ matrix.GC64 }}
+      arch: ${{ matrix.ARCH }}
+      os: ${{ matrix.OS }}
+      release: ${{ matrix.RELEASE }}
+      revision: ${{ matrix.REVISION }}
