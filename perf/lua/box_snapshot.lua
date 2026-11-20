@@ -53,7 +53,7 @@ params.column_count = params.column_count or 1
 assert(params.column_count >= 1)
 
 -- Number of checkpoints to create.
-params.checkpoint_count = params.checkpoint_count or 1
+params.checkpoint_count = bench.dry_run and 1 or params.checkpoint_count or 1
 assert(params.checkpoint_count >= 1)
 
 -- Whether to enable the MemTX sort data or not.

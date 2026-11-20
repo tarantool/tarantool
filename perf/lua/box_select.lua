@@ -277,9 +277,9 @@ end
 -- Returns the average time it takes to run the function once.
 --
 local function run_bench(test)
-    local warmup_runs = 1e2 / 4
-    local test_runs = 1e2
-    local iters_per_run = 1e4
+    local warmup_runs = bench.dry_run and 0 or 1e2 / 4
+    local test_runs = bench.dry_run and 1 or 1e2
+    local iters_per_run = bench.dry_run and 1 or 1e4
     local func = test.func
     local run = function()
         for _ = 1, iters_per_run do

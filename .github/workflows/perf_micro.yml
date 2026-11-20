@@ -98,6 +98,9 @@ jobs:
     env:
       PERF_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
       PERF_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+      # Results are collected only on the 'performance' runner. Elsewhere,
+      # just check that the benchmarks work: run each of them once.
+      BENCHMARK_DRY_RUN: ${{ matrix.runner_label != 'performance' }}
 
     steps:
       - name: Prepare checkout
