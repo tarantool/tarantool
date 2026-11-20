@@ -2485,8 +2485,8 @@ func_sql_expr_new(const struct func_def *def)
 	int res_reg = sqlExprCodeTarget(&parser, expr, ++parser.nMem);
 	sqlVdbeAddOp2(v, OP_ResultRow, res_reg, 1);
 
-	bool is_error = parser.is_aborted;
 	sql_finish_coding(&parser);
+	bool is_error = parser.is_aborted;
 	/* Take VDBE out of parser. */
 	parser.pVdbe = NULL;
 	sql_parser_destroy(&parser);
