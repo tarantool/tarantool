@@ -260,8 +260,9 @@ local function emit_table(lines, index, declared, names, body, name)
 end
 
 -- Emit a `---@type` annotated declaration. For a module value, that is
--- a top-level `return { ... }`, the table is emitted as is. Return
--- whether the module value was emitted as is.
+-- a top-level `return { ... }`, the table is emitted as is. An assignment
+-- to a table field is emitted as a field declaration. Return whether the
+-- module value was emitted as is.
 local function emit_value(
     lines, index, statement, declared, names, body, return_name)
     local name = statement:match('^local%s+([%a_][%w_]*)%s*=%s*{')
@@ -270,6 +271,12 @@ local function emit_value(
             table.insert(body, 'local ' .. name .. ' = {}')
             declared[name] = true
         end
+        return false
+    end
+    local target = statement:match(
+        '^([%a_][%w_]*%.[%w_%.]*)%s*=')
+    if target ~= nil then
+        table.insert(body, target .. ' = nil')
         return false
     end
     if return_name == nil or not statement:match('^return%s*{') then
