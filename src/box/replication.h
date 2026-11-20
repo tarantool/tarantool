@@ -702,6 +702,14 @@ int
 replicaset_collect_confirmed_vclock(struct vclock *confirmed_vclock,
 				    double deadline);
 
+/**
+ * Wait for captured replicas to acknowledge the current instance vclock.
+ * Includes all registered replicas and optionally connected anonymous ones.
+ * Ignores component zero. Returns -1 with a diagnostic on timeout/cancellation.
+ */
+int
+replication_sync(double timeout, bool include_anon);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 

@@ -1580,6 +1580,78 @@ replicaset_sync(void)
 	fiber_testcancel();
 }
 
+/** A captured replication barrier, independent of subsequent membership. */
+struct replication_sync_context {
+	/** Replicas which have not yet acknowledged the target. */
+	struct tt_uuid *pending;
+	/** Number of pending replicas. */
+	int count;
+	/** Vclock captured before the first yield. */
+	struct vclock target;
+	/** Signaled when a captured replica makes progress. */
+	struct fiber_cond cond;
+};
+
+/** Remember completion before a replica can disconnect or be removed. */
+static int
+replication_sync_on_ack(struct trigger *trigger, void *event)
+{
+	struct replication_sync_context *ctx =
+		(struct replication_sync_context *)trigger->data;
+	const struct replication_ack *ack = (struct replication_ack *)event;
+	if (vclock_compare_ignore0(&ctx->target, ack->vclock) > 0)
+		return 0;
+	for (int i = 0; i < ctx->count; ++i) {
+		if (tt_uuid_is_equal(&ctx->pending[i], &ack->source->uuid)) {
+			ctx->pending[i] = ctx->pending[--ctx->count];
+			fiber_cond_signal(&ctx->cond);
+			break;
+		}
+	}
+	return 0;
+}
+
+int
+replication_sync(double timeout, bool include_anon)
+{
+	struct replication_sync_context ctx;
+	ctx.count = 0;
+	vclock_copy_ignore0(&ctx.target, instance_vclock);
+	int capacity = replicaset.registered_count + replicaset.anon_count;
+	ctx.pending = (struct tt_uuid *)xmalloc(sizeof(*ctx.pending) *
+					      MAX(capacity, 1));
+	fiber_cond_create(&ctx.cond);
+	auto guard = make_scoped_guard([&] {
+		fiber_cond_destroy(&ctx.cond);
+		free(ctx.pending);
+	});
+	replicaset_foreach(replica) {
+		if (tt_uuid_is_equal(&replica->uuid, &INSTANCE_UUID))
+			continue;
+		if (replica->id == REPLICA_ID_NIL &&
+		    !(include_anon && replica->anon &&
+		      replica->has_incoming_connection))
+			continue;
+		const struct vclock *acked = relay_vclock(replica->relay);
+		if (vclock_compare_ignore0(&ctx.target, acked) <= 0)
+			continue;
+		assert(ctx.count < capacity);
+		ctx.pending[ctx.count++] = replica->uuid;
+	}
+	struct trigger on_ack;
+	trigger_create(&on_ack, replication_sync_on_ack, &ctx, NULL);
+	trigger_add(&replicaset.on_ack, &on_ack);
+	auto trigger_guard = make_scoped_guard([&] {
+		trigger_clear(&on_ack);
+	});
+	double deadline = fiber_clock() + timeout;
+	while (ctx.count > 0) {
+		if (fiber_cond_wait_deadline(&ctx.cond, deadline) != 0)
+			return -1;
+	}
+	return 0;
+}
+
 void
 replicaset_check_quorum(void)
 {
