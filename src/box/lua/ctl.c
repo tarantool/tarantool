@@ -41,12 +41,14 @@
 #include "box/lua/trigger.h"
 
 #include "box/box.h"
+#include "box/checkpoint.h"
 #include "box/schema.h"
 #include "box/engine.h"
 #include "box/memtx_engine.h"
 #include "box/raft.h"
 #include "box/replication.h"
 #include "box/security.h"
+#include "box/txn.h"
 #include "box/wal.h"
 
 #include "core/event.h"
@@ -203,6 +205,22 @@ lbox_ctl_wal_sync(struct lua_State *L)
 	return 0;
 }
 
+/** Lua binding for the transaction checkpoint barrier. */
+static int
+lbox_ctl_txn_sync(struct lua_State *L)
+{
+	if (box_check_configured() != 0)
+		return luaT_error(L);
+	if (in_txn() != NULL) {
+		diag_set(ClientError, ER_ACTIVE_TRANSACTION);
+		return luaT_error(L);
+	}
+	struct box_checkpoint checkpoint;
+	if (box_checkpoint_build_in_memory(&checkpoint) != 0)
+		return luaT_error(L);
+	return 0;
+}
+
 static int
 lbox_ctl_replica_gc(struct lua_State *L)
 {
@@ -249,6 +267,7 @@ static const struct luaL_Reg lbox_ctl_lib[] = {
 	{"set_on_shutdown_timeout", lbox_ctl_set_on_shutdown_timeout},
 	{"iproto_lockdown", lbox_ctl_set_iproto_lockdown},
 	{"wal_sync", lbox_ctl_wal_sync},
+	{"txn_sync", lbox_ctl_txn_sync},
 	{"replica_gc", lbox_ctl_replica_gc},
 	{"liveness_probe", lbox_ctl_liveness_probe},
 	{NULL, NULL}
