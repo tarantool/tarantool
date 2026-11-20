@@ -9,6 +9,27 @@ local root = emmylua.source_root()
 -- add a spec and a fixture directory with module.lua and object.lua.
 local modules = {
     {
+        name = 'buffer',
+        source = 'src/lua/buffer.lua',
+        fixtures = 'test/app-luatest/emmylua/buffer',
+        type_name = 'buffer',
+        fields = {
+            ibuf = 'Create a new buffer',
+        },
+        objects = {
+            {
+                fixture = 'object.lua',
+                type_name = 'buffer_object',
+                fields = {
+                    alloc = 'Allocate',
+                    capacity = 'Return the capacity',
+                    recycle = 'Clear the memory slots allocated',
+                    reset = 'Clear the memory slots used',
+                },
+            },
+        },
+    },
+    {
         name = 'strict',
         source = 'src/lua/strict.lua',
         fixtures = 'test/app-luatest/emmylua/strict',
