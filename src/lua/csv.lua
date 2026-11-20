@@ -88,15 +88,73 @@ local iter = function(csvstate, i)
     end
 end
 
+---The `csv` module handles records formatted according to
+---Comma-Separated-Values (CSV) rules.
+---
+---The default formatting rules are:
+---* Lua [escape sequences](http://www.lua.org/pil/2.4.html) such as `\\n`
+---  or `\\10` are legal within strings but not within files.
+---* Commas designate end-of-field.
+---* Line feeds, or line feeds plus carriage returns, designate end-of-record.
+---* Leading or trailing spaces are ignored.
+---* Quote marks may enclose fields or parts of fields.
+---* When enclosed by quote marks, commas and line feeds and spaces are treated
+---  as ordinary characters, and a pair of quote marks "" is treated as a
+---  single quote mark.
 local module = {}
 
---@brief parse csv string by string
---@param readable must be string or object with method read(num) returns string
---@param opts.chunk_size (default 4096). Parser will read by chunk_size symbols
---@param opts.delimiter (default ',').
---@param opts.quote_char (default '"').
---@param opts.skip_head_lines (default 0). Skip header.
---@return iter function, iterator state
+---Options for `csv.iterate()`, `csv.load()`, and `csv.dump()`.
+---@class csv.options
+---@field delimiter? string (default: comma) single-byte character to
+---    designate end-of-field
+---@field quote_char? string (default: quote mark) single-byte character
+---    to designate encloser of string
+---@field chunk_size? integer (default: 4096) number of characters to read
+---    at once (usually for file-IO efficiency)
+---@field skip_head_lines? integer (default: 0) number of lines to skip at
+---    the start (usually for a header)
+
+---Iterate through CSV records.
+---
+---Form a Lua iterator function for going through CSV records one
+---field at a time.
+---
+---Use of an iterator is strongly recommended if the amount of data is
+---large (ten or more megabytes).
+---
+---**Example:**
+---
+---[`csv.iterate()`](lua://csv.iterate) is the low level of
+---[`csv.load()`](lua://csv.load) and [`csv.dump()`](lua://csv.dump).
+---
+---To illustrate that, here is a function which is the same as the
+---[`csv.load()`](lua://csv.load) function, as seen in the Tarantool
+---source code.
+---
+--- ```tarantoolsession
+--- tarantool> load = function(readable, opts)
+---          >   opts = opts or {}
+---          >   local result = {}
+---          >   for i, tup in csv.iterate(readable, opts) do
+---          >     result[i] = tup
+---          >   end
+---          >   return result
+---          > end
+--- ---
+--- ...
+--- tarantool> load('a,b,c')
+--- ---
+--- - - - a
+---     - b
+---     - c
+--- ...
+--- ```
+---
+---@param readable string | { read: fun(self: table, count?: integer): string }
+---@param opts? csv.options
+---@return fun(k: integer): any iter
+---@return table state
+---@return integer initial
 module.iterate = function(readable, opts)
     opts = opts or {}
     if type(readable) ~= "string" and type(readable.read) ~= "function" then
@@ -142,8 +200,79 @@ module.iterate = function(readable, opts)
     return iter, {readable, opts.chunk_size, csv, it, str}, -opts.skip_head_lines
 end
 
---@brief parse csv and make table
---@return table
+---Get CSV-formatted input from `readable` and return a table as output.
+---
+---Usually `readable` is either a string or a file opened for reading.
+---
+---Usually `options` are not specified.
+---
+---**Example:**
+---
+---Readable string has 3 fields, field#2 has comma and space so use quote marks:
+---
+--- ```tarantoolsession
+--- tarantool> csv = require('csv')
+--- ---
+--- ...
+--- tarantool> csv.load('a,"b,c ",d')
+--- ---
+--- - - - a
+---     - 'b,c '
+---     - d
+--- ...
+--- ```
+---
+---Readable string contains 2-byte character = Cyrillic Letter Palochka:
+---(This displays a palochka if and only if character set = UTF-8.)
+---
+--- ```tarantoolsession
+--- tarantool> csv.load('a\\211\\128b')
+--- ---
+--- - - - a\211\128b
+--- ...
+--- ```
+---
+---Semicolon instead of comma for the delimiter:
+---
+--- ```tarantoolsession
+--- tarantool> csv.load('a,b;c,d', {delimiter = ';'})
+--- ---
+--- - - - a,b
+---     - c,d
+--- ...
+--- ```
+---
+---Readable file :file:`./file.csv` contains two CSV records. Explanation of
+---`fio` is in section [fio](lua://fio). Source CSV file and example
+---respectively:
+---
+--- ```tarantoolsession
+---
+--- tarantool> -- input in file.csv is:
+--- tarantool> -- a,"b,c ",d
+--- tarantool> -- a\\211\\128b
+--- tarantool> fio = require('fio')
+--- ---
+--- ...
+--- tarantool> f = fio.open('./file.csv', {'O_RDONLY'})
+--- ---
+--- ...
+--- tarantool> csv.load(f, {chunk_size = 4096})
+--- ---
+--- - - - a
+---     - 'b,c '
+---     - d
+---   - - a\\211\\128b
+--- ...
+--- tarantool> f:close()
+--- ---
+--- - true
+--- ...
+--- ```
+---
+---@param readable string | { read: fun(self: table, count?: integer): string }
+---@param opts? csv.options
+---@return table loaded_value
 module.load = function(readable, opts)
     opts = opts or {}
     local result = {}
@@ -153,12 +282,50 @@ module.load = function(readable, opts)
     return result
 end
 
---@brief dumps tuple or table as csv
---@param t is tuple or table
---@param writable must be object with method write(string) like file or socket
---@param opts.delimiter (default ',').
---@param opts.quote_char (default '"').
---@return there is no writable it returns csv as string
+---Get table input and return a CSV-formatted string as output.
+---
+---Or, get table input from `csv_table` and put the output in `writable`.
+---
+---Usually `options` are not specified.
+---
+---Usually `writable`, if specified, is a file opened for writing.
+---[`csv.dump()`](lua://csv.dump) is the reverse of
+---[`csv.load()`](lua://csv.load).
+---
+---**Example:**
+---
+---CSV-table has 3 fields, field#2 has "," so result has quote marks
+---
+--- ```tarantoolsession
+--- tarantool> csv = require('csv')
+--- ---
+--- ...
+--- tarantool> csv.dump({'a','b,c ','d'})
+--- ---
+--- - 'a,"b,c ",d
+---
+--- '
+--- ...
+--- ```
+---
+---Round Trip: from string to table and back to string
+---
+--- ```tarantoolsession
+--- tarantool> csv_table = csv.load('a,b,c')
+--- ---
+--- ...
+--- tarantool> csv.dump(csv_table)
+--- ---
+--- - 'a,b,c
+---
+--- '
+--- ...
+--- ```
+---
+---@param t table a table which can be formatted according to the CSV
+---@param opts? csv.options
+---@param writable? { write: fun(self: table, s: string): boolean }
+---@return string? dumped_value
 module.dump = function(t, opts, writable)
     opts = opts or {}
     writable = writable or nil
