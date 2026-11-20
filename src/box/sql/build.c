@@ -2267,7 +2267,7 @@ sql_drop_field_constraint(struct Parse *parser, const struct Token *table_name,
 		const char *column_name_str =
 			sql_tt_name_from_token(column_name);
 		diag_set(ClientError, ER_NO_SUCH_FIELD_NAME_IN_SPACE,
-			 space->def->name, column_name_str);
+			 column_name_str, space->def->name);
 		parser->is_aborted = true;
 		return;
 	}
@@ -2327,7 +2327,7 @@ sql_drop_field_foreign_key(struct Parse *parser, const struct Token *table_name,
 		const char *column_name_str =
 			sql_tt_name_from_token(column_name);
 		diag_set(ClientError, ER_NO_SUCH_FIELD_NAME_IN_SPACE,
-			 space->def->name, column_name_str);
+			 column_name_str, space->def->name);
 		parser->is_aborted = true;
 		return;
 	}
@@ -2367,7 +2367,7 @@ sql_drop_field_check(struct Parse *parser, const struct Token *table_name,
 		const char *column_name_str =
 			sql_tt_name_from_token(column_name);
 		diag_set(ClientError, ER_NO_SUCH_FIELD_NAME_IN_SPACE,
-			 space->def->name, column_name_str);
+			 column_name_str, space->def->name);
 		parser->is_aborted = true;
 		return;
 	}
