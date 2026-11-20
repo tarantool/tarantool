@@ -306,14 +306,6 @@ static void json_append_object(lua_State *l, struct luaL_serializer *cfg,
     /* const table, key_idx(nil), key(nil) */
 
     while (luaL_next_field(l, cfg) != 0) {
-        /* Skip nil values */
-        if (lua_isnil(l, -1)) {
-            /* const table, (table ?), key_idx, key, value */
-            lua_pop(l, 1);
-            /* const table, (table ?), key_idx, key */
-            continue;
-        }
-
         if (comma)
             strbuf_append_char(json, ',');
         else
