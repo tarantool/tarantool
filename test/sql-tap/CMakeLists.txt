@@ -58,7 +58,7 @@ foreach(test_path ${tests})
   set(TEST_CMD "${RM} -rf ${WORK_DIR}/* && ${TARANTOOL_BIN} ${test_path}")
   add_test(NAME ${TEST_TITLE}
            COMMAND ${BASH} -c "${TEST_CMD}"
-           WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+           WORKING_DIRECTORY ${WORK_DIR}
   )
   set_tests_properties(${TEST_TITLE} PROPERTIES
     ENVIRONMENT "${TEST_ENV};TT_WORK_DIR=${WORK_DIR};TEST_ENGINE=memtx;"
@@ -73,7 +73,7 @@ foreach(test_path ${tests})
   set(TEST_CMD "${RM} -rf ${WORK_DIR}/* && ${TARANTOOL_BIN} ${TAP_TEST_FLAGS} ${test_path}")
   add_test(NAME ${TEST_TITLE}
            COMMAND ${BASH} -c "${TEST_CMD}"
-           WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+           WORKING_DIRECTORY ${WORK_DIR}
   )
   set_tests_properties(${TEST_TITLE} PROPERTIES
     ENVIRONMENT "${TEST_ENV};TT_WORK_DIR=${WORK_DIR};TEST_ENGINE=vinyl;"
