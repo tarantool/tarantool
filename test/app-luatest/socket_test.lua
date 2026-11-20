@@ -61,10 +61,13 @@ g.test_detach = function()
 end
 
 g.test_socketpair = function()
+    ---@diagnostic disable-next-line: missing-parameter
     t.assert_is(socket.socketpair(), nil)
     t.assert_equals(errno(), errno.EINVAL)
+    ---@diagnostic disable-next-line: missing-parameter
     t.assert_is(socket.socketpair('foo'), nil)
     t.assert_equals(errno(), errno.EINVAL)
+    ---@diagnostic disable-next-line: missing-parameter
     t.assert_is(socket.socketpair('AF_UNIX', 'bar'), nil)
     t.assert_equals(errno(), errno.EINVAL)
     t.assert_is(socket.socketpair('AF_UNIX', 'SOCK_STREAM', 'baz'), nil)
