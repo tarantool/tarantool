@@ -116,7 +116,12 @@ jobs:
         run: nix run --no-update-lock-file --inputs-from . nixpkgs#statix -- check .
       - name: Check Nix formatting
         if: hashFiles('flake.nix') != ''
-        run: git ls-files -z '*.nix' | xargs -0 -r nix run --no-update-lock-file --inputs-from . nixpkgs#nixfmt -- --check
+        # nixfmt defaults to 100 columns, while the project limits text
+        # file lines to 80 columns.
+        run: |
+          git ls-files -z '*.nix' | xargs -0 -r \
+            nix run --no-update-lock-file --inputs-from . \
+            nixpkgs#nixfmt -- --width=80 --check
 
   release-notes:
     # Run on push to the 'master' and release branches of tarantool/tarantool
