@@ -659,3 +659,53 @@ g.test_4007_collation_feature_request = function (cg)
         s:drop()
     end)
 end
+
+--
+-- gh-13358: make sure that errors from the `sql_finish_coding()` function
+-- and from functions called by it are not lost.
+--
+g.test_13358_errors_from_sql_finish_coding_are_not_lost = function (cg)
+    cg.server:exec(function ()
+        local exp_err = "COLLATE clause can't be used with non-string arguments"
+        local sql = [[CREATE TABLE s (a ANY NULL CHECK (a = 1 COLLATE "binary"),
+                                      b UNSIGNED PRIMARY KEY);]]
+        local _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+
+        local f_err = {
+            language = 'SQL_EXPR',
+            is_deterministic = true,
+            body = 'a = 1 COLLATE "binary"'
+        }
+        t.assert_error_msg_equals(exp_err, box.schema.func.create, 'f', f_err)
+
+        exp_err = "row value misused"
+        sql = [[CREATE TABLE s (a ANY NULL CHECK (a = 1 OR (1,2) IS NULL),
+                                b INT PRIMARY KEY);]]
+        _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+
+        exp_err = "RAISE() may only be used within a trigger-program"
+        sql = [[CREATE TABLE s
+                (a ANY NULL CHECK (a = 1 OR RAISE(IGNORE) IS NULL),
+                 b INT PRIMARY KEY)]]
+        _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+
+        exp_err = "Illegal mix of collations"
+        sql = [[CREATE TABLE s
+                (a ANY NULL CHECK
+                    (a = 1 OR 'x' COLLATE "unicode_ci" = 'y' COLLATE "binary"),
+                 b INT PRIMARY KEY)]]
+        _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+
+        exp_err = "Collation 'no_such_collation' does not exist"
+        sql = [[CREATE TABLE s
+                (a ANY NULL CHECK
+                    (a = 1 OR 'x' COLLATE "no_such_collation" = 'y'),
+                 b INT PRIMARY KEY)]]
+        _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+    end)
+end
