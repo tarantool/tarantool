@@ -55,6 +55,13 @@ let
       "$@"
   '';
 
+  # `taskset' pins a perf test process to a CPU for stable results. Only
+  # the binary is wrapped because util-linux ships many other utils which
+  # would shadow the system ones.
+  taskset = pkgs.writeShellScriptBin "taskset" ''
+    exec ${pkgs.util-linux}/bin/taskset "$@"
+  '';
+
   # Build dependencies shared with the Tarantool derivations in
   # flake.nix, which reuse them through `passthru.buildDeps'
   # below. The commented CMake options select the system libraries;
@@ -108,6 +115,12 @@ pkgs.mkShell {
       luajitPackages.luacheck
       ninja
       stdenv.cc.cc.lib
+      taskset
+      # libprotobuf-mutator in lua-tests is pinned to a revision that is
+      # incompatible with protobuf >= 22.
+      protobuf_21
+      # libprotobuf-mutator examples use find_package(LibLZMA).
+      xz
 
       # Python environment with packages required for regression
       # testing.
