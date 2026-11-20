@@ -1673,6 +1673,46 @@ applier_process_heartbeat(struct applier *applier, struct applier_tx_row *txr)
 	return 0;
 }
 
+/**
+ * Validate original WAL flags before synchro filtering can replace rows with
+ * NOPs. A relay's mode says nothing about the originator's compatibility.
+ * JOIN metadata and local recovery do not pass through this function.
+ */
+static int
+applier_check_tx_replication_mode(struct stailq *rows)
+{
+	if (replication_mode == REPLICATION_MODE_LEGACY)
+		return 0;
+	struct xrow_header *last = &stailq_last_entry(
+		rows, struct applier_tx_row, next)->row;
+	struct replica *origin = replica_by_id(last->replica_id);
+	if (origin == NULL || origin->applier == NULL ||
+	    origin->applier->ballot.replication_mode == REPLICATION_MODE_LEGACY)
+		return 0;
+	const char *reason = NULL;
+	if (replication_mode == REPLICATION_MODE_ASYNC) {
+		if (last->wait_sync || last->wait_ack)
+			reason = "synchronous transaction in async mode";
+		else if (last->type == IPROTO_RAFT_PROMOTE &&
+			 last->replica_id != REPLICA_ID_NIL)
+			reason = "promotion in async mode";
+	} else if (iproto_type_is_dml(last->type) && !last->wait_ack) {
+		struct applier_tx_row *item;
+		stailq_foreach_entry(item, rows, next) {
+			if (item->row.type != IPROTO_NOP) {
+				reason = "async transaction in sync mode";
+				break;
+			}
+		}
+	}
+	if (reason == NULL)
+		return 0;
+	diag_set(ClientError, ER_REPLICATION_MODE_WAL,
+		 replication_mode_str(replication_mode), last->replica_id,
+		 last->lsn, reason);
+	return -1;
+}
+
 static int
 applier_apply_tx(struct applier *applier, struct stailq *rows)
 {
@@ -1737,6 +1777,9 @@ applier_apply_tx(struct applier *applier, struct stailq *rows)
 			}
 		}
 	}
+	rc = applier_check_tx_replication_mode(rows);
+	if (rc != 0)
+		goto finish;
 	rc = applier_synchro_filter_tx(rows);
 	if (rc != 0)
 		goto finish;

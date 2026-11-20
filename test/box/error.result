@@ -513,6 +513,7 @@ t;
  |   305: box.error.NO_SUCH_READ_VIEW
  |   306: box.error.READ_VIEW_THROTTLED
  |   307: box.error.REPLICATION_MODE_MISMATCH
+ |   308: box.error.REPLICATION_MODE_WAL
  | ...
 
 test_run:cmd("setopt delimiter ''");

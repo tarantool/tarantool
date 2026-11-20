@@ -585,3 +585,233 @@ ballot.test_hot_standby_checks_ballot_after_takeover = function(cg)
     standby:drop()
     drop_ballot_replica(cg)
 end
+
+local wal = t.group('replication_mode_wal', {{mode = 'sync'}, {mode = 'async'}})
+
+--
+-- Rejected records remain in WAL and stop appliers permanently. Each case
+-- needs its own replicaset so these histories cannot affect the next one.
+--
+local function start_wal_cluster(cg)
+    cg.master = server:new({alias = 'master', box_cfg = {
+        replication_mode = cg.params.mode,
+        election_mode = cg.params.mode == 'sync' and 'manual' or 'off',
+        replication_synchro_quorum = 1,
+        replication_timeout = 0.1,
+    }, env = {TARANTOOL_RUN_BEFORE_BOX_CFG = new_compat}})
+    cg.master:start()
+    cg.master:exec(function()
+        box.schema.space.create('s'):create_index('pk')
+    end)
+    cg.replica = server:new({alias = 'replica', box_cfg = {
+        replication = cg.master.net_box_uri,
+        replication_mode = cg.params.mode,
+        election_mode = cg.params.mode == 'sync' and 'voter' or 'off',
+        read_only = true,
+        replication_timeout = 0.1,
+    }, env = {TARANTOOL_RUN_BEFORE_BOX_CFG = new_compat}})
+    cg.replica:start()
+    cg.replica:wait_for_vclock_of(cg.master)
+end
+
+local function drop_wal_cluster(cg)
+    if cg.sink ~= nil then
+        cg.sink:drop()
+        cg.sink = nil
+    end
+    cg.replica:drop()
+    cg.master:drop()
+end
+
+local function assert_stopped(replica, upstream_id, vclock, reason)
+    replica:exec(function(id, clock)
+        t.helpers.retrying({}, function()
+            local upstream = box.info.replication[id].upstream
+            t.assert_equals(upstream.status, 'stopped')
+            t.assert_str_contains(upstream.message, 'Replication mode WAL')
+        end)
+        t.assert_equals(box.info.vclock[1], clock[1])
+        t.assert_equals(box.space.s:select(), {})
+    end, {upstream_id, vclock})
+    t.assert(replica:grep_log(reason, nil, {plain = true}))
+end
+
+wal.test_incompatible_transaction = function(cg)
+    start_wal_cluster(cg)
+    local mode = cg.params.mode == 'sync' and 'async' or 'sync'
+    local clock = cg.replica:exec(function(target)
+        box.cfg{
+            replication_mode = target,
+            election_mode = target == 'sync' and 'voter' or 'off',
+        }
+        return box.info.vclock
+    end, {mode})
+    cg.master:exec(function() box.space.s:insert{1} end)
+    assert_stopped(cg.replica, 1, clock, 'transaction in ' .. mode .. ' mode')
+    -- A local mode correction does not restart a permanently stopped applier.
+    cg.replica:exec(function(target)
+        box.cfg{
+            replication_mode = target,
+            election_mode = target == 'sync' and 'voter' or 'off',
+        }
+        t.assert_equals(box.info.replication[1].upstream.status, 'stopped')
+        local replication = box.cfg.replication
+        box.cfg{replication = {}}
+        box.cfg{replication = replication}
+    end, {cg.params.mode})
+    cg.replica:wait_for_vclock_of(cg.master)
+    cg.replica:exec(function() t.assert_equals(box.space.s:select(), {{1}}) end)
+    drop_wal_cluster(cg)
+end
+
+wal.test_legacy_originator = function(cg)
+    start_wal_cluster(cg)
+    cg.master:exec(function()
+        require('compat').box_cfg_replication_mode = 'old'
+    end)
+    cg.replica:exec(function()
+        local replication = box.cfg.replication
+        box.cfg{replication = {}}
+        box.cfg{replication = replication}
+    end)
+    -- The legacy writer can originate an asynchronous transaction in either
+    -- mode. With sync mode, its own queue ownership makes this term valid.
+    cg.master:exec(function() box.space.s:insert{1} end)
+    cg.replica:wait_for_vclock_of(cg.master)
+    cg.replica:exec(function() t.assert_equals(box.space.s:select(), {{1}}) end)
+    drop_wal_cluster(cg)
+end
+
+wal.test_promotion = function(cg)
+    t.skip_if(cg.params.mode ~= 'async')
+    start_wal_cluster(cg)
+    local clock = cg.replica:get_vclock()
+    cg.master:exec(function()
+        box.cfg{
+            replication_mode = 'sync',
+            election_mode = 'manual',
+        }
+        box.ctl.promote()
+    end)
+    assert_stopped(cg.replica, 1, clock, 'promotion in async mode')
+    cg.replica:exec(function()
+        t.assert_equals(box.info.synchro.queue.owner, 0)
+    end)
+    drop_wal_cluster(cg)
+end
+
+wal.test_forwarded_unknown_originator = function(cg)
+    t.skip_if(cg.params.mode ~= 'async')
+    start_wal_cluster(cg)
+    -- R1 knows M, R2 only knows R1. R2 must not use R1's ballot for M's rows.
+    cg.sink = server:new({alias = 'sink', box_cfg = {
+        replication = cg.replica.net_box_uri,
+        replication_mode = 'async',
+        replication_anon = true,
+        read_only = true,
+    }, env = {TARANTOOL_RUN_BEFORE_BOX_CFG = new_compat}})
+    cg.sink:start()
+    cg.replica:exec(function()
+        box.cfg{
+            replication_mode = 'sync',
+            election_mode = 'voter',
+        }
+    end)
+    cg.master:exec(function()
+        box.cfg{
+            replication_mode = 'sync',
+            election_mode = 'manual',
+        }
+        box.ctl.promote()
+        box.space.s:insert{1}
+    end)
+    cg.sink:wait_for_vclock_of(cg.master)
+    cg.sink:exec(function() t.assert_equals(box.space.s:select(), {{1}}) end)
+    drop_wal_cluster(cg)
+end
+
+for _, nop in ipairs({false, true}) do
+    wal['test_forwarded_known_originator_nop_' .. tostring(nop)] = function(cg)
+        t.skip_if(cg.params.mode ~= 'async')
+        t.tarantool.skip_if_not_debug()
+        start_wal_cluster(cg)
+        cg.replica:exec(function(make_nop)
+            if make_nop then
+                box.cfg{
+                    read_only = false,
+                    replication_skip_conflict = true,
+                }
+                box.space.s:insert{1}
+            end
+        end, {nop})
+        cg.sink = server:new({alias = 'sink', box_cfg = {
+            replication = {cg.master.net_box_uri, cg.replica.net_box_uri},
+            bootstrap_strategy = 'config',
+            bootstrap_leader = cg.replica.net_box_uri,
+            replication_anon = true,
+            read_only = true,
+        }, env = {TARANTOOL_RUN_BEFORE_BOX_CFG = new_compat}})
+        cg.sink:start()
+        cg.replica:exec(function()
+            box.error.injection.set('ERRINJ_RELAY_SEND_DELAY', true)
+        end)
+        local clock = cg.sink:exec(function()
+            box.cfg{replication_mode = 'sync'}
+            return box.info.vclock
+        end)
+        cg.master:exec(function() box.space.s:insert{1} end)
+        cg.sink:exec(function()
+            t.helpers.retrying({}, function()
+                t.assert_equals(box.info.replication[1].upstream.status,
+                                'stopped')
+            end)
+        end)
+        cg.replica:exec(function()
+            box.error.injection.set('ERRINJ_RELAY_SEND_DELAY', false)
+        end)
+        if nop then
+            cg.sink:wait_for_vclock_of(cg.master)
+            cg.sink:exec(function()
+                local upstream = box.info.replication[2].upstream
+                t.assert_equals(upstream.status, 'follow')
+                t.assert_equals(box.space.s:select(), {{1}})
+            end)
+        else
+            assert_stopped(cg.sink, 2, clock, 'transaction in sync mode')
+        end
+        drop_wal_cluster(cg)
+    end
+end
+
+wal.test_final_join = function(cg)
+    t.skip_if(cg.params.mode ~= 'async')
+    t.tarantool.skip_if_not_debug()
+    start_wal_cluster(cg)
+    cg.master:exec(function()
+        box.error.injection.set('ERRINJ_REPLICA_JOIN_DELAY', true)
+    end)
+    local uuid = require('uuid').str()
+    cg.sink = server:new({alias = 'sink', box_cfg = {
+        instance_uuid = uuid,
+        replication = cg.master.net_box_uri,
+        bootstrap_strategy = 'legacy',
+        read_only = true,
+    }, env = {TARANTOOL_RUN_BEFORE_BOX_CFG = new_compat}})
+    cg.sink:start({wait_until_ready = false})
+    t.helpers.retrying({}, function()
+        t.assert(cg.master:grep_log('replica ' .. uuid:gsub('%-', '%%-')))
+    end)
+    cg.master:exec(function()
+        box.cfg{
+            replication_mode = 'sync',
+            election_mode = 'manual',
+        }
+        box.ctl.promote()
+        box.error.injection.set('ERRINJ_REPLICA_JOIN_DELAY', false)
+    end)
+    t.helpers.retrying({}, function()
+        t.assert_not(cg.sink.process:is_alive())
+        t.assert(cg.sink:grep_log('Replication mode WAL mismatch'))
+    end)
+    drop_wal_cluster(cg)
+end
