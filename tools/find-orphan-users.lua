@@ -38,6 +38,7 @@
 local DEFAULT_ORIGIN = ''
 local CONFIG_ORIGIN = 'config'
 local USER_OPTS_FIELD = 8
+local PRIV_OPTS_FIELD = 7
 
 -- Return origins for user/role from the given tuple.
 local function user_origins_from_tuple(tuple)
@@ -46,6 +47,25 @@ local function user_origins_from_tuple(tuple)
         return {[DEFAULT_ORIGIN] = true}
     end
     return tuple[USER_OPTS_FIELD].origins
+end
+
+-- Return origins for a privilege tuple.
+local function priv_origins_from_tuple(tuple)
+    if tuple[PRIV_OPTS_FIELD] == nil or
+       tuple[PRIV_OPTS_FIELD].origins == nil then
+        return {[DEFAULT_ORIGIN] = true}
+    end
+    local res = {}
+    for origin, priv_mask in pairs(tuple[PRIV_OPTS_FIELD].origins) do
+        if priv_mask ~= 0 then
+            res[origin] = true
+        end
+    end
+    -- If no CONFIG_ORIGIN entry at all, treat as DEFAULT_ORIGIN.
+    if next(res) == nil then
+        res[DEFAULT_ORIGIN] = true
+    end
+    return res
 end
 
 local function is_system(tuple)
@@ -64,6 +84,8 @@ end
 local config_entries = {}
 local duplicate_entries = {}
 local orphan_entries = {}
+-- Maps user/role name -> list of Lua-granted privilege descriptions.
+local lua_privileges_on_config = {}
 
 for _, t in box.space._user:pairs() do
     if not is_system(t) then
@@ -73,6 +95,45 @@ for _, t in box.space._user:pairs() do
 
         if comes_from_config then
             table.insert(config_entries, ('%s %q'):format(t.type, t.name))
+            -- Check for Lua-granted privileges on this config-managed subject.
+            local lua_privs = {}
+            for _, priv_t in box.space._priv:select({t.id}) do
+                local priv_origins = priv_origins_from_tuple(priv_t)
+                if priv_origins[DEFAULT_ORIGIN] and
+                   not priv_origins[CONFIG_ORIGIN] then
+                    local obj_name = ''
+                    local obj_type = priv_t.object_type
+                    if obj_type == 'universe' or obj_type == 'lua_eval' or
+                       obj_type == 'sql' or obj_type == 'lua_call' then
+                        obj_name = ''
+                    else
+                        local space_map = {
+                            role = '_user',
+                            user = '_user',
+                            space = '_space',
+                            function = '_func',
+                            sequence = '_sequence',
+                        }
+                        local space_name = space_map[obj_type]
+                        if space_name then
+                            local obj =
+                                box.space[space_name]:get{priv_t.object_id}
+                            if obj then
+                                obj_name = obj.name
+                            else
+                                obj_name = tostring(priv_t.object_id)
+                            end
+                        else
+                            obj_name = tostring(priv_t.object_id)
+                        end
+                    end
+                    table.insert(lua_privs, ('  - %s on %s %q'):format(
+                        priv_t.privilege, obj_type, obj_name))
+                end
+            end
+            if #lua_privs > 0 then
+                lua_privileges_on_config[t.name] = lua_privs
+            end
         end
 
         if comes_from_lua and comes_from_config then
@@ -137,11 +198,26 @@ local function gen_disown_f(user_or_role)
         opts.origins = origins
         box.space._user:update({t.id}, {{'=', USER_OPTS_FIELD, opts}})
 
-        return ('The %s %q is now considered to be managed by the ' ..
-                'configuration.\nNote that it may still retain implicit ' ..
-                'privileges granted manually or inherited earlier. ' ..
-                'Please review its privileges if necessary.')
-                :format(user_or_role, name)
+        local result = ('The %s %q is now considered to be managed by the ' ..
+                'configuration.'):format(user_or_role, name)
+
+        local has_lua_privs = lua_privileges_on_config[name]
+        if has_lua_privs then
+            result = result .. '\n\n' ..
+                'WARNING: The following privileges were granted from Lua ' ..
+                'and are not managed by the YAML configuration:\n' ..
+                table.concat(has_lua_privs, '\n') .. '\n\n' ..
+                'You should add these privileges to the configuration ' ..
+                'manually and then run config:reload() to ensure they ' ..
+                'persist correctly.'
+        else
+            result = result ..
+                '\nNote that it may still retain implicit privileges ' ..
+                'granted manually or inherited earlier. ' ..
+                'Please review its privileges if necessary.'
+        end
+
+        return result
     end
 end
 
@@ -152,7 +228,8 @@ if #config_entries == 0 then
         'No further actions are expected.'
 end
 
-if #duplicate_entries == 0 and #orphan_entries == 0 then
+if #duplicate_entries == 0 and #orphan_entries == 0 and
+   next(lua_privileges_on_config) == nil then
     return 'Found no users/roles created from Lua. Everything is managed ' ..
         'using the YAML configuration. Fine.'
 end
@@ -197,6 +274,20 @@ if #orphan_entries > 0 then
     o('are obsoleted). The following commands remove them.')
     o('')
     l(orphan_entries)
+end
+
+-- Report Lua-granted privileges on config-managed subjects (append after
+-- existing output so that backward-compatible output remains unchanged).
+if next(lua_privileges_on_config) ~= nil then
+    o('')
+    o('Some config-managed users/roles have privileges granted from Lua.')
+    o('These are not managed by the YAML configuration and should be')
+    o('reviewed and migrated if necessary.')
+    for name, privs in pairs(lua_privileges_on_config) do
+        o((''):format())
+        o(('%q has Lua-granted privileges:'):format(name))
+        l(privs)
+    end
 end
 
 return output
