@@ -150,7 +150,9 @@ jobs:
 
   crud:
     needs: tarantool
-    uses: tarantool/crud/.github/workflows/reusable_test.yml@master
+    # DO NOT MERGE: crud's master has no `luatest_args` input until
+    # tarantool/crud#529 is merged.
+    uses: tarantool/crud/.github/workflows/reusable_test.yml@crud-integration-duration
     with:
       artifact_name: tarantool-ubuntu-noble-${{ needs.tarantool.outputs.sha }}
       # Skip what checks crud and vshard rather than tarantool: crud's
