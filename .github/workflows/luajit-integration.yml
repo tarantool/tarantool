@@ -49,8 +49,9 @@ on:
 
 jobs:
   luajit-integration:
-    runs-on: ${{ inputs.os == 'Linux' && inputs.arch == 'ARM64' &&
-                 'ubuntu-26.04-arm' ||
+    runs-on: ${{ inputs.os == 'Linux' &&
+                 (inputs.arch == 'ARM64' && 'ubuntu-26.04-arm' ||
+                  'ubuntu-26.04') ||
                  fromJSON(format('["self-hosted", "regular", "{0}", "{1}"]',
                                  inputs.os, inputs.arch)) }}
     timeout-minutes: 60
