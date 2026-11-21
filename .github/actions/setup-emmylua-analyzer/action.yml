@@ -19,6 +19,10 @@ inputs:
     description: Version of the EmmyLua tools to install
     required: false
     default: "0.25.1"
+  doc-cli-rev:
+    description: Git revision to install emmylua_doc_cli from; overrides emmylua-version
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -98,5 +102,13 @@ runs:
 
     - name: Setup emmylua_doc_cli
       if: inputs.doc-cli == 'true'
-      run: cargo install emmylua_doc_cli --version ${{ inputs.emmylua-version }}
+      run: |
+        if [ -n "${{ inputs.doc-cli-rev }}" ]; then
+          cargo install \
+            --git https://github.com/EmmyLuaLs/emmylua-analyzer-rust \
+            --rev "${{ inputs.doc-cli-rev }}" \
+            emmylua_doc_cli
+        else
+          cargo install emmylua_doc_cli --version ${{ inputs.emmylua-version }}
+        fi
       shell: bash

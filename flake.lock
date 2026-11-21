@@ -41,6 +41,31 @@
         "type": "github"
       }
     },
+    "emmyluaDoc": {
+      "inputs": {
+        "flake-utils": [
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "rust-overlay": "rust-overlay_2"
+      },
+      "locked": {
+        "lastModified": 1795146382,
+        "narHash": "sha256-74mL7XVRNVn0Jz8nQ2ctWXbzp/To1ASNrHBZPYn7EF8=",
+        "owner": "EmmyLuaLs",
+        "repo": "emmylua-analyzer-rust",
+        "rev": "70dbcf4db9a240a970dab317b56a01e6ac2ff65e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "EmmyLuaLs",
+        "repo": "emmylua-analyzer-rust",
+        "rev": "70dbcf4db9a240a970dab317b56a01e6ac2ff65e",
+        "type": "github"
+      }
+    },
     "flake-utils": {
       "inputs": {
         "systems": "systems"
@@ -79,6 +104,7 @@
       "inputs": {
         "checkpatch": "checkpatch",
         "emmylua": "emmylua",
+        "emmyluaDoc": "emmyluaDoc",
         "flake-utils": "flake-utils",
         "nixpkgs": "nixpkgs",
         "tarantool-release": "tarantool-release"
@@ -88,6 +114,27 @@
       "inputs": {
         "nixpkgs": [
           "emmylua",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1784216271,
+        "narHash": "sha256-bvaxxdk7mmMQ88AuXQGTUtk+PcUujHpgxqpryqTWvTU=",
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "rev": "1f69c7203034a4a974d7a4eac0f19b54af30804d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "type": "github"
+      }
+    },
+    "rust-overlay_2": {
+      "inputs": {
+        "nixpkgs": [
+          "emmyluaDoc",
           "nixpkgs"
         ]
       },
