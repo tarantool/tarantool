@@ -69,6 +69,36 @@ local modules = {
             },
         },
     },
+    {
+        name = 'http',
+        source = 'src/lua/httpc.lua',
+        fixtures = 'test/app-luatest/emmylua/http',
+        type_name = 'http.client',
+        fields = {
+            new = 'Create a new HTTP client instance',
+        },
+        objects = {
+            {
+                fixture = 'client.lua',
+                type_name = 'http.client_object',
+                fields = {
+                    request = 'An HTTP client instance',
+                    get = 'Make a `GET` request and receive a response',
+                    post = 'Make a `POST` request and receive a response',
+                    stat = 'Get a table with statistics for the HTTP client',
+                },
+            },
+            {
+                fixture = 'options.lua',
+                type_name = 'http.client.options',
+                fields = {
+                    max_connections = 'The maximum number of entries',
+                    max_total_connections =
+                        'The maximum number of active connections',
+                },
+            },
+        },
+    },
 }
 
 local function normalize(value)
