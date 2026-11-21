@@ -57,6 +57,14 @@ run-perf-test:
 	cmake --build ${BUILD_DIR} --parallel
 	cmake --build ${BUILD_DIR} --target test-perf
 
+.PHONY: test-gdb-debug test-gdb-release
+
+test-gdb-debug: CMAKE_PARAMS += DCMAKE_BUILD_TYPE=Debug
+test-gdb-release: CMAKE_PARAMS += DCMAKE_BUILD_TYPE=RelWithDebInfo
+
+test-gdb-debug test-gdb-release: build
+	cd ${BUILD_DIR} && ctest --verbose -L gdb
+
 ##############################
 # Linux                      #
 ##############################
