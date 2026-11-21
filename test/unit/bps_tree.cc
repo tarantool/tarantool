@@ -158,6 +158,47 @@ static int compare_key(const elem_t &a, long b)
 #undef bps_tree_key_t
 #undef bps_tree_arg_t
 
+/*
+ * Tree for binary search test. Elements are ordered by the pair of fields,
+ * but a search key is compared with the first field only, like a partial key
+ * of a non-unique index is compared with the index key.
+ */
+struct pair_elem_t {
+	type_t key;
+	type_t id;
+};
+
+static int
+compare_pair(const pair_elem_t &a, const pair_elem_t &b)
+{
+	int rc = compare(a.key, b.key);
+	return rc != 0 ? rc : compare(a.id, b.id);
+}
+
+static int
+compare_pair_key(const pair_elem_t &a, type_t key)
+{
+	return compare(a.key, key);
+}
+
+#define BPS_TREE_NAME pair
+#define BPS_TREE_BLOCK_SIZE SMALL_BLOCK_SIZE /* small value for tests */
+#define BPS_TREE_IS_IDENTICAL(a, b) (compare_pair(a, b) == 0)
+#define BPS_TREE_COMPARE(a, b, arg) compare_pair(a, b)
+#define BPS_TREE_COMPARE_KEY(a, b, arg) compare_pair_key(a, b)
+#define bps_tree_elem_t struct pair_elem_t
+#define bps_tree_key_t type_t
+#define bps_tree_arg_t int
+#include "salad/bps_tree.h"
+#undef BPS_TREE_NAME
+#undef BPS_TREE_BLOCK_SIZE
+#undef BPS_TREE_IS_IDENTICAL
+#undef BPS_TREE_COMPARE
+#undef BPS_TREE_COMPARE_KEY
+#undef bps_tree_elem_t
+#undef bps_tree_key_t
+#undef bps_tree_arg_t
+
 /* tree for approximate_count test */
 #define BPS_TREE_NAME approx
 #define BPS_TREE_BLOCK_SIZE SMALL_BLOCK_SIZE /* small value for tests */
@@ -956,6 +997,105 @@ insert_successor_test()
 	ok(true, "successor test");
 }
 
+#define check_bound_elem(prefix, obj, it, index) do { \
+	if ((index) == pair_count) { \
+		fail_unless(pair_iterator_is_invalid(it)); \
+	} else { \
+		pair_elem_t *elem = \
+			prefix##_iterator_get_elem((obj), (it)); \
+		fail_unless(elem != NULL); \
+		fail_unless(elem->key == pair_elems[index].key); \
+		fail_unless(elem->id == pair_elems[index].id); \
+	} \
+} while (false)
+
+#define check_binary_search(prefix, obj, search_key) do { \
+	size_t expected_lower = 0; \
+	while (expected_lower < pair_count && \
+	       pair_elems[expected_lower].key < (search_key)) \
+		++expected_lower; \
+	size_t expected_upper = expected_lower; \
+	while (expected_upper < pair_count && \
+	       pair_elems[expected_upper].key == (search_key)) \
+		++expected_upper; \
+	pair_iterator lower, upper; \
+	bool exact = false; \
+	bool found = prefix##_binary_search((obj), (search_key), &lower, \
+					    &upper, &exact); \
+	fail_unless(found == (expected_lower != expected_upper)); \
+	fail_unless(exact == found); \
+	check_bound_elem(prefix, obj, &lower, expected_lower); \
+	check_bound_elem(prefix, obj, &upper, expected_upper); \
+} while (false)
+
+static void
+binary_search_test(void)
+{
+	plan(4);
+	header();
+
+	/*
+	 * Every key of the first pair_key_count ones is repeated
+	 * pair_repeats times, so its range spans several leaves. The last
+	 * key has a single element.
+	 */
+	const type_t pair_key_count = 100;
+	const type_t pair_repeats = 7;
+	const type_t pair_count = pair_key_count * pair_repeats + 1;
+	pair_elem_t pair_elems[pair_count];
+	for (type_t key = 0; key < pair_key_count; key++) {
+		for (type_t id = 0; id < pair_repeats; id++) {
+			type_t pos = key * pair_repeats + id;
+			pair_elem_t *elem = &pair_elems[pos];
+			elem->key = key;
+			elem->id = id;
+		}
+	}
+	pair_elems[pair_count - 1].key = pair_key_count;
+	pair_elems[pair_count - 1].id = 0;
+
+	pair tree;
+	pair_create(&tree, 0, &allocator, NULL);
+	fail_unless(pair_build(&tree, pair_elems, pair_count) == 0);
+
+	for (type_t key = -1; key <= pair_key_count + 1; key++)
+		check_binary_search(pair, &tree, key);
+	ok(true, "tree");
+
+	pair_view view;
+	pair_view_create(&view, &tree);
+	for (type_t key = -1; key <= pair_key_count + 1; key++)
+		check_binary_search(pair_view, &view, key);
+	ok(true, "view");
+
+	/* The exact output parameter is optional. */
+	pair_iterator lower, upper;
+	fail_unless(pair_binary_search(&tree, 0, &lower, &upper, NULL));
+	pair_elem_t *elem = pair_iterator_get_elem(&tree, &lower);
+	fail_unless(elem != NULL && elem->key == 0 && elem->id == 0);
+	ok(true, "exact is optional");
+
+	pair_view_destroy(&view);
+	pair_destroy(&tree);
+
+	/* An empty tree has no bounds. */
+	pair_create(&tree, 0, &allocator, NULL);
+	bool exact = true;
+	fail_unless(!pair_binary_search(&tree, 0, &lower, &upper,
+					&exact));
+	fail_unless(!exact);
+	fail_unless(pair_iterator_is_invalid(&lower));
+	fail_unless(pair_iterator_is_invalid(&upper));
+	pair_destroy(&tree);
+	ok(true, "empty tree");
+
+	footer();
+	check_plan();
+}
+
+#undef check_binary_search
+#undef check_bound_elem
+
 static void
 gh_11326_oom_on_insertion_test()
 {
@@ -1163,7 +1303,7 @@ gh_11979_head_view_changes_test()
 int
 main(void)
 {
-	plan(16);
+	plan(17);
 	header();
 
 	matras_allocator_create(&allocator, test_TREE_EXTENT_SIZE,
@@ -1181,6 +1321,7 @@ main(void)
 	insert_get_iterator();
 	delete_value_check();
 	insert_successor_test();
+	binary_search_test();
 
 	matras_allocator_destroy(&allocator);
 
