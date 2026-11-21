@@ -46,6 +46,15 @@
       inputs.flake-utils.follows = "flake-utils";
     };
 
+    # emmylua_doc_cli 0.25.1 does not render Markdown tables in the
+    # generated HTML documentation. The fix is merged upstream but not
+    # released yet, so track the merged revision, like the CI action does.
+    emmylua-doc-cli = {
+      url = "github:EmmyLuaLs/emmylua-analyzer-rust/567a5a228e673ad2e2e15a7af0d933c40afe4740";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-utils.follows = "flake-utils";
+    };
+
     # checkpatch.pl is not packaged in nixpkgs, so use the Tarantool fork
     # used by CI. The repository has no flake.nix. The revision is pinned
     # by flake.lock and advanced by `nix flake update checkpatch'.
@@ -62,6 +71,7 @@
       flake-utils,
       tarantool-release,
       emmylua,
+      emmylua-doc-cli,
       checkpatch,
     }:
     flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
@@ -85,7 +95,7 @@
           inherit pkgs;
           checkpatchSrc = checkpatch;
           emmyluaCheck = emmylua.packages.${system}.emmylua_check;
-          emmyluaDocCli = emmylua.packages.${system}.emmylua_doc_cli;
+          emmyluaDocCli = emmylua-doc-cli.packages.${system}.emmylua_doc_cli;
         };
 
         tarantoolRelease = pkgs.stdenv.mkDerivation (finalAttrs: {
