@@ -150,9 +150,21 @@ jobs:
 
   crud:
     needs: tarantool
-    uses: tarantool/crud/.github/workflows/reusable_test.yml@master
+    # DO NOT MERGE: crud's master has no `luatest_args` input until
+    # tarantool/crud#529 is merged.
+    uses: tarantool/crud/.github/workflows/reusable_test.yml@crud-integration-duration
     with:
       artifact_name: tarantool-ubuntu-noble-${{ needs.tarantool.outputs.sha }}
+      # Skip what checks crud and vshard rather than tarantool: crud's
+      # rebalance safe mode, the vshard backend variants (the config
+      # backend stays) and the groups that wait for vshard to rebalance
+      # buckets.
+      luatest_args: >-
+        -x safe_mode:true
+        -x backend_cfg:
+        -x double_buckets_duplicates
+        -x double_buckets_not_applied
+        -x many_operations_errors
 
   # FIXME: Disabled due to tarantool/ddl#130.
   # ddl:
