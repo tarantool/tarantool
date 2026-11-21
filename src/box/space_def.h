@@ -183,6 +183,8 @@ struct space_def {
 	char *format_data;
 	/** Length of MsgPack encoded format clause. */
 	size_t format_data_len;
+	/** Number of references. */
+	int refs;
 	char name[0];
 };
 
@@ -192,6 +194,28 @@ struct space_def {
  */
 void
 space_def_delete(struct space_def *def);
+
+/**
+ * Increment the reference counter of a space definition.
+ */
+static inline void
+space_def_ref(struct space_def *def)
+{
+	def->refs++;
+}
+
+/**
+ * Decrement the reference counter of a space definition.
+ * Delete the definition if it isn't used anymore.
+ */
+static inline void
+space_def_unref(struct space_def *def)
+{
+	assert(def->refs > 0);
+	def->refs--;
+	if (def->refs == 0)
+		space_def_delete(def);
+}
 
 /**
  * Duplicate space_def object.

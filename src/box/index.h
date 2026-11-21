@@ -1114,7 +1114,6 @@ index_reset_stat(struct index *index)
 
 /**
  * Initialize an index read view instance.
- * Note, this function copies the given index definition.
  */
 void
 index_read_view_create(struct index_read_view *rv,

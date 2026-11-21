@@ -12,6 +12,7 @@
 
 #include "small/rlist.h"
 #include "vclock/vclock.h"
+#include "space_def.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -36,27 +37,14 @@ struct space_read_view {
 	struct rlist link;
 	/** Read view that owns this space. */
 	struct read_view *rv;
-	/** Space id. */
-	uint32_t id;
-	/** Space name. */
-	char *name;
 	/** Space engine */
 	struct engine *engine;
 	/**
-	 * Tuple field definition array used by this space. Allocated only if
-	 * read_view_opts::enable_field_names is set, otherwise set to NULL.
+	 * Definition of the space this read view was created from. Shared
+	 * with the space and kept alive with a reference for as long as
+	 * this read view is alive.
 	 */
-	struct field_def *fields;
-	/** Number of entries in the fields array. */
-	uint32_t field_count;
-	/**
-	 * Tuple format data used by this space. Allocated only if
-	 * read_view_opts::enable_field_names is set, otherwise set to NULL.
-	 * Used for creation of space_read_view::format.
-	 */
-	char *format_data;
-	/** Length of tuple format data. */
-	size_t format_data_len;
+	struct space_def *def;
 	/**
 	 * Upgrade function for this space read view or NULL if there wasn't
 	 * a space upgrade in progress at the time when this read view was
@@ -95,9 +83,6 @@ struct space_read_view_handle {
 	/**
 	 * Runtime tuple format needed to access tuple field names by name.
 	 * Referenced (ref counter incremented).
-	 *
-	 * A new format is created only if read_view_opts::enable_field_names
-	 * is set, otherwise runtime_tuple_format is used.
 	 *
 	 * We can't just use the space tuple format as is because it allocates
 	 * tuples from the space engine arena, which is single-threaded, while
@@ -208,13 +193,6 @@ struct read_view_opts {
 	 * Argument passed to filter functions.
 	 */
 	void *filter_arg;
-	/**
-	 * If this flag is set, a new runtime tuple format will be created for
-	 * each read view space to support accessing tuple fields by name,
-	 * otherwise the preallocated name-less runtime tuple format will be
-	 * used instead.
-	 */
-	bool enable_field_names;
 	/**
 	 * If this flag is set and there's a space upgrade in progress at the
 	 * time when this read view is created, create an upgrade function that

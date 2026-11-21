@@ -228,6 +228,17 @@ struct index_def {
 	 * space and its primary index.
 	 */
 	struct key_def *pk_def;
+	/**
+	 * Key definition equipped with raw (format-independent) comparison,
+	 * hashing and key extraction functions. Read views need it because
+	 * a tuple stored in a read view may have no format: the format id
+	 * is overwritten when the tuple is freed.
+	 */
+	struct key_def *key_def_rv;
+	/** Same as key_def_rv, but built from cmp_def. */
+	struct key_def *cmp_def_rv;
+	/** Number of references. */
+	int refs;
 };
 
 struct index_def *
@@ -236,6 +247,28 @@ index_def_dup(const struct index_def *def);
 /* Destroy and free an index_def. */
 void
 index_def_delete(struct index_def *def);
+
+/**
+ * Increment the reference counter of an index definition.
+ */
+static inline void
+index_def_ref(struct index_def *def)
+{
+	def->refs++;
+}
+
+/**
+ * Decrement the reference counter of an index definition.
+ * Delete the definition if it isn't used anymore.
+ */
+static inline void
+index_def_unref(struct index_def *def)
+{
+	assert(def->refs > 0);
+	def->refs--;
+	if (def->refs == 0)
+		index_def_delete(def);
+}
 
 /**
  * Update 'has_optional_parts' property of key definitions.

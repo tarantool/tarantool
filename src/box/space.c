@@ -598,6 +598,7 @@ space_create(struct space *space, struct engine *engine,
 	tuple_format_ref(format);
 
 	space->def = space_def_dup(def);
+	space_def_ref(space->def);
 	bool is_on_recovery = recovery_state < FINISHED_RECOVERY;
 	space_set_events(space, is_on_recovery);
 
@@ -678,8 +679,7 @@ fail_free_indexes:
 fail:
 	free(space->index_map);
 	free(space->check_unique_constraint_map);
-	if (space->def != NULL)
-		space_def_delete(space->def);
+	space_def_unref(space->def);
 	space_cleanup_constraints(space);
 	space_unpin_defaults(space);
 	tuple_format_unref(space->format);
@@ -761,7 +761,7 @@ space_delete(struct space *space)
 	if (space->upgrade != NULL)
 		space_upgrade_delete(space->upgrade);
 	free(space->sequence_path);
-	space_def_delete(space->def);
+	space_def_unref(space->def);
 	assert(rlist_empty(&space->space_cache_pin_list));
 	/* tarantool_L is freed on Tarantool shutdown. */
 	if (tarantool_L != NULL)

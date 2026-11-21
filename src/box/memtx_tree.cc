@@ -2264,7 +2264,7 @@ tree_read_view_count(struct index_read_view *base, enum iterator_type type,
 	 * amount of invisible tuples counted.
 	 */
 	size_t invisible_count = memtx_tx_snapshot_invisible_count_matching(
-		&rv->cleaner, base->def, type, key, part_count);
+		&rv->cleaner, base->def->cmp_def_rv, type, key, part_count);
 
 	return full_count - invisible_count;
 }
@@ -2281,7 +2281,7 @@ tree_read_view_quantile(struct index_read_view *base, double level,
 	struct tree_read_view<USE_HINT> *rv =
 		(struct tree_read_view<USE_HINT> *)base;
 	memtx_tree_view_t<USE_HINT> *tree = &rv->tree_view;
-	struct key_def *key_def = base->def->key_def;
+	struct key_def *key_def = base->def->key_def_rv;
 
 	struct memtx_tree_key_data<USE_HINT> begin_data;
 	begin_data.key = begin_key;
@@ -2383,7 +2383,7 @@ struct TreeReadViewIteratorEQ {
 					      it->key_data.key,
 					      it->key_data.part_count,
 					      it->key_data.hint,
-					      rv->base.def->key_def) == 0 ?
+					      rv->base.def->key_def_rv) == 0 ?
 		       res : NULL;
 	}
 };
@@ -2406,7 +2406,7 @@ struct TreeReadViewIteratorREQ {
 					      it->key_data.key,
 					      it->key_data.part_count,
 					      it->key_data.hint,
-					      rv->base.def->key_def) == 0 ?
+					      rv->base.def->key_def_rv) == 0 ?
 		       res : NULL;
 	}
 };
@@ -2548,7 +2548,7 @@ tree_read_view_iterator_start(struct tree_read_view_iterator<USE_HINT> *it,
 				memtx_tree_index_entry(&rv->index->base, prev);
 		size_t skip_more_visible =
 			memtx_tx_snapshot_invisible_count_matching_until(
-				&rv->cleaner, rv->base.def, type,
+				&rv->cleaner, rv->base.def->cmp_def_rv, type,
 				start_data.key, start_data.part_count,
 				prev->tuple, prev->hint) +
 			!memtx_tx_snapshot_entry_is_visible(&rv->cleaner,
@@ -2611,11 +2611,9 @@ static void
 tree_read_view_reset_key_def(struct tree_read_view<USE_HINT> *rv)
 {
 	struct index_def *def = rv->base.def;
-	key_def_set_func_raw(def->key_def);
-	key_def_set_func_raw(def->cmp_def);
 	rv->tree_view.common.arg = def->opts.is_unique &&
-				   !def->key_def->is_nullable ?
-				   def->key_def : def->cmp_def;
+				   !def->key_def_rv->is_nullable ?
+				   def->key_def_rv : def->cmp_def_rv;
 }
 
 /**
