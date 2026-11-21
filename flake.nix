@@ -46,6 +46,18 @@
       inputs.flake-utils.follows = "flake-utils";
     };
 
+    # emmylua_doc_cli 0.25.1 does not render the description of a
+    # class-based module (---@class plus ---@field) on the module page.
+    # Version 0.30.0 fixes this, but is neither tagged nor published to
+    # crates.io yet, so pin the upstream main revision that contains the
+    # fix. Keep the `emmylua' input at 0.25.1 for emmylua_check, which is
+    # used by the lint job.
+    emmyluaDoc = {
+      url = "github:EmmyLuaLs/emmylua-analyzer-rust/70dbcf4db9a240a970dab317b56a01e6ac2ff65e";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-utils.follows = "flake-utils";
+    };
+
     # checkpatch.pl is not packaged in nixpkgs, so use the Tarantool fork
     # used by CI. The repository has no flake.nix. The revision is pinned
     # by flake.lock and advanced by `nix flake update checkpatch'.
@@ -62,6 +74,7 @@
       flake-utils,
       tarantool-release,
       emmylua,
+      emmyluaDoc,
       checkpatch,
     }:
     flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
@@ -85,7 +98,13 @@
           inherit pkgs;
           checkpatchSrc = checkpatch;
           emmyluaCheck = emmylua.packages.${system}.emmylua_check;
-          emmyluaDocCli = emmylua.packages.${system}.emmylua_doc_cli;
+          # libmimalloc-sys2 builds mimalloc with CMake, but the
+          # upstream package does not list cmake in nativeBuildInputs.
+          emmyluaDocCli =
+            emmyluaDoc.packages.${system}.emmylua_doc_cli.overrideAttrs
+              (old: {
+                nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.cmake ];
+              });
         };
 
         tarantoolRelease = pkgs.stdenv.mkDerivation (finalAttrs: {
