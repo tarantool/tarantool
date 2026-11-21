@@ -62,7 +62,6 @@ function(create_perf_lua_test)
     DEPENDS ${BENCH_TARGET}-deps)
 endfunction()
 
-create_perf_lua_test(NAME 1mops_write)
 create_perf_lua_test(NAME box_select)
 create_perf_lua_test(NAME gh-7089-vclock-copy)
 create_perf_lua_test(NAME luafun)
@@ -77,6 +76,31 @@ file(GENERATE OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/recovery_script.lua
 create_perf_lua_test(NAME box_snapshot)
 
 include_directories(${MSGPUCK_INCLUDE_DIRS})
+
+build_module(1mops_write_module 1mops_write_module.c)
+target_link_libraries(1mops_write_module msgpuck)
+create_perf_lua_test(NAME 1mops_write
+                     DEPENDS 1mops_write_module
+)
+
+# The default workload runs the Lua path. The C fiber is the path the
+# benchmark exists for, so it is measured in a case of its own. The
+# result goes to a subdirectory so that the C fiber run does not add a
+# second point to the benchmark's series in the monitoring.
+set(C_FIBER_OUTPUT_DIR ${PERF_OUTPUT_DIR}/1mops_write-c-fiber)
+file(MAKE_DIRECTORY ${C_FIBER_OUTPUT_DIR})
+add_test(NAME perf/lua/1mops_write-c-fiber
+         COMMAND ${TARANTOOL_BIN}
+                 ${CMAKE_CURRENT_SOURCE_DIR}/1mops_write.lua
+                 --c_fiber --columns=10 --ops=20000 --fibers=4
+                 --transaction=10 --warmup=0 --wal_mode=none
+                 --output=${C_FIBER_OUTPUT_DIR}/1mops_write.json
+                 --output_format=json
+)
+set_tests_properties(perf/lua/1mops_write-c-fiber PROPERTIES
+  ENVIRONMENT "LUA_PATH=${LUA_PATH};BUILDDIR=${CMAKE_BINARY_DIR}"
+  LABELS "${TEST_SUITE_NAME};performance;"
+  DEPENDS 1mops_write-deps)
 
 build_module(column_scan_module column_scan_module.c)
 target_link_libraries(column_scan_module msgpuck)
