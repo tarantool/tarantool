@@ -153,6 +153,85 @@ jobs:
     uses: tarantool/crud/.github/workflows/reusable_test.yml@master
     with:
       artifact_name: tarantool-ubuntu-noble-${{ needs.tarantool.outputs.sha }}
+      # Reduce the testing matrix to save CI job time. The full test suite is
+      # quite long (~50 minutes at the time of writing). The reduced suite
+      # should be around 8 minutes with similar tarantool code coverage.
+      #
+      # First, essential information about crud's testing.
+      #
+      # There are testing groups of three kinds:
+      #
+      # A. Defined with helpers.backend_matrix(<...>).
+      # B. Defined with its own matrix.
+      # C. Defined without a matrix, a singleton test case.
+      #
+      # The A kind has 15 matrix cells:
+      #
+      # | ? |  N | backend | backend_cfg                                            | safe_mode |
+      # | - | -- | ------- | ------------------------------------------------------ | --------- |
+      # |   |  1 | vshard  | {identification_mode = "uuid_as_key"}                  |           |
+      # |   |  2 | vshard  | {identification_mode = "uuid_as_key"}                  | false     |
+      # |   |  3 | vshard  | {identification_mode = "uuid_as_key"}                  | true      |
+      # |   |  4 | vshard  | {identification_mode = "name_as_key"}                  |           |
+      # |   |  5 | vshard  | {identification_mode = "name_as_key"}                  | false     |
+      # |   |  6 | vshard  | {identification_mode = "name_as_key"}                  | true      |
+      # |   |  7 | vshard  | {identification_mode = "uuid_as_key", master = "auto"} |           |
+      # |   |  8 | vshard  | {identification_mode = "uuid_as_key", master = "auto"} | false     |
+      # |   |  9 | vshard  | {identification_mode = "uuid_as_key", master = "auto"} | true      |
+      # | + | 10 | vshard  | {identification_mode = "name_as_key", master = "auto"} |           |
+      # | + | 11 | vshard  | {identification_mode = "name_as_key", master = "auto"} | false     |
+      # |   | 12 | vshard  | {identification_mode = "name_as_key", master = "auto"} | true      |
+      # | + | 13 | config  | nil                                                    |           |
+      # |   | 14 | config  | nil                                                    | false     |
+      # | + | 15 | config  | nil                                                    | true      |
+      #
+      # The '?' column shows what is run here from the test cases of the kind A.
+      #
+      # Note 1: A group either defines safe_mode = false/true or it doesn't. We
+      # keep cells both with and without safe_mode, so as not to miss test
+      # cases.
+      #
+      # Note 2: Some groups add their own axes, for example, engine =
+      # "memtx"/"vinyl". All these configuration variants are kept.
+      #
+      # So, we run:
+      #
+      # * 4/15 cells of A except three long rebalancing test cases.
+      # * B in full.
+      # * C in full.
+      #
+      # The choice of the A cells is such that all the test cases (except the
+      # rebalancing ones) that run in the full suite are run in the reduced
+      # one, but not in all the configurations. We can't run just one or two
+      # cells, because some test cases are skipped with particular backends or
+      # vshard's master modes and there is no cell that runs everything.
+      #
+      # The 'keep the running test cases list the same' is the method: the goal
+      # is to keep tarantool's coverage on the same level. If you're going to
+      # tune this workflow call, please briefly check gcov and luacov profiles.
+      # Another point to consider is to try to make the exclusion list
+      # future-proof: prefer referring to matrix parameters over particular
+      # test case names, because the general parameters likely vary less over
+      # time.
+      #
+      # Each -x line below skips particular cells of A. The luatest_args option
+      # doesn't allow inline comments, so the list of skipped cells for each -x
+      # option is here:
+      #
+      # 1. First -x skips cells 1, 2, 3.
+      # 2. Second -x skips cells 4, 5, 6.
+      # 3. Third -x skips cells 7, 8, 9.
+      # 4. Fourth -x skips cell 12.
+      # 5. Fifth -x skips cell 14.
+      luatest_args: >-
+        -x 'backend_cfg:{identification_mode = "uuid_as_key"}'
+        -x 'backend_cfg:{identification_mode = "name_as_key"}'
+        -x 'backend_cfg:{identification_mode = "uuid_as_key", master = "auto"}'
+        -x 'backend_cfg:{identification_mode = "name_as_key", master = "auto"}.*safe_mode:true'
+        -x 'backend:"config".*safe_mode:false'
+        -x double_buckets_duplicates
+        -x double_buckets_not_applied
+        -x many_operations_errors
 
   # FIXME: Disabled due to tarantool/ddl#130.
   # ddl:
