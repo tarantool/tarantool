@@ -1,0 +1,29 @@
+name: docker_entrypoint
+
+on:
+  pull_request:
+    paths:
+      - 'docker/**'
+      - '.github/workflows/docker_entrypoint.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  entrypoint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          submodules: false
+          persist-credentials: false
+      - name: Check shell syntax
+        run: |
+          sh -n docker/entrypoint/docker-entrypoint.sh
+          sh -n docker/tools/console
+          sh -n docker/tools/status
+      - name: Check entrypoint contracts
+        run: timeout 30s python3 docker/tests/entrypoint_test.py
