@@ -227,6 +227,35 @@ local modules = {
             },
         },
     },
+    {
+        name = 'key_def',
+        source = 'src/box/lua/key_def.lua',
+        fixtures = 'test/app-luatest/emmylua/key_def',
+        type_name = 'key_def',
+        fields = {
+            new = 'Create a new key_def',
+        },
+        objects = {
+            {
+                fixture = 'object.lua',
+                type_name = 'key_def_object',
+                fields = {
+                    extract_key = 'Return a tuple containing only the fields',
+                    compare = 'Compare the key fields',
+                    totable = 'Return a table containing the fields',
+                },
+            },
+            {
+                fixture = 'part.lua',
+                type_name = 'key_def.part',
+                fields = {
+                    fieldno = 'Required unless `field` is used',
+                    type = 'The field type. Required',
+                    scale = 'Required for `decimal32`',
+                },
+            },
+        },
+    },
 }
 
 local function normalize(value)
