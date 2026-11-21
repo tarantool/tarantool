@@ -69,6 +69,27 @@ local modules = {
             },
         },
     },
+    {
+        name = 'merger',
+        source = 'src/box/lua/merger.lua',
+        fixtures = 'test/app-luatest/emmylua/merger',
+        type_name = 'merger',
+        fields = {
+            new = 'Create a new merger',
+            new_source_fromtable = 'Create a source from one table',
+        },
+        objects = {
+            {
+                fixture = 'object.lua',
+                type_name = 'merger_object',
+                fields = {
+                    select = 'Access the contents',
+                    pairs = 'Return a luafun iterator',
+                    ipairs = 'An alias',
+                },
+            },
+        },
+    },
 }
 
 local function normalize(value)
