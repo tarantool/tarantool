@@ -1,6 +1,7 @@
 local t = require('luatest')
 local protobuf = require('protobuf')
 local g = t.group()
+local utils = require('test/app-luatest/protobuf_utils')
 
 g.test_module_multiple_fields = function()
     local protocol = protobuf.protocol({
@@ -19,11 +20,8 @@ g.test_module_multiple_fields = function()
         index = 15,
         available = true,
     })
-    t.assert_str_contains(string.hex(result), '2801')
-    t.assert_str_contains(string.hex(result), '0a03616263')
-    t.assert_str_contains(string.hex(result), '100f')
-    t.assert_str_contains(string.hex(result), '2501000000')
-    t.assert_str_contains(string.hex(result), '1819')
+    local exp = '(\x01\n\x03abc\x10\x0F%\x01\0\0\0\x18\x19'
+    utils.strings_deepequal(result, exp)
 end
 
 g.test_module_selective_coding = function()
@@ -40,8 +38,8 @@ g.test_module_selective_coding = function()
         version = 1,
         key = 'abc',
     })
-    t.assert_str_contains(string.hex(result), '0a03616263')
-    t.assert_str_contains(string.hex(result), '2501000000')
+    local exp = '\n\x03abc%\x01\0\0\0'
+    utils.strings_deepequal(result, exp)
 end
 
 g.test_module_selective_coding_with_box_NULL = function()
@@ -59,8 +57,8 @@ g.test_module_selective_coding_with_box_NULL = function()
         key = 'abc',
         number = box.NULL,
     })
-    t.assert_str_contains(string.hex(result), '0a03616263')
-    t.assert_str_contains(string.hex(result), '2501000000')
+    local exp = '\n\x03abc%\x01\0\0\0'
+    utils.strings_deepequal(result, exp)
 end
 
 g.test_module_multiple_messages = function()
@@ -79,14 +77,14 @@ g.test_module_multiple_messages = function()
         index = 25,
         key = 'abc',
     })
-    t.assert_str_contains(string.hex(result), '0a03616263')
-    t.assert_str_contains(string.hex(result), '1019')
+    local exp = '\n\x03abc\x10\x19'
+    utils.strings_deepequal(result, exp)
     local result = protocol:encode('Storage', {
         number = 15,
         available = true,
     })
-    t.assert_str_contains(string.hex(result), '2801')
-    t.assert_str_contains(string.hex(result), '180f')
+    exp = '(\x01\x18\x0F'
+    utils.strings_deepequal(result, exp)
 end
 
 g.test_module_nested_messages = function()
@@ -111,12 +109,8 @@ g.test_module_nested_messages = function()
             version = 1,
         }
     })
-    t.assert_str_contains(string.hex(result), '1019')
-    t.assert_str_contains(string.hex(result), '0a03616263')
-    t.assert_str_contains(string.hex(result), '1a09')
-    t.assert_str_contains(string.hex(result), '180f')
-    t.assert_str_contains(string.hex(result), '2501000000')
-    t.assert_str_contains(string.hex(result), '2801')
+    local exp = '\n\x03abc\x10\x19\x1A\t\x18\x0F(\x01%\x01\0\0\0'
+    utils.strings_deepequal(result, exp)
 end
 
 g.test_module_message_default_value_encoding = function()
@@ -164,9 +158,8 @@ g.test_module_enum_usage = function()
         key = 'abc',
         ret_val = 'error2',
     })
-    t.assert_str_contains(string.hex(result), '1019')
-    t.assert_str_contains(string.hex(result), '0a03616263')
-    t.assert_str_contains(string.hex(result), '1802')
+    local exp = '\x10\x19\n\x03abc\x18\x02'
+    utils.strings_deepequal(result, exp)
 end
 
 g.test_module_enum_default_value_encoding = function()
@@ -296,8 +289,8 @@ g.test_module_unknown_fields = function()
         index = 10,
         _unknown_fields = {'\x1a\x03\x61\x62\x63'},
     })
-    t.assert_str_contains(string.hex(result), '100a')
-    t.assert_str_contains(string.hex(result), '1a03616263')
+    local exp = '\x1A\x03abc\x10\n'
+    utils.strings_deepequal(result, exp)
 end
 
 g.test_module_unknown_fields_multiple = function()
@@ -311,8 +304,8 @@ g.test_module_unknown_fields_multiple = function()
         index = 10,
         _unknown_fields = {'\x1a\x01\x61', '\x22\x01\x62'},
     })
-    t.assert_str_contains(string.hex(result), '100a')
-    t.assert_str_contains(string.hex(result), '1a0161220162')
+    local exp = '\x10\n\x1A\x01a\"\x01b'
+    utils.strings_deepequal(result, exp)
 end
 
 g.test_module_exception_name_reusage = function()
@@ -369,7 +362,7 @@ g.test_module_exception_id_out_of_range = function()
     local message_def = {
         val = {'int32', 2^32}
     }
-    local msg = 'Id 4294967296 in field "val" is out of range [1; 536870911]'
+    local msg = 'Id 4294967296 in "val" field is out of range [1; 536870911]'
     t.assert_error_msg_contains(msg, protobuf.message,
         message_name, message_def)
 end
@@ -379,7 +372,7 @@ g.test_module_exception_id_in_prohibited_range = function()
     local message_def = {
         val = {'int32', 19000}
     }
-    local msg = 'Id 19000 in field "val" is in reserved ' ..
+    local msg = 'Id 19000 in "val" field is in reserved ' ..
         'id range [19000, 19999]'
     t.assert_error_msg_contains(msg, protobuf.message,
         message_name, message_def)
@@ -424,4 +417,40 @@ g.test_repetitive_int64_encoding = function()
         })
         t.assert_str_contains(string.hex(result), '08fef9ffffffffffffff01')
     end
+end
+
+g.test_marshalling_message_with_scalar_fields = function()
+    local protocol = protobuf.protocol({
+        protobuf.message('test', {
+            message = {'string', 1},
+            status = {'int32', 2},
+            ok = {'bool', 3},
+        })
+    })
+    local primary_result = protocol:encode('test',
+        {message = 'this is message', status = 200, ok = true})
+    local decoded_data = protocol:decode('test', primary_result)
+    local secondary_result = protocol:encode('test', decoded_data)
+    return utils.strings_deepequal(primary_result, secondary_result)
+end
+
+g.test_marshalling_message_with_scalar_fields_and_enum = function()
+    local protocol = protobuf.protocol({
+        protobuf.message('test', {
+            message = {'string', 1},
+            status = {'status', 2},
+            ok = {'bool', 3},
+        }),
+        protobuf.enum('status', {
+            ok = 0,
+            err1 = 1,
+            err2 = 2,
+            err3 = 3,
+        })
+    })
+    local primary_result = protocol:encode('test',
+        {message = 'this is message', status = 'err1', ok = true})
+    local decoded_data = protocol:decode('test', primary_result)
+    local secondary_result = protocol:encode('test', decoded_data)
+    return utils.strings_deepequal(primary_result, secondary_result)
 end
