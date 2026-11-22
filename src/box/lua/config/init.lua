@@ -1,3 +1,91 @@
+---@class config.get_opts
+---@field instance? string the name of a remote instance. The default is
+---    the current instance.
+---@field env? boolean whether to use environment variables. The default
+---    is false.
+
+---@class config.instance_opts
+---@field instance? string the name of a remote instance. The default is
+---    the current instance.
+
+---@class config.instance_uri_opts
+---@field instance? string the name of a remote instance. The default is
+---    the current instance.
+---@field login? string a username used to connect to the instance. The
+---    default is nil.
+---@field password? string a user's password. The default is nil.
+---@field params? table URI parameters. The default is nil.
+
+---@class config.hierarchy
+---@field group? string the group name.
+---@field replicaset? string the replica set name.
+---@field instance? string the instance name.
+
+---@class config.info
+---@field status string the configuration status.
+---@field meta table additional configuration information.
+---@field alerts table[] warnings or errors raised on applying.
+---@field hierarchy config.hierarchy the group, replica set and instance names.
+
+---@class config.instance
+---@field instance_name string the instance name.
+---@field replicaset_name string the replica set name.
+---@field group_name string the group name.
+
+---@class config.instance_uri
+---@field uri string the instance URI.
+---@field login? string a username used to connect.
+---@field password? string a user's password.
+---@field params? table URI parameters.
+
+---@class config
+---Get a configuration applied to the current or remote instance.
+---
+---The `path` argument defaults to nil (the full configuration), `opts`
+---defaults to an empty table.
+---@field get fun(self: config, path?: string,
+---    opts?: config.get_opts): any
+---Reload the current instance's configuration.
+---
+---Raises an error on failure. Returns no value.
+---@field reload fun(self: config): nil
+---Get the current instance's state in regard to configuration.
+---
+---The `version` argument defaults to `'v1'`.
+---@field info fun(self: config,
+---    version?: 'v1' | 'v2'): config.info
+---Wait until the configuration status is one of the given statuses.
+---
+---The `timeout` argument defaults to `math.huge`.
+---@field wait_status fun(self: config, statuses: string | string[],
+---    timeout?: number): string
+---Check whether an instance has the storage sharding role.
+---@field is_storage fun(self: config,
+---    opts?: config.instance_opts): boolean
+---Check whether an instance has the router sharding role.
+---@field is_router fun(self: config,
+---    opts?: config.instance_opts): boolean
+---Check whether an instance has the given role.
+---@field has_role fun(self: config, role: string,
+---    opts?: config.instance_opts): boolean
+---Check whether a metric is enabled by the metrics filter.
+---@field is_metric_enabled fun(self: config, name: string): boolean
+---Get the cluster configuration.
+---@field cluster_config fun(self: config): table
+---List all instances of the cluster.
+---@field instances fun(self: config): table<string, config.instance>
+---Get a URI of the current or remote instance.
+---
+---The `uri_type` argument defaults to `'peer'`, `opts` defaults to an
+---empty table.
+---@field instance_uri fun(self: config,
+---    uri_type?: 'peer' | 'sharding',
+---    opts?: config.instance_uri_opts): config.instance_uri
+---Get the cluster configuration JSON schema.
+---@field jsonschema fun(self: config): table
+---Create a new alerts namespace.
+---@field new_alerts_namespace fun(self: config, name: string): any
+
 local fiber = require('fiber')
 local fio = require('fio')
 local yaml = require('yaml')
@@ -1085,6 +1173,7 @@ end
 
 -- The object is a singleton. The constructor should be called
 -- only once.
+---@return config
 local function new()
     local self = setmetatable({
         _sources = {},
@@ -1120,4 +1209,272 @@ local function new()
     return self
 end
 
-return new()
+---@type fun(self: config, path?: string, opts?: config.get_opts): any
+local get = {} -- luacheck: ignore 311
+get = methods.get
+
+---@type fun(self: config): nil
+local reload = {} -- luacheck: ignore 311
+reload = methods.reload
+
+---@type fun(self: config, version?: 'v1' | 'v2'): config.info
+local info = {} -- luacheck: ignore 311
+info = methods.info
+
+---@type fun(self: config, statuses: string | string[],
+---    timeout?: number): string
+local wait_status = {} -- luacheck: ignore 311
+wait_status = methods.wait_status
+
+---@type fun(self: config, opts?: config.instance_opts): boolean
+local is_storage = {} -- luacheck: ignore 311
+is_storage = methods.is_storage
+
+---@type fun(self: config, opts?: config.instance_opts): boolean
+local is_router = {} -- luacheck: ignore 311
+is_router = methods.is_router
+
+---@type fun(self: config, role: string,
+---    opts?: config.instance_opts): boolean
+local has_role = {} -- luacheck: ignore 311
+has_role = methods.has_role
+
+---@type fun(self: config, name: string): boolean
+local is_metric_enabled = {} -- luacheck: ignore 311
+is_metric_enabled = methods.is_metric_enabled
+
+---@type fun(self: config): table
+local cluster_config = {} -- luacheck: ignore 311
+cluster_config = methods.cluster_config
+
+---@type fun(self: config): table<string, config.instance>
+local instances = {} -- luacheck: ignore 311
+instances = methods.instances
+
+---@type fun(self: config, uri_type?: 'peer' | 'sharding',
+---    opts?: config.instance_uri_opts): config.instance_uri
+local instance_uri = {} -- luacheck: ignore 311
+instance_uri = methods.instance_uri
+
+---@type fun(self: config): table
+local jsonschema = {} -- luacheck: ignore 311
+jsonschema = methods.jsonschema
+
+---@type fun(self: config, name: string): any
+local new_alerts_namespace = {} -- luacheck: ignore 311
+new_alerts_namespace = methods.new_alerts_namespace
+
+---The `config` module provides the ability to work with an instance's
+---configuration. For example, you can determine whether the current
+---instance is up and running without errors after applying the cluster's
+---configuration.
+---
+---*Since 3.0.0*
+---
+---The `config.storage` role provides a Tarantool-based centralized
+---configuration storage.
+---
+---**Loading the module:**
+---
+---```lua
+---local config = require('config')
+---config:reload()
+---```
+---
+---**`config:get()`**
+---
+---Get the full instance configuration:
+---
+---```lua
+---require('config'):get()
+---```
+---
+---Get an `iproto.listen` option value:
+---
+---```lua
+---require('config'):get('iproto.listen')
+----- - uri: 127.0.0.1:3301
+---```
+---
+---`config:get()` can also be used in application code to get the value
+---of a custom configuration option.
+---
+---**`config:info()`**
+---
+---An instance's state with no configuration warnings or errors:
+---
+---```lua
+---require('config'):info('v2')
+----- status: ready
+----- meta:
+---  last: &0 []
+---  active: *0
+----- alerts: []
+----- hierarchy:
+---  group: group-001
+---  replicaset: replicaset-001
+---  instance: instance-001
+---```
+---
+---An instance's state with configuration warnings:
+---
+---```lua
+---require('config'):info('v2')
+----- status: check_warnings
+----- meta:
+---  last: &0 []
+---  active: *0
+----- alerts:
+---  - type: warn
+---    message: box.schema.user.grant("sampleuser", "read,write",
+---      "space", "bands") has failed because either the object has
+---      not been created yet, a database schema upgrade has not been
+---      performed, or the privilege write has failed (separate alert
+---      reported)
+---    timestamp: 2024-07-03T18:09:18.826138+0300
+----- hierarchy:
+---  group: group-001
+---  replicaset: replicaset-001
+---  instance: instance-001
+---```
+---
+---An instance's state with configuration errors:
+---
+---```lua
+---require('config'):info('v2')
+----- status: check_errors
+----- meta:
+---  last: []
+---  active: []
+----- alerts:
+---  - type: error
+---    message: '[cluster_config] log.level: Got 8, but only the
+---      following values are allowed: 0, fatal, 1, syserror, 2, error,
+---      3, crit, 4, warn, 5, info, 6, verbose, 7, debug'
+---    timestamp: 2024-07-03T18:13:19.755454+0300
+----- hierarchy:
+---  group: group-001
+---  replicaset: replicaset-001
+---  instance: instance-001
+---```
+---
+---An instance's state with a centralized configuration storage:
+---
+---```lua
+---require('config'):info('v2')
+----- status: check_errors
+----- meta:
+---  last:
+---    etcd:
+---      mod_revision:
+---        /myapp/config/all: 5
+---      revision: 5
+---  active:
+---    etcd:
+---      mod_revision:
+---        /myapp/config/all: 2
+---      revision: 4
+----- alerts:
+---  - type: error
+---    message: 'etcd source: invalid config at key
+---      "/myapp/config/all": [cluster_config]
+---      groups.group001.replicasets.replicaset001.instances.instance001
+---      .log.level: Got 8, but only the following values are allowed:
+---      0, fatal, 1, syserror, 2, error, 3, crit, 4, warn, 5, info, 6,
+---      verbose, 7, debug'
+---    timestamp: 2024-07-03T15:22:06.438275Z
+----- hierarchy:
+---  group: group001
+---  replicaset: replicaset001
+---  instance: instance001
+---```
+---
+---**`config:instance_uri()`**
+---
+---Get a URI used to advertise `storage-b-003` to other cluster members:
+---
+---```lua
+---local config = require('config')
+---config:instance_uri('peer', {instance = 'storage-b-003'})
+---```
+---
+---**`config:instances()`**
+---
+---Get the names of all instances in the cluster, create a connection
+---to each instance using the `experimental.connpool` module, and log
+---connection URIs using the `log` module:
+---
+---```lua
+---local config = require('config')
+---local connpool = require('experimental.connpool')
+---local log = require('log')
+---
+---for instance_name in pairs(config:instances()) do
+---    local conn = connpool.connect(instance_name)
+---    log.info("Connection URI for %q: %s:%s", instance_name,
+---        conn.host, conn.port)
+---end
+---```
+---
+---The same actions for instances from the `storage-b` replica set:
+---
+---```lua
+---local config = require('config')
+---local connpool = require('experimental.connpool')
+---local log = require('log')
+---
+---for instance_name, def in pairs(config:instances()) do
+---    if def.replicaset_name == 'storage-b' then
+---        local conn = connpool.connect(instance_name)
+---        log.info("Connection URI for %q: %s:%s", instance_name,
+---            conn.host, conn.port)
+---    end
+---end
+---```
+---
+---**`config:reload()`**
+---
+---Reload the current instance's configuration. Use cases:
+---
+---* A configuration option value specific to this instance is changed
+---  in a cluster's configuration.
+---* A new instance is added to a replica set.
+---* A centralized configuration with turned-off configuration reloading
+---  is updated.
+---
+---```lua
+---require('config'):reload()
+---```
+---
+
+local m = { -- luacheck: ignore 211
+    ---Get a configuration applied to the current or remote instance.
+    get = get,
+    ---Reload the current instance's configuration.
+    reload = reload,
+    ---Get the current instance's state in regard to configuration.
+    info = info,
+    ---Wait until the configuration status is one of the given statuses.
+    wait_status = wait_status,
+    ---Check whether an instance has the storage sharding role.
+    is_storage = is_storage,
+    ---Check whether an instance has the router sharding role.
+    is_router = is_router,
+    ---Check whether an instance has the given role.
+    has_role = has_role,
+    ---Check whether a metric is enabled by the metrics filter.
+    is_metric_enabled = is_metric_enabled,
+    ---Get the cluster configuration.
+    cluster_config = cluster_config,
+    ---List all instances of the cluster.
+    instances = instances,
+    ---Get a URI of the current or remote instance.
+    instance_uri = instance_uri,
+    ---Get the cluster configuration JSON schema.
+    jsonschema = jsonschema,
+    ---Create a new alerts namespace.
+    new_alerts_namespace = new_alerts_namespace,
+}
+
+local config_api = new()
+return config_api

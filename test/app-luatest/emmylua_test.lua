@@ -227,6 +227,76 @@ local modules = {
             },
         },
     },
+    {
+        name = 'config',
+        source = 'src/box/lua/config/init.lua',
+        fixtures = 'test/app-luatest/emmylua/config',
+        type_name = 'config',
+        fields = {
+            get = 'Get a configuration applied',
+            reload = "Reload the current instance's configuration",
+            info = "Get the current instance's state",
+            wait_status = 'Wait until the configuration status',
+            is_storage = 'Check whether an instance has the storage',
+            is_router = 'Check whether an instance has the router',
+            has_role = 'Check whether an instance has the given role',
+            is_metric_enabled = 'Check whether a metric is enabled',
+            cluster_config = 'Get the cluster configuration',
+            instances = 'List all instances of the cluster',
+            instance_uri = 'Get a URI of the current or remote instance',
+            jsonschema = 'Get the cluster configuration JSON schema',
+            new_alerts_namespace = 'Create a new alerts namespace',
+        },
+        objects = {
+            {
+                fixture = 'get_opts.lua',
+                type_name = 'config.get_opts',
+                fields = {
+                    instance = 'the name of a remote instance',
+                    env = 'whether to use environment variables',
+                },
+            },
+            {
+                fixture = 'instance_uri_opts.lua',
+                type_name = 'config.instance_uri_opts',
+                fields = {
+                    instance = 'the name of a remote instance',
+                    login = 'a username used to connect',
+                    password = "a user's password",
+                    params = 'URI parameters',
+                },
+            },
+            {
+                fixture = 'info.lua',
+                type_name = 'config.info',
+                fields = {
+                    status = 'the configuration status',
+                    meta = 'additional configuration information',
+                    alerts = 'warnings or errors',
+                    hierarchy = 'the group, replica set and instance names',
+                },
+            },
+            {
+                fixture = 'instance.lua',
+                type_name = 'config.instance',
+                fields = {
+                    instance_name = 'the instance name',
+                    replicaset_name = 'the replica set name',
+                    group_name = 'the group name',
+                },
+            },
+            {
+                fixture = 'instance_uri.lua',
+                type_name = 'config.instance_uri',
+                fields = {
+                    uri = 'the instance URI',
+                    login = 'a username used to connect',
+                    password = "a user's password",
+                    params = 'URI parameters',
+                },
+            },
+        },
+    },
 }
 
 local function normalize(value)
