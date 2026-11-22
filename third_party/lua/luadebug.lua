@@ -1196,7 +1196,8 @@ local stdout_isatty = ffi.C.isatty(1)
 
 -- Conditionally enable color support.
 local color_maybe_supported = (stdout_isatty and os.getenv("TERM") and os.getenv("TERM") ~= "dumb")
-if color_maybe_supported and not os.getenv("NO_COLOR") then
+local no_color = os.getenv("NO_COLOR")
+if color_maybe_supported and (no_color == nil or no_color == "") then
     COLOR_GRAY = string.char(27) .. "[90m"
     COLOR_RED = string.char(27) .. "[91m"
     COLOR_GREEN = string.char(27) .. "[92m"
