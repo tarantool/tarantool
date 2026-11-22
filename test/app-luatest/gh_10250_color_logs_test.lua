@@ -222,3 +222,15 @@ g.test_banner = function(cg)
         end
     end
 end
+
+g.test_debugger_no_color = function(cg)
+    for _, no_color in ipairs({false, '', '1'}) do
+        local output = run_log(cg, [[
+            local dbg = require('luadebug')
+            getmetatable(dbg).__call = function() end
+            pcall(dbg.error, 'color check')
+        ]], {no_color = no_color})
+        t.assert_str_contains(output, 'color check')
+        t.assert_equals(output:find('\27', 1, true) ~= nil, no_color ~= '1')
+    end
+end
