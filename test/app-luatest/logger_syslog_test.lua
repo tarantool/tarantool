@@ -7,6 +7,26 @@ local t = require('luatest')
 
 local g = t.group()
 
+g.test_fatal_is_copied_to_stderr_once = function()
+    local dir = treegen.prepare_directory({}, {})
+    local socket_path = fio.pathjoin(dir, 'socket')
+    local sock = socket('AF_UNIX', 'SOCK_DGRAM', 0)
+    t.assert(sock:bind('unix/', socket_path))
+    treegen.write_file(dir, 'script.lua', string.format([[
+        local ffi = require('ffi')
+        require('log').cfg{log = 'syslog:server=unix:%s'}
+        ffi.C._say(ffi.C.S_FATAL, nil, 0, nil, 'syslog fatal marker')
+        os.exit(0)
+    ]], socket_path))
+
+    local res = justrun.tarantool(dir, {}, {'script.lua'},
+                                  {nojson = true, stderr = true})
+    sock:close()
+    t.assert_equals(res.exit_code, 0, res.stderr)
+    local _, count = res.stderr:gsub('F> syslog fatal marker', '')
+    t.assert_equals(count, 1, res.stderr)
+end
+
 g.test_gh_11840_no_recursive_reconnect = function()
     local dir = treegen.prepare_directory({}, {})
     local socket_path = fio.pathjoin(dir, 'socket')
