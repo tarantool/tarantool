@@ -1237,15 +1237,8 @@ say_internal(int level, bool check_level, const char *module,
 	     const char *filename, int line, const char *error,
 	     const char *format, va_list ap)
 {
-	int errsv = errno;
-	int total = log_vsay(log_default, level, check_level, module, filename,
-			     line, error, format, ap);
-	if (total > 0 &&
-	    level == S_FATAL && log_default->fd != STDERR_FILENO) {
-		ssize_t r = safe_write(STDERR_FILENO, say_buf, total);
-		(void)r;
-	}
-	errno = errsv; /* Preserve the errno. */
+	log_vsay(log_default, level, check_level, module, filename, line, error,
+		 format, ap);
 }
 
 /**
@@ -1571,8 +1564,6 @@ log_vsay(struct log *log, int level, bool check_level, const char *module,
 		break;
 	case SAY_LOGGER_SYSLOG:
 		write_to_syslog(log, total);
-		if (level == S_FATAL && log->fd != STDERR_FILENO)
-			(void)safe_write(STDERR_FILENO, say_buf, total);
 		break;
 	case SAY_LOGGER_BOOT:
 	{
@@ -1587,6 +1578,9 @@ log_vsay(struct log *log, int level, bool check_level, const char *module,
 	default:
 		unreachable();
 	}
+	if (level == S_FATAL && log->fd != STDERR_FILENO &&
+	    (log == log_default || log->type == SAY_LOGGER_SYSLOG))
+		(void)safe_write(STDERR_FILENO, say_buf, total);
 out:
 	errno = errsv; /* Preserve the errno. */
 	return total;
