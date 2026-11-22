@@ -227,6 +227,42 @@ local modules = {
             },
         },
     },
+    {
+        name = 'yaml',
+        source = 'third_party/lua-yaml/yaml-stub.lua',
+        fixtures = 'test/app-luatest/emmylua/yaml',
+        type_name = 'yaml',
+        fields = {
+            encode = 'Convert a Lua object to a YAML string',
+            decode = 'Convert a YAML string to a Lua object',
+            new = 'Create a new YAML serializer',
+            cfg = 'Set values affecting the behavior',
+            NULL = 'A value comparable to Lua',
+        },
+        objects = {
+            {
+                fixture = 'cfg.lua',
+                type_name = 'yaml.cfg',
+                fields = {
+                    encode_invalid_numbers = 'a flag saying whether to enable',
+                    encode_number_precision = 'the precision of floating',
+                    encode_load_metatables = 'a flag saying whether the',
+                    encode_use_tostring = 'a flag saying whether to use',
+                    encode_invalid_as_nil = 'a flag saying whether to use NULL',
+                    encode_sparse_convert = 'a flag saying whether to handle',
+                    encode_sparse_ratio = '1/`encode_sparse_ratio`',
+                    encode_sparse_safe = 'a limit ensuring that small Lua',
+                    decode_invalid_numbers = 'a flag saying whether to enable',
+                    decode_save_metatables = 'a flag saying whether to set',
+                },
+            },
+        },
+        signatures = {
+            {fixture = 'cfg.lua', expect = 'yaml.cfg_options'},
+            {fixture = 'encode_options.lua',
+             expect = '(yaml.tag_pair|yaml.no_tags)'},
+        },
+    },
 }
 
 local function normalize(value)
@@ -317,6 +353,33 @@ local function assert_fields(client, items, fields, context)
         t.assert_str_contains(documentation, phrase, false,
             ('%s: %s has no description'):format(context, field))
     end
+end
+
+local function signature_labels(result)
+    local labels = {}
+    if type(result) == 'table' and type(result.signatures) == 'table' then
+        for _, signature in ipairs(result.signatures) do
+            if type(signature.label) == 'string' then
+                table.insert(labels, signature.label)
+            end
+        end
+    end
+    return labels
+end
+
+local function assert_signature(client, uri, text, phrase, context)
+    local result = client:request('textDocument/signatureHelp', {
+        textDocument = {uri = uri},
+        position = emmylua.marker_position(text, 'call'),
+    }, 30)
+    local labels = signature_labels(result)
+    for _, label in ipairs(labels) do
+        if label:find(phrase, 1, true) ~= nil then
+            return
+        end
+    end
+    t.assert(false, ('%s: call signature has no %s: %s'):format(
+        context, phrase, table.concat(labels, ', ')))
 end
 
 local function run_module_test(spec)
@@ -413,6 +476,13 @@ local function run_module_test(spec)
                 end, 30)
             assert_fields(client, object_items, object.fields,
                 object.type_name)
+        end
+
+        for _, signature in ipairs(spec.signatures or {}) do
+            local path, text =
+                open_fixture(client, workspace, signature.fixture)
+            assert_signature(client, emmylua.file_uri(path), text,
+                signature.expect, spec.name)
         end
     end, debug.traceback)
 
