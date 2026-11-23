@@ -1932,12 +1932,9 @@ check_vclock_sync_on_ack(struct trigger *trigger, void *event)
 	struct replication_ack *ack = (struct replication_ack *)event;
 	struct sync_trigger_data *data =
 		(struct sync_trigger_data *)trigger->data;
-	uint32_t id = ack->source;
-	/*
-	 * Messages from anon replicas are skipped on a lower level, as having
-	 * no weight on any decision making.
-	 */
-	assert(id != REPLICA_ID_NIL);
+	uint32_t id = ack->source->id;
+	if (ack->source->anon || id == REPLICA_ID_NIL)
+		return 0;
 	uint64_t sync = data->vclock_syncs[id];
 	int accounted_count = bit_count_u32(data->collected_vclock_map);
 	if (!bit_test(&data->collected_vclock_map, id) && sync > 0 &&

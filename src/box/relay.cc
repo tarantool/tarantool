@@ -658,10 +658,9 @@ tx_status_update(struct cmsg *msg)
 	relay->tx.vclock_sync = status->vclock_sync;
 
 	struct replication_ack ack;
-	ack.source = status->relay->replica->id;
+	ack.source = relay->replica;
 	ack.vclock = &status->vclock;
 	ack.vclock_sync = status->vclock_sync;
-	bool anon = status->relay->replica->anon;
 	/*
 	 * Zero component must be ignored at all stages and paths of ACKs. Local
 	 * txns acking makes no logical sense.
@@ -675,15 +674,8 @@ tx_status_update(struct cmsg *msg)
 	 * replica but can't CONFIRM/ROLLBACK - the old term has ended, new one
 	 * has no result yet, need a PROMOTE.
 	 */
-	raft_process_term(box_raft(), status->term, ack.source);
-	/*
-	 * A replica can declare itself anon, but master might assign it an ID.
-	 * Or replica might be having an ID, but the master can remove it. A
-	 * true proper replica must declare itself not anon, and not be expelled
-	 * by the master.
-	 */
-	if (!anon && ack.source != REPLICA_ID_NIL)
-		trigger_run(&replicaset.on_ack, &ack);
+	raft_process_term(box_raft(), status->term, ack.source->id);
+	trigger_run(&replicaset.on_ack, &ack);
 
 	if (!relay->tx.is_paired) {
 		/*

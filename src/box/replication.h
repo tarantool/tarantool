@@ -329,8 +329,12 @@ typedef rb_tree(struct replica) replica_hash_t;
 
 /** Ack which is passed to on ack triggers. */
 struct replication_ack {
-	/** Replica ID of the ACK source. */
-	uint32_t source;
+	/**
+	 * Source replica. It is safe to use this pointer in an ACK handler
+	 * as long as the handler does not yield. Removing it from _cluster only
+	 * clears its ID while has_incoming_connection keeps it alive.
+	 */
+	const struct replica *source;
 	/** Confirmed vclock. */
 	const struct vclock *vclock;
 	/** Vclock sync received with ACK. */
