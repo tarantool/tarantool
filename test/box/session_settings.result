@@ -55,6 +55,7 @@ s:select()
  | - - ['sql_default_engine', 'memtx']
  |   - ['sql_full_column_names', false]
  |   - ['sql_full_metadata', false]
+ |   - ['sql_mixed_anon_vars', false]
  |   - ['sql_named_var_default_null', false]
  |   - ['sql_parser_debug', false]
  |   - ['sql_recursive_triggers', true]

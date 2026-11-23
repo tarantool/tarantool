@@ -3639,7 +3639,8 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			assert(!ExprHasProperty(pExpr, EP_IntValue));
 			assert(pExpr->u.zToken != 0);
 			assert(pExpr->u.zToken[0] != 0);
-			sqlVdbeAddOp2(v, OP_Variable, pExpr->iColumn, target);
+			sqlVdbeAddOp3(v, OP_Variable, pExpr->iColumn, target,
+				      op == TK_VAR_ANON);
 			assert(pExpr->u.zToken[1] != 0 || op == TK_VAR_ANON);
 			if (pExpr->var_base != 0) {
 				const char *z =

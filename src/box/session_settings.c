@@ -45,6 +45,7 @@ const char *session_setting_strs[SESSION_SETTING_COUNT] = {
 	"sql_default_engine",
 	"sql_full_column_names",
 	"sql_full_metadata",
+	"sql_mixed_anon_vars",
 	"sql_named_var_default_null",
 	"sql_parser_debug",
 	"sql_recursive_triggers",

@@ -128,6 +128,8 @@ end
 g.test_12733_bind_variables = function()
     g.server:exec(function()
         box.execute([[SET SESSION "sql_named_var_default_null" = true;]])
+        box.execute([[SET SESSION "sql_mixed_anon_vars" = true;]])
+
         local sql = [[SELECT $3, $1, $2, $10;]]
         local res = box.execute(sql, {'a', 'b', 'c'})
         t.assert_equals(res.rows, {{'c', 'a', 'b', nil}})
@@ -250,6 +252,7 @@ g.test_12733_bind_variables = function()
 
         box.execute([[DROP TABLE t;]])
         box.execute([[SET SESSION "sql_named_var_default_null" = false;]])
+        box.execute([[SET SESSION "sql_mixed_anon_vars" = false;]])
     end)
 end
 
@@ -272,6 +275,54 @@ g.test_sql_named_var_default_null = function()
 
         res = box.execute([[SELECT :a;]], {1})
         t.assert_equals(res.rows, {{nil}})
+
+        box.execute([[SET SESSION "sql_named_var_default_null" = false;]])
+    end)
+end
+
+g.test_sql_mixed_anon_vars = function()
+    g.server:exec(function()
+        local exp_err = "Mixing anonymous variables with other types "..
+                        "of variables is not permitted"
+        local _, err = box.execute([[SELECT :a, ?;]], {{[':a'] = 1}, 2})
+        t.assert_equals(tostring(err), exp_err)
+
+        _, err = box.execute([[SELECT $1, ?;]], {1, 2})
+        t.assert_equals(tostring(err), exp_err)
+
+        _, err = box.execute([[SELECT ?, :a;]], {1, {[':a'] = 2}})
+        t.assert_equals(tostring(err), exp_err)
+
+        _, err = box.execute([[SELECT ?, $2;]], {1, 2})
+        t.assert_equals(tostring(err), exp_err)
+
+        _, err = box.execute([[SELECT :a, ?, $1, ?;]], {{[':a'] = 1}, 2})
+        t.assert_equals(tostring(err), exp_err)
+
+        _, err = box.execute([[SELECT ? UNION ALL SELECT $2;]], {1, 2})
+
+        box.execute([[SET SESSION "sql_mixed_anon_vars" = true;]])
+        t.assert_equals(tostring(err), exp_err)
+
+        local res = box.execute([[SELECT :a, ?;]], {{[':a'] = 1}, 2})
+        t.assert_equals(res.rows, {{1, 2}})
+
+        res = box.execute([[SELECT $1, ?;]], {1, 2})
+        t.assert_equals(res.rows, {{1, 2}})
+
+        res = box.execute([[SELECT ?, :a;]], {1, {[':a'] = 2}})
+        t.assert_equals(res.rows, {{1, 2}})
+
+        res = box.execute([[SELECT ?, $2;]], {1, 2})
+        t.assert_equals(res.rows, {{1, 2}})
+
+        res = box.execute([[SELECT :a, ?, $1, ?;]], {{[':a'] = 1}, 2})
+        t.assert_equals(res.rows, {{1, 2, 1, 2}})
+
+        res = box.execute([[SELECT ? UNION ALL SELECT $2;]], {1, 2})
+        t.assert_equals(res.rows, {{1}, {2}})
+
+        box.execute([[SET SESSION "sql_mixed_anon_vars" = false;]])
     end)
 end
 
@@ -304,6 +355,7 @@ g.before_all(function(cg)
         end
         rawset(_G, 'execute', execute)
         rawset(_G, 'cn', cn)
+        _G.execute([[SET SESSION "sql_mixed_anon_vars" = true;]])
     end, {cg.params.remote})
 end)
 

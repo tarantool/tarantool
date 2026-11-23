@@ -852,7 +852,7 @@ case OP_Blob: {                /* out2 */
 	break;
 }
 
-/* Opcode: Variable P1 P2 * P4 *
+/* Opcode: Variable P1 P2 P3 P4 *
  * Synopsis: r[P2]=parameter(P1,P4)
  *
  * Transfer the values of bound parameter P1 into register P2.
@@ -862,6 +862,13 @@ case OP_Blob: {                /* out2 */
  */
 case OP_Variable: {            /* out2 */
 	assert(pOp->p1 >= 0);
+	if (p->mix_anon_vars == 2) {
+		p->mix_anon_vars = pOp->p3;
+	} else if ((p->sql_flags & sql_mixed_anon_vars) == 0 &&
+		 p->mix_anon_vars != pOp->p3) {
+		diag_set(ClientError, ER_MIX_ANON_VARS);
+		goto abort_due_to_error;
+	}
 	pOut = vdbe_prepare_null_out(p, pOp->p2);
 	uint32_t pos = 0;
 	if (pOp->p4.z != NULL) {

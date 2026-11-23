@@ -871,6 +871,7 @@ struct sql {
 enum {
 	SQL_SeqScan = 0x00000008,
 	sql_named_var_default_null = 0x00000010,
+	sql_mixed_anon_vars = 0x00000020,
 	SQL_DEFAULT_FLAGS = SQL_EnableTrigger | SQL_AutoIndex |
 			    SQL_RecTriggers | SQL_SeqScan,
 };

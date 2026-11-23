@@ -452,6 +452,7 @@ struct errcode_record {
 	_(ER_NO_SUCH_READ_VIEW, 305,		"Read view was not found by id") \
 	_(ER_READ_VIEW_THROTTLED, 306,		"Read view creation is throttled, try again later") \
 	_(ER_NO_VALUE_FOR_NAMED_VARIABLE, 307,	"No value for parameter '%s'") \
+	_(ER_MIX_ANON_VARS, 308,		"Mixing anonymous variables with other types of variables is not permitted") \
 	TEST_ERROR_CODES(_) /** This one should be last. */
 
 /*
