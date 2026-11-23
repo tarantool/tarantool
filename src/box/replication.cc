@@ -604,7 +604,10 @@ replica_set_id(struct replica *replica, uint32_t replica_id)
 	++replicaset.registered_count;
 	say_info("assigned id %d to replica %s",
 		 replica->id, tt_uuid_str(&replica->uuid));
-	replica->anon = false;
+	if (replica->anon) {
+		--replicaset.anon_count;
+		replica->anon = false;
+	}
 	box_broadcast_ballot();
 }
 

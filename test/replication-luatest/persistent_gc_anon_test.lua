@@ -264,7 +264,12 @@ g.test_registration_fail = function(g)
         function() box.cfg{replication_anon = false} end)
 
     g.server:exec(function()
-        t.assert_equals(box.info.replication_anon, {count = 1})
+        -- The registration of the replica has already happened on the
+        -- master (its _cluster record is committed), but the final join
+        -- failed, so the replica is not counted as anonymous anymore. Its
+        -- WAL GC state and the replica object must be preserved so that
+        -- it can retry.
+        t.assert_equals(box.info.replication_anon, {count = 0})
         t.assert_not_equals(box.info.gc().consumers, {})
         t.assert_not_equals(box.space._gc_consumers:select(), {})
     end)
