@@ -82,6 +82,7 @@ if(ENABLE_LUA_EXTRAS)
 endif()
 
 lua_stub(varbinary FILES lua/varbinary.lua RETURN varbinary)
+lua_stub(utf8 FILES lua/utf8_stub.lua RETURN utf8)
 
 # 3rd party lua sources
 lua_source(lua_sources ../third_party/luafun/fun.lua fun_lua)

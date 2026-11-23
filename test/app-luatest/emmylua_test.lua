@@ -69,6 +69,27 @@ local modules = {
             },
         },
     },
+    {
+        name = 'utf8',
+        source = 'src/lua/utf8_stub.lua',
+        fixtures = 'test/app-luatest/emmylua/utf8',
+        type_name = 'utf8',
+        fields = {
+            casecmp = 'Compare two strings',
+            cmp = 'Compare two strings',
+            char = 'Convert code points',
+            isalpha = 'Return true if the input character is an',
+            isdigit = 'Return true if the input character is a digit',
+            islower = 'Return true if the input character is lower case',
+            isupper = 'Return true if the input character is upper case',
+            len = 'Return the number of characters',
+            lower = 'Convert a UTF-8 string to lower case',
+            next = 'Return the byte position of the next character',
+            sub = 'Return the substring',
+            upper = 'Convert a UTF-8 string to upper case',
+        },
+        objects = {},
+    },
 }
 
 local function normalize(value)
