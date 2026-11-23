@@ -1127,9 +1127,10 @@ sql_and_expr_new(struct Expr *left_expr, struct Expr *right_expr)
  * Assign a variable number to an expression that encodes a
  * wildcard in the original SQL statement.
  *
- * Wildcards consisting of a single "?" character are assigned
- * an offset from the preceding named variable; if no named variables
- * have appeared yet, the next sequential variable number is assigned.
+ * Wildcards consisting of a single "?". The first anonymous variable (`?`)
+ * corresponds to the first value from the array,
+ * the second to the second value,
+ * the n-th to the n-th value, and so on.
  *
  * Wildcards of the form "$nnn" are assigned the number "nnn".
  * We make sure "nnn" is not too big to avoid a denial of service
@@ -1155,19 +1156,17 @@ sqlExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
 	assert(z[0] != 0);
 	assert(n == sqlStrlen30(z));
 	if (z[1] == 0) {
-		/* Wildcard of the form "?".  Assign the next variable number */
+		/**
+		 * Wildcard of the form "?". The first anonymous variable (`?`)
+		 * corresponds to the first value from the array,
+		 * the second to the second value,
+		 * the n-th to the n-th value, and so on.
+		 */
 		assert(z[0] == '?');
-		x = pParse->var.offset;
-		int nVar = x;
-		if (pParse->var.pos != 0) {
-			nVar += pParse->var.pos;
-			pExpr->var_base = pParse->var.pos;
-		} else {
-			pExpr->var_base = 0;
-		}
-		if (nVar > pParse->nVar)
-			pParse->nVar = nVar;
-		pParse->var.offset++;
+		pParse->anon_pos++;
+		x = pParse->anon_pos;
+		if (x > pParse->nVar)
+			pParse->nVar = x;
 	} else {
 		int doAdd = 0;
 		assert(z[0] != '?');
@@ -1194,8 +1193,6 @@ sqlExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
 				pParse->is_aborted = true;
 				return;
 			}
-			pParse->var.pos = 0;
-			pParse->var.offset = x + 1;
 			if (x > pParse->nVar)
 				pParse->nVar = x;
 			num = sqlVListNameToNum(pParse->pVList, z, n);
@@ -1215,8 +1212,6 @@ sqlExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
 				doAdd = 1;
 			}
 			x = (ynVar)0;
-			pParse->var.offset = 1;
-			pParse->var.pos = num;
 			pExpr->var_base = num;
 		}
 		if (doAdd) {

@@ -146,27 +146,27 @@ g.test_12733_bind_variables = function()
         res = box.execute([[select $1, :a;]], {321, {[':a'] = 123}})
         t.assert_equals(res.rows, {{321, 123}})
 
-        local parameters = {111, {['#a'] = 222}, {[':a'] = 333}}
+        local parameters = {{['#a'] = 222}, {[':a'] = 333}}
         res = box.execute([[select #a, ?, :a;]], parameters)
-        t.assert_equals(res.rows, {{222, 333, 333}})
+        t.assert_equals(res.rows, {{222, 222, 333}})
 
         res = box.execute([[SELECT ?, ?;]], {1, 2})
         t.assert_equals(res.rows, {{1, 2}})
 
-        res = box.execute([[SELECT $1, ?;]], {1, 2})
-        t.assert_equals(res.rows, {{1, 2}})
+        res = box.execute([[SELECT $1, ?;]], {1})
+        t.assert_equals(res.rows, {{1, 1}})
 
-        res = box.execute([[SELECT :a, $1, ?;]], {1, 2, {[':a'] = 3}})
-        t.assert_equals(res.rows, {{3, 1, 2}})
+        res = box.execute([[SELECT :a, $2, ?;]], {1, 2, {[':a'] = 3}})
+        t.assert_equals(res.rows, {{3, 2, 1}})
 
         res = box.execute([[SELECT $1, $2;]], {1, {['$1'] = 2}})
         t.assert_equals(res.rows, {{1, 2}})
 
         res = box.execute([[SELECT :a, $2, ?;]], {1})
-        t.assert_equals(res.rows, {{nil, nil, nil}})
+        t.assert_equals(res.rows, {{nil, nil, 1}})
 
         res = box.execute([[SELECT @a, ?, @a, ?;]], {{['@a'] = 1}, 2})
-        t.assert_equals(res.rows, {{1, 2, 1, 2}})
+        t.assert_equals(res.rows, {{1, 1, 1, 2}})
 
         local s = box.prepare([[SELECT @a, ?, @a, ?;]])
         local exp = {
@@ -181,16 +181,16 @@ g.test_12733_bind_variables = function()
         }
         t.assert_equals(s.params, exp)
         res = box.execute(s.stmt_id, {{['@a'] = 1}, 2})
-        t.assert_equals(res.rows, {{1, 2, 1, 2}})
+        t.assert_equals(res.rows, {{1, 1, 1, 2}})
 
-        local s = box.prepare([[SELECT $1, ?, :a, $5;]])
+        local s = box.prepare([[SELECT ?, $2, :a, $5;]])
         local exp = {
             {
-                name = "$1",
+                name = "?",
                 type = "ANY",
             },
             {
-                name = "?",
+                name = "$2",
                 type = "ANY",
             },
             {
@@ -245,7 +245,7 @@ g.test_12733_bind_variables = function()
                           {20, {[':a'] = 2}})
         t.assert_equals(res.rows, {{2}})
 
-        parameters = {100, {[':b'] = 2}, 200}
+        parameters = {100, 200, {[':b'] = 2}}
         res = box.execute([[SELECT id + ?, :b, id + ? FROM SEQSCAN t;]],
                           parameters)
         t.assert_equals(res.rows, {{101, 2, 201}, {102, 2, 202}})
@@ -284,10 +284,10 @@ g.test_sql_mixed_anon_vars = function()
     g.server:exec(function()
         local exp_err = "Mixing anonymous variables with other types "..
                         "of variables is not permitted"
-        local _, err = box.execute([[SELECT :a, ?;]], {{[':a'] = 1}, 2})
+        local _, err = box.execute([[SELECT :a, ?;]], {2, {[':a'] = 1}})
         t.assert_equals(tostring(err), exp_err)
 
-        _, err = box.execute([[SELECT $1, ?;]], {1, 2})
+        _, err = box.execute([[SELECT $2, ?;]], {2, 1})
         t.assert_equals(tostring(err), exp_err)
 
         _, err = box.execute([[SELECT ?, :a;]], {1, {[':a'] = 2}})
@@ -304,10 +304,10 @@ g.test_sql_mixed_anon_vars = function()
         box.execute([[SET SESSION "sql_mixed_anon_vars" = true;]])
         t.assert_equals(tostring(err), exp_err)
 
-        local res = box.execute([[SELECT :a, ?;]], {{[':a'] = 1}, 2})
+        local res = box.execute([[SELECT :a, ?;]], {2, {[':a'] = 1}})
         t.assert_equals(res.rows, {{1, 2}})
 
-        res = box.execute([[SELECT $1, ?;]], {1, 2})
+        res = box.execute([[SELECT $2, ?;]], {2, 1})
         t.assert_equals(res.rows, {{1, 2}})
 
         res = box.execute([[SELECT ?, :a;]], {1, {[':a'] = 2}})
@@ -317,7 +317,7 @@ g.test_sql_mixed_anon_vars = function()
         t.assert_equals(res.rows, {{1, 2}})
 
         res = box.execute([[SELECT :a, ?, $1, ?;]], {{[':a'] = 1}, 2})
-        t.assert_equals(res.rows, {{1, 2, 1, 2}})
+        t.assert_equals(res.rows, {{1, 1, 1, 2}})
 
         res = box.execute([[SELECT ? UNION ALL SELECT $2;]], {1, 2})
         t.assert_equals(res.rows, {{1}, {2}})
@@ -406,9 +406,9 @@ g.test_3401_box_execute_parameter_binding = function(cg)
         parameters[5] = 5
         parameters[6] = {}
         parameters[6]['@value2'] = 6
-        sql = 'SELECT :value3, ?, :value1, ?, ?, @value2, ?, :value3;'
+        sql = 'SELECT :value3, ?, :value1, ?, ?, @value2, ?, :value3, ?, ?;'
         res = _G.execute(sql, parameters)
-        t.assert_equals(res.rows, {{1, 2, 3, 4, 5, 6, nil, 1}})
+        t.assert_equals(res.rows, {{1, 1, 3, 2, 3, 6, 4, 1, 5, 6}})
 
         -- Try not-integer types.
         local msgpack = require('msgpack')
@@ -524,7 +524,7 @@ end
 --
 g.test_bind_numbering_in_compound_select = function(cg)
     cg.server:exec(function()
-        local sql = [[SELECT ?, 1 UNION SELECT $2, 2 UNION SELECT ?, 3;]]
+        local sql = [[SELECT ?, 1 UNION SELECT ?, 2 UNION SELECT ?, 3;]]
         local res = _G.execute(sql, {1, 2, 3})
         t.assert_equals(res.rows, {{1, 1}, {2, 2}, {3, 3}})
 
@@ -532,7 +532,7 @@ g.test_bind_numbering_in_compound_select = function(cg)
         res = _G.execute(sql, {10, 20, 30})
         t.assert_equals(res.rows, {{10}, {20}, {30}})
 
-        res = _G.execute([[VALUES (?, 1), ($2, 2), (?, 3);]], {1, 2, 3})
+        res = _G.execute([[VALUES (?, 1), (?, 2), (?, 3);]], {1, 2, 3})
         t.assert_equals(res.rows, {{1, 1}, {2, 2}, {3, 3}})
     end)
 end

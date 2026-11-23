@@ -102,7 +102,9 @@ SELECT GROUP_CONCAT(a, ' +++ ') FROM t0;
 
 -- Check BOOLEAN as binding parameter.
 \set language lua
+box.execute('SET SESSION "sql_mixed_anon_vars" = true;')
 box.execute('SELECT ?, ?, return_type($1), TYPEOF($2);', {true, false})
+box.execute('SET SESSION "sql_mixed_anon_vars" = false;')
 
 parameters = {}
 parameters[1] = {}
