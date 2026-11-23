@@ -69,6 +69,21 @@ local modules = {
             },
         },
     },
+    {
+        name = 'errno',
+        source = 'src/lua/errno.lua',
+        fixtures = 'test/app-luatest/emmylua/errno',
+        type_name = 'errno',
+        fields = {
+            strerror = 'Return a string, given an error number',
+            EAGAIN = 'Resource temporarily unavailable',
+            EBADF = 'Bad file descriptor',
+            EINVAL = 'Invalid argument',
+            ENOENT = 'No such file or directory',
+            EXDEV = 'Improper link',
+        },
+        objects = {},
+    },
 }
 
 local function normalize(value)
