@@ -1,4 +1,222 @@
 -- net_box.lua (internal file)
+
+---@alias net.box.conn.state
+---| 'initial'
+---| 'fetch_schema'
+---| 'active'
+---| 'error'
+---| 'error_reconnect'
+---| 'closed'
+---| 'graceful_shutdown'
+
+---@class net.box
+---Create a connection to a remote instance.
+---@field connect fun(uri: string | table,
+---    opts?: net.box.connect_options): net.box.conn
+---Create a connection to a remote instance.
+---@field connect fun(host: string, port: string | number,
+---    opts?: net.box.connect_options): net.box.conn
+---Create a connection (compatibility alias).
+---@field new fun(uri: string | table,
+---    opts?: net.box.connect_options): net.box.conn
+---Create a connection (compatibility alias).
+---@field new fun(host: string, port: string | number,
+---    opts?: net.box.connect_options): net.box.conn
+---Create a connection from a file descriptor.
+---@field from_fd fun(fd: number,
+---    opts?: net.box.connect_options): net.box.conn
+---Return a wrapper that applies a default connection timeout.
+---@field timeout fun(timeout: number | table, ...): net.box
+---@field self net.box.self the connection object for the local Tarantool
+---    server.
+
+---@class net.box.connect_options
+---Options passed to `net.box.connect()`.
+---
+---@field user? string a username used to connect.
+---@field password? string a user's password.
+---@field wait_connected? number | boolean a connection timeout in seconds,
+---    or false to return immediately.
+---@field reconnect_after? number a number of seconds to wait before
+---    reconnecting.
+---@field console? boolean
+---@field connect_timeout? number a number of seconds to wait before
+---    returning "error: Connection timed out".
+---@field fetch_schema? boolean whether to fetch schema changes from the
+---    server. The default is true.
+---@field auth_type? string
+---@field required_protocol_version? number a minimum version of the IPROTO
+---    protocol supported by the server.
+---@field required_protocol_features? string[] IPROTO protocol features
+---    supported by the server.
+---@field _disable_graceful_shutdown? boolean
+
+---@class net.box.request_options
+---Options passed to net.box requests.
+---
+---@field is_async? boolean whether the request is asynchronous.
+---@field iterator? string an iterator type.
+---@field limit? number a maximum number of tuples.
+---@field offset? number an offset.
+---@field on_push? fun(ctx: any, msg: any) callback for each inbound message.
+---@field on_push_ctx? any
+---@field return_raw? boolean return raw MsgPack data.
+---@field skip_header? boolean
+---@field timeout? number
+---@field fetch_pos? boolean
+---@field after? any
+---@field buffer? ffi.cdata*
+---@field _thread_id? number
+
+---@class net.box.call_options: net.box.request_options
+---Options passed to `conn:call()` and `conn:eval()`.
+
+---@class net.box.conn
+---A connection object, created by `net.box.connect()`. It supports methods
+---for making remote requests.
+---
+---@field host string? the remote host.
+---@field port string? the remote port.
+---@field state net.box.conn.state the current connection state.
+---@field error string? the error message, if the connection is in an error
+---    state.
+---@field protocol string the IPROTO protocol version.
+---@field schema_version number the remote schema version.
+---@field peer_uuid string? the peer's UUID.
+---@field peer_version_id number? the peer's version id.
+---@field peer_protocol_version number? the peer's IPROTO protocol version.
+---@field peer_protocol_features table<string, boolean> the peer's protocol
+---    features.
+---@field space table<string | integer, net.box.space> the remote spaces.
+---
+---@field ping fun(self: net.box.conn,
+---    opts?: net.box.request_options): boolean
+---@field wait_connected fun(self: net.box.conn, timeout?: number): boolean
+---@field is_connected fun(self: net.box.conn): boolean
+---@field wait_state fun(self: net.box.conn,
+---    states: string | table<string, boolean>, timeout?: number): boolean
+---@field close fun(self: net.box.conn)
+---@field call fun(self: net.box.conn, func: string, args?: any[],
+---    opts?: net.box.call_options): any...
+---@field eval fun(self: net.box.conn, expression: string, args?: any[],
+---    opts?: net.box.call_options): any...
+---@field execute fun(self: net.box.conn, query: string, parameters?: any[],
+---    sql_opts?: table, opts?: net.box.request_options): any
+---@field prepare fun(self: net.box.conn, query: string,
+---    opts?: net.box.request_options): any
+---@field unprepare fun(self: net.box.conn, query: number,
+---    opts?: net.box.request_options): any
+---@field reload_schema fun(self: net.box.conn)
+---@field watch fun(self: net.box.conn, key: string,
+---    func: fun(key: string, value: any)): net.box.watcher
+---@field watch_once fun(self: net.box.conn, key: string,
+---    opts?: net.box.request_options): any
+---@field new_stream fun(self: net.box.conn): net.box.stream
+---@field on_connect fun(self: net.box.conn, new_trigger?: function,
+---    old_trigger?: function)
+---@field on_disconnect fun(self: net.box.conn, new_trigger?: function,
+---    old_trigger?: function)
+---@field on_shutdown fun(self: net.box.conn, new_trigger?: function,
+---    old_trigger?: function)
+---@field on_schema_reload fun(self: net.box.conn, new_trigger?: function,
+---    old_trigger?: function)
+
+---@class net.box.self
+---The connection object for the local Tarantool server, available as
+---`net.box.self`.
+---
+---@field ping fun(self: net.box.self): boolean
+---@field reload_schema fun(self: net.box.self)
+---@field close fun(self: net.box.self)
+---@field timeout fun(self: net.box.self): net.box.self
+---@field wait_connected fun(self: net.box.self): boolean
+---@field is_connected fun(self: net.box.self): boolean
+---@field call fun(self: net.box.self, proc_name: string, args?: any[]): any...
+---@field eval fun(self: net.box.self, expr: string, args?: any[]): any...
+
+---@class net.box.space
+---A remote space object, accessed as `conn.space.<space_name>`.
+---
+---@field id number the space id.
+---@field name string the space name.
+---@field engine string the storage engine of the space.
+---@field field_count number the number of fields in the space.
+---@field enabled boolean whether the space is enabled.
+---@field temporary boolean whether the space is temporary.
+---@field is_sync boolean whether the space is synchronous.
+---@field index table<string | integer, net.box.index> the space indexes.
+---@field connection net.box.conn the connection the space belongs to.
+---
+---@field insert fun(self: net.box.space, tuple: any[],
+---    opts?: net.box.request_options): any
+---@field replace fun(self: net.box.space, tuple: any[],
+---    opts?: net.box.request_options): any
+---@field select fun(self: net.box.space, key?: any,
+---    opts?: net.box.request_options): any[]
+---@field delete fun(self: net.box.space, key: any,
+---    opts?: net.box.request_options): any
+---@field update fun(self: net.box.space, key: any, oplist: any[],
+---    opts?: net.box.request_options): any
+---@field upsert fun(self: net.box.space, key: any, oplist: any[],
+---    opts?: net.box.request_options)
+---@field get fun(self: net.box.space, key: any,
+---    opts?: net.box.request_options): any
+---@field format fun(self: net.box.space): table?
+
+---@class net.box.index
+---A remote index object, accessed as
+---`conn.space.<space_name>.index.<index_name>`.
+---
+---@field space net.box.space the space the index belongs to.
+---@field id number the index id.
+---@field name string the index name.
+---@field type string the index type, e.g. 'TREE', 'HASH'.
+---@field parts any[] the index parts.
+---@field unique boolean whether the index is unique.
+---
+---@field select fun(self: net.box.index, key?: any,
+---    opts?: net.box.request_options): any[]
+---@field get fun(self: net.box.index, key: any,
+---    opts?: net.box.request_options): any
+---@field min fun(self: net.box.index, key?: any,
+---    opts?: net.box.request_options): any
+---@field max fun(self: net.box.index, key?: any,
+---    opts?: net.box.request_options): any
+---@field count fun(self: net.box.index, key?: any,
+---    opts?: net.box.request_options): number
+---@field delete fun(self: net.box.index, key: any,
+---    opts?: net.box.request_options): any
+---@field update fun(self: net.box.index, key: any, oplist: any[],
+---    opts?: net.box.request_options): any
+
+---@class net.box.stream
+---A stream object, created by `conn:new_stream()`.
+---
+---@field new_stream fun(self: net.box.stream): net.box.stream
+---@field begin fun(self: net.box.stream,
+---    txn_opts?: {timeout?: number, txn_isolation?: string, is_sync?: boolean},
+---    opts?: net.box.request_options)
+---@field commit fun(self: net.box.stream, txn_opts?: table,
+---    opts?: net.box.request_options)
+---@field rollback fun(self: net.box.stream,
+---    opts?: net.box.request_options)
+---@field space table<string | integer, net.box.space> the stream spaces.
+
+---@class net.box.watcher
+---A watcher handle, created by `conn:watch()`.
+---
+---@field unregister fun(self: net.box.watcher) unregister the watcher.
+
+---@class net.box.future
+---An object returned by an asynchronous request (`is_async = true`), which
+---can be used later to get the result of the request.
+---
+---@field is_ready fun(self: net.box.future): boolean
+---@field result fun(self: net.box.future): any
+---@field wait_result fun(self: net.box.future, timeout?: number): any
+---@field discard fun(self: net.box.future)
+---@field pairs fun(self: net.box.future): fun(...): (integer, any)
+
 local log      = require('log')
 local ffi      = require('ffi')
 local fiber    = require('fiber')
@@ -8,7 +226,9 @@ local internal = require('net.box.lib')
 local trigger  = require('internal.trigger')
 local utils    = require('internal.utils')
 
-local this_module
+---@type net.box
+---@diagnostic disable-next-line: missing-fields
+local this_module = {}
 
 local max               = math.max
 local fiber_clock       = fiber.clock
@@ -265,13 +485,14 @@ local function new_sm(uri_or_fd, opts)
     end
     local user, password = opts.user, opts.password; opts.password = nil
     local last_err_code, last_err_name, last_prev_err_code
-    local remote = {
+    ---@type net.box.conn
+    local remote = setmetatable({
         host = host,
         port = port,
         fd = fd,
         opts = opts,
         state = 'initial',
-    }
+    }, remote_mt)
     local function callback(what, ...)
         if remote._fiber == nil then
             remote._fiber = fiber.self()
@@ -487,6 +708,23 @@ end
 --
 -- @retval Net.box object.
 --
+---Create a new connection. The connection is established on demand, at the
+---time of the first request. It can be re-established automatically after
+---a disconnect (see the `reconnect_after` option).
+---
+---**Example:**
+---
+--- ```lua
+--- conn = net_box.connect('localhost:3301')
+--- conn = net_box.connect('localhost:3301', {wait_connected = false})
+--- conn = net_box.connect('127.0.0.1:3302', {reconnect_after = 5})
+--- ```
+---
+---@overload fun(uri: string | table,
+---    opts?: net.box.connect_options): net.box.conn
+---@overload fun(host: string, port: string | number,
+---    opts?: net.box.connect_options): net.box.conn
+---@return net.box.conn conn a connection object.
 local function connect(...)
     local uri, opts = parse_connect_params(...)
     check_param_table(opts, CONNECT_OPTION_TYPES)
@@ -499,6 +737,14 @@ end
 -- The file descriptor should point to a socket and be switched to
 -- the non-blocking mode.
 --
+---Create a connection from a file descriptor number.
+---
+---The file descriptor should point to a socket and be switched to the
+---non-blocking mode.
+---
+---@param fd number the file descriptor.
+---@param opts? net.box.connect_options connection options.
+---@return net.box.conn conn a connection object.
 local function from_fd(fd, opts)
     check_param(fd, 'fd', 'number')
     check_param_table(opts, CONNECT_OPTION_TYPES)
@@ -528,11 +774,21 @@ local function check_eval_args(args)
     end
 end
 
+---Create a new stream for the given stream.
+---
+---@param stream net.box.stream a stream object.
+---@return net.box.stream new_stream a new stream object.
 local function stream_new_stream(stream)
     check_remote_arg(stream, 'new_stream')
     return stream._conn:new_stream()
 end
 
+---Begin a stream transaction.
+---
+---@param stream net.box.stream a stream object.
+---@param txn_opts? {timeout?: number, txn_isolation?: string,
+---    is_sync?: boolean} transaction options.
+---@param netbox_opts? net.box.request_options request options.
 local function stream_begin(stream, txn_opts, netbox_opts)
     check_remote_arg(stream, 'begin')
     check_param_table(netbox_opts, REQUEST_OPTION_TYPES)
@@ -606,6 +862,11 @@ local function order_opts_commit(opts_1, opts_2)
     return new_opts_1, new_opts_2
 end
 
+---Commit a stream transaction.
+---
+---@param stream net.box.stream a stream object.
+---@param txn_opts? table transaction options.
+---@param opts? net.box.request_options request options.
 local function stream_commit(stream, txn_opts, opts)
     check_remote_arg(stream, 'commit')
     local new_txn_opts, new_opts = order_opts_commit(txn_opts, opts)
@@ -644,6 +905,10 @@ local function stream_commit(stream, txn_opts, opts)
     end
 end
 
+---Rollback a stream transaction.
+---
+---@param stream net.box.stream a stream object.
+---@param opts? net.box.request_options request options.
 local function stream_rollback(stream, opts)
     check_remote_arg(stream, 'rollback')
     check_param_table(opts, REQUEST_OPTION_TYPES)
@@ -653,6 +918,9 @@ local function stream_rollback(stream, opts)
     end
 end
 
+---Create a stream.
+---
+---@return net.box.stream stream a stream object.
 function remote_methods:new_stream()
     check_remote_arg(self, 'new_stream')
     self._last_stream_id = self._last_stream_id + 1
@@ -742,6 +1010,7 @@ function watcher_methods:_run_async()
     fiber.new(self._run, self)
 end
 
+---Unregister the watcher.
 function watcher_methods:unregister()
     if type(self) ~= 'table' then
         box.error(E_PROC_LUA,
@@ -779,6 +1048,12 @@ function watcher_methods:unregister()
     end
 end
 
+---Subscribe to events broadcast by a remote host.
+---
+---@param key string a key name of an event to subscribe to.
+---@param func fun(key: string, value: any) a callback to invoke when the key
+---    value is updated.
+---@return net.box.watcher watcher a watcher handle.
 function remote_methods:watch(key, func)
     check_remote_arg(self, 'watch')
     if type(key) ~= 'string' then
@@ -841,6 +1116,11 @@ function remote_methods:watch(key, func)
     return watcher
 end
 
+---Subscribe to an event broadcast by a remote host and wait for its value.
+---
+---@param key string a key name of an event to subscribe to.
+---@param opts? net.box.request_options request options.
+---@return any value the current value of the event.
 function remote_methods:watch_once(key, opts)
     check_remote_arg(self, 'watch_once')
     if type(key) ~= 'string' then
@@ -850,36 +1130,65 @@ function remote_methods:watch_once(key, opts)
     return self:_request('WATCH_ONCE', opts, nil, nil, key)
 end
 
+---Close a connection.
+---
+---Connection objects are destroyed by the Lua garbage collector, just like
+---any other objects in Lua, so an explicit destruction is not mandatory.
 function remote_methods:close()
     check_remote_arg(self, 'close')
     self._transport:stop(true)
 end
 
+---Define a trigger for execution when some operation has been performed on
+---the remote server after the schema has been updated.
+---
+---@return any trigger the trigger, or a list of existing triggers if no
+---    arguments are given.
 function remote_methods:on_schema_reload(...)
     check_remote_arg(self, 'on_schema_reload')
     return self._on_schema_reload(...)
 end
 
+---Define a trigger for shutdown when a `box.shutdown` event is received.
+---
+---@return any trigger the trigger, or a list of existing triggers if no
+---    arguments are given.
 function remote_methods:on_shutdown(...)
     check_remote_arg(self, 'on_shutdown')
     return self._on_shutdown(...)
 end
 
+---Define a trigger for execution after a connection is closed.
+---
+---@return any trigger the trigger, or a list of existing triggers if no
+---    arguments are given.
 function remote_methods:on_disconnect(...)
     check_remote_arg(self, 'on_disconnect')
     return self._on_disconnect(...)
 end
 
+---Define a trigger for execution when a new connection is established, and
+---authentication and schema fetch are completed.
+---
+---@return any trigger the trigger, or a list of existing triggers if no
+---    arguments are given.
 function remote_methods:on_connect(...)
     check_remote_arg(self, 'on_connect')
     return self._on_connect(...)
 end
 
+---Show whether the connection is active or closed.
+---
+---@return boolean is_connected true if connected, false on failure.
 function remote_methods:is_connected()
     check_remote_arg(self, 'is_connected')
     return self.state == 'active' or self.state == 'fetch_schema'
 end
 
+---Wait for the connection to be active or closed.
+---
+---@param timeout? number the timeout in seconds.
+---@return boolean is_connected true when connected, false on failure.
 function remote_methods:wait_connected(timeout)
     check_remote_arg(self, 'wait_connected')
     return self:wait_state('active', timeout)
@@ -960,6 +1269,10 @@ function remote_methods:_next_sync()
     return self._transport:next_sync()
 end
 
+---Execute a PING command.
+---
+---@param opts? net.box.request_options request options.
+---@return boolean ok true on success, false on error.
 function remote_methods:ping(opts)
     check_remote_arg(self, 'ping')
     check_param_table(opts, REQUEST_OPTION_TYPES)
@@ -970,11 +1283,23 @@ function remote_methods:ping(opts)
     return err == nil
 end
 
+---Reload the schema from the remote server.
 function remote_methods:reload_schema()
     check_remote_arg(self, 'reload_schema')
     self:ping()
 end
 
+---Execute a remote stored-procedure call.
+---
+---`conn:call('func', {'1', '2', '3'})` is the remote-call equivalent of
+---`func('1', '2', '3')`. The return from `conn:call` is whatever the
+---function returns.
+---
+---@param func_name string the name of the function to call.
+---@param args? any[] the function arguments.
+---@param opts? net.box.call_options request options.
+---@return any ... the results returned by the function, or a future if
+---    `opts.is_async` is set.
 function remote_methods:call(func_name, args, opts)
     check_remote_arg(self, 'call')
     check_call_args(args)
@@ -988,6 +1313,16 @@ function remote_methods:call(func_name, args, opts)
     return unpack(res)
 end
 
+---Evaluate and execute the expression in a Lua string.
+---
+---To ensure that the return from `conn:eval` is whatever the Lua expression
+---returns, begin the Lua string with the word "return".
+---
+---@param code string the Lua expression to evaluate.
+---@param args? any[] the arguments passed to the expression.
+---@param opts? net.box.call_options request options.
+---@return any ... the results of the expression, or a future if
+---    `opts.is_async` is set.
 function remote_methods:eval(code, args, opts)
     check_remote_arg(self, 'eval')
     check_eval_args(args)
@@ -1000,6 +1335,13 @@ function remote_methods:eval(code, args, opts)
     return unpack(res)
 end
 
+---Execute an SQL statement on the remote server.
+---
+---@param query string the SQL query.
+---@param parameters? any[] the query parameters.
+---@param sql_opts? table SQL options.
+---@param netbox_opts? net.box.request_options request options.
+---@return any result the query result.
 function remote_methods:execute(query, parameters, sql_opts, netbox_opts)
     check_remote_arg(self, "execute")
     if sql_opts ~= nil then
@@ -1010,6 +1352,13 @@ function remote_methods:execute(query, parameters, sql_opts, netbox_opts)
                          query, parameters or {}, sql_opts or {})
 end
 
+---Prepare an SQL statement on the remote server.
+---
+---@param query string the SQL statement.
+---@param parameters? any[] the statement parameters.
+---@param sql_opts? table SQL options.
+---@param netbox_opts? net.box.request_options request options.
+---@return any result the prepared statement id.
 function remote_methods:prepare(query, parameters, sql_opts, netbox_opts) -- luacheck: no unused args
     check_remote_arg(self, "prepare")
     if type(query) ~= "string" then
@@ -1022,6 +1371,13 @@ function remote_methods:prepare(query, parameters, sql_opts, netbox_opts) -- lua
     return self:_request('PREPARE', netbox_opts, nil, self._stream_id, query)
 end
 
+---Unprepare an SQL statement on the remote server.
+---
+---@param query number the id of the prepared statement.
+---@param parameters? any[] the statement parameters.
+---@param sql_opts? table SQL options.
+---@param netbox_opts? net.box.request_options request options.
+---@return any result
 function remote_methods:unprepare(query, parameters, sql_opts, netbox_opts)
     check_remote_arg(self, "unprepare")
     if type(query) ~= "number" then
@@ -1036,6 +1392,13 @@ function remote_methods:unprepare(query, parameters, sql_opts, netbox_opts)
                          query, parameters or {}, sql_opts or {})
 end
 
+---Wait for a target state.
+---
+---@param state string | table<string, boolean> a target state, or a set of
+---    target states.
+---@param timeout? number the timeout in seconds.
+---@return boolean ok true when a target state is reached, false on timeout
+---    or connection closure.
 function remote_methods:wait_state(state, timeout)
     check_remote_arg(self, 'wait_state')
     local deadline = fiber_clock() + (timeout or TIMEOUT_INFINITY)
@@ -1195,6 +1558,11 @@ end
 space_metatable = function(remote)
     local methods = {}
 
+    ---Insert a tuple into the remote space.
+    ---
+    ---@param tuple any[] the tuple to insert.
+    ---@param opts? net.box.request_options request options.
+    ---@return any result the inserted tuple.
     function methods:insert(tuple, opts)
         check_space_arg(self, 'insert')
         check_param_table(opts, REQUEST_OPTION_TYPES)
@@ -1202,6 +1570,11 @@ space_metatable = function(remote)
                                self._stream_id, self._id_or_name, tuple)
     end
 
+    ---Insert or replace a tuple in the remote space.
+    ---
+    ---@param tuple any[] the tuple to replace.
+    ---@param opts? net.box.request_options request options.
+    ---@return any result the replaced tuple.
     function methods:replace(tuple, opts)
         check_space_arg(self, 'replace')
         check_param_table(opts, REQUEST_OPTION_TYPES)
@@ -1209,21 +1582,43 @@ space_metatable = function(remote)
                                self._stream_id, self._id_or_name, tuple)
     end
 
+    ---Select one or more tuples from the remote space.
+    ---
+    ---@param key? any the search key.
+    ---@param opts? net.box.request_options request options.
+    ---@return any[]? tuples the selected tuples.
     function methods:select(key, opts)
         check_space_arg(self, 'select')
         return check_primary_index(self):select(key, opts)
     end
 
+    ---Delete a tuple from the remote space.
+    ---
+    ---@param key any the search key.
+    ---@param opts? net.box.request_options request options.
+    ---@return any result the deleted tuple.
     function methods:delete(key, opts)
         check_space_arg(self, 'delete')
         return check_primary_index(self):delete(key, opts)
     end
 
+    ---Update a tuple in the remote space.
+    ---
+    ---@param key any the search key.
+    ---@param oplist any[] update operations.
+    ---@param opts? net.box.request_options request options.
+    ---@return any result the updated tuple.
     function methods:update(key, oplist, opts)
         check_space_arg(self, 'update')
         return check_primary_index(self):update(key, oplist, opts)
     end
 
+    ---Update a tuple in the remote space or insert a new one.
+    ---
+    ---@param key any the search key.
+    ---@param oplist any[] update operations.
+    ---@param opts? net.box.request_options request options.
+    ---@return any result the updated or inserted tuple.
     function methods:upsert(key, oplist, opts)
         check_space_arg(self, 'upsert')
         check_param_table(opts, REQUEST_OPTION_TYPES)
@@ -1233,11 +1628,19 @@ space_metatable = function(remote)
                                                key, oplist))
     end
 
+    ---Get a tuple from the remote space by key.
+    ---
+    ---@param key any the search key.
+    ---@param opts? net.box.request_options request options.
+    ---@return any result the tuple, or nil.
     function methods:get(key, opts)
         check_space_arg(self, 'get')
         return check_primary_index(self):get(key, opts)
     end
 
+    ---Get the format of the remote space.
+    ---
+    ---@return table? format the space format.
     function methods:format(format)
         if format == nil then
             return self._format
@@ -1252,6 +1655,11 @@ end
 index_metatable = function(remote)
     local methods = {}
 
+    ---Select one or more tuples from the remote index.
+    ---
+    ---@param key? any the search key.
+    ---@param opts? net.box.request_options request options.
+    ---@return any[]? tuples the selected tuples.
     function methods:select(key, opts)
         check_index_arg(self, 'select')
         check_param_table(opts, REQUEST_OPTION_TYPES)
@@ -1277,6 +1685,11 @@ index_metatable = function(remote)
         return unpack(res)
     end
 
+    ---Get a tuple from the remote index by key.
+    ---
+    ---@param key any the search key.
+    ---@param opts? net.box.request_options request options.
+    ---@return any result the tuple, or nil.
     function methods:get(key, opts)
         check_index_arg(self, 'get')
         check_param_table(opts, REQUEST_OPTION_TYPES)
@@ -1291,6 +1704,11 @@ index_metatable = function(remote)
                                                0, 2, key, nil, false))
     end
 
+    ---Get the minimal tuple from the remote index.
+    ---
+    ---@param key? any the search key.
+    ---@param opts? net.box.request_options request options.
+    ---@return any result the tuple, or nil.
     function methods:min(key, opts)
         check_index_arg(self, 'min')
         check_param_table(opts, REQUEST_OPTION_TYPES)
@@ -1305,6 +1723,11 @@ index_metatable = function(remote)
                                                0, 1, key, nil, false))
     end
 
+    ---Get the maximal tuple from the remote index.
+    ---
+    ---@param key? any the search key.
+    ---@param opts? net.box.request_options request options.
+    ---@return any result the tuple, or nil.
     function methods:max(key, opts)
         check_index_arg(self, 'max')
         check_param_table(opts, REQUEST_OPTION_TYPES)
@@ -1319,6 +1742,11 @@ index_metatable = function(remote)
                                                0, 1, key, nil, false))
     end
 
+    ---Count the tuples in the remote index.
+    ---
+    ---@param key? any the search key.
+    ---@param opts? net.box.request_options request options.
+    ---@return number count the number of tuples.
     function methods:count(key, opts)
         check_index_arg(self, 'count')
         check_param_table(opts, REQUEST_OPTION_TYPES)
@@ -1335,6 +1763,11 @@ index_metatable = function(remote)
                                code, { key, opts })
     end
 
+    ---Delete a tuple from the remote index.
+    ---
+    ---@param key any the search key.
+    ---@param opts? net.box.request_options request options.
+    ---@return any result the deleted tuple.
     function methods:delete(key, opts)
         check_index_arg(self, 'delete')
         check_param_table(opts, REQUEST_OPTION_TYPES)
@@ -1345,6 +1778,12 @@ index_metatable = function(remote)
                                                self._id_or_name, key))
     end
 
+    ---Update a tuple in the remote index.
+    ---
+    ---@param key any the search key.
+    ---@param oplist any[] update operations.
+    ---@param opts? net.box.request_options request options.
+    ---@return any result the updated tuple.
     function methods:update(key, oplist, opts)
         check_index_arg(self, 'update')
         check_param_table(opts, REQUEST_OPTION_TYPES)
@@ -1358,12 +1797,19 @@ index_metatable = function(remote)
     return { __index = methods, __metatable = false }
 end
 
+---@diagnostic disable-next-line: missing-fields
 this_module = {
     connect = connect,
     new = connect, -- Tarantool < 1.7.1 compatibility,
     from_fd = from_fd,
 }
 
+---Return a wrapper for `connect()` that applies a default connection
+---timeout.
+---
+---@param timeout number | table the timeout in seconds, or a table with the
+---    timeout.
+---@return net.box wrapper a wrapper module.
 function this_module.timeout(timeout, ...)
     if type(timeout) == 'table' then timeout = ... end
     if not timeout then return this_module end
@@ -1401,13 +1847,37 @@ local function handle_eval_result(status, ...)
     return unpack(results)
 end
 
+---@type net.box.self
 this_module.self = {
+    ---Execute a PING command.
+    ---
+    ---@return boolean ok true.
     ping = function() return true end,
+    ---Reload the schema.
     reload_schema = function() end,
+    ---Close the connection.
     close = function() end,
+    ---Return the connection object itself.
+    ---
+    ---@param self net.box.self
+    ---@return net.box.self
     timeout = function(self) return self end,
+    ---Wait for the connection to be active.
+    ---
+    ---@param self net.box.self
+    ---@return boolean ok true.
     wait_connected = function(self) return true end,
+    ---Show whether the connection is active.
+    ---
+    ---@param self net.box.self
+    ---@return boolean ok true.
     is_connected = function(self) return true end,
+    ---Execute a local stored-procedure call.
+    ---
+    ---@param __box net.box.self
+    ---@param proc_name string the name of the function to call.
+    ---@param args? any[] the function arguments.
+    ---@return any ... the results returned by the function.
     call = function(__box, proc_name, args)
         check_remote_arg(__box, 'call')
         check_call_args(args)
@@ -1430,6 +1900,12 @@ this_module.self = {
             return handle_eval_result(pcall(proc, unpack(args)))
         end
     end,
+    ---Evaluate and execute the expression in a Lua string locally.
+    ---
+    ---@param __box net.box.self
+    ---@param expr string the Lua expression to evaluate.
+    ---@param args? any[] the arguments passed to the expression.
+    ---@return any ... the results of the expression.
     eval = function(__box, expr, args)
         check_remote_arg(__box, 'eval')
         check_eval_args(args)
@@ -1471,5 +1947,44 @@ this_module.self = setmetatable({}, {
 })
 
 end -- not cord_is_main
+
+---@type fun(timeout: number | table, ...): net.box
+local m_timeout = {} -- luacheck: ignore 311
+m_timeout = this_module.timeout
+
+---@type net.box.self
+---@diagnostic disable-next-line: missing-fields
+local m_self = {} -- luacheck: ignore 311
+m_self = this_module.self
+
+---The `net.box` module contains connectors to remote database systems.
+---It is used to connect to Tarantool server instances via a network.
+---
+---Call `require('net.box')` to get a `net.box` object, then use
+---`net_box.connect()` to create a connection object and `conn:...` methods
+---to execute requests on the remote database. Call `conn:close()` to
+---disconnect.
+---
+---All `net.box` methods are fiber-safe: it is safe to share and use the
+---same connection object across multiple concurrent fibers. Requests from
+---multiple fibers are pipelined through the same network socket.
+---
+---Most methods accept the last `{options}` argument: `timeout`, `buffer`,
+---`is_async`, `on_push`/`on_push_ctx` and `return_raw`.
+---
+---Connection states: `initial`, `fetch_schema`, `active`,
+---`graceful_shutdown`, `error`, `error_reconnect`, `closed`.
+local m = { -- luacheck: ignore 211
+    ---Create a connection to a remote instance.
+    connect = connect,
+    ---Create a connection (compatibility alias).
+    new = connect,
+    ---Create a connection from a file descriptor.
+    from_fd = from_fd,
+    ---Return a wrapper that applies a default connection timeout.
+    timeout = m_timeout,
+    ---The connection object for the local Tarantool server.
+    self = m_self,
+}
 
 return this_module
