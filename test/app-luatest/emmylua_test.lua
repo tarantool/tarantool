@@ -69,6 +69,47 @@ local modules = {
             },
         },
     },
+    {
+        name = 'datetime',
+        source = 'src/lua/datetime.lua',
+        fixtures = 'test/app-luatest/emmylua/datetime',
+        fields = {
+            new = 'Create datetime given attribute values',
+            now = 'Create datetime object representing current time',
+            parse = 'Convert an input string with the date and time',
+            parse_date = 'Parse partial ISO-8601 date string',
+            is_datetime = 'Check whether the specified value is a `datetime`',
+        },
+        objects = {
+            {
+                fixture = 'object.lua',
+                type_name = 'datetime',
+                fields = {
+                    year = 'Year.',
+                    month = 'Month number',
+                    tzoffset = 'Time zone offset from UTC',
+                },
+            },
+            {
+                fixture = 'interval.lua',
+                type_name = 'datetime.interval',
+                fields = {
+                    day = 'Day number.',
+                    month = 'Month number.',
+                    adjust = 'Defines how to round days',
+                },
+            },
+            {
+                fixture = 'totable.lua',
+                type_name = 'datetime.totable',
+                fields = {
+                    year = 'Year.',
+                    month = 'Month number.',
+                    timestamp = 'Timestamp, in seconds.',
+                },
+            },
+        },
+    },
 }
 
 local function normalize(value)
