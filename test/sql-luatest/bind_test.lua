@@ -127,6 +127,7 @@ end
 -- Check work of numeric bind variables
 g.test_12733_bind_variables = function()
     g.server:exec(function()
+        box.execute([[SET SESSION "sql_named_var_default_null" = true;]])
         local sql = [[SELECT $3, $1, $2, $10;]]
         local res = box.execute(sql, {'a', 'b', 'c'})
         t.assert_equals(res.rows, {{'c', 'a', 'b', nil}})
@@ -248,6 +249,29 @@ g.test_12733_bind_variables = function()
         t.assert_equals(res.rows, {{101, 2, 201}, {102, 2, 202}})
 
         box.execute([[DROP TABLE t;]])
+        box.execute([[SET SESSION "sql_named_var_default_null" = false;]])
+    end)
+end
+
+g.test_sql_named_var_default_null = function()
+    g.server:exec(function()
+        local exp_err = "No value for parameter ':a'"
+        local _, err = box.execute([[SELECT :a;]], {1})
+        t.assert_equals(tostring(err), exp_err)
+
+        local res = box.execute([[SELECT :a;]], {{[':a'] = 1}})
+        t.assert_equals(res.rows, {{1}})
+
+        res = box.execute([[SELECT ?;]], {1})
+        t.assert_equals(res.rows, {{1}})
+
+        res = box.execute([[SELECT $1;]], {1})
+        t.assert_equals(res.rows, {{1}})
+
+        box.execute([[SET SESSION "sql_named_var_default_null" = true;]])
+
+        res = box.execute([[SELECT :a;]], {1})
+        t.assert_equals(res.rows, {{nil}})
     end)
 end
 

@@ -866,8 +866,20 @@ case OP_Variable: {            /* out2 */
 	uint32_t pos = 0;
 	if (pOp->p4.z != NULL) {
 		pos = sql_bind_lookup(p->bind, p->bind_count, pOp->p4.z);
-		if (pos == 0)
+		if (pos == 0) {
+			/**
+			 * If pOp->p1 == 0, then the current variable is named;
+			 * otherwise, it is anonymous.
+			 */
+			if ((p->sql_flags & sql_named_var_default_null) == 0 &&
+			    pOp->p1 == 0) {
+				diag_set(ClientError,
+					 ER_NO_VALUE_FOR_NAMED_VARIABLE,
+					 pOp->p4.z);
+				goto abort_due_to_error;
+			}
 			break;
+		}
 	}
 	pos += pOp->p1;
 	if (pos > p->bind_count)
