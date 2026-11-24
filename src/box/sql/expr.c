@@ -2667,6 +2667,12 @@ sqlCodeSubselect(Parse * pParse,	/* Parsing context */
 			Select *pSel;	/* SELECT statement to encode */
 			SelectDest dest;	/* How to deal with SELECT result */
 			int nReg;	/* Registers to allocate */
+			/**
+			 * SELECT statement to encode.
+			 * Needed for counting subquerys.
+			 */
+			Select *p_sel;
+			int n_row; /** Number of subquerys in SELECT. */
 
 			assert(pExpr->op == TK_EXISTS
 			       || pExpr->op == TK_SELECT);
@@ -2705,6 +2711,19 @@ sqlCodeSubselect(Parse * pParse,	/* Parsing context */
 				pSel->pLimit = sql_expr_new_int(1);
 			}
 			pSel->iLimit = 0;
+			p_sel = pSel;
+			n_row = 1;
+			while (p_sel->pPrior != 0) {
+				p_sel = p_sel->pPrior;
+				n_row++;
+			}
+			if (n_row > SQL_MAX_EXPR_DEPTH) {
+				diag_set(ClientError, ER_SQL_PARSER_LIMIT,
+					 "Number of rows in a VALUES subquery",
+					 n_row, SQL_MAX_EXPR_DEPTH);
+				pParse->is_aborted = true;
+				return 0;
+			}
 			pSel->selFlags &= ~SF_MultiValue;
 			if (sqlSelect(pParse, pSel, &dest)) {
 				return 0;
