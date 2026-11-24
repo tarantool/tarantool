@@ -308,6 +308,16 @@ TWEAK_DOUBLE(box_shutdown_timeout);
 double box_fiber_pool_idle_timeout = FIBER_POOL_IDLE_TIMEOUT;
 TWEAK_DOUBLE(box_fiber_pool_idle_timeout);
 
+/**
+ * The Raft worker is claiming the synchronous queue. Automatic elections can
+ * start this work without a public promote call, and it can outlive a caller
+ * that timed out or was cancelled. Public promote and demote must not interfere
+ * with it, they may disrupt ongoing elections.
+ */
+static bool is_in_raft_promote = false;
+/** A guard to block multiple simultaneous promote()/demote() invocations. */
+static bool is_in_box_promote = false;
+
 static int
 box_run_on_recovery_state(enum box_recovery_state state)
 {
@@ -3047,21 +3057,15 @@ box_wait_linearization_point(double timeout)
 	return txn_limbo_wait_last_txn(&txn_limbo, &is_rollback, timeout);
 }
 
-/** A guard to block multiple simultaneous promote()/demote() invocations. */
-static bool is_in_box_promote = false;
-
 int
 box_promote_qsync(void)
 {
-	if (is_in_box_promote) {
-		diag_set(ClientError, ER_IN_ANOTHER_PROMOTE);
-		return -1;
-	}
+	assert(!is_in_raft_promote);
 	assert(is_box_configured);
 	assert(box_raft()->state == RAFT_STATE_LEADER);
-	is_in_box_promote = true;
+	is_in_raft_promote = true;
 	auto promote_guard = make_scoped_guard([&] {
-		is_in_box_promote = false;
+		is_in_raft_promote = false;
 	});
 	return txn_limbo_promote(&txn_limbo, IPROTO_RAFT_PROMOTE,
 				 TIMEOUT_INFINITY);
@@ -3070,8 +3074,13 @@ box_promote_qsync(void)
 int
 box_check_promote(void) {
 	if (is_in_box_promote) {
-		diag_set(ClientError, ER_UNSUPPORTED, "box.ctl.promote/demote",
-			 "simultaneous invocations");
+		diag_set(ClientError, ER_IN_ANOTHER_PROMOTE);
+		return -1;
+	}
+	if (is_in_raft_promote) {
+		diag_set(ClientError, ER_UNSUPPORTED,
+			 "box.ctl.promote/demote()",
+			 "execution during Raft background promotion");
 		return -1;
 	}
 	if (cfg_replication_anon) {
@@ -3146,6 +3155,10 @@ box_promote(void)
 	 */
 	if (txn_limbo.state == TXN_LIMBO_STATE_LEADER)
 		return 0;
+	is_in_box_promote = true;
+	auto promote_guard = make_scoped_guard([&] {
+		is_in_box_promote = false;
+	});
 	if (box_raft_try_promote() != 0)
 		return -1;
 	assert(raft->state == RAFT_STATE_LEADER);

@@ -418,7 +418,7 @@ struct errcode_record {
 	_(ER_CREATE_DEFAULT_FUNC, 275,		"Failed to create field default function '%s': %s", "func", STRING, "details", STRING) \
 	_(ER_DEFAULT_FUNC_FAILED, 276,		"Error calling field default function '%s': %s", "func", STRING, "details", STRING) \
 	_(ER_INVALID_DEC, 277,			"Invalid decimal: '%s'", "value", STRING) \
-	_(ER_IN_ANOTHER_PROMOTE, 278,		"box.ctl.promote() is already running") \
+	_(ER_IN_ANOTHER_PROMOTE, 278,		"box.ctl.promote/demote() is already running") \
 	_(ER_SHUTDOWN, 279,			"Server is shutting down") \
 	_(ER_FIELD_VALUE_OUT_OF_RANGE, 280,	"The value of field %s exceeds the supported range for type '%s': %s", "field", STRING, "field_type", STRING, "", STRING, "value", MSGPACK, "min", MSGPACK, "max", MSGPACK) \
 	_(ER_REPLICASET_NOT_FOUND, 281,		"The replicaset was not found by its name") \
