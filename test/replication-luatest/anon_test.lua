@@ -306,3 +306,45 @@ g4.test_anon_replication_info_after_deanonymization = function(lg)
     assert_replication_anon_is_empty(lg.replica)
     assert_replication_anon_is_empty(lg.master)
 end
+
+--
+-- gh-13747: instance_name must be rejected for an anonymous replica
+-- until it is deanonymized.
+--
+g4.test_forbid_setting_instance_name_for_anon_replica = function(lg)
+    lg.replica:start()
+
+    lg.replica:exec(function()
+        -- Precondition: the instance is anonymous.
+        t.assert_equals(box.info.id, 0)
+        -- A name can't be given to an anonymous replica.
+        t.assert_error_msg_contains('anonymous replica', box.cfg,
+                                    {instance_name = 'replica'})
+        -- Nothing was applied: no name, still anonymous.
+        t.assert_equals(box.info.name, nil)
+        t.assert_equals(box.cfg.instance_name, nil)
+        t.assert_equals(box.info.id, 0)
+    end)
+
+    lg.replica:exec(function()
+        -- An anonymous replica can't become writable on its own.
+        t.assert_error_msg_contains(
+            'the value may be set to false only when ' ..
+            'replication_anon is false', box.cfg, {read_only = false})
+        t.assert_equals(box.info.ro, true)
+    end)
+
+    lg.replica:exec(function()
+        -- Only together with deanonymization can the replica become writable
+        box.cfg{read_only = false, replication_anon = false}
+        t.assert_not_equals(box.info.id, 0)
+        t.helpers.retrying({}, function()
+            t.assert_equals(box.info.ro, false)
+        end)
+        -- Only then can it be given a name.
+        box.cfg{instance_name = 'replica'}
+        t.assert_equals(box.info.name, 'replica')
+    end)
+
+    lg.replica:wait_for_vclock_of(lg.master)
+end

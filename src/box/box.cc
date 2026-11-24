@@ -2900,6 +2900,13 @@ box_set_instance_name(void)
 	char name[NODE_NAME_SIZE_MAX];
 	if (box_check_instance_name(name) != 0)
 		diag_raise();
+
+	if (box_is_anon()) {
+		tnt_raise(ClientError, ER_CFG, "instance_name",
+			  "cannot be set on an anonymous replica, "
+			  "deanonymize the replica first by setting "
+			  "'replication_anon' to false");
+	}
 	if (strcmp(cfg_instance_name, name) == 0)
 		return;
 	/**
