@@ -592,14 +592,11 @@ local function set_supervised_failover_mode(configdata, box_cfg)
     end
 
     local replicaset_name = configdata._replicaset_name
-    local path = {'failover', 'replicasets', replicaset_name, 'synchro_mode'}
-    local synchro_mode = configdata:get(path, {use_default = true})
-    if not synchro_mode then
-        return
-    end
+    local synchro_mode = instance_config:is_supervised_sync(
+        configdata._iconfig_def, replicaset_name)
 
     local is_anon = configdata:get('replication.anon', {use_default = true})
-    box_cfg.election_mode = is_anon and 'off' or 'manual'
+    box_cfg.election_mode = synchro_mode and not is_anon and 'manual' or 'off'
 end
 
 -- }}} failover.replicasets.*.synchro_mode

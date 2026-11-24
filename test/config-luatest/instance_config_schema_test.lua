@@ -1184,6 +1184,7 @@ end
 g.test_replication = function()
     local iconfig = {
         replication = {
+            mode = 'async',
             failover = 'off',
             peers = {'one', 'two'},
             anon = true,
@@ -1215,6 +1216,7 @@ g.test_replication = function()
                     instance_config.schema.fields.replication)
 
     local exp = {
+        mode = 'async',
         failover = 'off',
         anon = false,
         anon_ttl = 60 * 60,
@@ -1507,9 +1509,6 @@ g.test_box_cfg_coverage = function()
 
         -- Moved to the CLI options (see gh-8876).
         force_recovery = true,
-
-        -- Available through box.cfg() only.
-        replication_mode = true,
     }
 
     -- There are options, where defaults are changed deliberately.

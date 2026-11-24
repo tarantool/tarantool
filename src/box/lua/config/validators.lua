@@ -401,6 +401,12 @@ M['replication.failover'] = function(_data, w)
     validate_scope(w, {'global', 'group', 'replicaset'})
 end
 
+M['replication.mode'] = function(_data, w)
+    validate_scope(w, {'global', 'replicaset'})
+end
+
+M['compat.box_cfg_replication_mode'] = M['replication.mode']
+
 -- }}} replication
 
 -- {{{ session

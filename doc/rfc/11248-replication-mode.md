@@ -319,6 +319,11 @@ switch of the `compat.box_cfg_replication_mode` to `'new'`:
 2. Before entering async, require an empty limbo and no unfinished promotions
    or demotions. An existing limbo owner is allowed.
 
+YAML reloads apply compat before `box.cfg()`. Before enabling `'new'`, prepare
+mode and election settings that satisfy the new rules while compat is still
+`'old'`, then reload with `'new'`. Mode, election and compat changes are not an
+atomic operation.
+
 These checks are local. The caller must coordinate the nodes. There are no
 checks for transactions in progress, replication status, or vclocks of connected
 replicas: the switch of mode happens like never, so no need to protect it that

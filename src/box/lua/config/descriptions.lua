@@ -322,6 +322,14 @@ I['compat.box_cfg_replication_sync_timeout'] = format_text([[
     - `old` (2.x default): 300 seconds
 ]])
 
+I['compat.box_cfg_replication_mode'] = format_text([[
+    Select legacy per-space replication (`old`) or dedicated replication modes
+    (`new`). The default is `old` in 3.10 and changes to `new` in 4.0. Legacy
+    behavior is removed in 5.0. This option is dynamic and can be set only at
+    global or replicaset scope. All replicaset members, including anonymous
+    replicas, must use the same selection.
+]])
+
 I['compat.box_consider_system_spaces_synchronous'] = format_text([[
     Whether to consider most system spaces as synchronized regardless
     of the `is_sync` space option:
@@ -1272,6 +1280,10 @@ I['failover.replicasets.*.synchro_min_quorum'] = format_text([[
 ]])
 
 I['failover.replicasets.*.synchro_mode'] = format_text([[
+    Legacy supervised replication policy. Explicit values, including `false`,
+    are rejected under `compat.box_cfg_replication_mode = new`. Use
+    `replication.mode` to select the supervised policy in that case.
+
     The coordinator supports two leader appoint modes: one suits
     better for asynchronous replication, the other one better
     works for the quorum synchronous replication.
@@ -2520,6 +2532,30 @@ I['replication.election_timeout'] = format_duration_text([[
     timeouts to 300, 310, and 320 respectively, or to 305, 302, and 324, and
     so on. In that way, the votes will never be split because the election on
     different nodes won't be restarted simultaneously.
+]])
+
+I['replication.mode'] = format_text([[
+    Select `async` (default) or `sync` replication for all newly originated
+    replicated transactions under `compat.box_cfg_replication_mode = new`.
+    Legacy compatibility ignores this setting. Local and data-temporary spaces
+    retain their behavior. Explicit `is_sync` API options are rejected under new
+    compatibility, and both space `is_sync` properties are hidden.
+
+    This dynamic option can be set only at global or replicaset scope. All
+    replicaset members, including anonymous replicas, must agree. Synchronous
+    YAML configurations require `replication.failover = election` or
+    `supervised`. With supervised failover, this option selects the
+    coordinator's synchronous policy.
+
+    Before changing modes, pause replicated writes, call `box.ctl.txn_sync()`
+    on every writer, and wait for `box.ctl.replication_sync()` on every writer
+    (include anonymous replicas with `include_anon = true`). Entering async
+    requires an empty synchronous queue and no unfinished promotion or demotion.
+    An existing owner keeps async nodes read-only until `box.ctl.demote()` on
+    that owner clears ownership. On reload, compat is applied before box.cfg().
+    Prepare compatible mode and election settings under old compatibility
+    before enabling the new behavior. A failed reload may leave earlier
+    settings applied.
 ]])
 
 I['replication.failover'] = format_text([[
