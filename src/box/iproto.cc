@@ -1738,6 +1738,14 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 	/* Enqueue all requests which are fully read up. */
 	if (iproto_enqueue_batch(con, in) != 0)
 		goto error;
+	/*
+	 * An armed watcher won't fire for data that the stream has already
+	 * read from the socket, such as the rest of an SSL record, so feed
+	 * it. An unarmed watcher is fed by the output path. If the data is
+	 * incomplete, the read waits for the socket again.
+	 */
+	if (ev_is_active(&con->input) && iostream_has_pending(io))
+		ev_feed_event(loop, &con->input, EV_CUSTOM);
 	return;
 error:;
 	struct error *e = diag_last_error(diag_get());

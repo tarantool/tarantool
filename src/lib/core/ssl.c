@@ -509,9 +509,22 @@ ssl_iostream_writev(struct iostream *io, const struct iovec *iov, int iovcnt)
 	return n_written;
 }
 
+/** iostream_vtab::has_pending */
+static bool
+ssl_iostream_has_pending(struct iostream *io)
+{
+	const SSL *ssl = io->data;
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
+	return SSL_pending(ssl) > 0;
+#else
+	return SSL_has_pending(ssl) == 1;
+#endif
+}
+
 static const struct iostream_vtab ssl_iostream_vtab = {
 	/* .destroy = */ ssl_iostream_destroy,
 	/* .read = */ ssl_iostream_read,
 	/* .write = */ ssl_iostream_write,
 	/* .writev = */ ssl_iostream_writev,
+	/* .has_pending = */ ssl_iostream_has_pending,
 };

@@ -104,6 +104,9 @@ struct iostream_vtab {
 	/** See iostream_writev. */
 	ssize_t
 	(*writev)(struct iostream *io, const struct iovec *iov, int iovcnt);
+	/** See iostream_has_pending. May be NULL. */
+	bool
+	(*has_pending)(struct iostream *io);
 };
 
 /**
@@ -190,13 +193,31 @@ iostream_destroy(struct iostream *io)
  * Reads up to count bytes from a stream and stores them in buf.
  * On success returns the number of bytes read (>= 0); 0 means
  * that the other end closed the connection. On failure returns
- * iostream_status (< 0).
+ * iostream_status (< 0). A caller that waits for the fd to become
+ * readable must check iostream_has_pending() before waiting.
  */
 static inline ssize_t
 iostream_read(struct iostream *io, void *buf, size_t count)
 {
 	IOSTREAM_OWNER_SET(io);
 	ssize_t ret = io->vtab->read(io, buf, count);
+	IOSTREAM_OWNER_CLEAR(io);
+	return ret;
+}
+
+/**
+ * Returns true if the stream has buffered data that it has already read
+ * from the fd, e.g. the rest of an SSL record. Polling the fd doesn't
+ * report such data, so the caller should read again while this is true.
+ * A read may still return IOSTREAM_WANT_READ if the data is incomplete.
+ */
+static inline bool
+iostream_has_pending(struct iostream *io)
+{
+	if (io->vtab->has_pending == NULL)
+		return false;
+	IOSTREAM_OWNER_SET(io);
+	bool ret = io->vtab->has_pending(io);
 	IOSTREAM_OWNER_CLEAR(io);
 	return ret;
 }
