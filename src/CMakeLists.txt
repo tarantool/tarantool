@@ -78,6 +78,7 @@ lua_source(lua_sources lua/protobuf.lua protobuf_lua)
 lua_source(lua_sources lua/version.lua version_lua)
 
 lua_stub(iconv FILES lua/iconv.lua RETURN iconv)
+lua_stub(tap FILES lua/tap.lua RETURN tap)
 
 if(ENABLE_LUA_EXTRAS)
     lua_multi_source(lua_sources ${EXTRA_LUA_SOURCES})
