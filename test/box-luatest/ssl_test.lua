@@ -27,6 +27,15 @@ local SERVER2_CERT_FILE = fio.pathjoin(CERT_DIR, 'server2.crt')
 local SERVER2_KEY_FILE = fio.pathjoin(CERT_DIR, 'server2.key')
 local CLIENT2_CERT_FILE = fio.pathjoin(CERT_DIR, 'client2.crt')
 local CLIENT2_KEY_FILE = fio.pathjoin(CERT_DIR, 'client2.key')
+local CA3_FILE = fio.pathjoin(CERT_DIR, 'ca3.crt')
+local CA3_AND_INTERMEDIATE3_FILE = fio.pathjoin(CERT_DIR,
+                                              'ca3_and_intermediate3.crt')
+local SERVER3_CERT_FILE = fio.pathjoin(CERT_DIR, 'server3.crt')
+local SERVER3_CHAIN_FILE = fio.pathjoin(CERT_DIR, 'server3_chain.crt')
+local SERVER3_KEY_FILE = fio.pathjoin(CERT_DIR, 'server3.key')
+local CLIENT3_CERT_FILE = fio.pathjoin(CERT_DIR, 'client3.crt')
+local CLIENT3_CHAIN_FILE = fio.pathjoin(CERT_DIR, 'client3_chain.crt')
+local CLIENT3_KEY_FILE = fio.pathjoin(CERT_DIR, 'client3.key')
 local TMP_CERT_FILE = fio.pathjoin(VARDIR, 'tmp.crt')
 local TMP_KEY_FILE = fio.pathjoin(VARDIR, 'tmp.key')
 local GOST_KEY_FILE = fio.pathjoin(CERT_DIR, 'gost.key')
@@ -329,6 +338,111 @@ g.test_net_box = function()
             transport = 'ssl',
             ssl_cert_file = CLIENT_CERT_FILE,
             ssl_key_file = CLIENT_KEY_FILE,
+        }
+    })
+    t.assert_equals(c.state, 'active')
+    t.assert_equals(c:eval('return true'), true)
+    c:close()
+end
+
+g.before_test('test_cert_chain', function()
+    g.server = server:new({alias = 'master'})
+    g.server:start()
+end)
+
+g.after_test('test_cert_chain', function()
+    g.server:stop()
+    g.server = nil
+end)
+
+--
+-- Checks that intermediate CA certificates that follow the certificate in
+-- ssl_cert_file are sent to the peer (gh-13802).
+--
+g.test_cert_chain = function()
+    local c
+    local uri = g.server.net_box_uri
+    local function listen(cert_file, ca_file)
+        g.server:exec(function(listen_uri, cert, key, ca)
+            box.cfg({listen = {
+                uri = listen_uri,
+                params = {
+                    transport = 'ssl',
+                    ssl_ca_file = ca,
+                    ssl_cert_file = cert,
+                    ssl_key_file = key,
+                }
+            }})
+        end, {uri, cert_file, SERVER3_KEY_FILE, ca_file})
+    end
+
+    -- Check server authority.
+    -- Certificate without the chain.
+    listen(SERVER3_CERT_FILE)
+    c = net.connect({
+        uri = uri,
+        params = {
+            transport = 'ssl',
+            ssl_ca_file = CA3_FILE,
+        }
+    })
+    t.assert_equals(c.state, 'error')
+    t.assert_str_contains(c.error, 'certificate verify failed')
+    c:close()
+    -- Certificate with the chain.
+    listen(SERVER3_CHAIN_FILE)
+    c = net.connect({
+        uri = uri,
+        params = {
+            transport = 'ssl',
+            ssl_ca_file = CA3_FILE,
+        }
+    })
+    t.assert_equals(c.state, 'active')
+    t.assert_equals(c:eval('return true'), true)
+    c:close()
+
+    -- Check client authority.
+    listen(SERVER3_CHAIN_FILE, CA3_FILE)
+    -- Certificate without the chain.
+    c = net.connect({
+        uri = uri,
+        params = {
+            transport = 'ssl',
+            ssl_ca_file = CA3_FILE,
+            ssl_cert_file = CLIENT3_CERT_FILE,
+            ssl_key_file = CLIENT3_KEY_FILE,
+        }
+    })
+    t.assert_equals(c.state, 'error')
+    t.assert_str_contains(c.error, 'unknown ca')
+    c:close()
+    t.assert(g.server:grep_log(
+           '.*:SSL routines:.*:certificate verify failed:.*') ~= nil,
+        "no error 'certificate verify failed' in server's log")
+    -- Certificate with the chain.
+    c = net.connect({
+        uri = uri,
+        params = {
+            transport = 'ssl',
+            ssl_ca_file = CA3_FILE,
+            ssl_cert_file = CLIENT3_CHAIN_FILE,
+            ssl_key_file = CLIENT3_KEY_FILE,
+        }
+    })
+    t.assert_equals(c.state, 'active')
+    t.assert_equals(c:eval('return true'), true)
+    c:close()
+
+    -- Certificate without the chain, the peer trusts the intermediate.
+    listen(SERVER3_CERT_FILE, CA3_AND_INTERMEDIATE3_FILE)
+    c = net.connect({
+        uri = uri,
+        params = {
+            transport = 'ssl',
+            ssl_ca_file = CA3_AND_INTERMEDIATE3_FILE,
+            ssl_cert_file = CLIENT3_CERT_FILE,
+            ssl_key_file = CLIENT3_KEY_FILE,
         }
     })
     t.assert_equals(c.state, 'active')

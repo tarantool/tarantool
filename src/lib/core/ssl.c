@@ -314,8 +314,7 @@ ssl_iostream_ctx_new(enum iostream_mode mode, const struct uri *uri)
 		goto err_ctx;
 	}
 	if (cert_file != NULL &&
-	    SSL_CTX_use_certificate_file(ssl_ctx, cert_file,
-					 SSL_FILETYPE_PEM) != 1) {
+	    SSL_CTX_use_certificate_chain_file(ssl_ctx, cert_file) != 1) {
 		diag_set(SSLError, "Error loading SSL certificate '%s'",
 			 cert_file);
 		goto err_ctx;
