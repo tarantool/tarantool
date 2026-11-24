@@ -312,53 +312,66 @@ end)
 test:test("Simple tests for parser", function(test)
     test:plan(19)
     test:ok(date.parse("1970-01-01T01:00:00Z") ==
-            date.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0})
+            date.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0},
+            'parse ISO date without options')
     test:ok(date.parse("1970-01-01T01:00:00Z", {format = 'iso8601'}) ==
-            date.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0})
+            date.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0},
+            'parse ISO date with iso8601 format')
     test:ok(date.parse("1970-01-01T01:00:00Z", {format = 'rfc3339'}) ==
-            date.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0})
+            date.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0},
+            'parse ISO date with rfc3339 format')
     test:ok(date.parse("2020-01-01T01:00:00+00:00", {format = 'rfc3339'}) ==
-            date.parse("2020-01-01T01:00:00+00:00", {format = 'iso8601'}))
+            date.parse("2020-01-01T01:00:00+00:00", {format = 'iso8601'}),
+            'parse rfc3339 date with zero offset')
     test:ok(date.parse("1970-01-01T02:00:00+02:00") ==
-            date.new{year=1970, mon=1, day=1, hour=2, min=0, sec=0, tzoffset=120})
+            date.new{year=1970, mon=1, day=1, hour=2, min=0, sec=0, tzoffset=120},
+            'parse date with +02:00 offset')
 
     -- Testcases with override timezone by setting tzoffset.
     test:ok(date.parse("1970-01-01T01:00:00", {tzoffset = 120}) ==
-            date.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0, tzoffset=120})
+            date.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0, tzoffset=120},
+            'parse date with tzoffset 120')
     test:ok(date.parse("1970-01-01T01:00:00", {tzoffset = '+0200'}) ==
-            date.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0, tzoffset=120})
+            date.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0, tzoffset=120},
+            'parse date with tzoffset +0200')
     test:ok(date.parse("1970-01-01T01:00:00", {tzoffset = '+02:00'}) ==
-            date.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0, tzoffset=120})
+            date.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0, tzoffset=120},
+            'parse date with tzoffset +02:00')
     test:ok(date.parse("1970-01-01T01:00:00Z", {tzoffset = '+02:00'}) ==
-            date.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0, tzoffset=0})
+            date.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0, tzoffset=0},
+            'parse UTC date with tzoffset +02:00')
     test:ok(date.parse("1970-01-01T01:00:00+01:00", {tzoffset = '+02:00'}) ==
-            date.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0, tzoffset=60})
+            date.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0, tzoffset=60},
+            'parse date with offset and tzoffset')
     test:ok(date.parse('1998-11-25', { format = '%Y-%m-%d', tzoffset = 180 }) ==
-            date.new({ year = 1998, month = 11, day = 25, tzoffset = 180 }))
+            date.new({ year = 1998, month = 11, day = 25, tzoffset = 180 }),
+            'parse date with format and tzoffset')
     test:ok(date.parse('1998', { format = '%Y', tzoffset = '+03:00' }) ==
-            date.new({ year = 1998, tzoffset = 180 }))
+            date.new({ year = 1998, tzoffset = 180 }),
+            'parse year with format and tzoffset')
 
     -- Testcases with override timezone by setting tz.
     -- Timezone is not specified in a parsed string.
     test:ok(date.parse("1970-01-01T01:00:00", {tz = "MSK"}) ==
             date.new{year = 1970, mon = 1, day = 1,
                      hour = 1, min = 0, sec = 0, tzoffset=180,
-                    })
+                    }, 'parse date with tz MSK')
     -- Timezone is specified in a parsed string as a military timezone.
     test:ok(date.parse("1970-01-01T01:00:00Z", {tz = "Europe/Moscow"}) ==
             date.new{
                 year = 1970, mon = 1, day = 1,
                 hour = 1, min = 0, sec = 0, tzoffset = 0
-            })
+            }, 'parse UTC date with tz Europe/Moscow')
     -- Timezone is specified in a parsed string as an offset.
     test:ok(date.parse("1970-01-01T01:00:00+01:00", {tz = "Asia/Omsk"}) ==
             date.new{
                 year = 1970, mon = 1, day = 1,
                 hour = 1, min = 0, sec = 0, tzoffset = 60,
-            })
+            }, 'parse date with tz Asia/Omsk')
     -- Timezone is not specified in a parsed string and format is passed.
     test:ok(date.parse("1998-11-25", { format = "%Y-%m-%d", tz = "MSK" }) ==
-            date.new{year = 1998, month = 11, day = 25, tzoffset = 180})
+            date.new{year = 1998, month = 11, day = 25, tzoffset = 180},
+            'parse date with format and tz MSK')
 
     -- Both tz and tzoffset are passed.
     assert_raises(test, ambiguous_timezone, function()
@@ -366,9 +379,11 @@ test:test("Simple tests for parser", function(test)
                   end)
 
     test:ok(date.parse("1970-01-01T02:00:00Z") <
-            date.new{year=1970, mon=1, day=1, hour=2, min=0, sec=1})
+            date.new{year=1970, mon=1, day=1, hour=2, min=0, sec=1},
+            'compare datetime less than')
     test:ok(date.parse("1970-01-01T02:00:00Z") <=
-            date.new{year=1970, mon=1, day=1, hour=2, min=0, sec=0})
+            date.new{year=1970, mon=1, day=1, hour=2, min=0, sec=0},
+            'compare datetime less than or equal')
 end)
 
 test:test("Multiple tests for parser (with nanoseconds)", function(test)

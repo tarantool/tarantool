@@ -176,7 +176,7 @@ end
 ---
 ---@param test taptest
 ---@param cond boolean
----@param message? string
+---@param message string
 ---@param extra? table
 ---@return boolean
 function taptest.ok(test, cond, message, extra)
@@ -324,7 +324,7 @@ end
 ---@param test taptest
 ---@param got any
 ---@param pattern string
----@param message? string
+---@param message string
 ---@param extra? table
 ---@return boolean
 function taptest.like(test, got, pattern, message, extra)
@@ -350,7 +350,7 @@ end
 ---@param test taptest
 ---@param got any
 ---@param pattern string
----@param message? string
+---@param message string
 ---@param extra? table
 ---@return boolean
 function taptest.unlike(test, got, pattern, message, extra)
@@ -376,7 +376,7 @@ end
 ---@param test taptest
 ---@param got any
 ---@param expected any
----@param message? string
+---@param message string
 ---@param extra? table
 ---@return boolean
 function taptest.is(test, got, expected, message, extra)
@@ -402,7 +402,7 @@ end
 ---@param test taptest
 ---@param got any
 ---@param unexpected any
----@param message? string
+---@param message string
 ---@param extra? table
 ---@return boolean
 function taptest.isnt(test, got, unexpected, message, extra)
@@ -431,7 +431,7 @@ end
 ---@param test taptest
 ---@param got any
 ---@param expected any
----@param message? string
+---@param message string
 ---@param extra? table
 ---@return boolean
 function taptest.is_deeply(test, got, expected, message, extra)
@@ -456,7 +456,7 @@ end
 ---
 ---@param test taptest
 ---@param v any
----@param message? string
+---@param message string
 ---@param extra? table
 ---@return boolean
 function taptest.isnil(test, v, message, extra)
@@ -477,7 +477,7 @@ end
 ---
 ---@param test taptest
 ---@param v any
----@param message? string
+---@param message string
 ---@param extra? table
 ---@return boolean
 function taptest.isnumber(test, v, message, extra)
@@ -498,7 +498,7 @@ end
 ---
 ---@param test taptest
 ---@param v any
----@param message? string
+---@param message string
 ---@param extra? table
 ---@return boolean
 function taptest.isstring(test, v, message, extra)
@@ -519,7 +519,7 @@ end
 ---
 ---@param test taptest
 ---@param v any
----@param message? string
+---@param message string
 ---@param extra? table
 ---@return boolean
 function taptest.istable(test, v, message, extra)
@@ -540,7 +540,7 @@ end
 ---
 ---@param test taptest
 ---@param v any
----@param message? string
+---@param message string
 ---@param extra? table
 ---@return boolean
 function taptest.isboolean(test, v, message, extra)
@@ -561,7 +561,7 @@ end
 ---
 ---@param test taptest
 ---@param v any
----@param message? string
+---@param message string
 ---@param extra? table
 ---@return boolean
 function taptest.isfunction(test, v, message, extra)
@@ -585,7 +585,7 @@ end
 ---@param test taptest
 ---@param v any
 ---@param utype string
----@param message? string
+---@param message string
 ---@param extra? table
 ---@return boolean
 function taptest.isudata(test, v, utype, message, extra)
@@ -623,7 +623,7 @@ end
 ---@param test taptest
 ---@param v any
 ---@param ctype string
----@param message? string
+---@param message string
 ---@param extra? table
 ---@return boolean
 function taptest.iscdata(test, v, ctype, message, extra)
