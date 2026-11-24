@@ -425,7 +425,9 @@ pg_is_deeply.test_tap_is_deeply = function(pg)
     test.trace = false
     test.strict = pg.params.strict
     test:plan(1)
-    local res = test:is_deeply(pg.params.got, pg.params.expected)
+    local res = test:is_deeply(pg.params.got, pg.params.expected,
+                               'is_deeply with strict=' ..
+                               tostring(pg.params.strict))
     t.assert_equals(res, pg.params.res_bool)
 end
 
@@ -452,8 +454,10 @@ pg_strict.test_strict_flag_inheritance = function()
     test:plan(1)
     test:test('check strict flag inheritance', function(tc)
         tc:plan(2)
-        t.assert_equals(tc:is_deeply({}, {a = box.NULL}), false)
-        t.assert_equals(tc:is_deeply(nil, box.NULL), false)
+        t.assert_equals(tc:is_deeply({}, {a = box.NULL},
+                                     'strict flag is inherited'), false)
+        t.assert_equals(tc:is_deeply(nil, box.NULL,
+                                     'strict flag is inherited'), false)
     end)
     test.strict = false
 end
@@ -501,7 +505,8 @@ pg_iscdata.test_tap_iscdata = function(pg)
     local test = tap.test('test_tap_iscdata')
     test.trace = false
     test:plan(1)
-    local res = test:iscdata(pg.params.value, pg.params.ctype)
+    local res = test:iscdata(pg.params.value, pg.params.ctype,
+                             'iscdata type check')
     t.assert_equals(res, pg.params.res_bool)
 end
 

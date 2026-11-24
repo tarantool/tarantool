@@ -32,10 +32,14 @@ test:test("Simple tests for datetime indices", function(test)
     tmp:insert{date.new{year = 2000, month = 1, day = 1}}
 
     local rs = tmp:select{}
-    test:is(tostring(rs[1][1]), '1970-01-01T00:00:00Z')
-    test:is(tostring(rs[2][1]), '1970-01-02T00:00:00Z')
-    test:is(tostring(rs[3][1]), '1970-01-03T00:00:00Z')
-    test:is(tostring(rs[4][1]), '2000-01-01T00:00:00Z')
+    test:is(tostring(rs[1][1]), '1970-01-01T00:00:00Z',
+            'datetime tuple order #1')
+    test:is(tostring(rs[2][1]), '1970-01-02T00:00:00Z',
+            'datetime tuple order #2')
+    test:is(tostring(rs[3][1]), '1970-01-03T00:00:00Z',
+            'datetime tuple order #3')
+    test:is(tostring(rs[4][1]), '2000-01-01T00:00:00Z',
+            'datetime tuple order #4')
 
     for _ = 1,16 do
         tmp:insert{date.now()}

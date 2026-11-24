@@ -684,12 +684,13 @@ local function test_box_txn(test, module)
         box.space.test:insert({1984})
         test:ok(module.box_txn_rollback_to_savepoint(svp),
                 "box_txn_rollback_to_savepoint")
-        test:is(box.space.test:get(1984), nil)
+        test:is(box.space.test:get(1984), nil,
+                'rollback to savepoint restores the space')
     end
 
     box.space.test:insert({1984})
     test:ok(module.box_txn_rollback(), "box_txn_rollback")
-    test:is(box.space.test:get(1984), nil)
+    test:is(box.space.test:get(1984), nil, 'rollback restores the space')
 
     test:ok(module.box_txn_begin(), "box_txn_begin")
     test:ok(module.box_txn_commit(), "box_txn_commit")
