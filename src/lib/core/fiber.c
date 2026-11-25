@@ -338,8 +338,12 @@ static int stack_direction;
 #endif
 
 enum {
-	/* The minimum allowable fiber stack size in bytes */
+	/* The minimum requested fiber stack size in bytes. */
 	FIBER_STACK_SIZE_MINIMAL = 16384,
+	/* Minimum usable space after excluding the guard and slab metadata. */
+	FIBER_STACK_SIZE_USABLE_MIN = 8192,
+	/* Stack pointer alignment required by the coroutine ABI. */
+	FIBER_STACK_ALIGNMENT = 16,
 	/* Stack size watermark in bytes. */
 	FIBER_STACK_SIZE_WATERMARK = 65536,
 };
@@ -400,7 +404,13 @@ fiber_attr_delete(struct fiber_attr *fiber_attr)
 int
 fiber_attr_setstacksize(struct fiber_attr *fiber_attr, size_t stack_size)
 {
-	if (stack_size < FIBER_STACK_SIZE_MINIMAL) {
+	/*
+	 * Reserve space for the usable stack and for the guard page aligned
+	 * past the slab header.
+	 */
+	size_t min_stack_size = 2 * (size_t)small_getpagesize() +
+				FIBER_STACK_SIZE_USABLE_MIN;
+	if (stack_size < MAX(FIBER_STACK_SIZE_MINIMAL, min_stack_size)) {
 		errno = EINVAL;
 		diag_set(SystemError, "stack size is too small");
 		return -1;
@@ -1475,6 +1485,8 @@ fiber_stack_create(struct fiber *fiber, const struct fiber_attr *fiber_attr,
 			 "runtime arena", "fiber stack");
 		return -1;
 	}
+	void *data = slab_data(fiber->stack_slab);
+	void *end = data + stack_size;
 	void *guard;
 	/* Adjust begin and size for stack memory chunk. */
 	if (stack_direction < 0) {
@@ -1484,19 +1496,19 @@ fiber_stack_create(struct fiber *fiber, const struct fiber_attr *fiber_attr,
 		 * after protected page until end of memory chunk can be
 		 * used for coro stack usage.
 		 */
-		guard = page_align_up(slab_data(fiber->stack_slab));
+		guard = page_align_up(data);
 		fiber->stack = guard + page_size;
-		fiber->stack_size = slab_data(fiber->stack_slab) + stack_size -
-				    fiber->stack;
+		fiber->stack_size = small_align_down(end - fiber->stack,
+						     FIBER_STACK_ALIGNMENT);
 	} else {
 		/*
 		 * A stack grows up. Last page should be protected and
 		 * memory from begin of chunk until protected page can
 		 * be used for coro stack usage
 		 */
-		guard = page_align_down(fiber->stack_slab + stack_size) -
-			page_size;
-		fiber->stack = fiber->stack_slab + slab_sizeof();
+		guard = page_align_down(end) - page_size;
+		fiber->stack = (void *)small_align((uintptr_t)data,
+						   FIBER_STACK_ALIGNMENT);
 		fiber->stack_size = guard - fiber->stack;
 	}
 
