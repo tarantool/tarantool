@@ -78,6 +78,12 @@ files["src/lua/init.lua"] = {
     -- Miscellaneous global function definition.
     globals = {"dostring"},
 }
+files["src/lua/os_stub.lua"] = {
+    ignore = {
+        -- Unused arguments in annotation-only stub functions.
+        "212",
+    },
+}
 files["test/box/box.lua"] = {
     globals = {
         "cfg_filter",
