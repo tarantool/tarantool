@@ -69,6 +69,89 @@ local modules = {
             },
         },
     },
+    {
+        name = 'os',
+        source = 'src/lua/os_stub.lua',
+        fixtures = 'test/app-luatest/emmylua/os',
+        fields = {
+            execute = 'Execute a command by passing it to the shell',
+            rename = 'Rename a file or directory',
+            getenv = 'Get an environment variable',
+            remove = 'Remove a file or directory',
+            date = 'Return a formatted date',
+            exit = 'Exit the program',
+            time = 'Return the number of seconds since the epoch',
+            clock = 'Return the number of CPU seconds since the program start',
+            tmpname = 'Return a name for a temporary file',
+            environ = 'Return a table containing all environment variables',
+            setenv = 'Set an environment variable',
+            setlocale = 'Change the locale',
+            difftime = 'Return the number of seconds between two times',
+        },
+        objects = {
+            {
+                fixture = 'date_table.lua',
+                type_name = 'os.date_table',
+                fields = {
+                    year = 'The year',
+                    month = 'The month',
+                    day = 'The day of the month',
+                    hour = 'The hour',
+                    min = 'The minute',
+                    sec = 'The second',
+                    wday = 'The day of the week',
+                    yday = 'The day of the year',
+                    isdst = 'Whether daylight saving time is in effect',
+                },
+            },
+        },
+        global = {
+            fixture = 'global.lua',
+            hovers = {
+                environ_ret = {'table<string'},
+                environ_fn = {
+                    'os.environ',
+                    'Return a table containing',
+                },
+                setenv_fn = {
+                    'os.setenv',
+                    'Set an environment variable',
+                },
+                date_str = {'string'},
+                date_tbl = {'year'},
+                time = {'number'},
+                clock = {'number'},
+                execute_fn = {'os.execute'},
+                getenv_fn = {'os.getenv'},
+                exit_fn = {'os.exit', 'close'},
+                difftime_fn = {'os.difftime'},
+                rename_fn = {'os.rename'},
+                remove_fn = {'os.remove'},
+                tmpname_fn = {'os.tmpname'},
+                setlocale_fn = {'os.setlocale'},
+            },
+            not_contains = {
+                execute_fn = {'passing it to the shell'},
+                getenv_fn = {'safer'},
+                exit_fn = {'graceful'},
+            },
+            completions = {
+                'date',
+                'environ',
+                'setenv',
+                'execute',
+                'exit',
+                'getenv',
+                'time',
+                'clock',
+                'difftime',
+                'rename',
+                'remove',
+                'tmpname',
+                'setlocale',
+            },
+        },
+    },
 }
 
 local function normalize(value)
@@ -161,6 +244,56 @@ local function assert_fields(client, items, fields, context)
     end
 end
 
+local function assert_global(client, spec, workspace)
+    local path, text = open_fixture(
+        client, workspace, spec.global.fixture)
+    local uri = emmylua.file_uri(path)
+    local values = {}
+    for marker in pairs(spec.global.hovers) do
+        local result = client:request_until('textDocument/hover', {
+            textDocument = {uri = uri},
+            position = emmylua.marker_position(text, marker, -1),
+        }, function(res)
+            local value = normalize(hover_text(res))
+            return value ~= '' and value ~= 'any' and
+                not value:find('unknown', 1, true)
+        end, 30)
+        values[marker] = normalize(hover_text(result))
+    end
+    for marker, needles in pairs(spec.global.hovers) do
+        for _, needle in ipairs(needles) do
+            t.assert_str_contains(values[marker], needle, false,
+                ('os global %s: missing %q in %s'):format(
+                    marker, needle, values[marker]))
+        end
+    end
+    for marker, needles in pairs(spec.global.not_contains or {}) do
+        for _, needle in ipairs(needles) do
+            t.assert(not values[marker]:find(needle, 1, true),
+                ('os global %s: unexpected %q in %s'):format(
+                    marker, needle, values[marker]))
+        end
+    end
+    local wanted = {}
+    for _, name in ipairs(spec.global.completions) do
+        wanted[name] = true
+    end
+    local items = client:request_until('textDocument/completion', {
+        textDocument = {uri = uri},
+        position = emmylua.marker_position(text, 'fields', 0),
+    }, function(result)
+        return has_any_label(result, wanted)
+    end, 30)
+    local labels = {}
+    for _, item in ipairs(items) do
+        labels[item.label] = true
+    end
+    for _, name in ipairs(spec.global.completions) do
+        t.assert(labels[name] == true,
+            ('os global completion has no %s'):format(name))
+    end
+end
+
 local function run_module_test(spec)
     local binary = os.getenv('EMMYLUA_LS')
     t.skip_if(binary == nil or binary == '',
@@ -247,6 +380,10 @@ local function run_module_test(spec)
                 end, 30)
             assert_fields(client, object_items, object.fields,
                 object.type_name)
+        end
+
+        if spec.global ~= nil then
+            assert_global(client, spec, workspace)
         end
     end, debug.traceback)
 

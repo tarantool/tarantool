@@ -95,6 +95,7 @@ jobs:
         with:
           check: 'false'
           language-server: 'true'
+          emmylua-ls-rev: 146073550ef4dc023bd191be485bd6187e1ef6ad
 
       - name: Optional submodule bump
         if: ${{ inputs.submodule }}
