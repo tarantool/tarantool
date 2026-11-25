@@ -1,0 +1,63 @@
+name: reusable_testing
+
+on:
+  workflow_call:
+    inputs:
+      artifact_name:
+        description: The name of the tarantool build artifact
+        default: ubuntu-noble
+        required: false
+        type: string
+
+jobs:
+  run_tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Clone the go-tarantool connector
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.repository_owner }}/go-tarantool
+          # Later revisions skip the CRUD suite on Tarantool 1.10.
+          ref: 34ae9e088ab292e90c624da9e977971bd41e5048
+
+      - name: Download the tarantool build artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ inputs.artifact_name }}
+
+      - name: Install tarantool
+        # Now we're lucky: all dependencies are already installed. Check package
+        # dependencies when migrating to other OS version.
+        run: sudo dpkg -i tarantool*.deb
+
+      - name: Get the tarantool version
+        run: |
+          TNT_VERSION=$(tarantool --version | grep -e '^Tarantool')
+          echo "TNT_VERSION=$TNT_VERSION" >> $GITHUB_ENV
+
+      - name: Setup golang for connector and tests
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.24'
+
+      - name: Setup tt
+        run: |
+          curl -L https://tarantool.io/release/3/installer.sh | sudo bash
+          sudo apt install -y tt
+          tt version
+
+      - name: Install test dependencies
+        env:
+          # CRUD 1.5.2 declares CMake 2.8, which CMake 4 no longer accepts.
+          CMAKE_POLICY_VERSION_MINIMUM: '3.5'
+        run: |
+          (cd queue/testdata && tt rocks install queue 1.3.0)
+          (
+            cd crud/testdata
+            # Satisfy CRUD's vshard dependency with a 1.10-compatible release.
+            tt rocks install vshard 0.1.26
+            tt rocks install crud 1.5.2
+          )
+
+      - name: Run tests
+        run: make test
