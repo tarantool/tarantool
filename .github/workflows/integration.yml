@@ -139,7 +139,7 @@ jobs:
 
   crud:
     needs: tarantool
-    uses: tarantool/crud/.github/workflows/reusable_test.yml@master
+    uses: ./.github/workflows/integration-crud.yml
     with:
       artifact_name: tarantool-ubuntu-noble-${{ github.sha }}
 
