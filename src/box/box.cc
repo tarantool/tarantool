@@ -2372,14 +2372,21 @@ box_set_auth_type(void)
 	return 0;
 }
 
+/** Apply a validated election mode without yielding or failing. */
+static void
+box_apply_election_mode(enum election_mode mode)
+{
+	box_raft_cfg_election_mode(mode);
+	box_broadcast_ballot();
+}
+
 int
 box_set_election_mode(void)
 {
 	enum election_mode mode;
 	if (box_check_election_mode(&mode) != 0)
 		return -1;
-	box_raft_cfg_election_mode(mode);
-	box_broadcast_ballot();
+	box_apply_election_mode(mode);
 	return 0;
 }
 
@@ -2786,12 +2793,12 @@ box_register_on_master(void)
 	replicaset_sync();
 }
 
-void
-box_set_replication_anon(void)
+/** Apply a validated anonymous setting. Registration may yield and fail. */
+static void
+box_apply_replication_anon(bool new_anon)
 {
 	assert(is_box_configured);
 	assert(cfg_replication_anon == box_is_anon());
-	bool new_anon = box_check_replication_anon();
 	if (new_anon == cfg_replication_anon)
 		return;
 	auto guard = make_scoped_guard([&]{
@@ -2813,6 +2820,13 @@ box_set_replication_anon(void)
 			  " has finished");
 	}
 	guard.is_active = false;
+}
+
+void
+box_set_replication_anon(void)
+{
+	bool anon = box_check_replication_anon();
+	box_apply_replication_anon(anon);
 }
 
 int
