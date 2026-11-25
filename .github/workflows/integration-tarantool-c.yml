@@ -1,0 +1,52 @@
+name: reusable_testing
+
+on:
+  workflow_call:
+    inputs:
+      artifact_name:
+        description: The name of the tarantool build artifact
+        default: ubuntu-noble
+        required: false
+        type: string
+
+jobs:
+  run_tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Clone the tarantool-c connector
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/tarantool-c
+          # Enable recursive submodules checkout as test-run git module is used
+          # for running tests.
+          submodules: recursive
+
+      - name: Update test-run
+        # The 1.10 port discovery fallback can find duplicate sockets.
+        run: |
+          git -C test-run fetch --depth=1 origin da98d7fc95f5adbb026e65558a8c4d12e3805e2c
+          git -C test-run checkout --detach FETCH_HEAD
+          git -C test-run submodule update --init --recursive
+
+      - name: Download the tarantool build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+
+      - name: Install tarantool
+        # Now we're lucky: all dependencies are already installed. Check package
+        # dependencies when migrating to other OS version.
+        run: sudo dpkg -i tarantool*.deb
+
+      - name: Setup python3 for tests
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install test requirements
+        run: pip install -r test-run/requirements.txt
+
+      - run: cmake . && make
+      - run: |
+          ulimit -n 8192 # set file descriptors limit to enable poll test
+          make testing
