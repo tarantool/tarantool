@@ -49,7 +49,7 @@ jobs:
 
   vshard:
     needs: tarantool
-    uses: tarantool/vshard/.github/workflows/reusable_testing.yml@master
+    uses: ./.github/workflows/integration-vshard.yml
     with:
       artifact_name: tarantool-ubuntu-noble-${{ github.sha }}
 
