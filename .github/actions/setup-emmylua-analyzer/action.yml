@@ -15,6 +15,12 @@ inputs:
     description: Also install emmylua_doc_cli
     required: false
     default: "false"
+  emmylua-ls-rev:
+    description: >-
+      Git revision to install emmylua_ls from; overrides
+      emmylua-version
+    required: false
+    default: ""
   emmylua-version:
     description: Version of the EmmyLua tools to install
     required: false
@@ -49,10 +55,24 @@ runs:
     # Building emmylua_ls from sources requires the Rust toolchain, which is
     # not available in all the CI images and takes minutes to install and
     # build, so the prebuilt binary is used instead.
+    - name: Setup Rust toolchain for emmylua_ls
+      if: inputs.language-server == 'true' && inputs.emmylua-ls-rev != ''
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: stable
+
     - name: Setup emmylua_ls
       if: inputs.language-server == 'true'
       run: |
         set -euo pipefail
+        if [ -n "${{ inputs.emmylua-ls-rev }}" ]; then
+          cargo install \
+            --git https://github.com/EmmyLuaLs/emmylua-analyzer-rust \
+            --rev "${{ inputs.emmylua-ls-rev }}" \
+            emmylua_ls
+          emmylua_ls --version
+          exit 0
+        fi
         case "$(uname -m)" in
           x86_64)
             ASSET=emmylua_ls-linux-musl.tar.gz
