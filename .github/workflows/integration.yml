@@ -79,7 +79,7 @@ jobs:
 
   metrics:
     needs: tarantool
-    uses: tarantool/metrics/.github/workflows/reusable-test.yml@master
+    uses: ./.github/workflows/integration-metrics.yml
     with:
       artifact_name: tarantool-ubuntu-noble-${{ github.sha }}
 
