@@ -133,7 +133,7 @@ jobs:
 
   go-tarantool:
     needs: tarantool
-    uses: tarantool/go-tarantool/.github/workflows/reusable_testing.yml@master
+    uses: ./.github/workflows/integration-go-tarantool.yml
     with:
       artifact_name: tarantool-ubuntu-noble-${{ github.sha }}
 
