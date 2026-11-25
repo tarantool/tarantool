@@ -1987,7 +1987,7 @@ xrow_decode_begin(const struct xrow_header *row, struct begin_request *request)
 	if (row->type != IPROTO_BEGIN)
 		goto bad_msgpack;
 	memset(request, 0, sizeof(*request));
-	request->is_sync = false;
+	request->is_sync = -1;
 
 	/** Request without extra options. */
 	if (row->bodycnt == 0)
@@ -2013,14 +2013,7 @@ xrow_decode_begin(const struct xrow_header *row, struct begin_request *request)
 			request->txn_isolation = mp_decode_uint(&d);
 			break;
 		case IPROTO_IS_SYNC:
-			if (mp_decode_bool(&d)) {
-				request->is_sync = true;
-				break;
-			} else {
-				xrow_on_decode_err(row, ER_ILLEGAL_PARAMS,
-						   "is_sync can only be true");
-				return -1;
-			}
+			request->is_sync = mp_decode_bool(&d);
 			break;
 		default:
 			mp_next(&d);
@@ -2039,6 +2032,7 @@ xrow_decode_commit(const struct xrow_header *row, struct commit_request *request
 {
 	assert(row->type == IPROTO_COMMIT);
 	memset(request, 0, sizeof(*request));
+	request->is_sync = -1;
 
 	/** Request without extra options. */
 	if (row->bodycnt == 0)
@@ -2058,14 +2052,7 @@ xrow_decode_commit(const struct xrow_header *row, struct commit_request *request
 			goto bad_msgpack;
 		switch (key) {
 		case IPROTO_IS_SYNC:
-			if (mp_decode_bool(&d)) {
-				request->is_sync = true;
-				break;
-			} else {
-				xrow_on_decode_err(row, ER_ILLEGAL_PARAMS,
-						   "is_sync can only be true");
-				return -1;
-			}
+			request->is_sync = mp_decode_bool(&d);
 			break;
 		default:
 			mp_next(&d);
