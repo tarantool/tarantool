@@ -61,7 +61,7 @@ jobs:
 
   expirationd:
     needs: tarantool
-    uses: tarantool/expirationd/.github/workflows/reusable_testing.yml@master
+    uses: ./.github/workflows/integration-expirationd.yml
     with:
       artifact_name: tarantool-ubuntu-noble-${{ github.sha }}
 
