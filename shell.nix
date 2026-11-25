@@ -17,6 +17,7 @@
   # newer than the one in nixpkgs. The defaults keep `nix-shell` usable.
   emmyluaCheck ? pkgs.emmylua-check,
   emmyluaDocCli ? pkgs.emmylua-doc-cli,
+  emmyluaLs ? null,
   # Taken from the upstream flake through flake.nix. The default keeps
   # `nix-shell` usable with the same pinned revision.
   checkpatchSrc ? pkgs.fetchFromGitHub {
@@ -116,7 +117,8 @@ pkgs.mkShell {
       # Python environment with packages required for regression
       # testing.
       pythonEnv
-    ]);
+    ])
+    ++ pkgs.lib.optional (emmyluaLs != null) emmyluaLs;
 
   passthru.buildDeps = buildDeps;
 
