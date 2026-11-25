@@ -1,0 +1,49 @@
+name: reusable_testing
+
+on:
+  workflow_call:
+    inputs:
+      artifact_name:
+        description: The name of the Tarantool build artifact
+        default: ubuntu-noble
+        required: false
+        type: string
+
+jobs:
+  run_tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Clone the expirationd module
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/expirationd
+
+      - name: Download the Tarantool build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+
+      - name: Install Tarantool
+        # Now we're lucky: all dependencies are already installed. Check package
+        # dependencies when migrating to other OS version.
+        run: sudo dpkg -i tarantool_*.deb tarantool-common_*.deb tarantool-dev_*.deb
+
+      - name: Setup tt
+        run: |
+          curl -L https://tarantool.io/release/2/installer.sh | sudo bash
+          sudo apt install -y tt
+          tt version
+
+      # The argument error assertions expect "to nil" for unnamed functions.
+      - run: tt rocks install checks 3.4.1
+      - run: make deps
+      - run: echo $PWD/.rocks/bin >> $GITHUB_PATH
+
+      - name: Run tests
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 10
+          timeout_minutes: 60
+          command: make test
