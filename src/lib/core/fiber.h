@@ -215,7 +215,9 @@ fiber_attr_delete(struct fiber_attr *fiber_attr);
  * Set stack size for the fiber attribute.
  *
  * \param fiber_attr fiber attribute container
- * \param stack_size stack size for new fibers
+ * \param stack_size requested allocation size, including guard page and padding
+ * \retval 0 on success
+ * \retval -1 if the size is too small for the platform
  */
 API_EXPORT int
 fiber_attr_setstacksize(struct fiber_attr *fiber_attr, size_t stack_size);
@@ -224,7 +226,7 @@ fiber_attr_setstacksize(struct fiber_attr *fiber_attr, size_t stack_size);
  * Get stack size from the fiber attribute.
  *
  * \param fiber_attr fiber attribute container or NULL for default
- * \retval stack size
+ * \retval requested stack size
  */
 API_EXPORT size_t
 fiber_attr_getstacksize(struct fiber_attr *fiber_attr);
