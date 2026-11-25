@@ -1,0 +1,52 @@
+name: reusable_testing
+
+on:
+  workflow_call:
+    inputs:
+      artifact_name:
+        description: 'The name of the tarantool build artifact'
+        default: ubuntu-noble
+        required: false
+        type: string
+
+jobs:
+  run_tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: 'Clone the vshard module'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/vshard
+          # vshard 1.0.0 requires Tarantool 2.11.0 or newer.
+          ref: 523c3e172a8239a66d896fc3dd7b42140709cba5 # 0.1.42
+          # Fetch the entire history for all branches and tags. It is needed for
+          # upgrade testing.
+          fetch-depth: 0
+          # Enable recursive submodules checkout as test-run git module is used
+          # for running tests.
+          submodules: recursive
+
+      - name: 'Download the tarantool build artifact'
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+
+      - name: 'Install tarantool'
+        # TODO(ylobankov): Install package dependencies. Now we're lucky: all
+        # dependencies are already there.
+        run: sudo dpkg -i tarantool*.deb
+
+      - name: 'Install test requirements'
+        run: pip3 install --user -r test-run/requirements.txt
+
+      - name: Setup tt
+        run: |
+          curl -L https://tarantool.io/release/2/installer.sh | sudo bash
+          sudo apt install -y tt
+          tt version
+
+      - name: Setup luatest
+        run: tt rocks install luatest 1.4.1
+
+      - run: cmake .
+      - run: make test-force
