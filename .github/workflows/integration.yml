@@ -145,6 +145,6 @@ jobs:
 
   ddl:
     needs: tarantool
-    uses: tarantool/ddl/.github/workflows/reusable_test.yml@master
+    uses: ./.github/workflows/integration-ddl.yml
     with:
       artifact_name: tarantool-ubuntu-noble-${{ github.sha }}

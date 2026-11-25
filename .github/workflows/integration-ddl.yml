@@ -1,0 +1,51 @@
+name: Reusable test
+
+on:
+  workflow_call:
+    inputs:
+      artifact_name:
+        description: The name of the Tarantool build artifact
+        default: ubuntu-focal
+        required: false
+        type: string
+
+jobs:
+  run_tests:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Clone the ddl module
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/ddl
+
+      - name: Download the Tarantool build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+
+      # All dependencies for tarantool are already installed in Ubuntu 20.04.
+      # Check package dependencies when migrating to other OS version.
+      - name: Install Tarantool
+        run: |
+          sudo dpkg -i tarantool_*.deb tarantool-common_*.deb tarantool-dev_*.deb
+          tarantool --version
+
+      - name: Setup tt
+        run: |
+          curl -L https://tarantool.io/release/3/installer.sh | sudo bash
+          sudo apt install -y tt
+          tt version
+
+      - name: Install requirements
+        # luatest 1.4.2 uses package.searchroot(), which 1.10 lacks.
+        run: |
+          sed -i 's/^\$TTCTL rocks install luatest$/& 1.4.1/' deps.sh
+          ./deps.sh
+
+      - run: echo $PWD/.rocks/bin >> $GITHUB_PATH
+
+      - run: cmake -S . -B build
+
+      - name: Run regression tests
+        run: make -C build luatest-no-coverage
