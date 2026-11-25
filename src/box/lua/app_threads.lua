@@ -313,6 +313,30 @@ local function box_info_init()
     end
 end
 
+--
+-- Initialize from the main thread's snapshot and keep watching it, as compat
+-- settings can change after application threads have started.
+--
+local function iproto_features_init()
+    local features = box.iproto.protocol_features
+    local is_initialized = false
+    local on_update = fiber.cond()
+    threads_conn:watch('internal.iproto_features', function(_k, ids)
+        local enabled = {}
+        for _, id in ipairs(ids) do
+            enabled[id] = true
+        end
+        for name, id in pairs(box.iproto.feature) do
+            features[name] = enabled[id]
+        end
+        is_initialized = true
+        on_update:broadcast()
+    end)
+    while not is_initialized do
+        on_update:wait()
+    end
+end
+
 local function box_session_init()
     box.session = {
         user = box.internal.runtime_user,
@@ -344,6 +368,7 @@ function box.internal.threads.init(cfg, group_name, id_in_group, conn_fd)
     init_thread_groups(cfg)
     if not is_main then
         box_info_init()
+        iproto_features_init()
         box_session_init()
     end
 end

@@ -15,7 +15,11 @@ ffi.cdef[[
      * compat action.
      */
     void
-    system_spaces_update_is_sync_state_from_compat(void)
+    system_spaces_update_is_sync_state_from_compat(void);
+
+    /** Update advertised features when tuple compatibility changes. */
+    void
+    lbox_iproto_set_tuple_extension(bool enabled);
 ]]
 
 local options_format = {
@@ -334,8 +338,9 @@ local options = {
         default = 'new',
         obsolete = nil,
         brief = BOX_TUPLE_EXTENSION_BRIEF,
-        run_action_now = true,
-        action = tweak_action('box_tuple_extension', false, true)
+        action = function(is_new)
+            ffi.C.lbox_iproto_set_tuple_extension(is_new)
+        end,
     },
     box_space_max = {
         default = 'new',

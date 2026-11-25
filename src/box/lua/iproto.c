@@ -12,6 +12,7 @@
 #include "box/iproto_constants.h"
 #include "box/iproto_features.h"
 #include "box/user.h"
+#include "box/watcher.h"
 #include "box/xrow.h"
 
 #include "version.h"
@@ -151,6 +152,8 @@ push_iproto_constants(struct lua_State *L)
 	lua_setfield(L, -2, "GREETING_PROTOCOL_LEN_MAX");
 	lua_pushinteger(L, GREETING_SALT_LEN_MAX);
 	lua_setfield(L, -2, "GREETING_SALT_LEN_MAX");
+	lua_pushinteger(L, IPROTO_CURRENT_VERSION);
+	lua_setfield(L, -2, "protocol_version");
 	push_iproto_flag_enum(L);
 	push_iproto_key_enum(L);
 	push_iproto_metadata_key_enum(L);
@@ -160,28 +163,61 @@ push_iproto_constants(struct lua_State *L)
 }
 
 /**
- * Pushes IPROTO protocol features onto Lua stack.
+ * Pushes IPROTO feature identifiers onto Lua stack.
  */
 static void
-push_iproto_protocol_features(struct lua_State *L)
+push_iproto_feature_enum(struct lua_State *L)
 {
-	lua_pushinteger(L, IPROTO_CURRENT_VERSION);
-	lua_setfield(L, -2, "protocol_version");
-
-	for (int i = 0; i < 2; i++)
-		lua_newtable(L);
+	lua_newtable(L);
 	for (int i = 0; i < iproto_feature_id_MAX; i++) {
 		char *name = strtolowerdup(iproto_feature_id_strs[i]);
-		if (iproto_features_test(&IPROTO_CURRENT_FEATURES, i)) {
-			lua_pushboolean(L, true);
-			lua_setfield(L, -2, name);
-		}
 		lua_pushinteger(L, i);
-		lua_setfield(L, -3, name);
+		lua_setfield(L, -2, name);
 		free(name);
 	}
-	lua_setfield(L, -3, "protocol_features");
 	lua_setfield(L, -2, "feature");
+}
+
+void
+lbox_iproto_update_protocol_features(struct lua_State *L)
+{
+	assert(cord_is_main());
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.iproto.protocol_features", 0);
+	const struct iproto_features *features = &IPROTO_CURRENT_FEATURES;
+	for (int i = 0; i < iproto_feature_id_MAX; i++) {
+		char *name = strtolowerdup(iproto_feature_id_strs[i]);
+		if (iproto_features_test(features, i))
+			lua_pushboolean(L, true);
+		else
+			lua_pushnil(L);
+		lua_setfield(L, -2, name);
+		free(name);
+	}
+	lua_pop(L, 1);
+	/* An array header and UINT32 ids take at most five bytes each. */
+	char data[5 * (iproto_feature_id_MAX + 1)];
+	char *end = mp_encode_iproto_features(data, features);
+	const char *key = "internal.iproto_features";
+	box_broadcast(key, strlen(key), data, end);
+}
+
+/** Update advertised features when tuple compatibility changes. */
+extern void
+lbox_iproto_set_tuple_extension(bool enabled)
+{
+	assert(cord_is_main());
+	if (enabled) {
+		iproto_features_set(&IPROTO_CURRENT_FEATURES,
+				    IPROTO_FEATURE_CALL_RET_TUPLE_EXTENSION);
+		iproto_features_set(&IPROTO_CURRENT_FEATURES,
+				    IPROTO_FEATURE_CALL_ARG_TUPLE_EXTENSION);
+	} else {
+		iproto_features_clear(&IPROTO_CURRENT_FEATURES,
+				      IPROTO_FEATURE_CALL_RET_TUPLE_EXTENSION);
+		iproto_features_clear(&IPROTO_CURRENT_FEATURES,
+				      IPROTO_FEATURE_CALL_ARG_TUPLE_EXTENSION);
+	}
+	lbox_iproto_update_protocol_features(tarantool_L);
 }
 
 /**
@@ -653,7 +689,11 @@ box_lua_iproto_init(struct lua_State *L)
 {
 	luaL_findtable(L, LUA_GLOBALSINDEX, "box.iproto", 0);
 	push_iproto_constants(L);
-	push_iproto_protocol_features(L);
+	push_iproto_feature_enum(L);
+	lua_newtable(L);
+	lua_setfield(L, -2, "protocol_features");
+	if (cord_is_main())
+		lbox_iproto_update_protocol_features(L);
 	static const struct luaL_Reg funcs_main[] = {
 		{"send", lbox_iproto_send},
 		{"drop_connections", lbox_iproto_drop_connections},

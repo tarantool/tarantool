@@ -47,14 +47,6 @@
 #include "iproto_features.h"
 #include "mpstream/mpstream.h"
 #include "errinj.h"
-#include "core/tweaks.h"
-
-/**
- * Controls whether `IPROTO_FEATURE_CALL_RET_TUPLE_EXTENSION` feature bit is set
- * in `IPROTO_ID` request responses.
- */
-bool box_tuple_extension;
-TWEAK_BOOL(box_tuple_extension);
 
 /**
  * Min length of the salt sent in a greeting message.
@@ -555,12 +547,6 @@ iproto_reply_id(struct obuf *out, const char *auth_type,
 	uint32_t auth_type_len = strlen(auth_type);
 	unsigned version = IPROTO_CURRENT_VERSION;
 	struct iproto_features features = IPROTO_CURRENT_FEATURES;
-	if (!box_tuple_extension) {
-		iproto_features_clear(&features,
-				      IPROTO_FEATURE_CALL_RET_TUPLE_EXTENSION);
-		iproto_features_clear(&features,
-				      IPROTO_FEATURE_CALL_ARG_TUPLE_EXTENSION);
-	}
 #ifndef NDEBUG
 	struct errinj *errinj;
 	errinj = errinj(ERRINJ_IPROTO_SET_VERSION, ERRINJ_INT);

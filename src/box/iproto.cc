@@ -3165,9 +3165,9 @@ error:
 static void
 tx_process_id(struct iproto_connection *con, const struct id_request *id)
 {
-	extern bool box_tuple_extension;
 	con->session->meta.features = id->features;
-	if (!box_tuple_extension)
+	if (!iproto_features_test(&IPROTO_CURRENT_FEATURES,
+				  IPROTO_FEATURE_CALL_RET_TUPLE_EXTENSION))
 		iproto_features_clear(&con->session->meta.features,
 				      IPROTO_FEATURE_CALL_RET_TUPLE_EXTENSION);
 }

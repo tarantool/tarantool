@@ -276,6 +276,7 @@ ibuf_create
 ibuf_destroy
 ibuf_reinit
 ibuf_reserve_slow
+lbox_iproto_set_tuple_extension
 lbox_socket_local_resolve
 lbox_socket_nonblock
 log_format
