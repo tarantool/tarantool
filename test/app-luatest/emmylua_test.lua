@@ -69,6 +69,93 @@ local modules = {
             },
         },
     },
+    {
+        name = 'fiber',
+        source = 'src/lua/fiber.lua',
+        fixtures = 'test/app-luatest/emmylua/fiber',
+        type_name = 'fiber',
+        fields = {
+            create = 'Create and start a fiber',
+            new = 'Create a fiber but do not start it',
+            sleep = 'sleep for the specified number of seconds',
+            yield = 'Yield control to the scheduler',
+            status = 'Return the status of the current fiber',
+            info = 'Return information about all fibers',
+            top = 'Show all alive fibers',
+            kill = 'Cancel a fiber',
+            time = 'Get the current system time',
+            clock = 'Get the monotonic time in seconds',
+            channel = 'Create a channel',
+            cond = 'Create a conditional variable',
+        },
+        objects = {
+            {
+                fixture = 'object.lua',
+                type_name = 'fiber_object',
+                fields = {
+                    id = "Get a fiber's ID",
+                    name = 'Get or set a name',
+                    status = "Get a fiber's status",
+                    cancel = 'Send a cancellation request',
+                    set_max_slice = 'Set max',
+                    storage = 'Local storage within the fiber',
+                    set_joinable = 'Make joinable',
+                    join = 'Join a fiber',
+                },
+            },
+            {
+                fixture = 'channel.lua',
+                type_name = 'fiber.channel',
+                fields = {
+                    put = 'Send a message',
+                    get = 'Fetch and remove a message',
+                    close = 'Close the channel',
+                    is_empty = 'Check whether the channel is empty',
+                    count = 'Find out how many messages',
+                    is_full = 'Check if a channel is full',
+                    is_closed = 'Check if a channel is closed',
+                },
+            },
+            {
+                fixture = 'cond.lua',
+                type_name = 'fiber.cond',
+                fields = {
+                    wait = 'Wait for a signal',
+                    signal = 'Wake up a single fiber',
+                    broadcast = 'Wake up all fibers',
+                },
+            },
+            {
+                fixture = 'info.lua',
+                type_name = 'fiber.info',
+                fields = {
+                    csw = 'Context switch count',
+                    memory = 'memory occupied by the fiber',
+                    time = 'duplicates the "time" entry',
+                    name = 'name of the fiber',
+                    fid = 'id of the fiber',
+                    backtrace = "fiber's stack trace",
+                },
+            },
+            {
+                fixture = 'top.lua',
+                type_name = 'fiber.top',
+                fields = {
+                    instant = 'the share of',
+                    average = 'exponential moving average',
+                    time = 'estimates how much CPU',
+                },
+            },
+            {
+                fixture = 'slice.lua',
+                type_name = 'fiber.slice',
+                fields = {
+                    warn = 'A warning slice in seconds',
+                    err = 'An error slice in seconds',
+                },
+            },
+        },
+    },
 }
 
 local function normalize(value)
