@@ -1,0 +1,40 @@
+name: Reusable Test
+
+on:
+  workflow_call:
+    inputs:
+      artifact_name:
+        description: 'The name of the tarantool build artifact'
+        default: ubuntu-noble
+        required: false
+        type: string
+
+jobs:
+  run_tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: 'Clone the metrics module'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/metrics
+          # For Tarantool 1.10, stay before the schema upgrade metric
+          # and longer Graphite fiber names.
+          ref: 8432839eecc4559bed183c5c4e2e852db25b0ee9
+
+      - name: 'Download the tarantool build artifact'
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+
+      - name: 'Install tarantool'
+        # Now we're lucky: all dependencies are already installed. Check package
+        # dependencies when migrating to other OS version.
+        run: sudo dpkg -i tarantool*.deb
+
+      - name: Setup tt
+        run: |
+          curl -L https://tarantool.io/release/2/installer.sh | sudo bash
+          sudo apt install -y tt
+          tt version
+
+      - run: make test
