@@ -161,6 +161,46 @@ local function assert_fields(client, items, fields, context)
     end
 end
 
+local function assert_global(client, spec, workspace)
+    local path, text = open_fixture(
+        client, workspace, spec.global.fixture)
+    local uri = emmylua.file_uri(path)
+    local values = {}
+    for marker in pairs(spec.global.hovers) do
+        local result = client:request_until('textDocument/hover', {
+            textDocument = {uri = uri},
+            position = emmylua.marker_position(text, marker, -1),
+        }, function(res)
+            local value = normalize(hover_text(res))
+            return value ~= '' and value ~= 'any' and
+                not value:find('unknown', 1, true)
+        end, 30)
+        values[marker] = normalize(hover_text(result))
+    end
+    for marker, needles in pairs(spec.global.hovers) do
+        for _, needle in ipairs(needles) do
+            t.assert_str_contains(values[marker], needle, false,
+                ('%s global %s: missing %q in %s'):format(
+                    spec.name, marker, needle, values[marker]))
+        end
+    end
+    local items = client:request('textDocument/completion', {
+        textDocument = {uri = uri},
+        position = emmylua.marker_position(text, 'fields', 0),
+    }, 10)
+    local labels = {}
+    for _, item in ipairs(items) do
+        labels[item.label] = true
+    end
+    for _, name in ipairs(spec.global.completions) do
+        t.assert(labels[name] == true,
+            ('%s global completion has no %s'):format(spec.name, name))
+    end
+    if spec.fields ~= nil then
+        assert_fields(client, items, spec.fields, spec.name .. ' global')
+    end
+end
+
 local function run_module_test(spec)
     local binary = os.getenv('EMMYLUA_LS')
     t.skip_if(binary == nil or binary == '',
@@ -261,8 +301,96 @@ local function run_module_test(spec)
     end
 end
 
+local string_global_spec = {
+    name = 'string',
+    source = 'src/lua/string_stub.lua',
+    fixtures = 'test/app-luatest/emmylua/string',
+    fields = {
+        split = 'Split a string into parts',
+        ljust = 'Left-justify a string',
+        rjust = 'Right-justify a string',
+        center = 'Center a string',
+        startswith = 'Check for a prefix',
+        endswith = 'Check for a suffix',
+        hex = 'Return hex representation',
+        fromhex = 'Decode hex digits',
+        strip = 'Strip both ends',
+        lstrip = 'Strip the left side',
+        rstrip = 'Strip the right side',
+    },
+    global = {
+        fixture = 'global.lua',
+        hovers = {
+            split = {'string[]'},
+            ljust = {'string'},
+            rjust = {'string'},
+            center = {'string'},
+            startswith = {'boolean'},
+            endswith = {'boolean'},
+            hex = {'string'},
+            fromhex = {'string'},
+            strip = {'string'},
+            lstrip = {'string'},
+            rstrip = {'string'},
+        },
+        completions = {
+            'split',
+            'ljust',
+            'rjust',
+            'center',
+            'startswith',
+            'endswith',
+            'hex',
+            'fromhex',
+            'strip',
+            'lstrip',
+            'rstrip',
+        },
+    },
+}
+
+local function run_global_test(spec)
+    local binary = os.getenv('EMMYLUA_LS')
+    t.skip_if(binary == nil or binary == '',
+        'EMMYLUA_LS is not set')
+
+    local workspace = fio.tempdir()
+    local resources = fio.pathjoin(workspace, 'resources')
+    local client = nil
+    local ok, err = xpcall(function()
+        emmylua.copy_file(
+            fio.pathjoin(root, spec.source),
+            fio.pathjoin(workspace, spec.name .. '.lua'))
+        copy_fixtures(workspace, spec)
+
+        client = emmylua.new_client({
+            binary = binary,
+            workspace = workspace,
+            resources = resources,
+        })
+        client:initialize()
+        assert_global(client, spec, workspace)
+    end, debug.traceback)
+
+    if client ~= nil then
+        pcall(function()
+            client:close()
+        end)
+    end
+    pcall(fio.rmtree, workspace)
+    if not ok then
+        error(err)
+    end
+end
+
 for _, spec in ipairs(modules) do
     g['test_' .. spec.name] = function()
         run_module_test(spec)
+    end
+end
+
+for _, spec in ipairs({string_global_spec}) do
+    g['test_global_' .. spec.name] = function()
+        run_global_test(spec)
     end
 end

@@ -137,6 +137,8 @@ g.test_extension_tuple_validation = function()
         while err.prev ~= nil do
             err = err.prev
         end
+        -- emmylua_check resolves error:unpack() to string.unpack().
+        ---@diagnostic disable-next-line: missing-parameter
         t.assert_covers(err:unpack(), {
             type = 'ClientError',
             name = 'INVALID_MSGPACK',

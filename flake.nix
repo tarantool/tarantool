@@ -46,6 +46,18 @@
       inputs.flake-utils.follows = "flake-utils";
     };
 
+    # emmylua_ls 0.25.1 cannot merge built-in standard library
+    # definitions with workspace global classes (upstream issue #1432),
+    # so Tarantool-specific additions such as `os.environ()` and
+    # `os.setenv()` are not visible for the global `os`. Pin the
+    # upstream revision that contains the LSP merge fix (#1446). Keep
+    # the `emmylua' input at 0.25.1 for emmylua_check.
+    emmyluaLs = {
+      url = "github:EmmyLuaLs/emmylua-analyzer-rust/146073550ef4dc023bd191be485bd6187e1ef6ad";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-utils.follows = "flake-utils";
+    };
+
     # checkpatch.pl is not packaged in nixpkgs, so use the Tarantool fork
     # used by CI. The repository has no flake.nix. The revision is pinned
     # by flake.lock and advanced by `nix flake update checkpatch'.
@@ -62,6 +74,7 @@
       flake-utils,
       tarantool-release,
       emmylua,
+      emmyluaLs,
       checkpatch,
     }:
     flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
@@ -81,11 +94,22 @@
           ) "tarantool-release must match the release tag in flake.lock";
           pkgs.lib.removePrefix "refs/tags/" releaseInput.ref;
 
+        # emmylua_ls 0.30.0 depends on libmimalloc-sys2, whose build
+        # script invokes cmake, but the upstream package lists only
+        # pkg-config in nativeBuildInputs. Add cmake here until the
+        # upstream package is fixed.
+        emmyluaLsPkg = emmyluaLs.packages.${system}.emmylua_ls.overrideAttrs (old: {
+          nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [
+            pkgs.cmake
+          ];
+        });
+
         devShell = import ./shell.nix {
           inherit pkgs;
           checkpatchSrc = checkpatch;
           emmyluaCheck = emmylua.packages.${system}.emmylua_check;
           emmyluaDocCli = emmylua.packages.${system}.emmylua_doc_cli;
+          emmyluaLs = emmyluaLsPkg;
         };
 
         tarantoolRelease = pkgs.stdenv.mkDerivation (finalAttrs: {
