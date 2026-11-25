@@ -1,0 +1,69 @@
+name: Reusable test
+
+on:
+  workflow_call:
+    inputs:
+      artifact_name:
+        description: The name of the Tarantool build artifact
+        default: ubuntu-focal
+        required: false
+        type: string
+      luatest_args:
+        description: Extra luatest arguments, for example -x to skip tests
+        default: ''
+        required: false
+        type: string
+
+env:
+  TT_VERSION: "2.*"
+
+jobs:
+  run_tests:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Clone the crud module
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/crud
+          # The last release that tests Tarantool 1.10.
+          ref: e1e99adbd1ce6452776108a82ee04982a657b558 # 1.5.2
+
+      - name: Download the Tarantool build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+
+      # All dependencies for tarantool are already installed in Ubuntu 20.04.
+      # Check package dependencies when migrating to other OS version.
+      - name: Install Tarantool
+        run: |
+          sudo dpkg -i tarantool_*.deb tarantool-common_*.deb tarantool-dev_*.deb
+          tarantool --version
+
+      - name: Setup tt
+        run: |
+          curl -L https://tarantool.io/release/2/installer.sh | sudo bash
+          sudo apt install -y "tt=${TT_VERSION}"
+          tt version
+
+      - name: Install requirements
+        env:
+          # CRUD 1.5.2 declares CMake 2.8, which CMake 4 no longer accepts.
+          CMAKE_POLICY_VERSION_MINIMUM: '3.5'
+        # The upstream deps.sh also installs coverage tools.
+        run: |
+          tt rocks install vshard 0.1.26
+          tt rocks install checks 3.4.1
+          tt rocks install errors 2.2.1
+          tt rocks install luatest 1.0.1
+          tt rocks install ddl 1.6.2
+          tt rocks install metrics 1.1.0
+          tt rocks make
+
+      # This server starts and listen on 8084 port that is used for tests
+      - name: Stop Mono server
+        run: sudo kill -9 $(sudo lsof -t -i tcp:8084) || true
+
+      - name: Run regression tests
+        run: .rocks/bin/luatest -v ${{ inputs.luatest_args }}
