@@ -75,4 +75,8 @@ iproto_features_init(void)
 			    IPROTO_FEATURE_WATCHERS);
 	iproto_features_set(&IPROTO_CURRENT_FEATURES,
 			    IPROTO_FEATURE_PAGINATION);
+#if defined(ENABLE_FETCH_SNAPSHOT_CURSOR)
+	iproto_features_set(&IPROTO_CURRENT_FEATURES,
+			    IPROTO_FEATURE_FETCH_SNAPSHOT_CURSOR);
+#endif /* defined(ENABLE_FETCH_SNAPSHOT_CURSOR) */
 }

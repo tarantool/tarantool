@@ -3248,8 +3248,6 @@ fail:
 void
 iproto_init(int threads_count)
 {
-	iproto_features_init();
-
 	iproto_threads_count = 0;
 	struct session_vtab iproto_session_vtab = {
 		/* .push = */ iproto_session_push,

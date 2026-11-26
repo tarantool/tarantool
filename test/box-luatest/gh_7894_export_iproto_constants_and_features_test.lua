@@ -3,6 +3,8 @@ local t = require('luatest')
 
 local g = t.group()
 
+local is_enterprise = t.tarantool.is_enterprise_package()
+
 g.before_all(function(cg)
     cg.server = server:new{
         alias   = 'dflt',
@@ -170,6 +172,7 @@ local reference_table = {
         error_extension = true,
         watchers = true,
         pagination = true,
+        fetch_snapshot_cursor = is_enterprise and true or nil,
     },
     feature = {
         streams = 0,
@@ -177,6 +180,7 @@ local reference_table = {
         error_extension = 2,
         watchers = 3,
         pagination = 4,
+        fetch_snapshot_cursor = 10,
     },
 }
 

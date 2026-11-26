@@ -49,6 +49,12 @@ extern "C" {
 	 * request fields and IPROTO_POSITION response field.
 	 */								\
 	_(PAGINATION, 4)						\
+	/**
+	 * Cursor (for checkpoint join) in FETCH_SNAPSHOT support:
+	 * IPROTO_IS_CHECKPOINT_JOIN, IPROTO_CHECKPOINT_VCLOCK and
+	 * IRPOTO_CHECKPOINT_LSN.
+	 */								\
+	 _(FETCH_SNAPSHOT_CURSOR, 10)					\
 
 #define IPROTO_FEATURE_MEMBER(s, v) IPROTO_FEATURE_ ## s = v,
 

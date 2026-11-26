@@ -9,6 +9,14 @@ errinj = box.error.injection
  | ---
  | ...
 
+function print_features(conn)                                               \
+    local f = c.peer_protocol_features                                      \
+    f.fetch_snapshot_cursor = nil                                           \
+    return f                                                                \
+end
+ | ---
+ | ...
+
 -- actual version and feautures
 c = net.connect(box.cfg.listen)
  | ---
@@ -17,7 +25,7 @@ c.peer_protocol_version
  | ---
  | - 4
  | ...
-c.peer_protocol_features
+print_features(c)
  | ---
  | - transactions: true
  |   watchers: true
@@ -45,7 +53,7 @@ c.peer_protocol_version
  | ---
  | - 0
  | ...
-c.peer_protocol_features
+print_features(c)
  | ---
  | - transactions: false
  |   watchers: false
@@ -94,7 +102,7 @@ c.peer_protocol_version
  | ---
  | - 9000
  | ...
-c.peer_protocol_features
+print_features(c)
  | ---
  | - transactions: true
  |   watchers: true
@@ -148,7 +156,7 @@ c.peer_protocol_version
  | ---
  | - 4
  | ...
-c.peer_protocol_features
+print_features(c)
  | ---
  | - transactions: false
  |   watchers: true
@@ -175,7 +183,7 @@ c.peer_protocol_version
  | ---
  | - 4
  | ...
-c.peer_protocol_features
+print_features(c)
  | ---
  | - transactions: true
  |   watchers: true
