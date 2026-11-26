@@ -615,8 +615,12 @@ static int dump_table(struct lua_yaml_dumper *dumper, struct luaL_field *field,
        !yaml_emitter_emit(&dumper->emitter, &ev))
          return 0;
 
+   struct luaL_serializer *cfg = dumper->cfg;
+   /* const table */
    lua_pushnil(dumper->L);
-   while (lua_next(dumper->L, -2)) {
+   lua_pushnil(dumper->L);
+   /* const table, key_idx(nil), key(nil) */
+   while (luaL_next_field(dumper->L, cfg) != 0) {
       lua_pushvalue(dumper->L, -2); /* push copy of key on top of stack */
       if (!dump_node(dumper) || dumper->error)
          return 0;
@@ -903,6 +907,7 @@ lua_yaml_encode(lua_State *L, struct luaL_serializer *serializer,
    dumper.error = 0;
    /* create thread to use for YAML buffer */
    dumper.outputL = luaT_newthread(L);
+   /* arg, thread. */
    if (dumper.outputL == NULL) {
       return luaL_error(L, OOM_ERRMSG);
    }
@@ -924,11 +929,13 @@ lua_yaml_encode(lua_State *L, struct luaL_serializer *serializer,
    lua_newtable(L);
    dumper.anchortable_index = lua_gettop(L);
    dumper.anchor_number = 0;
+   /* arg, thread, anchor tab */
 
-   luaT_reftable_new(L, dumper.cfg, 1);
+   luaT_reftable_new(L, dumper.cfg, -3);
    dumper.reftable_index = lua_gettop(L);
+   /* arg, thread, anchor tab, ref tab */
 
-   lua_pushvalue(L, 1); /* push copy of arg we're processing */
+   lua_pushvalue(L, -4); /* push copy of arg we're processing */
    find_references(&dumper);
    dump_document(&dumper);
    if (dumper.error)
@@ -980,26 +987,53 @@ usage_error:
       return luaL_error(L, "Usage: encode(object, {tag_prefix = <string>, "\
                         "tag_handle = <string>})");
    }
+   /* Drop all args except the given value and options. */
+   lua_settop(L, 2);
+   struct luaL_serializer *user_cfg = serializer;
    const char *prefix = NULL, *handle = NULL;
    if (! lua_isnoneornil(L, 2)) {
       if (! lua_istable(L, 2))
          goto usage_error;
-      lua_getfield(L, 2, "tag_prefix");
+      /*
+       * user_cfg is per-call local version of serializer instance
+       * options: it is used if a user passes custom options to
+       * :encode() method within a separate argument. In this case
+       * it is required to avoid modifying options of the instance.
+       * Life span of user_cfg is restricted by the scope of
+       * :encode() so it is ok to push it onto the Lua stack to be collected
+       * by the garbage collector.
+       */
+      struct luaL_serializer *copied_cfg = luaL_newserializer_config(L);
+      user_cfg = copied_cfg;
+      lua_insert(L, 1);
+      luaL_serializer_copy_options(user_cfg, serializer);
+      luaL_serializer_parse_options(L, user_cfg);
+      lua_getfield(L, 3, "tag_prefix");
       if (lua_isstring(L, -1))
          prefix = lua_tostring(L, -1);
       else if (! lua_isnil(L, -1))
          goto usage_error;
+      /* Save prefix value on the stack to avoid dangling ptr. */
+      lua_insert(L, 2);
 
-      lua_getfield(L, 2, "tag_handle");
+      lua_getfield(L, 4, "tag_handle");
       if (lua_isstring(L, -1))
          handle = lua_tostring(L, -1);
       else if (! lua_isnil(L, -1))
          goto usage_error;
+      /* Save handle value on the stack to avoid dangling ptr. */
+      lua_insert(L, 3);
+      /* Pop options table. */
+      lua_pop(L, 1);
 
       if ((prefix == NULL) != (handle == NULL))
          goto usage_error;
+   } else {
+      /* Drop values above first stack slot. */
+      lua_settop(L, 1);
    }
-   return lua_yaml_encode(L, serializer, handle, prefix);
+   /* Value to be encoded on top. */
+   return lua_yaml_encode(L, user_cfg, handle, prefix);
 }
 
 static int
