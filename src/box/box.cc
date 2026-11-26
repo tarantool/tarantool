@@ -5646,6 +5646,7 @@ box_storage_free(void)
 void
 box_init(void)
 {
+	iproto_features_init();
 	msgpack_init();
 	fiber_cond_create(&ro_cond);
 	auth_init();

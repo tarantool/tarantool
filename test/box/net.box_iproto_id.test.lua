@@ -2,10 +2,16 @@ test_run = require('test_run').new()
 net = require('net.box')
 errinj = box.error.injection
 
+function print_features(conn)                                               \
+    local f = c.peer_protocol_features                                      \
+    f.fetch_snapshot_cursor = nil                                           \
+    return f                                                                \
+end
+
 -- actual version and feautures
 c = net.connect(box.cfg.listen)
 c.peer_protocol_version
-c.peer_protocol_features
+print_features(c)
 c:close()
 
 -- no IPROTO_ID => assume no features
@@ -13,7 +19,7 @@ errinj.set('ERRINJ_IPROTO_DISABLE_ID', true)
 c = net.connect(box.cfg.listen)
 c.error -- none
 c.peer_protocol_version
-c.peer_protocol_features
+print_features(c)
 errinj.set('ERRINJ_IPROTO_DISABLE_ID', false)
 
 -- required version
@@ -27,7 +33,7 @@ c:close()
 c = net.connect(box.cfg.listen, {required_protocol_version = 9001})
 c.error -- error
 c.peer_protocol_version
-c.peer_protocol_features
+print_features(c)
 c:close()
 errinj.set('ERRINJ_IPROTO_SET_VERSION', -1)
 
@@ -44,14 +50,14 @@ c = net.connect(box.cfg.listen,                                             \
                 {required_protocol_features = {'streams', 'transactions'}})
 c.error -- error
 c.peer_protocol_version
-c.peer_protocol_features
+print_features(c)
 c:close()
 errinj.set('ERRINJ_IPROTO_FLIP_FEATURE', -1)
 c = net.connect(box.cfg.listen,                                             \
                 {required_protocol_features = {'foo', 'transactions', 'bar'}})
 c.error -- error
 c.peer_protocol_version
-c.peer_protocol_features
+print_features(c)
 c:close()
 
 -- required features and version are checked on reconnect
