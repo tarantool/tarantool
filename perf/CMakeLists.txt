@@ -33,6 +33,7 @@ list(APPEND TARANTOOL_PERF_CTEST_FLAGS
 )
 
 add_subdirectory(lua)
+add_subdirectory(learned)
 
 if(ENABLE_BUNDLED_LIBBENCHMARK)
     include(BuildBenchmark)
