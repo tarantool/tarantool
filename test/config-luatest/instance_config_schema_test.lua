@@ -2081,6 +2081,12 @@ g.test_threads = function()
         'Thread group name "tx" is reserved',
         instance_config.validate, instance_config, iconfig)
 
+    iconfig.threads.groups[3] = {name = 'all', size = 3}
+    t.assert_error_msg_content_equals(
+        '[instance_config] threads.groups: ' ..
+        'Thread group name "all" is reserved',
+        instance_config.validate, instance_config, iconfig)
+
     iconfig.threads.groups[3] = {name = 'test1', size = 3}
     t.assert_error_msg_content_equals(
         '[instance_config] threads.groups: ' ..

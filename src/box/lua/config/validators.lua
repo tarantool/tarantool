@@ -502,8 +502,8 @@ end
 M['threads.groups'] = function(groups, w)
     local group_names = {}
     for _, group in ipairs(groups or {}) do
-        if group.name == 'tx' then
-            w.error('Thread group name "tx" is reserved')
+        if group.name == 'tx' or group.name == 'all' then
+            w.error('Thread group name %q is reserved', group.name)
         end
         if group_names[group.name] then
             w.error('Duplicate thread group name: %q', group.name)
