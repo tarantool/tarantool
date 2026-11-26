@@ -32,6 +32,7 @@
  */
 #include "trivia/config.h"
 
+#include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include "tt_pthread.h"
@@ -835,6 +836,12 @@ struct cord {
 	struct cpu_stat cpu_stat;
 	pthread_t id;
 	const struct cord_on_exit *on_exit;
+#ifndef ENABLE_ASAN
+	/** Alternate signal stack allocated by this cord. */
+	void *signal_stack;
+	/** Alternate signal stack settings before the cord was created. */
+	stack_t prev_signal_stack;
+#endif
 	/** A helper hash to map id -> fiber. */
 	struct mh_i64ptr_t *fiber_registry;
 	/** All fibers */

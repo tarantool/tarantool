@@ -225,7 +225,7 @@ error:
  * We skip this for ASAN because it installs its own signal stack.
  */
 static void
-signal_stack_init(void)
+signal_stack_init(struct cord *cord)
 {
 #ifndef ENABLE_ASAN
 	stack_t stack;
@@ -233,26 +233,51 @@ signal_stack_init(void)
 	/* SIGSTKSZ doesn't seem to be enough for libunwind. */
 	stack.ss_size = 4 * SIGSTKSZ;
 	stack.ss_sp = xmalloc(stack.ss_size);
-	if (sigaltstack(&stack, NULL) != 0) {
+	cord->signal_stack = NULL;
+	if (sigaltstack(&stack, &cord->prev_signal_stack) != 0) {
 		say_syserror("sigaltstack");
 		free(stack.ss_sp);
+		return;
 	}
+	cord->signal_stack = stack.ss_sp;
+	/* Darwin can check ss_size even with SS_DISABLE set. */
+	if (cord->prev_signal_stack.ss_flags & SS_DISABLE) {
+		cord->prev_signal_stack = (stack_t){
+			.ss_flags = SS_DISABLE,
+			.ss_size = MINSIGSTKSZ,
+		};
+	}
+#else
+	(void)cord;
 #endif
 }
 
 /**
- * Frees the signal stack set with signal_stack_init().
+ * Frees the cord's signal stack and restores the previous settings if the cord
+ * still owns the registered stack.
  */
 static void
-signal_stack_free(void)
+signal_stack_free(struct cord *cord)
 {
 #ifndef ENABLE_ASAN
+	if (cord->signal_stack == NULL)
+		return;
 	stack_t stack;
 	if (sigaltstack(NULL, &stack) != 0) {
 		say_syserror("sigaltstack");
-	} else {
-		free(stack.ss_sp);
+		return;
 	}
+	if (!(stack.ss_flags & SS_DISABLE) &&
+	    stack.ss_sp == cord->signal_stack &&
+	    sigaltstack(&cord->prev_signal_stack, NULL) != 0) {
+		/* The kernel can still use this stack. */
+		say_syserror("sigaltstack");
+		return;
+	}
+	free(cord->signal_stack);
+	cord->signal_stack = NULL;
+#else
+	(void)cord;
 #endif
 }
 
@@ -1919,7 +1944,7 @@ cord_create(struct cord *cord, const char *name)
 #ifdef HAVE_MADV_DONTNEED
 	cord->sched.stack_watermark = NULL;
 #endif
-	signal_stack_init();
+	signal_stack_init(cord);
 	cord->shutdown_fiber = NULL;
 	cord->client_fiber_count = 0;
 	cord->managed_shutdown_fiber_count = 0;
@@ -1951,9 +1976,8 @@ void
 cord_exit(struct cord *cord)
 {
 	assert(cord == cord());
-	(void)cord;
 	trigger_free_in_thread();
-	signal_stack_free();
+	signal_stack_free(cord);
 }
 
 void

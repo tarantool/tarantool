@@ -342,6 +342,13 @@ create_unit_test(PREFIX fiber
                  LIBRARIES core unit
 )
 
+if(NOT ENABLE_ASAN)
+    create_unit_test(PREFIX cord_signal_stack
+                     SOURCES cord_signal_stack.c core_test_utils.c
+                     LIBRARIES core unit
+    )
+endif()
+
 if(NOT ${CMAKE_BUILD_TYPE} EQUAL "Release")
     create_unit_test(PREFIX fiber_stack
                      SOURCES fiber_stack.c core_test_utils.c
