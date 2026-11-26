@@ -1128,6 +1128,47 @@ test_xrow_decode_dml_requests()
 	footer();
 }
 
+static void
+test_xrow_decode_call_required_fields(void)
+{
+	const struct {
+		/** IPROTO request type. */
+		uint16_t type;
+		/** Expected diagnostic message. */
+		const char *message;
+	} cases[] = {
+		{IPROTO_CALL,
+		 "Missing mandatory field 'FUNCTION_NAME' in request"},
+		{IPROTO_EVAL, "Missing mandatory field 'EXPR' in request"},
+	};
+	header();
+	plan(3 * lengthof(cases));
+
+	char buf[16];
+	struct xrow_header row = {};
+	row.bodycnt = 1;
+	row.body[0].iov_base = buf;
+	row.body[0].iov_len = mp_format(buf, sizeof(buf), "{%u[%u]}",
+					IPROTO_TUPLE, 42);
+	struct call_request request;
+	for (size_t i = 0; i < lengthof(cases); i++) {
+		row.type = cases[i].type;
+		const char *name = iproto_type_name(row.type);
+		is(xrow_decode_call(&row, &request), -1, "%s: rejected", name);
+		box_error_t *err = box_error_last();
+		ok(err != NULL &&
+		   box_error_code(err) == ER_MISSING_REQUEST_FIELD,
+		   "%s: missing field error code", name);
+		ok(err != NULL &&
+		   strcmp(box_error_message(err), cases[i].message) == 0,
+		   "%s: expected diagnostic", name);
+		box_error_clear();
+	}
+
+	check_plan();
+	footer();
+}
+
 /**
  * Check that xrow_decode_* functions silently ignore unknown keys.
  */
@@ -1490,7 +1531,7 @@ main(void)
 	memory_init();
 	fiber_init(fiber_c_invoke);
 	header();
-	plan(15);
+	plan(16);
 
 	random_init();
 
@@ -1502,6 +1543,7 @@ main(void)
 	test_xrow_encode_dml();
 	test_xrow_decode_dml_keys();
 	test_xrow_decode_dml_requests();
+	test_xrow_decode_call_required_fields();
 	test_xrow_decode_unknown_key();
 	test_xrow_decode_error_1();
 	test_xrow_decode_error_2();
