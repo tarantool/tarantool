@@ -12,31 +12,6 @@ size_t  tnt_iconv(iconv_t cd, const char **inbuf, size_t *inbytesleft,
                    char **outbuf, size_t *outbytesleft);
 ]]
 
-local iconv_t         = ffi.typeof('struct iconv')
-local char_ptr_arr_t  = ffi.typeof('char *[1]')
-local cchar_ptr_arr_t = ffi.typeof('const char *[1]')
-local cchar_ptr_t     = ffi.typeof('const char *')
-local size_t_arr_t    = ffi.typeof('size_t [1]')
-
-local E2BIG    = errno['E2BIG']
-local EINVAL   = errno['EINVAL']
-local EILSEQ   = errno['EILSEQ']
-local BUF_SIZE = 64
-
-local conv_rv_error = ffi.cast('void *', -1)
-
----The `iconv` module provides a way to convert a string with one encoding
----to a string with another encoding, for example from ASCII to UTF-8. It is
----based on the POSIX iconv routines.
----
----An exact list of the available encodings may depend on environment.
----Typically the list includes ASCII, BIG5, KOI8R, LATIN8, MS-GREEK, SJIS,
----and about 100 others. For a complete list, type `iconv --list` on a
----terminal.
-local iconv = {}
-
----@class iconv.converter: ffi.cdata*
----
 ---An `iconv` converter object that converts a string from one encoding to
 ---another. Call it as a function to convert a string.
 ---
@@ -71,14 +46,35 @@ local iconv = {}
 ---- '0414'
 ---...
 ---```
+---@class iconv.converter: ffi.cdata*
 ---@field __tostring fun(
 ---    self: iconv.converter
 ---): string Returns a string representation of the converter.
 ---@operator call(string): string
 
----@param data string the string to be converted (the "from" string)
----@return string res_string the string that results from the conversion
----    (the "to" string)
+local iconv_t         = ffi.typeof('struct iconv')
+local char_ptr_arr_t  = ffi.typeof('char *[1]')
+local cchar_ptr_arr_t = ffi.typeof('const char *[1]')
+local cchar_ptr_t     = ffi.typeof('const char *')
+local size_t_arr_t    = ffi.typeof('size_t [1]')
+
+local E2BIG    = errno['E2BIG']
+local EINVAL   = errno['EINVAL']
+local EILSEQ   = errno['EILSEQ']
+local BUF_SIZE = 64
+
+local conv_rv_error = ffi.cast('void *', -1)
+
+---The `iconv` module provides a way to convert a string with one encoding
+---to a string with another encoding, for example from ASCII to UTF-8. It is
+---based on the POSIX iconv routines.
+---
+---An exact list of the available encodings may depend on environment.
+---Typically the list includes ASCII, BIG5, KOI8R, LATIN8, MS-GREEK, SJIS,
+---and about 100 others. For a complete list, type `iconv --list` on a
+---terminal.
+local iconv = {}
+
 local function iconv_convert(converter, data)
     if not ffi.istype(iconv_t, converter) then
         error("Usage: iconv:convert(data: string)")
