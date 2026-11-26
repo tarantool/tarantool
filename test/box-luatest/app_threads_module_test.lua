@@ -145,6 +145,8 @@ local function test_threads_not_configured()
                                 [[error('foobar')]])
     t.assert_error_covers({type = 'Foo', name = 'Bar'}, threads.eval, 'tx',
                           [[box.error({type = 'Foo', name = 'Bar'})]])
+    t.assert_equals(threads.call('all', 'test1', {1, 2}), {{2, 1}})
+    t.assert_equals(threads.eval('all', [[return ...]], {1, 2}), {{1, 2}})
 end
 
 g.test_threads_not_configured = function()
@@ -388,15 +390,10 @@ g.test_threads_call = function()
                                      expected)
     end)
     --
-    -- Usage in other a non-tx thread.
+    -- Calling all threads from tx.
     --
     cluster.server:exec(function()
         local threads = require('threads')
-        t.assert_covers(threads.info(), {
-            thread_id = 2,
-            group_name = 'test2',
-        })
-        local func = 'test_func_6'
         local expr = [[
             local threads = require('threads')
             threads.export('test_func_6', function()
@@ -407,12 +404,33 @@ g.test_threads_call = function()
         threads.eval('tx', expr)
         threads.eval('test1', expr)
         threads.eval('test2', expr)
+        t.assert_equals(threads.call('all', 'test_func_6'), {
+            {'tx', 1},
+            {'test1', 1}, {'test1', 2}, {'test1', 3},
+            {'test2', 1}, {'test2', 2},
+        })
+    end)
+    --
+    -- Usage in other a non-tx thread.
+    --
+    cluster.server:exec(function()
+        local threads = require('threads')
+        t.assert_covers(threads.info(), {
+            thread_id = 2,
+            group_name = 'test2',
+        })
+        local func = 'test_func_6'
         t.assert_equals(threads.call('tx', func, {}, {target = 'all'}),
                         {{'tx', 1}})
         t.assert_equals(threads.call('test1', func, {}, {target = 'all'}),
                         {{'test1', 1}, {'test1', 2}, {'test1', 3}})
         t.assert_equals(threads.call('test2', func, {}, {target = 'all'}),
                         {{'test2', 1}, {'test2', 2}})
+        t.assert_equals(threads.call('all', func), {
+            {'tx', 1},
+            {'test1', 1}, {'test1', 2}, {'test1', 3},
+            {'test2', 1}, {'test2', 2},
+        })
     end, {}, {_thread_id = 5})
 end
 
@@ -569,6 +587,22 @@ g.test_threads_eval = function()
                                      expected)
     end)
     --
+    -- Calling all threads from tx.
+    --
+    cluster.server:exec(function()
+        local threads = require('threads')
+        local expr = [[
+            local threads = require('threads')
+            local info = threads.info()
+            return info.group_name, info.thread_id
+        ]]
+        t.assert_equals(threads.eval('all', expr), {
+            {'tx', 1},
+            {'test1', 1}, {'test1', 2}, {'test1', 3},
+            {'test2', 1}, {'test2', 2},
+        })
+    end)
+    --
     -- Usage in other a non-tx thread.
     --
     cluster.server:exec(function()
@@ -588,6 +622,11 @@ g.test_threads_eval = function()
                         {{'test1', 1}, {'test1', 2}, {'test1', 3}})
         t.assert_equals(threads.eval('test2', expr, {}, {target = 'all'}),
                         {{'test2', 1}, {'test2', 2}})
+        t.assert_equals(threads.eval('all', expr), {
+            {'tx', 1},
+            {'test1', 1}, {'test1', 2}, {'test1', 3},
+            {'test2', 1}, {'test2', 2},
+        })
     end, {}, {_thread_id = 5})
 end
 
@@ -739,6 +778,13 @@ g.test_box_cfg = function(cg)
         ]])
         t.assert_equals(threads.call('app', 'test_func'), {
             {'app', 1}, {'app', 2}, {'app', 3}, {'app', 4},
+        })
+        threads.export('test_func', function()
+            local info = threads.info()
+            return info.group_name, info.thread_id
+        end)
+        t.assert_equals(threads.call('all', 'test_func'), {
+            {'tx', 1}, {'app', 1}, {'app', 2}, {'app', 3}, {'app', 4},
         })
     end)
 end

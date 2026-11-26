@@ -3301,8 +3301,9 @@ I['threads.groups.*'] = format_text([[
 I['threads.groups.*.name'] = format_text([[
     Thread group name.
 
-    Each thread group must have a unique name. The name "tx" must not be
-    used because it is reserved for the main thread.
+    Each thread group must have a unique name. The names "tx" and "all"
+    must not be used because they are reserved for the main thread and
+    all configured threads, respectively.
 ]])
 
 I['threads.groups.*.size'] = format_text([[

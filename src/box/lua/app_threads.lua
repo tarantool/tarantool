@@ -68,6 +68,7 @@ thread_groups.tx = {
         return self._handle_call_eval_result(pcall(proc, unpack(args)))
     end,
 }
+thread_groups.all = thread_groups.tx
 
 --
 -- Creates an IPROTO connection to the local instance over a socket pair.
@@ -124,10 +125,11 @@ end
 -- Initializes thread groups from the config.
 --
 -- Note that it always creates the 'tx' group with thread 0 for calling
--- the main thread.
+-- the main thread and the 'all' group with all configured threads.
 --
 local function init_thread_groups(cfg)
     thread_groups.tx = nil
+    thread_groups.all = nil
     create_thread_group('tx', 0, 0)
     local thread_id = 1
     for _, group_cfg in ipairs(cfg.groups) do
@@ -136,6 +138,7 @@ local function init_thread_groups(cfg)
         create_thread_group(group_cfg.name, first_thread_id, last_thread_id)
         thread_id = last_thread_id + 1
     end
+    create_thread_group('all', 0, thread_id - 1)
 end
 
 --
@@ -372,7 +375,7 @@ function box.internal.threads.cfg(cfg)
     box.internal.threads.init(cfg, 'tx', 1, make_conn_fd())
     -- Initialize the subsystem in threads.
     for group_name, group in pairs(thread_groups) do
-        if group_name ~= this_group_name then
+        if group_name ~= this_group_name and group_name ~= 'all' then
             group:init(cfg)
         end
     end
@@ -384,7 +387,7 @@ end
 --
 function box.internal.threads.cfg_priv(priv)
     for group_name, group in pairs(thread_groups) do
-        if group_name ~= 'tx' then
+        if group_name ~= 'tx' and group_name ~= 'all' then
             group:reload_priv(priv)
         end
     end
