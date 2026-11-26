@@ -1,0 +1,223 @@
+---@meta
+
+---The `json` module provides JSON manipulation routines. It is based on
+---the Lua-CJSON module by Mark Pulford. For a complete manual on
+---Lua-CJSON, see the official
+---[manual](https://kyne.au/~mark/software/lua-cjson-manual.html).
+---
+---**Loading a module:**
+---
+---```lua
+---local json = require('json')
+---```
+---@class json: json.serializer
+local json = {}
+
+---Options for `json.encode()` and `json.decode()`.
+---
+---**Sparse arrays features:**
+---
+---During encoding, the JSON encoder tries to classify a table into one
+---of four kinds:
+---
+---* map - at least one table index is not an unsigned integer.
+---* regular array - all array indexes are available.
+---* sparse array - at least one array index is missing.
+---* excessively sparse array - the number of values missing exceeds
+---  the configured ratio.
+---
+---An array is excessively sparse when **all** the following conditions
+---are met:
+---
+---* `encode_sparse_ratio > 0`
+---* `max(table) > encode_sparse_safe`
+---* `max(table) > count(table) * encode_sparse_ratio`
+---
+---The JSON encoder will never consider an array to be excessively
+---sparse when `encode_sparse_ratio = 0`. The `encode_sparse_safe` limit
+---ensures that small Lua arrays are always encoded as sparse arrays. By
+---default, attempting to encode an excessively sparse array will
+---generate an error. If `encode_sparse_convert` is set to `true`,
+---excessively sparse arrays will be handled as maps.
+---@class json.cfg_options
+---@field encode_max_depth? integer Max recursion depth for encoding. The
+---    default is 128.
+---@field encode_deep_as_nil? boolean Crop tables with a nesting level
+---    deeper than `encode_max_depth` instead of raising an error. Not
+---    encoded fields are replaced with one null. The default is false.
+---@field encode_invalid_numbers? boolean Enable encoding of NaN and Inf
+---    numbers. The default is true.
+---@field encode_number_precision? integer Precision of floating point
+---    numbers. The default is 14.
+---@field encode_key_order? string[] Order in which to encode named keys.
+---    The listed keys are encoded first, the rest follow in an
+---    unspecified order.
+---@field encode_load_metatables? boolean Follow the `__serialize`
+---    metatable field. The default is true.
+---@field encode_use_tostring? boolean Use `tostring()` for unknown
+---    types. The default is false.
+---@field encode_invalid_as_nil? boolean Use null for non-recognized
+---    types. The default is false.
+---@field encode_sparse_convert? boolean Handle excessively sparse arrays
+---    as maps. The default is true.
+---@field encode_sparse_ratio? integer `1 / encode_sparse_ratio` is the
+---    permissible percentage of missing values in a sparse array. The
+---    default is 2.
+---@field encode_sparse_safe? integer A limit ensuring that small Lua
+---    arrays are always encoded as sparse arrays. The default is 10.
+---@field decode_invalid_numbers? boolean Enable decoding of NaN and Inf
+---    numbers. The default is true.
+---@field decode_save_metatables? boolean Set metatables for all arrays
+---    and maps. The default is true. **Important:** the decoder uses
+---    globally defined tables as metatables for arrays and maps. You
+---    must not change entries of `decode()` result's table metatable,
+---    because it affects all results and may lead to undefined
+---    behavior of other code. See Yaml for a detailed example.
+---@field decode_max_depth? integer Max recursion depth for decoding. The
+---    default is 128.
+---@field decode_overflow? 'clamp' | 'error' JSON integer overflow policy.
+---    The default is 'clamp'.
+
+---The configuration of a `json` serializer. Call the object with a table
+---of options to update the configuration:
+---
+---```lua
+---json.cfg{encode_max_depth = 128}
+---```
+---@class json.cfg_object: json.cfg_options
+---@operator call(json.cfg_options): void
+
+---@alias json.encode_fn (fun(lua_value: any): string)
+---    & (fun(lua_value: any, configuration: json.cfg_options): string)
+---@alias json.decode_fn (fun(string: string): any)
+---    & (fun(string: string, configuration: json.cfg_options): any)
+
+---@class json.serializer
+---@field encode json.encode_fn Convert a Lua object to a JSON string.
+---@field decode json.decode_fn Convert a JSON string to a Lua object.
+---@field new fun(): json.serializer Create a new JSON serializer.
+---@field cfg json.cfg_object Set values that affect encoding and decoding.
+---@field NULL any A value comparable to Lua's `nil`.
+
+---Convert a Lua object to a JSON string.
+---
+---**Example:**
+---
+---```lua
+---json.encode({123, 234, 345}) -- '[123,234,345]'
+---```
+---
+---**`__serialize` parameter:**
+---
+---The JSON output structure can be specified with `__serialize`:
+---
+---* `'seq'`, `'sequence'`, `'array'` - the table is encoded as an array.
+---* `'map'`, `'mapping'` - the table is encoded as a map.
+---* function - the meta-method called to unpack a serializable
+---  representation of table, cdata or userdata objects.
+---
+---Serializing `'A'` and `'B'` with different `__serialize` values
+---brings different results:
+---
+---```lua
+---json.encode(setmetatable({'A', 'B'}, {__serialize = 'seq'}))
+--- --> '["A","B"]'
+---
+---json.encode(setmetatable({'A', 'B'}, {__serialize = 'map'}))
+--- --> '{"1":"A","2":"B"}'
+---
+---json.encode({setmetatable({f1 = 'A', f2 = 'B'},
+---    {__serialize = 'map'})})
+--- --> '[{"f2":"B","f1":"A"}]'
+---
+---json.encode({setmetatable({f1 = 'A', f2 = 'B'},
+---    {__serialize = 'seq'})})
+--- --> '[[]]'
+---```
+---
+---@overload fun(lua_value: any): string
+---@param lua_value any either a scalar value or a Lua table value.
+---@param configuration json.cfg_options Omit for defaults; do not pass nil.
+---@return string result the original value reformatted as a JSON string.
+function json.encode(lua_value, configuration) end
+
+---Convert a JSON string to a Lua object.
+---
+---**Example:**
+---
+---```lua
+---json.decode('{"hello": "world"}').hello -- 'world'
+---```
+---
+---@overload fun(string: string): any
+---@param string string a string formatted as JSON.
+---@param configuration json.cfg_options Omit for defaults; do not pass nil.
+---@return any result the original contents formatted as a Lua object.
+function json.decode(string, configuration) end
+
+---Create a new JSON serializer.
+---
+---The returned object has the same `encode()`, `decode()`, `new()` and
+---`cfg` API as the module itself.
+---
+---@return json.serializer serializer a new JSON serializer.
+function json.new() end
+
+---Set values that affect the behavior of `json.encode()` and
+---`json.decode()`.
+---
+---**Example 1:** encode `0/0` as NaN and `1/0` as Inf instead of
+---returning nil or an error:
+---
+---```lua
+---local json = require('json')
+---json.cfg{encode_invalid_numbers = true}
+---local x = 0/0
+---local y = 1/0
+---json.encode({1, x, y, 2}) -- '[1,nan,inf,2]'
+---```
+---
+---**Example 2:** avoid errors when encoding unknown data types as
+---userdata/cdata:
+---
+---```lua
+---local httpc = require('http.client').new()
+---json.encode(httpc.curl)
+--- --> error: unsupported Lua type 'userdata'
+---json.encode(httpc.curl, {encode_use_tostring = true})
+--- --> '"userdata: 0x010a4ef2a0"'
+---```
+---
+---**Note:** to achieve the same effect for only one call to
+---`json.encode()` without changing the configuration permanently, use
+---`json.encode({1, x, y, 2}, {encode_invalid_numbers = true})`.
+---
+---Similar configuration settings exist for MsgPack and YAML.
+---@type json.cfg_object
+json.cfg = {}
+
+---A value comparable to Lua's `nil` which may be useful as a placeholder
+---in a tuple.
+---
+---**Example:**
+---
+---```lua
+--- -- When nil is assigned to a Lua-table field, the field is null.
+---local t1 = {nil, 'a', 'b'}
+---
+--- -- When json.NULL is assigned to a Lua-table field, the field is
+--- -- json.NULL.
+---local t2 = {json.NULL, 'a', 'b'}
+---
+--- -- When json.NULL is assigned to a JSON field, the field is null.
+---json.encode({field2 = json.NULL, field1 = 'a', field3 = 'c'})
+--- --> '{"field2":null,"field1":"a","field3":"c"}'
+---```
+---@type any
+json.NULL = nil
+
+---Lowercase alias of `json.NULL`, kept for compatibility with Lua-CJSON.
+---@type any
+json.null = nil
+
+return json

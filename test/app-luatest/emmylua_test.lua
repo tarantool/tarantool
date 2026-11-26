@@ -248,6 +248,63 @@ local modules = {
             },
         },
     },
+    {
+        name = 'json',
+        source = 'third_party/lua-cjson/json_stub.lua',
+        fixtures = 'test/app-luatest/emmylua/json',
+        type_name = 'json',
+        fields = {
+            encode = 'Convert a Lua object to a JSON string',
+            decode = 'Convert a JSON string to a Lua object',
+            new = 'Create a new JSON serializer',
+            cfg = 'Set values that affect',
+            NULL = "A value comparable to Lua's",
+            null = 'Lowercase alias of',
+        },
+        objects = {
+            {
+                fixture = 'object.lua',
+                type_name = 'json.serializer',
+                fields = {
+                    encode = 'Convert a Lua object to a JSON string',
+                    decode = 'Convert a JSON string to a Lua object',
+                    cfg = 'Set values that affect',
+                    NULL = "A value comparable to Lua's",
+                },
+                forbidden_fields = {'null'},
+            },
+            {
+                fixture = 'cfg_options.lua',
+                type_name = 'json.cfg_options',
+                fields = {
+                    encode_max_depth = 'Max recursion depth for encoding',
+                    encode_deep_as_nil = 'Crop tables with a nesting level',
+                    encode_invalid_numbers = 'Enable encoding of NaN and Inf',
+                    encode_number_precision = 'Precision of floating point',
+                    encode_key_order = 'Order in which to encode named keys',
+                    encode_load_metatables = 'Follow the',
+                    encode_use_tostring = 'for unknown types',
+                    encode_invalid_as_nil = 'Use null for non-recognized',
+                    encode_sparse_convert = 'Handle excessively sparse arrays',
+                    encode_sparse_ratio = 'permissible percentage of missing',
+                    encode_sparse_safe = 'small Lua arrays are always encoded',
+                    decode_invalid_numbers = 'Enable decoding of NaN and Inf',
+                    decode_save_metatables = 'Set metatables for all arrays',
+                    decode_max_depth = 'Max recursion depth for decoding',
+                    decode_overflow = 'JSON integer overflow policy',
+                },
+            },
+            {
+                fixture = 'cfg_object.lua',
+                type_name = 'json.cfg_object',
+                fields = {
+                    encode_max_depth = 'Max recursion depth for encoding',
+                    decode_overflow = 'JSON integer overflow policy',
+                },
+                forbidden_fields = {'__call'},
+            },
+        },
+    },
 }
 
 local function normalize(value)
@@ -337,6 +394,18 @@ local function assert_fields(client, items, fields, context)
         local documentation = normalize(documentation_text(resolved))
         t.assert_str_contains(documentation, phrase, false,
             ('%s: %s has no description'):format(context, field))
+    end
+end
+
+local function assert_forbidden_fields(items, names, context)
+    local labels = {}
+    for _, item in ipairs(items) do
+        labels[item.label] = true
+    end
+
+    for _, name in ipairs(names) do
+        t.assert(labels[name] == nil,
+            ('%s: completion has %s'):format(context, name))
     end
 end
 
@@ -434,6 +503,10 @@ local function run_module_test(spec)
                 end, 30)
             assert_fields(client, object_items, object.fields,
                 object.type_name)
+            if object.forbidden_fields ~= nil then
+                assert_forbidden_fields(object_items,
+                    object.forbidden_fields, object.type_name)
+            end
         end
     end, debug.traceback)
 
