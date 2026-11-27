@@ -6,6 +6,9 @@
 # all the necessary dependencies for building Tarantool and quite old glibc 2.17
 # which theoretically provides compatibility of the created packages with any
 # distro where glibc >= 2.17.
+# The image's rpmbuild 4.11 writes only SHA1 and MD5 digests into an RPM
+# package. rpm 6.0 (Fedora 43) no longer counts these and refuses to install
+# such a package, so tools/redigest-rpm.py adds SHA256 digests to it.
 # Usually the script should be run by a CI/CD system, but it is possible to do
 # this manually set the following variables:
 #
@@ -44,7 +47,10 @@ if [ "${USER_ID}" = "0" ]; then
             cmake3 -DCMAKE_TARANTOOL_ARGS=\"${CMAKE_TARANTOOL_ARGS}\" -DPACKAGE_FORMAT=DEB . &&
             cpack3 -G DEB &&
             cmake3 -DCMAKE_TARANTOOL_ARGS=\"${CMAKE_TARANTOOL_ARGS}\" -DPACKAGE_FORMAT=RPM . &&
-            cpack3 -G RPM"
+            cpack3 -G RPM &&
+            for package in /tarantool/build/*.rpm; do
+                python3 ../tools/redigest-rpm.py \"\$package\" \"\$package\" || exit 1
+            done"
 else
     docker run --rm --pull=always \
         --env VERSION=${VERSION} \
@@ -60,5 +66,8 @@ else
                 cmake3 -DCMAKE_TARANTOOL_ARGS=\"${CMAKE_TARANTOOL_ARGS}\" -DPACKAGE_FORMAT=DEB . &&
                 cpack3 -G DEB &&
                 cmake3 -DCMAKE_TARANTOOL_ARGS=\"${CMAKE_TARANTOOL_ARGS}\" -DPACKAGE_FORMAT=RPM . &&
-                cpack3 -G RPM'"
+                cpack3 -G RPM &&
+                for package in /tarantool/build/*.rpm; do
+                    python3 ../tools/redigest-rpm.py \"\$package\" \"\$package\" || exit 1
+                done'"
 fi
