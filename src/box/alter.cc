@@ -4879,6 +4879,12 @@ on_replace_dd_cluster_insert(const struct replica_def *new_def,
 			 tt_uuid_str(&replica->uuid));
 		return -1;
 	}
+	replica = replica_by_uuid(&new_def->uuid);
+	if (replica != NULL && replica->id != REPLICA_ID_NIL) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Replica",
+			 "registration with an already registered UUID");
+		return -1;
+	}
 	/*
 	 * Update the quorum only after commit. Otherwise the replica would have
 	 * to ack its own insertion.
@@ -4897,7 +4903,6 @@ on_replace_dd_cluster_insert(const struct replica_def *new_def,
 	 * now. While WAL write is in progress, new replicas might come, they
 	 * should see the ID is already in use.
 	 */
-	replica = replica_by_uuid(&new_def->uuid);
 	if (replica != NULL)
 		replica_set_id(replica, new_def->id);
 	else
