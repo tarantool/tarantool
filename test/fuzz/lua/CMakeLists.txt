@@ -40,7 +40,7 @@ add_test(NAME ${test_path}/test_mvcc.lua
   COMMAND ${TARANTOOL_BIN}
           ${CMAKE_CURRENT_SOURCE_DIR}/test_mvcc.lua
           ${TEST_MVCC_FLAGS}
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
 set_tests_properties(
   ${test_path}/test_engine.lua${TEST_PARAM_DELIM}vinyl

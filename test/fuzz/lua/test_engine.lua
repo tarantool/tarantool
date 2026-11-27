@@ -5,10 +5,11 @@ toggle random error injections. All random operations and settings
 depend on the seed, which is generated at the very beginning of
 the test.
 
-By default the script uses a directory `test_engine_dir` in
-a current directory. Custom test directory can be specified with
-option `--test_dir`. The script will clean up the directory before
-testing if it exists.
+By default the script uses a directory `test_engine_dir` in the build
+directory (or in a temporary directory when no build directory can be
+detected). Custom test directory can be specified with option
+`--test_dir`. The script will clean up the directory before testing if
+it exists.
 
 The test has two modes: blackbox and greybox. In a first one test
 blindly generates parameters and executes DDL and DML operations
@@ -45,7 +46,28 @@ local msgpack = require('msgpack')
 local uuid = require('uuid')
 
 local test_dir_name = 'test_engine_dir'
-local DEFAULT_TEST_DIR = fio.pathjoin(fio.cwd(), test_dir_name)
+
+-- By default keep the test directory in the build directory so that
+-- generated sockets and other files do not pollute the source tree.
+-- Fall back to a temporary directory when the build directory cannot be
+-- detected (e.g. when running an installed tarantool).
+local function default_test_root()
+    local build_dir = os.getenv('BUILDDIR')
+    if build_dir ~= nil and build_dir ~= '' then
+        return build_dir
+    end
+    local bin = arg and arg[-1]
+    if bin ~= nil then
+        -- <build>/src/tarantool -> <build>.
+        local dir = fio.dirname(fio.dirname(fio.abspath(bin)))
+        if fio.path.is_dir(fio.pathjoin(dir, 'src')) then
+            return dir
+        end
+    end
+    return fio.tempdir()
+end
+
+local DEFAULT_TEST_DIR = fio.pathjoin(default_test_root(), test_dir_name)
 local DEFAULT_ENGINE = 'vinyl'
 
 local SUPPORTED_ENGINES = {'memtx', 'vinyl', 'memcs'}
@@ -88,7 +110,7 @@ local USAGE_STRING = [[
 
    workers <number, 50>                  - number of fibers to run in parallel
    test_duration <number, 2*60>          - test duration time (sec)
-   test_dir <string, ./%s>  - path to a test directory
+   test_dir <string, %s>  - path to a test directory
    engine <string, '%s'>              - engine (%s)
    fault_injection <boolean, false>      - enable fault injection
    seed <number>                         - set a PRNG seed
@@ -100,7 +122,7 @@ local function parse_args()
     local params = require('internal.argparse').parse(arg, arg_options)
 
     if params.help or params.h then
-        print((USAGE_STRING):format(test_dir_name, DEFAULT_ENGINE,
+        print((USAGE_STRING):format(DEFAULT_TEST_DIR, DEFAULT_ENGINE,
           SUPPORTED_ENGINES_STR))
         os.exit(0)
     end
