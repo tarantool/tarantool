@@ -1104,8 +1104,8 @@ datetime_from_fields(struct datetime *dt, const struct dt_fields *fields)
 		return -1;
 	if (fields->tzoffset < TZOFFSET_MIN || fields->tzoffset > TZOFFSET_MAX)
 		return -1;
-	if (fields->timestamp < (double)INT32_MIN * SECS_PER_DAY ||
-	    fields->timestamp > (double)INT32_MAX * SECS_PER_DAY)
+	if (fields->timestamp < (double)MIN_EPOCH_SECS_VALUE ||
+	    fields->timestamp > (double)MAX_EPOCH_SECS_VALUE)
 		return -1;
 	if (fields->is_ts) {
 		if (fields->is_ymdhms)
@@ -1125,10 +1125,9 @@ datetime_from_fields(struct datetime *dt, const struct dt_fields *fields)
 	}
 	if (fields->year < MIN_DATE_YEAR || fields->year > MAX_DATE_YEAR)
 		return -1;
-	if (fields->month < 1 || fields->month > 12)
-		return -1;
-	if (fields->day < 1 ||
-	    fields->day > dt_days_in_month(fields->year, fields->month))
+	dt_t date;
+	if (!dt_from_ymd_checked(fields->year, fields->month, fields->day,
+				 &date))
 		return -1;
 	if (fields->hour < 0 || fields->hour > 23)
 		return -1;
@@ -1136,10 +1135,8 @@ datetime_from_fields(struct datetime *dt, const struct dt_fields *fields)
 		return -1;
 	if (fields->sec < 0 || fields->sec > 60)
 		return -1;
-	double days = dt_from_ymd(fields->year, fields->month, fields->day) -
-		      DT_EPOCH_1970_OFFSET;
-	dt->epoch = days * SECS_PER_DAY + fields->hour * 3600 +
-		    fields->min * 60 + fields->sec;
+	dt->epoch = dt_epoch(date) + fields->hour * 3600 + fields->min * 60 +
+		    fields->sec;
 	dt->nsec = nsec;
 	dt->tzoffset = fields->tzoffset;
 	dt->tzindex = 0;
