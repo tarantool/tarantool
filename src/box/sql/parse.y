@@ -1166,6 +1166,16 @@ nexprlist(A) ::= expr(Y). {
   A = ast_expr_list_append(ctx->region, NULL, Y);
 }
 
+expr(A) ::= CURRENT_TIMESTAMP(X). {
+  A = ast_expr_new_function(ctx->region, &X, false, NULL);
+}
+
+expr(A) ::= CURRENT_TIMESTAMP(X) LP INTEGER(Y) RP. {
+  struct ast_expr *arg = ast_expr_new_leaf(ctx->region, TK_INTEGER, Y.z, Y.n);
+  struct ast_expr_list *args = ast_expr_list_append(ctx->region, NULL, arg);
+  A = ast_expr_new_function(ctx->region, &X, false, args);
+}
+
 ///////////////////////////// The CREATE INDEX command ///////////////////////
 //
 cmd(A) ::= CREATE INDEX ifnotexists(E) nm(X) ON nm(Y) LP sortlist(Z) RP. {
