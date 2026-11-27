@@ -435,6 +435,8 @@ void
 txn_limbo_set_max_size(struct txn_limbo *limbo, int64_t size)
 {
 	limbo->queue.max_size = size;
+	/* The waiting transactions might fit into the new limit. */
+	fiber_cond_broadcast(&limbo->queue.cond);
 }
 
 static inline void
