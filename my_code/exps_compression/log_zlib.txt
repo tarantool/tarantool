@@ -1,0 +1,119 @@
+  MEMTX_SORT_DATA_ZLIB_LEVEL = 1
+[SNAPSHOT] zlib level = 1
+    Compressed data
+    Compressed data
+    box_snapshot 1333017 rps
+[RECOVERY] zlib level = 1
+    recovery 1078311 rps
+[SORTDATA MEMORY USAGE]
+    124M	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/00000000000010000004.sortdata
+    24K	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/tarantool.log
+    115M	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/00000000000010000004.snap
+    4.0K	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/00000000000010000004.xlog
+    238M	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0
+  MEMTX_SORT_DATA_ZLIB_LEVEL = 2
+[SNAPSHOT] zlib level = 2
+    Compressed data
+    Compressed data
+    box_snapshot 1194129 rps
+[RECOVERY] zlib level = 2
+    recovery 1143757 rps
+[SORTDATA MEMORY USAGE]
+    124M	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/00000000000010000004.sortdata
+    24K	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/tarantool.log
+    115M	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/00000000000010000004.snap
+    4.0K	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/00000000000010000004.xlog
+    238M	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0
+  MEMTX_SORT_DATA_ZLIB_LEVEL = 3
+[SNAPSHOT] zlib level = 3
+    Compressed data
+    Compressed data
+    box_snapshot 1217315 rps
+[RECOVERY] zlib level = 3
+    recovery 1183086 rps
+[SORTDATA MEMORY USAGE]
+    124M	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/00000000000010000004.sortdata
+    24K	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/tarantool.log
+    115M	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/00000000000010000004.snap
+    4.0K	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/00000000000010000004.xlog
+    239M	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0
+  MEMTX_SORT_DATA_ZLIB_LEVEL = 4
+[SNAPSHOT] zlib level = 4
+    Compressed data
+    Compressed data
+    box_snapshot 1275536 rps
+[RECOVERY] zlib level = 4
+    recovery 1182245 rps
+[SORTDATA MEMORY USAGE]
+    124M	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/00000000000010000004.sortdata
+    24K	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/tarantool.log
+    115M	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/00000000000010000004.snap
+    4.0K	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/00000000000010000004.xlog
+    238M	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0
+  MEMTX_SORT_DATA_ZLIB_LEVEL = 5
+[SNAPSHOT] zlib level = 5
+    Compressed data
+    Compressed data
+    box_snapshot 1086460 rps
+[RECOVERY] zlib level = 5
+    recovery 1213950 rps
+[SORTDATA MEMORY USAGE]
+    124M	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/00000000000010000004.sortdata
+    24K	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/tarantool.log
+    115M	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/00000000000010000004.snap
+    4.0K	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/00000000000010000004.xlog
+    238M	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0
+  MEMTX_SORT_DATA_ZLIB_LEVEL = 6
+[SNAPSHOT] zlib level = 6
+    Compressed data
+    Compressed data
+    box_snapshot 699993 rps
+[RECOVERY] zlib level = 6
+    recovery 1116702 rps
+[SORTDATA MEMORY USAGE]
+    124M	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/00000000000010000004.sortdata
+    24K	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/tarantool.log
+    115M	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/00000000000010000004.snap
+    4.0K	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/00000000000010000004.xlog
+    238M	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0
+  MEMTX_SORT_DATA_ZLIB_LEVEL = 7
+[SNAPSHOT] zlib level = 7
+    Compressed data
+    Compressed data
+    box_snapshot 568432 rps
+[RECOVERY] zlib level = 7
+    recovery 1203477 rps
+[SORTDATA MEMORY USAGE]
+    124M	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/00000000000010000004.sortdata
+    24K	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/tarantool.log
+    115M	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/00000000000010000004.snap
+    4.0K	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/00000000000010000004.xlog
+    239M	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0
+  MEMTX_SORT_DATA_ZLIB_LEVEL = 8
+[SNAPSHOT] zlib level = 8
+    Compressed data
+    Compressed data
+    box_snapshot 206143 rps
+[RECOVERY] zlib level = 8
+    recovery 1259794 rps
+[SORTDATA MEMORY USAGE]
+    124M	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/00000000000010000004.sortdata
+    24K	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/tarantool.log
+    115M	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/00000000000010000004.snap
+    4.0K	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/00000000000010000004.xlog
+    238M	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0
+  MEMTX_SORT_DATA_ZLIB_LEVEL = 9
+[SNAPSHOT] zlib level = 9
+    Compressed data
+    Compressed data
+    box_snapshot 123594 rps
+[RECOVERY] zlib level = 9
+    recovery 1187468 rps
+[SORTDATA MEMORY USAGE]
+    124M	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/00000000000010000004.sortdata
+    24K	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/tarantool.log
+    115M	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/00000000000010000004.snap
+    4.0K	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0/00000000000010000004.xlog
+    238M	/home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0
+
+DONE: MEMTX_SORT_DATA_ZLIB_LEVEL = 1..9
