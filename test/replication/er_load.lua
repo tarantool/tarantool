@@ -10,6 +10,15 @@ end
 
 require('console').listen(os.getenv('ADMIN'))
 
+if INSTANCE_ID == '2' then
+    -- Fail during join, after the master has connected to the replica.
+    box.ctl.on_schema_init(function()
+        box.space._cluster:before_replace(function()
+            error('bootstrap failure')
+        end)
+    end)
+end
+
 box.cfg{
     listen = instance_uri(INSTANCE_ID);
     replication = {
@@ -17,8 +26,6 @@ box.cfg{
         instance_uri(INSTANCE_ID % 2 + 1)
     },
     replication_timeout = 0.01,
-    -- Mismatching UUIDs to trigger bootstrap failure.
-    replicaset_uuid = tostring(require('uuid').new()),
     read_only = INSTANCE_ID == '2'
 }
 box.once('bootstrap', function()

@@ -120,6 +120,7 @@ local reference_table = {
         BOOTSTRAP_LEADER_UUID = 0x08,
         REGISTERED_REPLICA_UUIDS = 0x09,
         INSTANCE_NAME = 0x0a,
+        REPLICASET_UUID = 0x0b,
     },
 
     -- `iproto_type` enumeration.

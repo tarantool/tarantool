@@ -217,7 +217,7 @@ Cleanup
 box.schema.user.revoke('guest', 'replication')
 ---
 ...
-box.space._cluster:delete{2} ~= nil
+box.space._cluster:get{2} == nil
 ---
 - true
 ...

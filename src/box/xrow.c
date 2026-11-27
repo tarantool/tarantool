@@ -628,7 +628,7 @@ mp_sizeof_ballot_max(const struct ballot *ballot)
 {
 	int registered_uuids_size = ballot->registered_replica_uuids_size;
 	return mp_sizeof_map(1) + mp_sizeof_uint(IPROTO_BALLOT) +
-	       mp_sizeof_map(10) + mp_sizeof_uint(IPROTO_BALLOT_IS_RO_CFG) +
+	       mp_sizeof_map(11) + mp_sizeof_uint(IPROTO_BALLOT_IS_RO_CFG) +
 	       mp_sizeof_bool(ballot->is_ro_cfg) +
 	       mp_sizeof_uint(IPROTO_BALLOT_IS_RO) +
 	       mp_sizeof_bool(ballot->is_ro) +
@@ -644,6 +644,8 @@ mp_sizeof_ballot_max(const struct ballot *ballot)
 	       mp_sizeof_bool(ballot->can_lead) +
 	       mp_sizeof_uint(IPROTO_BALLOT_BOOTSTRAP_LEADER_UUID) +
 	       mp_sizeof_str(UUID_STR_LEN) +
+	       mp_sizeof_uint(IPROTO_BALLOT_REPLICASET_UUID) +
+	       mp_sizeof_str(UUID_STR_LEN) +
 	       mp_sizeof_uint(IPROTO_BALLOT_INSTANCE_NAME) +
 	       mp_sizeof_str(NODE_NAME_LEN_MAX) +
 	       mp_sizeof_uint(IPROTO_BALLOT_REGISTERED_REPLICA_UUIDS) +
@@ -658,7 +660,7 @@ mp_encode_ballot(char *data, const struct ballot *ballot)
 	data = mp_encode_map(data, 1);
 	data = mp_encode_uint(data, IPROTO_BALLOT);
 	bool has_name = *ballot->instance_name != '\0';
-	data = mp_encode_map(data, has_name ? 10 : 9);
+	data = mp_encode_map(data, has_name ? 11 : 10);
 	data = mp_encode_uint(data, IPROTO_BALLOT_IS_RO_CFG);
 	data = mp_encode_bool(data, ballot->is_ro_cfg);
 	data = mp_encode_uint(data, IPROTO_BALLOT_IS_RO);
@@ -675,6 +677,8 @@ mp_encode_ballot(char *data, const struct ballot *ballot)
 	data = mp_encode_bool(data, ballot->can_lead);
 	data = mp_encode_uint(data, IPROTO_BALLOT_BOOTSTRAP_LEADER_UUID);
 	data = xrow_encode_uuid(data, &ballot->bootstrap_leader_uuid);
+	data = mp_encode_uint(data, IPROTO_BALLOT_REPLICASET_UUID);
+	data = xrow_encode_uuid(data, &ballot->replicaset_uuid);
 	if (has_name) {
 		data = mp_encode_uint(data, IPROTO_BALLOT_INSTANCE_NAME);
 		data = mp_encode_str0(data, ballot->instance_name);
@@ -2099,6 +2103,7 @@ xrow_decode_ballot(const struct xrow_header *row, struct ballot *ballot)
 	ballot->is_ro = false;
 	ballot->is_anon = false;
 	ballot->is_booted = true;
+	ballot->replicaset_uuid = uuid_nil;
 	vclock_create(&ballot->vclock);
 	vclock_create(&ballot->gc_vclock);
 	*ballot->instance_name = '\0';
@@ -2203,6 +2208,11 @@ mp_decode_ballot(const char *data, const char *end,
 			*is_empty = false;
 			break;
 		}
+		case IPROTO_BALLOT_REPLICASET_UUID:
+			if (xrow_decode_uuid(&data, &ballot->replicaset_uuid) != 0)
+				return -1;
+			*is_empty = false;
+			break;
 		case IPROTO_BALLOT_INSTANCE_NAME:
 			if (xrow_decode_node_name(&data,
 						  ballot->instance_name) != 0) {
