@@ -1,6 +1,109 @@
 -- compat.lua -- module intended to solve compatibility problems in different
 -- parts of Tarantool. Introduced in gh-7000, see also gh-6912.
 
+---@class compat.option
+---@field brief string a brief description of the option.
+---@field default 'new'|'old' the default value of the option.
+---@field obsolete string? a string with the obsolete version, if the option
+---    is obsolete, or nil.
+---@field current 'new'|'old'|'default' the current effective value of the
+---    option.
+---@field is_new fun(self: compat.option): boolean whether the effective
+---    value of the option is `new`.
+---@field is_old fun(self: compat.option): boolean whether the effective
+---    value of the option is `old`.
+
+---@class compat.option_def
+---@field name string the option name.
+---@field default 'new'|'old' the default value of the option.
+---@field brief string a brief description of the option.
+---@field obsolete? string a string with the obsolete version, if the option
+---    is obsolete. The default is nil.
+---@field action? fun(is_new: boolean) the action to run when the option is
+---    toggled. The default is nil.
+---@field run_action_now? boolean whether to run the action immediately.
+---    The default is false.
+
+---@class compat_module
+---@overload fun(options: { [string]: 'new'|'old'|'default' })
+---@field help fun(): string
+---@field dump fun(mode?: 'new'|'old'|'default'|'current'): string
+---@field add_option fun(option_def: compat.option_def)
+---@field json_escape_forward_slash compat.option Whether to escape the
+---    forward slash symbol '/' using a backslash in a `json.encode()`
+---    result. The new behavior is considered more safe because most
+---    other JSON encoders don't escape the forward slash.
+---@field yaml_pretty_multiline compat.option Whether to encode in block
+---    scalar style all multiline strings or ones containing `"\n\n"`.
+---    The new behavior may be incompatible with some existing
+---    applications that rely on the old style.
+---@field fiber_slice_default compat.option Sets the default value for the
+---    max fiber slice. The old value is infinity (no warnings or
+---    errors). The new value is `{warn = 0.5, err = 1.0}`.
+---@field fiber_channel_close_mode compat.option Whether a fiber channel
+---    should be marked read-only on close instead of being destroyed.
+---    The new behavior can break code that relies on `ch:get()`
+---    returning `nil` after channel close.
+---@field datetime_setfn_timestamp_type_check compat.option Whether to
+---    check the timestamp type in `datetime:set()`. The new behavior
+---    requires timestamp to be a number, as `datetime.new()` does.
+---@field datetime_apply_timezone_action compat.option Whether applying a
+---    timezone alters the represented time of day or the timestamp. The
+---    new behavior changes the time of day and preserves the timestamp.
+---@field sql_priv compat.option Whether to enable access checks for SQL
+---    requests. The new behavior requires the 'execute' privilege on
+---    'sql' or 'universe'.
+---@field sql_seq_scan_default compat.option Whether the `sql_seq_scan`
+---    session setting should be set to true or false during
+---    initialization or new session creation.
+---@field box_info_cluster_meaning compat.option Whether
+---    `box.info.cluster` should show the current replicaset or the whole
+---    cluster with all its replicasets.
+---@field binary_data_decoding compat.option Whether a binary data field
+---    should be stored in a varbinary object or a plain string when
+---    decoded in Lua.
+---@field box_tuple_new_vararg compat.option Whether `box.tuple.new`
+---    should interpret the argument list as an array of tuple fields
+---    (vararg), which does not allow passing a tuple format as a second
+---    argument.
+---@field box_session_push_deprecation compat.option `box.session.push` is
+---    deprecated. The new behavior raises an error on any attempt to use
+---    it.
+---@field c_func_iproto_multireturn compat.option Whether the results of a
+---    C stored function should be encoded with an additional msgpack
+---    array when returning them via iproto.
+---@field box_tuple_extension compat.option Controls the
+---    `IPROTO_FEATURE_CALL_RET_TUPLE_EXTENSION` and
+---    `IPROTO_FEATURE_CALL_ARG_TUPLE_EXTENSION` feature bits.
+---@field box_space_max compat.option Controls the max space id
+---    (`box.schema.SPACE_MAX`). The old limit is 2147483647, the new
+---    limit is 2147483646.
+---@field box_error_unpack_type_and_code compat.option Whether to show
+---    redundant fields in `box.error.unpack()`. The new behavior does
+---    not show 'base_type' and 'custom_type' fields and hides 'code'
+---    when it is 0.
+---@field box_error_serialize_verbose compat.option Controls the verbosity
+---    of `box.error` serialization. The new behavior uses a more verbose
+---    representation.
+---@field box_consider_system_spaces_synchronous compat.option Controls
+---    whether to consider system spaces synchronous when the synchronous
+---    queue is claimed, regardless of the user-provided `is_sync`
+---    option.
+---@field wal_cleanup_delay_deprecation compat.option Whether the
+---    'wal_cleanup_delay' option can be used. The old behavior logs a
+---    deprecation warning, the new one raises an error.
+---@field replication_synchro_timeout compat.option Determines whether the
+---    `replication_synchro_timeout` option rolls back transactions or is
+---    only used to wait for confirmation in promote/demote and
+---    gc-checkpointing.
+---@field box_recovery_triggers_deprecation compat.option On recovery
+---    triggers are deprecated. The new behavior does not trigger space
+---    and transactional events during local recovery or join.
+---@field skip_replication_names compat.option Skip applying and validating
+---    instance and replicaset names during replication startup.
+---@field box_backup_default_ttl compat.option Default backup TTL values
+---    when it is not set explicitly in `box.backup.start()`.
+
 local NEW = true
 local OLD = false
 local TIMEOUT_INFINITY = 100 * 365 * 86400
@@ -520,6 +623,71 @@ local function set_option(name, val)
     option.selected = selected
 end
 
+---The usual way to handle compatibility problems is to introduce an option
+---for a new behavior and leave the old one by default. Sometimes developers
+---want to keep the old behavior for existing applications and offer the new
+---behavior by default for the new ones. It was decided to introduce a
+---compatibility module to provide a direct way to deprecate unwanted
+---behavior.
+---
+---The `compat` module is basically a global table of options with additional
+---verbose interface and helper functions. There are three stages of changing
+---behavior:
+---
+---1. Old behavior by default.
+---2. New behavior by default.
+---3. New behavior is frozen and the old behavior is removed.
+---
+---During the first two stages, a user can toggle options via the interface
+---and change the behavior according to one's needs. At the last stage, the
+---old behavior is removed from the codebase, and the option is marked as
+---obsolete. Because `compat` is a global instance, options can be hardcoded
+---into it or added in runtime, for example, by external module.
+---
+---**Basic usage:**
+---
+---To explicitly set the behavior and save the resulting Lua command, use
+---`compat.dump()`:
+---
+---```lua
+---require('compat')({
+---    json_escape_forward_slash = 'new',
+---})
+---require('compat').dump()
+---```
+---
+---**Configuration options:**
+---
+---The `compat.*` configuration options accept `new` and `old` values. The
+---set of configuration options matches the set of the module options:
+---
+---```yaml
+---compat:
+---  box_space_max: 'new'
+---  sql_seq_scan_default: 'old'
+---  fiber_slice_default: 'old'
+---  binary_data_decoding: 'new'
+---```
+---
+---**Options:**
+---
+---Below are the available `compat` options:
+---
+---* `json_escape_forward_slash` -- escape the forward slash in
+---  `json.encode()` results.
+---* `yaml_pretty_multiline` -- encode multiline strings in block scalar
+---  style.
+---* `fiber_channel_close_mode` -- mark a fiber channel read-only on
+---  close.
+---* `box_cfg_replication_sync_timeout` -- whether the
+---  `replication_synchro_timeout` option rolls back transactions.
+---* `sql_seq_scan_default` -- default value of the `sql_seq_scan`
+---  session setting.
+---* `fiber_slice_default` -- default max fiber slice.
+---* `binary_data_decoding` -- decode binary data as varbinary or string.
+---* `box_info_cluster_meaning` -- `box.info.cluster` meaning.
+---* `box_session_push_deprecation` -- `box.session.push` is deprecated.
+
 local compat = { }
 
 -- src/box/lua/config/applier/compat.lua needs information about
@@ -528,6 +696,29 @@ function compat._options()
     return options
 end
 
+---Return a Lua command that sets up the `compat` module with the same
+---options as the current ones.
+---
+---If you want to explicitly secure every behavior in `compat`, you can do it
+---manually, and then call `compat.dump()` to get a Lua command that sets up
+---the `compat` with all the options selected. You should place this command
+---at the beginning of code in your `init.lua` file.
+---
+---The `mode` argument selects how the options are dumped: `'current'`
+---replaces `'default'` with the effective value, `'new'` dumps everything
+---as `'new'`, `'old'` dumps everything as `'old'` (except obsolete options),
+---and `'default'` dumps everything as `'default'`.
+---
+---**Example:**
+---
+---```lua
+---require('compat').dump()
+---```
+---
+---@param mode? 'new'|'old'|'default'|'current' dump mode. The default is
+---    nil: the current configuration is dumped with `default` values where
+---    applicable.
+---@return string result a Lua command string.
 function compat.dump(mode)
     -- dump() works in one of the following modes:
     -- dump compat configuration as is with `default` if any
@@ -617,6 +808,24 @@ end
 -- * obsolete       (string/nil)
 -- * action         (function/nil)
 -- * run_action_now (boolean/nil)
+---Add a new option by providing a table with name, default, brief,
+---obsolete and action fields.
+---
+---Because `compat` is a global instance, options can be hardcoded into it or
+---added in runtime, for example, by an external module.
+---
+---**Example:**
+---
+---```lua
+---require('compat').add_option({
+---    name = 'my_option',
+---    default = 'old',
+---    brief = 'My option description',
+---    action = function(is_new) end,
+---})
+---```
+---
+---@param option_def compat.option_def a table describing the new option.
 function compat.add_option(option_def)
     if type(option_def) ~= 'table' then
         error("usage: compat.add_option({name = '...', default = 'new'/'old'" ..
@@ -651,6 +860,28 @@ function compat.add_option(option_def)
     end
 end
 
+---Show help for the `compat` module.
+---
+---**Example:**
+---
+---```lua
+---require('compat').help()
+---```
+---
+---Available commands:
+---
+---```text
+---compat.help()                   -- show this help
+---compat.<option_name>            -- list option info
+---compat.<option_name> = 'old'    -- set the desired value ('old', 'new',
+---                                --   'default')
+---compat{<option_name> = 'new'}   -- set the listed options
+---compat.dump()                   -- get a Lua command that sets up the
+---                                --   same options
+---compat.add_option()             -- add a new option
+---```
+---
+---@return string help the help text.
 function compat.help()
     return help
 end
@@ -679,6 +910,11 @@ end
 
 local compat_mt = { }
 
+---Set the listed options to the desired values.
+---
+---**Example:** `compat{<option_name> = 'new'}`.
+---
+---@param list { [string]: 'new'|'old'|'default' } a table of option values.
 function compat_mt.__call(_, list)
     if type(list) ~= 'table' then
         error("usage: compat({<option_name> = 'new'/'old'/'default'})")
@@ -688,6 +924,12 @@ function compat_mt.__call(_, list)
     end
 end
 
+---Set an option to the desired value.
+---
+---**Example:** `compat.<option_name> = 'old'`.
+---
+---@param key string the option name.
+---@param val 'new'|'old'|'default' the desired value.
 function compat_mt.__newindex(_, key, val)
     set_option(key, val)
 end
@@ -704,6 +946,10 @@ local function option_value(option)
 end
 
 -- Whether the effective value of the option is `new`.
+---Whether the effective value of the option is `new`.
+---
+---@param option compat.option
+---@return boolean is_new
 function compat_option_methods.is_new(option)
     if type(option) ~= 'table' then
         error('usage: compat.<option_name>:is_new()')
@@ -712,6 +958,10 @@ function compat_option_methods.is_new(option)
 end
 
 -- Whether the effective value of the option is `old`.
+---Whether the effective value of the option is `old`.
+---
+---@param option compat.option
+---@return boolean is_old
 function compat_option_methods.is_old(option)
     if type(option) ~= 'table' then
         error('usage: compat.<option_name>:is_old()')
@@ -723,6 +973,13 @@ local compat_option_mt = {
     __index = compat_option_methods,
 }
 
+---Get an option object with information about the option.
+---
+---**Example:** `compat.<option_name>`.
+---
+---@param key string the option name.
+---@return compat.option result an option object with `brief`, `default`,
+---    `obsolete`, and `current` fields.
 function compat_mt.__index(_, key)
     if not options[key] then
         error(('Invalid option %s'):format(key))
@@ -772,6 +1029,7 @@ compat.preload()
 -- else in the future.
 compat.postload()
 
+---@type compat_module
 compat = setmetatable(compat, compat_mt)
 
 return compat
