@@ -265,6 +265,73 @@ static inline int do_parse(struct lua_yaml_loader *loader) {
 
 static int load_node(struct lua_yaml_loader *loader);
 
+static inline bool
+is_array_table(lua_State *L, int idx)
+{
+   if (!lua_getmetatable(L, idx))
+      return false;
+
+   lua_rawgeti(L, LUA_REGISTRYINDEX, luaL_array_metatable_ref);
+   bool is_array = lua_rawequal(L, -1, -2);
+   lua_pop(L, 2);
+   return is_array;
+}
+
+static void
+merge_mapping(struct lua_yaml_loader *loader, int map_index,
+              int merge_index)
+{
+   lua_State *L = loader->L;
+
+   lua_pushnil(L);
+   while (lua_next(L, merge_index) != 0) {
+      lua_pushvalue(L, -2);
+      lua_rawget(L, map_index);
+      if (lua_isnil(L, -1)) {
+         lua_pop(L, 1);
+         lua_pushvalue(L, -2);
+         lua_pushvalue(L, -2);
+         lua_rawset(L, map_index);
+      } else {
+         lua_pop(L, 1);
+      }
+      lua_pop(L, 1);
+   }
+}
+
+static bool
+merge_value(struct lua_yaml_loader *loader, int map_index)
+{
+   lua_State *L = loader->L;
+   int value_index = lua_gettop(L);
+
+   if (!lua_istable(L, value_index)) {
+      lua_pushliteral(L, "merge value must be a mapping or sequence");
+      loader->error = 1;
+      return false;
+   }
+
+   if (is_array_table(L, value_index)) {
+      lua_Integer len = (lua_Integer)lua_objlen(L, value_index);
+      for (lua_Integer i = 1; i <= len; i++) {
+         lua_rawgeti(L, value_index, i);
+         if (!lua_istable(L, -1)) {
+            lua_pop(L, 1);
+            lua_pushliteral(L,
+                            "merge sequence contains non-mapping value");
+            loader->error = 1;
+            return false;
+         }
+         merge_mapping(loader, map_index, lua_gettop(L));
+         lua_pop(L, 1);
+      }
+      return true;
+   }
+
+   merge_mapping(loader, map_index, value_index);
+   return true;
+}
+
 static void handle_anchor(struct lua_yaml_loader *loader) {
    const char *anchor = (char *)loader->event.data.scalar.anchor;
    if (!anchor)
@@ -281,19 +348,32 @@ static void load_map(struct lua_yaml_loader *loader) {
       luaL_setmaphint(loader->L, -1);
 
    handle_anchor(loader);
+   int map_index = lua_gettop(loader->L);
+
    while (1) {
       int r;
       /* load key */
       if (load_node(loader) == 0 || loader->error)
-         return;
+         break;
+
+      bool is_merge_key = lua_type(loader->L, -1) == LUA_TSTRING &&
+         strcmp(lua_tostring(loader->L, -1), "<<") == 0;
 
       /* load value */
       r = load_node(loader);
       if (loader->error)
-         return;
-      if (r != 1)
+         break;
+      if (r != 1) {
          RETURN_ERRMSG(loader, "unanticipated END event");
-      lua_rawset(loader->L, -3);
+      }
+
+      if (is_merge_key) {
+         if (!merge_value(loader, map_index))
+            break;
+         lua_pop(loader->L, 2);
+         continue;
+      }
+      lua_rawset(loader->L, map_index);
    }
 }
 
