@@ -13,19 +13,18 @@ ffi.cdef([[
 ]])
 
 -- This module.
-local threads = {}
+local threads = {
+    -- Name of the group this thread belongs to.
+    group_name = 'tx',
+    -- Identifier of this thread in the group, 1 <= N <= group size.
+    thread_id = 1,
+}
 
 -- Functions used internally.
 box.internal.threads = {}
 
 -- Configuration of the threads subsystem copied from the global config.
 local threads_cfg
-
--- Name of the group this thread belongs to.
-local this_group_name = 'tx'
-
--- Identifier of this thread in the group, 1 <= N <= group size.
-local this_thread_id_in_group = 1
 
 -- Connection used to call threads.
 local threads_conn
@@ -329,8 +328,8 @@ end
 function box.internal.threads.init(cfg, group_name, id_in_group, conn_fd)
     assert(threads_cfg == nil)
     threads_cfg = cfg
-    this_group_name = group_name
-    this_thread_id_in_group = id_in_group
+    threads.group_name = group_name
+    threads.thread_id = id_in_group
     local is_main = (group_name == 'tx')
     if not is_main then
         ffi.C.cord_set_name(string.format('%s%d', group_name, id_in_group))
@@ -375,7 +374,7 @@ function box.internal.threads.cfg(cfg)
     box.internal.threads.init(cfg, 'tx', 1, make_conn_fd())
     -- Initialize the subsystem in threads.
     for group_name, group in pairs(thread_groups) do
-        if group_name ~= this_group_name and group_name ~= 'all' then
+        if group_name ~= threads.group_name and group_name ~= 'all' then
             group:init(cfg)
         end
     end
@@ -478,8 +477,8 @@ end
 --
 function threads.info()
     local info = {
-        thread_id = this_thread_id_in_group,
-        group_name = this_group_name,
+        thread_id = threads.thread_id,
+        group_name = threads.group_name,
         groups = {
             {name = 'tx', size = 1},
         },
