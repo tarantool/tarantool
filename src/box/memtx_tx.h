@@ -627,7 +627,7 @@ memtx_tx_story_gc_step(void);
 /** Helper of memtx_tx_snapshot_invisible_count_matching. */
 size_t
 memtx_tx_snapshot_invisible_count_matching_until_slow(
-	struct memtx_tx_snapshot_cleaner *cleaner, struct index_def *index_def,
+	struct memtx_tx_snapshot_cleaner *cleaner, struct key_def *cmp_def,
 	enum iterator_type type, const char *key, uint32_t part_count,
 	struct tuple *until, hint_t until_hint);
 
@@ -637,13 +637,13 @@ memtx_tx_snapshot_invisible_count_matching_until_slow(
  */
 static inline size_t
 memtx_tx_snapshot_invisible_count_matching(
-	struct memtx_tx_snapshot_cleaner *cleaner, struct index_def *index_def,
+	struct memtx_tx_snapshot_cleaner *cleaner, struct key_def *cmp_def,
 	enum iterator_type type, const char *key, uint32_t part_count)
 {
 	if (cleaner->ht == NULL)
 		return 0;
 	return memtx_tx_snapshot_invisible_count_matching_until_slow(
-		cleaner, index_def, type, key, part_count, NULL, HINT_NONE);
+		cleaner, cmp_def, type, key, part_count, NULL, HINT_NONE);
 }
 
 /**
@@ -654,14 +654,14 @@ memtx_tx_snapshot_invisible_count_matching(
  */
 static inline size_t
 memtx_tx_snapshot_invisible_count_matching_until(
-	struct memtx_tx_snapshot_cleaner *cleaner, struct index_def *index_def,
+	struct memtx_tx_snapshot_cleaner *cleaner, struct key_def *cmp_def,
 	enum iterator_type type, const char *key, uint32_t part_count,
 	struct tuple *until, hint_t until_hint)
 {
 	if (cleaner->ht == NULL)
 		return 0;
 	return memtx_tx_snapshot_invisible_count_matching_until_slow(
-		cleaner, index_def, type, key, part_count, until, until_hint);
+		cleaner, cmp_def, type, key, part_count, until, until_hint);
 }
 
 /**

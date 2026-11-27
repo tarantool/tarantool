@@ -90,7 +90,6 @@ read_view_opts_create(struct read_view_opts *opts)
 	opts->filter_space = default_space_filter;
 	opts->filter_index = default_index_filter;
 	opts->filter_arg = NULL;
-	opts->enable_field_names = false;
 	opts->enable_space_upgrade = false;
 	opts->enable_data_temporary_spaces = false;
 	opts->disable_decompression = false;
@@ -99,9 +98,7 @@ read_view_opts_create(struct read_view_opts *opts)
 static void
 space_read_view_delete(struct space_read_view *space_rv)
 {
-	if (space_rv->field_count > 0)
-		field_def_array_delete(space_rv->fields, space_rv->field_count);
-	free(space_rv->format_data);
+	space_def_unref(space_rv->def);
 	for (uint32_t i = 0; i <= space_rv->index_id_max; i++) {
 		struct index_read_view *index_rv = space_rv->index_map[i];
 		if (index_rv != NULL) {
@@ -123,35 +120,15 @@ space_read_view_new(struct space *space, const struct read_view_opts *opts)
 				(space->index_id_max + 1);
 	struct grp_alloc all = grp_alloc_initializer();
 	grp_alloc_reserve_data(&all, sizeof(*space_rv));
-	grp_alloc_reserve_str0(&all, space_name(space));
 	grp_alloc_reserve_data(&all, index_map_size);
 	grp_alloc_use(&all, xmalloc(grp_alloc_size(&all)));
 	space_rv = grp_alloc_create_data(&all, sizeof(*space_rv));
-	space_rv->name = grp_alloc_create_str0(&all, space_name(space));
 	space_rv->index_map = grp_alloc_create_data(&all, index_map_size);
 	assert(grp_alloc_size(&all) == 0);
 
-	space_rv->id = space_id(space);
+	space_rv->def = space->def;
+	space_def_ref(space_rv->def);
 	space_rv->group_id = space_group_id(space);
-	if (opts->enable_field_names && space->def->field_count > 0) {
-		space_rv->fields = field_def_array_dup(space->def->fields,
-						       space->def->field_count);
-		assert(space_rv->fields != NULL);
-		space_rv->field_count = space->def->field_count;
-	} else {
-		space_rv->fields = NULL;
-		space_rv->field_count = 0;
-	}
-	if (opts->enable_field_names &&
-	    space->def->format_data != NULL) {
-		space_rv->format_data = xmalloc(space->def->format_data_len);
-		memcpy(space_rv->format_data, space->def->format_data,
-		       space->def->format_data_len);
-		space_rv->format_data_len = space->def->format_data_len;
-	} else {
-		space_rv->format_data = NULL;
-		space_rv->format_data_len = 0;
-	}
 	if (opts->enable_space_upgrade && space->upgrade != NULL) {
 		space_rv->upgrade = space_upgrade_read_view_new(space->upgrade);
 		assert(space_rv->upgrade != NULL);
@@ -370,11 +347,11 @@ read_view_handle_new(struct read_view *rv)
 		space_rvh->format = NULL;
 		space_rvh->upgrade = NULL;
 		rlist_add_tail_entry(&h->spaces, space_rvh, link);
-		if (space_rv->format_data != NULL) {
+		if (space_rv->def->format_data != NULL) {
 			space_rvh->format =
 				runtime_tuple_format_new(
-					space_rv->format_data,
-					space_rv->format_data_len,
+					space_rv->def->format_data,
+					space_rv->def->format_data_len,
 					/*names_only=*/true);
 			if (space_rvh->format == NULL)
 				goto fail;

@@ -4948,13 +4948,11 @@ memtx_tx_snapshot_cleaner_destroy(struct memtx_tx_snapshot_cleaner *cleaner)
 
 size_t
 memtx_tx_snapshot_invisible_count_matching_until_slow(
-	struct memtx_tx_snapshot_cleaner *cleaner, struct index_def *index_def,
+	struct memtx_tx_snapshot_cleaner *cleaner, struct key_def *cmp_def,
 	enum iterator_type type, const char *key, uint32_t part_count,
 	struct tuple *until, hint_t until_hint)
 {
 	assert(cleaner->ht != NULL);
-
-	struct key_def *cmp_def = index_def->cmp_def;
 
 	/*
 	 * The border is only valid if it's located at or after the first
