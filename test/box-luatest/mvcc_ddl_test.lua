@@ -6,6 +6,27 @@ local g = t.group()
 g.before_each(function(cg)
     cg.server = server:new{box_cfg = {memtx_use_mvcc_engine = true}}
     cg.server:start()
+    cg.server:exec(function()
+        rawset(_G, 'assert_tuple_stats', function(s)
+            local expected = {}
+            for _, arena in ipairs({'memtx', 'malloc'}) do
+                expected[arena] = {
+                    data_size = 0, header_size = 0,
+                    field_map_size = 0, waste_size = 0,
+                }
+            end
+            for _, tuple in s:pairs() do
+                local info = tuple:info()
+                local stat = expected[info.arena]
+                for key in pairs(stat) do
+                    stat[key] = stat[key] + info[key]
+                end
+            end
+            t.assert_equals(s:stat().tuple, expected)
+            t.assert_equals(s:bsize(), expected.memtx.data_size +
+                                      expected.malloc.data_size)
+        end)
+    end)
 end)
 
 g.after_each(function(cg)
@@ -517,5 +538,298 @@ g.test_empty_stmt_tuple_ref = function(cg)
         collectgarbage('collect')
         -- Check if all tuples are alive
         t.assert_equals(s:select{}, {{1}, {2}, {3}, {4}, {5}})
+    end)
+end
+
+-- gh-13499: tuple statistics must survive DDL discarding MVCC stories.
+-- DDL accounts prepared DML before discarding its MVCC history.
+g.test_bsize_after_concurrent_dml_and_rename = function(cg)
+    t.tarantool.skip_if_not_debug()
+    cg.server:exec(function()
+        local fiber = require('fiber')
+        local s = box.schema.space.create('s')
+        s:create_index('pk')
+        local tuple = {1, string.rep('x', 1000)}
+        s:insert{2, string.rep('y', 100)}
+        _G.assert_tuple_stats(s)
+
+        box.error.injection.set('ERRINJ_WAL_DELAY', true)
+        local dml = fiber.new(function()
+            box.begin()
+            s:replace(tuple)
+            s:delete{2}
+            box.commit()
+        end)
+        dml:set_joinable(true)
+        fiber.yield()
+
+        -- Rename replaces the space object before the DML commits.
+        local rename = fiber.new(function() s:rename('s2') end)
+        rename:set_joinable(true)
+        fiber.yield()
+
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+        t.assert(dml:join(5))
+        t.assert(rename:join(5))
+
+        s = box.space.s2
+        t.assert_equals(s:select(), {tuple})
+        _G.assert_tuple_stats(s)
+        s:delete{1}
+        t.assert_equals(s:bsize(), 0)
+        _G.assert_tuple_stats(s)
+    end)
+end
+
+g.test_bsize_after_committed_replace_and_rename_rollback = function(cg)
+    t.tarantool.skip_if_not_debug()
+    cg.server:exec(function()
+        local fiber = require('fiber')
+        local s = box.schema.space.create('s')
+        s:create_index('pk')
+        s:replace{1, 'old'}
+        local tuple = {1, string.rep('x', 1000)}
+        local errinj = box.error.injection
+
+        errinj.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
+        local replace = fiber.new(function() s:replace(tuple) end)
+        replace:set_joinable(true)
+        t.helpers.retrying({}, function()
+            t.assert(errinj.get('ERRINJ_WAL_DELAY'))
+        end)
+
+        -- The first batch is already in WAL, so rename goes into a new batch.
+        local rename = fiber.new(function() s:rename('s2') end)
+        rename:set_joinable(true)
+        fiber.yield()
+
+        -- Commit the replace while keeping the rename's batch blocked.
+        errinj.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
+        errinj.set('ERRINJ_WAL_DELAY', false)
+        t.assert(replace:join(5))
+        t.helpers.retrying({}, function()
+            t.assert(errinj.get('ERRINJ_WAL_DELAY'))
+        end)
+        t.assert_not_equals(box.space.s2, nil)
+
+        errinj.set('ERRINJ_WAL_WRITE', true)
+        errinj.set('ERRINJ_WAL_DELAY', false)
+        local ok, err = rename:join(5)
+        errinj.set('ERRINJ_WAL_WRITE', false)
+        t.assert_not(ok)
+        t.assert_covers(err:unpack(), {code = box.error.WAL_IO})
+
+        t.assert_equals(box.space.s2, nil)
+        s = box.space.s
+        t.assert_equals(s:get{1}, tuple)
+        t.assert_equals(s:bsize(), box.tuple.new(tuple):bsize())
+        s:delete{1}
+        t.assert_equals(s:bsize(), 0)
+    end)
+end
+
+g.test_bsize_after_concurrent_replace_and_truncate = function(cg)
+    t.tarantool.skip_if_not_debug()
+    cg.server:exec(function()
+        local fiber = require('fiber')
+        local s = box.schema.space.create('s')
+        s:create_index('pk')
+        s:insert{1, 'old'}
+        s:insert{2, 'untouched'}
+
+        box.error.injection.set('ERRINJ_WAL_DELAY', true)
+        local replace = fiber.new(function()
+            s:replace{1, string.rep('x', 1000)}
+        end)
+        replace:set_joinable(true)
+        fiber.yield()
+
+        local truncate = fiber.new(function() s:truncate() end)
+        truncate:set_joinable(true)
+        fiber.yield()
+
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+        t.assert(replace:join(5))
+        t.assert(truncate:join(5))
+
+        s = box.space.s
+        t.assert_equals(s:select(), {})
+        t.assert_equals(s:bsize(), 0)
+        _G.assert_tuple_stats(s)
+        local tuple = {1, string.rep('y', 100)}
+        s:insert(tuple)
+        t.assert_equals(s:select(), {tuple})
+        _G.assert_tuple_stats(s)
+        s:delete{1}
+        t.assert_equals(s:select(), {})
+        t.assert_equals(s:bsize(), 0)
+        _G.assert_tuple_stats(s)
+    end)
+end
+
+g.test_bsize_after_multiple_renames_and_dml_in_one_txn = function(cg)
+    cg.server:exec(function()
+        box.cfg{memtx_max_tuple_size = 2 * 1024 * 1024}
+        local s = box.schema.space.create('s')
+        s:create_index('pk', {parts = {2}})
+        s:insert{'old', 1}
+        s:insert{string.rep('z', 1000), 2}
+        local tuple1 = {string.rep('x', 1000), 1}
+        local tuple2 = {'short', 2}
+        local tuple3 = {string.rep('y', 1100 * 1000), 3}
+        local tuple4 = {'last', 4}
+
+        box.begin()
+        s:replace(tuple1)
+        s:rename('s2')
+        s = box.space.s2
+        s:replace(tuple2)
+        s:insert{'temporary', 3}
+        s:rename('s3')
+        s = box.space.s3
+        s:replace(tuple3)
+        s:insert{string.rep('z', 1100 * 1000), 5}
+        s:rename('s4')
+        s = box.space.s4
+        s:delete{5}
+        s:insert(tuple4)
+        box.commit()
+
+        t.assert_equals(box.space.s, nil)
+        t.assert_equals(box.space.s2, nil)
+        t.assert_equals(box.space.s3, nil)
+        t.assert_equals(s:select(), {tuple1, tuple2, tuple3, tuple4})
+        _G.assert_tuple_stats(s)
+        for i = 1, 4 do
+            s:delete{i}
+        end
+        t.assert_equals(s:bsize(), 0)
+        _G.assert_tuple_stats(s)
+    end)
+end
+
+g.test_bsize_after_concurrent_dml_and_rename_rollback = function(cg)
+    t.tarantool.skip_if_not_debug()
+    cg.server:exec(function()
+        local fiber = require('fiber')
+        local s = box.schema.space.create('s')
+        s:create_index('pk')
+        local tuple1 = {1, 'old'}
+        local tuple2 = {2, string.rep('y', 100)}
+        s:insert(tuple1)
+        s:insert(tuple2)
+        local original_bsize = s:bsize()
+        local original_stat = s:stat().tuple
+        _G.assert_tuple_stats(s)
+        local errinj = box.error.injection
+
+        errinj.set('ERRINJ_WAL_DELAY', true)
+        local dml = fiber.new(function()
+            box.begin()
+            s:replace{1, string.rep('x', 1000)}
+            s:delete{2}
+            s:insert{3, 'new'}
+            box.commit()
+        end)
+        dml:set_joinable(true)
+        fiber.yield()
+
+        local rename = fiber.new(function() s:rename('s2') end)
+        rename:set_joinable(true)
+        fiber.yield()
+
+        errinj.set('ERRINJ_WAL_WRITE', true)
+        errinj.set('ERRINJ_WAL_DELAY', false)
+        local dml_ok, dml_err = dml:join(5)
+        local rename_ok, rename_err = rename:join(5)
+        errinj.set('ERRINJ_WAL_WRITE', false)
+        t.assert_not(dml_ok)
+        t.assert_covers(dml_err:unpack(), {code = box.error.WAL_IO})
+        t.assert_not(rename_ok)
+        t.assert(rename_err.code == box.error.WAL_IO or
+                 rename_err.code == box.error.CASCADE_ROLLBACK)
+
+        t.assert_equals(box.space.s2, nil)
+        s = box.space.s
+        t.assert_equals(s:select(), {tuple1, tuple2})
+        t.assert_equals(s:bsize(), original_bsize)
+        t.assert_equals(s:stat().tuple, original_stat)
+        _G.assert_tuple_stats(s)
+        s:delete{1}
+        s:delete{2}
+        t.assert_equals(s:bsize(), 0)
+        _G.assert_tuple_stats(s)
+    end)
+end
+
+g.test_bsize_after_dml_and_rename_manual_rollback = function(cg)
+    cg.server:exec(function()
+        local s = box.schema.space.create('s')
+        s:create_index('pk', {parts = {2}})
+        local tuple1 = {'old', 1}
+        local tuple2 = {string.rep('y', 1000), 2}
+        s:insert(tuple1)
+        s:insert(tuple2)
+        local original_bsize = s:bsize()
+        local original_stat = s:stat().tuple
+        _G.assert_tuple_stats(s)
+
+        box.begin()
+        s:replace{string.rep('x', 1000), 1}
+        s:delete{2}
+        s:insert{'temporary', 3}
+        s:rename('s2')
+        s = box.space.s2
+        s:replace{'short', 1}
+        s:delete{3}
+        s:insert{string.rep('z', 100), 4}
+        box.rollback()
+
+        t.assert_equals(box.space.s2, nil)
+        s = box.space.s
+        t.assert_equals(s:select(), {tuple1, tuple2})
+        t.assert_equals(s:bsize(), original_bsize)
+        t.assert_equals(s:stat().tuple, original_stat)
+        _G.assert_tuple_stats(s)
+    end)
+end
+
+g.test_bsize_after_unprepared_writer_aborted_by_rename = function(cg)
+    cg.server:exec(function()
+        local fiber = require('fiber')
+        local s = box.schema.space.create('s')
+        s:create_index('pk')
+        local tuple = {1, 'old'}
+        s:insert(tuple)
+        local original_bsize = s:bsize()
+        local original_stat = s:stat().tuple
+        local resume = fiber.channel(1)
+
+        local writer = fiber.new(function()
+            box.begin()
+            s:replace{1, string.rep('x', 1000)}
+            s:insert{2, string.rep('y', 100)}
+            resume:get()
+            box.commit()
+        end)
+        writer:set_joinable(true)
+        fiber.yield()
+
+        s:rename('s2')
+        s = box.space.s2
+        t.assert_equals(s:select(), {tuple})
+        t.assert_equals(s:bsize(), original_bsize)
+        t.assert_equals(s:stat().tuple, original_stat)
+        _G.assert_tuple_stats(s)
+
+        resume:put(true)
+        local ok, err = writer:join(5)
+        t.assert_not(ok)
+        t.assert_covers(err:unpack(), {code = box.error.TRANSACTION_CONFLICT})
+        t.assert_equals(box.space.s, nil)
+        t.assert_equals(s:select(), {tuple})
+        t.assert_equals(s:bsize(), original_bsize)
+        t.assert_equals(s:stat().tuple, original_stat)
+        _G.assert_tuple_stats(s)
     end)
 end
