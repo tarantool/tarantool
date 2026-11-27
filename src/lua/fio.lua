@@ -1,6 +1,311 @@
 -- fio.lua (internal file)
 
+---@alias seek
+---| 'SEEK_SET'
+---| 'SEEK_DATA'
+---| 'SEEK_HOLE'
+---| 'SEEK_END'
+---| 'SEEK_CUR'
+
+---@alias mode
+---| 'S_IWGRP'
+---| 'S_IXGRP'
+---| 'S_IROTH'
+---| 'S_IXOTH'
+---| 'S_IRUSR'
+---| 'S_IXUSR'
+---| 'S_IRWXU'
+---| 'S_IRWXG'
+---| 'S_IWOTH'
+---| 'S_IRWXO'
+---| 'S_IWUSR'
+---| 'S_IRGRP'
+
+---@alias flags
+---| 'O_APPEND' # (start at end of file)
+---| 'O_ASYNC' # (signal when IO is possible)
+---| 'O_CLOEXEC' # (enable a flag related to closing)
+---| 'O_CREAT' # (create file if it doesn't exist)
+---| 'O_DIRECT' # (do less caching or no caching)
+---| 'O_DIRECTORY' # (fail if it's not a directory)
+---| 'O_EXCL' # (fail if file cannot be created)
+---| 'O_LARGEFILE' # (allow 64-bit file offsets)
+---| 'O_NDELAY'
+---| 'O_NOATIME' # (no access-time updating)
+---| 'O_NOCTTY' # (no console tty)
+---| 'O_NOFOLLOW' # (no following symbolic links)
+---| 'O_NONBLOCK' # (no blocking)
+---| 'O_PATH' # (get a path for low-level use)
+---| 'O_RDONLY' # (read only)
+---| 'O_RDWR' # (either read or write)
+---| 'O_SYNC' # (force writing if it's possible)
+---| 'O_TMPFILE' # (the file will be temporary and nameless)
+---| 'O_TRUNC' # (truncate)
+---| 'O_WRONLY' # (write only)
+
+---@class fio.stat: table
+---@field inode number inode number.
+---@field rdev number device ID.
+---@field size number file size in bytes.
+---@field atime number last access time.
+---@field mode number file mode.
+---@field mtime number last modification time.
+---@field nlink number hard link count.
+---@field uid number owner user ID.
+---@field blksize number block size.
+---@field gid number owner group ID.
+---@field ctime number last status change time.
+---@field dev number device ID.
+---@field blocks number allocated block count.
+
+---@class fio.file: ffi.cdata*
+---@field close fun(self: fio.file): boolean, string? Close the file.
+---@field pread fun(self: fio.file, ...): ... Perform random-access read.
+---@field pwrite fun(self: fio.file, ...): ... Perform random-access write.
+---@field read fun(self: fio.file, ...): ... Perform non-random-access read.
+---@field write fun(self: fio.file, ...): ... Perform non-random-access write.
+---@field truncate fun(self: fio.file, length: number): boolean, string? Set
+---    the file size.
+---@field seek fun(self: fio.file, offset: number, whence?: seek): number? Move
+---    the position.
+---@field stat fun(self: fio.file): fio.stat Get statistics about the open file.
+---@field fsync fun(self: fio.file): boolean, string? Flush changes to disk.
+---@field fdatasync fun(self: fio.file): boolean, string? Flush data to disk.
+
+---@class fio.path
+---@field exists fun(path: string): boolean Check if the path exists.
+---@field is_dir fun(path: string): boolean Check if the path is a directory.
+---@field is_file fun(path: string): boolean Check if the path is a file.
+---@field is_link fun(path: string): boolean Check
+---    if the path is a symbolic link.
+---@field lexists fun(path: string): boolean Check
+---    if the path exists or is a broken link.
+
+---@alias fio.flags number|flags|flags[]
+
+---@alias fio.error ffi.cdata*
+
+---@class fio.constants
+---@field seek table<string, integer>
+---@field mode table<string, integer>
+---@field flag table<string, integer>
+
+---@class fio
+---Concatenate partial string, separated by '/' to form a path name.
+---
+---**Example:** `fio.pathjoin('/etc', 'default', 'myfile')` =>
+---`'/etc/default/myfile'`
+---
+---@field pathjoin fun(...: string): string
+---Given a full path name, remove all but the final part (the file name).
+---Also remove the suffix, if it is passed. Note that the basename of a path
+---with a trailing slash is an empty string. It is different from how the
+---Unix basename program interprets such a path.
+---
+---**Example:** `fio.basename('/path/to/my.lua', '.lua')` => `'my'`
+---
+---@field basename fun(path_name: string, suffix?: string): string
+---Get a directory name.
+---
+---**Example:** `fio.dirname('/path/to/my.lua')` => `'/path/to/'`
+---
+---@field dirname fun(path_name: string): string
+---Given a full path name, remove the final part (the file name).
+---
+---**Example:** `fio.abspath('my.lua')` => `'/path/to/my.lua'`
+---
+---@field abspath fun(file_name: string): string
+---Get the name of the current working directory.
+---
+---**Example:** `fio.cwd()` => `'/home/username/tarantool_sandbox'`
+---
+---@field cwd fun(): string
+---Get information about a file object.
+---
+---Returns information about a file object. For details type `man 2 lstat`
+---or `man 2 stat`.
+---
+---**Example:**
+---
+--- `fio.lstat('/etc')`
+---
+--- ```yaml
+---   inode: 1048577
+---   rdev: 0
+---   size: 12288
+---   atime: 1421340698
+---   mode: 16877
+---   mtime: 1424615337
+---   nlink: 160
+---   uid: 0
+---   blksize: 4096
+---   gid: 0
+---   ctime: 1424615337
+---   dev: 2049
+---   blocks: 24
+--- ```
+---
+---@field lstat fun(path: string): fio.stat
+---Get information about a file object.
+---
+---Returns information about a file object. For details type `man 2 lstat`
+---or `man 2 stat`.
+---
+---@field stat fun(path: string): fio.stat
+---Create a directory.
+---
+---**Example:** `fio.mkdir('/etc')` => `false`
+---
+---@field mkdir fun(path_name: string, mode?: number): boolean, string?
+---Delete a directory.
+---
+---@field rmdir fun(path_name: string): boolean, string?
+---Change working directory.
+---
+---**Example:** `fio.chdir('/etc')` => `true`
+---
+---@field chdir fun(path_name: string): boolean
+---List files in a directory.
+---
+---The result is similar to the ls shell command.
+---
+---@field listdir fun(path_name: string): string[]?, string?
+---Get files whose names match a given string.
+---
+---Return a list of files that match an input string. The list is
+---constructed with a single flag that controls the behavior of the function:
+---GLOB_NOESCAPE. For details type `man 3 glob`.
+---
+---**Example:**
+---
+--- `fio.glob('/etc/x*')`
+--- ```
+--- - - /etc/xdg
+---   - /etc/xml
+---   - /etc/xul-ext
+--- ```
+---
+---@field glob fun(path_name: string): string[]
+---Return the name of a directory that can be used to store temporary files.
+---
+---`fio.tempdir()` stores the created temporary directory into `/tmp` by
+---default. *Since 2.4.1*, this can be changed by setting the `TMPDIR`
+---environment variable. Before starting Tarantool, or at runtime by
+---`os.setenv()`.
+---
+---**Example:**
+---
+--- ```tarantoolsession
+--- tarantool> fio.tempdir()
+--- ---
+--- - /tmp/lG31e7
+--- ...
+--- tarantool> fio.mkdir('./mytmp')
+--- ---
+--- - true
+--- ...
+---
+--- tarantool> os.setenv('TMPDIR', './mytmp')
+--- ---
+--- ...
+---
+--- tarantool> fio.tempdir()
+--- ---
+--- - ./mytmp/506Z0b
+--- ```
+---
+---@field tempdir fun(): string
+---Copy everything in the `from-path`, including subdirectory contents, to
+---the `to-path`.
+---
+---The result is similar to the `cp -r` shell command. The `to-path` should
+---not be empty.
+---
+---@field copytree fun(from_path: string, to_path: string): boolean, string?
+---Create the path, including parent directories, but without file contents.
+---
+---The result is similar to the `mkdir -p` shell command.
+---
+---**Example:** `fio.mktree('/home/archives')` => `true`
+---
+---@field mktree fun(path_name: string, mode?: number): boolean, string?
+---Delete directories.
+---
+---**Example:** `fio.rmtree('/home/archives')` => `true`
+---
+---@field rmtree fun(path_name: string): boolean?, string?
+---Creates link.
+---
+---@field link fun(src: string, dst: string): boolean, string?
+---Creates link.
+---
+---@field symlink fun(src: string, dst: string): boolean, string?
+---Reads link.
+---
+---@field readlink fun(src: string): string
+---Deletes link or file.
+---
+---@field unlink fun(path_name: string): boolean, string?
+---Rename a file or directory.
+---
+---@field rename fun(path_name: string, new_path_name: string): boolean, string?
+---Change the access time and possibly also change the update time of a file.
+---
+---For details type man 2 utime. Times should be expressed as number of
+---seconds since the epoch.
+---
+---@field utime fun(name: string, acc?: number, mod?: number): boolean, string?
+---Copy a file. The result is similar to the cp shell command.
+---
+---@field copyfile fun(from: string, to: string): boolean, string?
+---Manage rights to and ownership of file objects.
+---
+---**Example:**
+---
+--- ```tarantoolsession
+--- tarantool> fio.chown('/home/username/tmp.txt', 'username', 'username')
+--- - true
+--- ```
+---
+---@field chown fun(path: string, user: string, group: string): boolean, string?
+---Manage rights to and ownership of file objects.
+---
+---**Example:**
+---
+--- ```tarantoolsession
+--- tarantool> fio.chmod('/home/username/tmp.txt', tonumber('0755', 8))
+--- - true
+--- ```
+---
+---@field chmod fun(path_name: string, new_rights: number): boolean, string?
+---Reduce the file size.
+---
+---@field truncate fun(path_name: string, new_size?: number): boolean, string?
+---Ensure that changes are written to disk.
+---
+---@field sync fun(): boolean
+---Open a file.
+---
+---@field open fun(p: string, f?: fio.flags, m?: number): fio.file?, fio.error?
+---Table of functions for checking paths.
+---
+---@field path fio.path
+---Table of constants which are the same as POSIX flag values.
+---
+---@field c fio.constants
+
 local minifio = require('internal.minifio')
+---Tarantool supports file input/output with an API that is similar to POSIX
+---syscalls. All operations are performed asynchronously. Multiple fibers can
+---access the same file simultaneously.
+---
+---* Functions for common pathname manipulations.
+---* Functions for directory or file existence and type checks.
+---* Functions for common file manipulations.
+---* Constants which are the same as POSIX flag values (for example
+---  `fio.c.flag.O_RDONLY` = POSIX O_RDONLY).
+---
+---@type fio
 local fio = require('fio')
 local ffi = require('ffi')
 local buffer = require('buffer')
@@ -34,6 +339,16 @@ local fio_methods = {}
 -- read(buf) -> len
 -- read(size) -> str
 -- read(buf, size) -> len
+---Perform non-random-access read on a file.
+---
+---@overload fun(self: fio.file, count?: number): string
+---@overload fun(self: fio.file, buffer: ffi.cdata*, count: number): number
+---@param self fio.file
+---@param buf ffi.cdata*|number|nil where to read into, or the number of
+---    bytes to read.
+---@param size? number bytes to read.
+---@return string|number|nil result
+---@return string? error_message
 fio_methods.read = function(self, buf, size)
     local tmpbuf
     if (not ffi.istype(const_char_ptr_t, buf) and buf == nil) or
@@ -66,6 +381,14 @@ end
 
 -- write(str)
 -- write(buf, len)
+---Perform non-random-access write on a file.
+---
+---@overload fun(self: fio.file, buffer: ffi.cdata*, count: number): boolean
+---@param self fio.file
+---@param data string|ffi.cdata* value to write.
+---@param len? number bytes to write.
+---@return boolean success
+---@return string? error_message
 fio_methods.write = function(self, data, len)
     if not ffi.istype(const_char_ptr_t, data) then
         data = tostring(data)
@@ -80,6 +403,14 @@ end
 
 -- pwrite(str, offset)
 -- pwrite(buf, len, offset)
+---Perform random-access write on a file.
+---
+---@overload fun(self: fio.file, b: ffi.cdata*, n: number, o: number): number
+---@param self fio.file
+---@param data string|ffi.cdata* value to write.
+---@param len? number bytes to write.
+---@param offset number offset within file where writing begins.
+---@return boolean success, string? error_message
 fio_methods.pwrite = function(self, data, len, offset)
     if not ffi.istype(const_char_ptr_t, data) then
         data = tostring(data)
@@ -95,6 +426,16 @@ end
 
 -- pread(size, offset) -> str
 -- pread(buf, size, offset) -> len
+---Perform random-access read on a file.
+---
+---@overload fun(self: fio.file, b: ffi.cdata*, n: number, o: number): number
+---@param self fio.file
+---@param buf ffi.cdata*|number where to read into, or the number of bytes
+---    to read.
+---@param size number bytes to read.
+---@param offset? number offset within file where reading begins.
+---@return string|number|nil result
+---@return string? error_message
 fio_methods.pread = function(self, buf, size, offset)
     local tmpbuf
     local has_buf = ffi.istype(const_char_ptr_t, buf)
@@ -124,6 +465,11 @@ fio_methods.pread = function(self, buf, size, offset)
     return res
 end
 
+---Change the size of an open file.
+---
+---@param self fio.file
+---@param length? number new file size. Default is 0.
+---@return boolean success, string? error_message
 fio_methods.truncate = function(self, length)
     if length == nil then
         length = 0
@@ -131,6 +477,18 @@ fio_methods.truncate = function(self, length)
     return internal.ftruncate(self.fh, length)
 end
 
+---Change position in a file.
+---
+---`SEEK_END` = end of file,
+---
+---`SEEK_CUR` = current position,
+---
+---`SEEK_SET` = start of file.
+---
+---@param self fio.file
+---@param offset number position to seek to.
+---@param whence? seek|integer offset from. Default is `SEEK_SET`.
+---@return number? result the new position if success
 fio_methods.seek = function(self, offset, whence)
     if whence == nil then
         whence = 'SEEK_SET'
@@ -148,6 +506,10 @@ fio_methods.seek = function(self, offset, whence)
     return tonumber(res)
 end
 
+---Close a file.
+---
+---@param self fio.file
+---@return boolean success, string? error_message
 fio_methods.close = function(self)
     local res, err = internal.close(self.fh)
     if err ~= nil then
@@ -157,14 +519,26 @@ fio_methods.close = function(self)
     return res
 end
 
+---Ensure that changes made to an open file are written to disk.
+---
+---@param self fio.file
+---@return boolean success, string? error_message
 fio_methods.fsync = function(self)
     return internal.fsync(self.fh)
 end
 
+---Ensure that changes made to an open file are written to disk.
+---
+---@param self fio.file
+---@return boolean success, string? error_message
 fio_methods.fdatasync = function(self)
     return internal.fdatasync(self.fh)
 end
 
+---Get statistics about an open file.
+---
+---@param self fio.file
+---@return fio.stat
 fio_methods.stat = function(self)
     return internal.fstat(self.fh)
 end
@@ -186,6 +560,29 @@ local fio_mt = {
 
 ffi.metatype('struct fio_handle', fio_mt)
 
+---Open a file.
+---
+---**Example:**
+---
+--- ```tarantoolsession
+--- tarantool> fh = fio.open('/home/username/tmp.txt', {'O_RDWR', 'O_APPEND'})
+--- ---
+--- ...
+--- tarantool> fh -- display file handle returned by fio.open
+--- ---
+--- - fh: 11
+--- ...
+--- ```
+---
+---@param path string full path to the file to open.
+---@param flags? number|flags|flags[] flags can be passed as a number or as
+---    string constants, for example 'O_RDONLY', 'O_WRONLY', 'O_RDWR'. Flags
+---    can be combined by enclosing them in braces.
+---@param mode? number mode bits can be passed as a number or as string
+---    constants, for example S_IWUSR. Mode bits can be combined by enclosing
+---    them in braces.
+---@return fio.file? fh the opened file handle.
+---@return fio.error? err an error if the file could not be opened.
 fio.open = function(path, flags, mode)
     local iflag = 0
     local imode = 0
@@ -232,6 +629,7 @@ fio.open = function(path, flags, mode)
         -- This is OOM.
         return error(res)
     end
+    ---@cast res fio.file
     return res
 end
 
@@ -250,6 +648,21 @@ assert(type(fio.cwd) == 'function')
 assert(type(fio.pathjoin) == 'function')
 assert(type(fio.abspath) == 'function')
 
+---Get a file name.
+---
+---Given a full path name, remove all but the final part (the file name).
+---Also remove the suffix, if it is passed.
+---
+---Note that the basename of a path with a trailing slash is an empty string.
+---It is different from how the Unix basename program interprets such a path.
+---
+---**Example:**
+---
+---`fio.basename('/path/to/my.lua', '.lua')` => `'my'`
+---
+---@param path string path name
+---@param suffix? string suffix
+---@return string file_name
 fio.basename = function(path, suffix)
     if type(path) ~= 'string' then
         error("Usage: fio.basename(path[, suffix])")
@@ -269,6 +682,14 @@ fio.basename = function(path, suffix)
     return path
 end
 
+---Get a directory name.
+---
+---**Example:**
+---
+---`fio.dirname('/path/to/my.lua')` => `'/path/to/'`
+---
+---@param path string path name
+---@return string
 fio.dirname = function(path)
     if type(path) ~= 'string' then
         error("Usage: fio.dirname(path)")
@@ -276,6 +697,21 @@ fio.dirname = function(path)
     return minifio.dirname(path)
 end
 
+---Set the mask bits used when creating files or directories.
+---
+---For a detailed description type `man 2 umask`.
+---
+---**Example:**
+---
+--- ```tarantoolsession
+--- tarantool> fio.umask(tonumber('755', 8))
+--- ---
+--- - 493
+--- ...
+--- ```
+---
+---@param umask? number mask bits.
+---@return number result previous mask bits.
 fio.umask = function(umask)
 
     if umask == nil then
@@ -290,6 +726,14 @@ fio.umask = function(umask)
 
 end
 
+---Change working directory.
+---
+---**Example:**
+---
+---`fio.chdir('/etc')` => `true`
+---
+---@param path string path of directory.
+---@return boolean success
 fio.chdir = function(path)
     if type(path)~='string' then
         error("Usage: fio.chdir(path)")
@@ -297,6 +741,13 @@ fio.chdir = function(path)
     return ffi.C.chdir(path) == 0
 end
 
+---List files in a directory.
+---
+---The result is similar to the ls shell command.
+---
+---@param path string path of directory.
+---@return string[]|nil list files in the directory.
+---@return string? error_message
 fio.listdir = function(path)
     if type(path) ~= 'string' then
         error("Usage: fio.listdir(path)")
@@ -316,6 +767,17 @@ fio.listdir = function(path)
     return t
 end
 
+---Create the path, including parent directories, but without file contents.
+---
+---The result is similar to the `mkdir -p` shell command.
+---
+---**Example:**
+---
+---`fio.mktree('/home/archives')` => `true`
+---
+---@param path string
+---@param mode? number
+---@return boolean success, string? error_message
 fio.mktree = function(path, mode)
     if type(path) ~= "string" then
         error("Usage: fio.mktree(path[, mode])")
@@ -347,6 +809,14 @@ fio.mktree = function(path, mode)
     return true
 end
 
+---Delete directories.
+---
+---**Example:**
+---
+---`fio.rmtree('/home/archives')` => `true`
+---
+---@param path string
+---@return boolean|nil success, string? error_message
 fio.rmtree = function(path)
     if type(path) ~= 'string' then
         error("Usage: fio.rmtree(path)")
@@ -377,6 +847,11 @@ fio.rmtree = function(path)
     return true
 end
 
+---Copy a file. The result is similar to the cp shell command.
+---
+---@param from string path to original file.
+---@param to string path to new file.
+---@return boolean success, string? error_message
 fio.copyfile = function(from, to)
     if type(from) ~= 'string' or type(to) ~= 'string' then
         error('Usage: fio.copyfile(from, to)')
@@ -392,6 +867,15 @@ fio.copyfile = function(from, to)
     return true
 end
 
+---Copy everything in the `from-path`, including subdirectory contents, to
+---the `to-path`.
+---
+---The result is similar to the `cp -r` shell command. The `to-path` should
+---not be empty.
+---
+---@param from string
+---@param to string
+---@return boolean success, string? error_message
 fio.copytree = function(from, to)
     if type(from) ~= 'string' or type(to) ~= 'string' then
         error('Usage: fio.copytree(from, to)')
@@ -449,6 +933,15 @@ local function check_time(time, name)
     end
 end
 
+---Change the access time and possibly also change the update time of a file.
+---
+---For details type man 2 utime. Times should be expressed as number of
+---seconds since the epoch.
+---
+---@param path string name.
+---@param atime? number time of last access. default current time.
+---@param mtime? number time of last update. default = access time.
+---@return boolean success, string? error_message
 fio.utime = function(path, atime, mtime)
     if type(path) ~= 'string' then
         error('Usage: fio.utime(filepath[, atime[, mtime]])')
@@ -464,28 +957,55 @@ fio.utime = function(path, atime, mtime)
     return internal.utime(path, atime, mtime)
 end
 
+---@diagnostic disable-next-line: missing-fields
 fio.path = {}
+---Check if file or directory is a file.
+---
+---@param filename string
+---@return boolean result `true` if path-name refers to a file; otherwise
+---    `false`.
 fio.path.is_file = function(filename)
     local fs = fio.stat(filename)
     return fs ~= nil and fs:is_reg() or false
 end
 
+---Check if file or directory is a link.
+---
+---@param filename string
+---@return boolean result `true` if path-name refers to a symbolic link;
+---    otherwise `false`.
 fio.path.is_link = function(filename)
     local fs = fio.lstat(filename)
     return fs ~= nil and fs:is_link() or false
 end
 
+---Check if file or directory is a directory.
+---
+---@param filename string
+---@return boolean result `true` if path-name refers to a directory;
+---    otherwise `false`.
 fio.path.is_dir = function(filename)
     local fs = fio.stat(filename)
     return fs ~= nil and fs:is_dir() or false
 end
 
+---Check if file or directory exists.
+---
+---@param filename string
+---@return boolean result `true` if path-name refers to a directory or file
+---    that exists and is not a broken symbolic link; otherwise `false`.
 fio.path.exists = function(filename)
     return fio.stat(filename) ~= nil
 end
 
+---Check if file or directory exists.
+---
+---@param filename string
+---@return boolean result `true` if path-name refers to a directory or file
+---    that exists or is a broken symbolic link; otherwise `false`.
 fio.path.lexists = function(filename)
     return fio.lstat(filename) ~= nil
 end
 
+---@type fio
 return fio
