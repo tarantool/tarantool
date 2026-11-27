@@ -264,3 +264,35 @@ g.test_3075_add_column = function(cg)
         box.execute("DROP TABLE t2;")
     end)
 end
+
+--
+-- Make sure that adding a column to a non-existent space produces
+-- an appropriate error message.
+--
+g.test_add_column_to_non_existing_space = function(cg)
+    cg.server:exec(function()
+        local sql = [[ALTER TABLE no_space ADD COLUMN a INT NOT NULL;]]
+        local _, err = box.execute(sql)
+        t.assert_equals(err.message, "Space 'no_space' does not exist")
+    end)
+end
+
+--
+-- gh-13358: Check that an attempt to create a self-reference to a space
+-- without a primary key does not cause a segmentation fault.
+--
+g.test_13358_creating_self_reference_on_space_without_primary_key = function(cg)
+    cg.server:exec(function(engine)
+        box.schema.space.create('nopk', {
+            engine = engine,
+            format = {{'a', 'integer'}}
+        })
+        local sql = [[ALTER TABLE nopk ADD COLUMN d INT REFERENCES nopk;]]
+        local _, err = box.execute(sql)
+        local exp_err = "Failed to create "..
+                        "foreign key constraint 'fk_unnamed_nopk_d_1': "..
+                        "referenced space doesn't feature PRIMARY KEY"
+        t.assert_equals(tostring(err), exp_err)
+        box.space.nopk:drop()
+    end, {cg.params.engine})
+end

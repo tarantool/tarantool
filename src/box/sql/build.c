@@ -1417,8 +1417,17 @@ vdbe_emit_create_constraints(struct Parse *parse, int reg_space_id)
 			}
 			fk_def->parent_id = reg_space_id;
 		} else if (fk_parse->is_self_referenced) {
-			struct key_def *pk_key_def =
-				sql_space_primary_key(space)->def->key_def;
+			struct index *primary_key =
+				sql_space_primary_key(space);
+			if (primary_key == NULL) {
+				diag_set(ClientError, ER_CREATE_FK_CONSTRAINT,
+					 fk_def->name,
+					 "referenced space doesn't feature "
+					 "PRIMARY KEY");
+				parse->is_aborted = true;
+				return;
+			}
+			struct key_def *pk_key_def = primary_key->def->key_def;
 			if (pk_key_def->part_count != fk_def->field_count) {
 				diag_set(ClientError, ER_CREATE_FK_CONSTRAINT,
 					 fk_def->name, "number of columns in "\
