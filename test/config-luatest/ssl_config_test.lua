@@ -25,6 +25,7 @@ local common = {
 
 local want_to_skip = {
     test_net_box_conn = false,
+    test_net_box_conn_inplace_cert_rotation = false,
     test_replication_ssl_reconfig = false,
     test_replication_and_connpool_ssl_reconfig = false,
 }
@@ -743,6 +744,93 @@ g.test_net_box_conn = function()
     cluster_check_net_box_conn(cl, CERTS.CA2_C1, 'assert_conn_active')
     -- SSL, client with (other) CA2 certs, CA2: OK, client trust, server trust.
     cluster_check_net_box_conn(cl, CERTS.CA2_C2, 'assert_conn_active')
+
+    cl:drop()
+end
+
+g.after_test('test_net_box_conn_inplace_cert_rotation', function(g)
+    if g.inplace_tmp_dir ~= nil then
+        fio.rmtree(g.inplace_tmp_dir)
+        g.inplace_tmp_dir = nil
+    end
+end)
+
+-- Checks that reloading the same configuration after the SSL CA,
+-- certificate, and key files are replaced in place (without changing
+-- their names) re-reads them from disk: the server switches to the
+-- new CA, an already established client connection survives the
+-- reload (the listen URIs are unchanged, so it is not dropped as
+-- stale), and new clients must present a certificate signed by the
+-- new CA.
+g.test_net_box_conn_inplace_cert_rotation = function()
+    t.skip_if(want_to_skip.test_net_box_conn_inplace_cert_rotation)
+    local done_tm
+
+    -- Temp copies of the server's CA, certificate, and key. They are
+    -- rotated in place (same file names).
+    g.inplace_tmp_dir = fio.tempdir()
+    local tmp_ca = fio.pathjoin(g.inplace_tmp_dir, 'ca.crt')
+    local tmp_server_cert = fio.pathjoin(g.inplace_tmp_dir, 'server.crt')
+    local tmp_server_key = fio.pathjoin(g.inplace_tmp_dir, 'server.key')
+    local function copy_server_files(ca, cert, key)
+        t.assert(fio.copyfile(ca, tmp_ca))
+        t.assert(fio.copyfile(cert, tmp_server_cert))
+        t.assert(fio.copyfile(key, tmp_server_key))
+    end
+
+    -- The server SSL config points at the temp files. ca_file is set,
+    -- so the server verifies client certificates.
+    local server_ssl = {
+        ca_file = tmp_ca,
+        ssl_cert = tmp_server_cert,
+        ssl_key = tmp_server_key,
+    }
+
+    -- Client connection options: the client verifies the server with
+    -- the same temp CA file (rotated in place) and presents a client
+    -- certificate from the real named files.
+    local function client_opts(cert, key)
+        return {ca_file = tmp_ca, ssl_cert = cert, ssl_key = key}
+    end
+    local client_ca1 = client_opts(CA1_CLIENT1_CERT_FILE, CA1_CLIENT1_KEY_FILE)
+    local client_ca2 = client_opts(CA2_CLIENT1_CERT_FILE, CA2_CLIENT1_KEY_FILE)
+
+    done_tm = start_tm('Start with SSL files (CA1).')
+    copy_server_files(CA1_FILE, CA1_SERVER1_CERT_FILE, CA1_SERVER1_KEY_FILE)
+    local cfg_plain = cluster_config_base({instances = {'i1'}})
+    local cfg_ssl = cbuilder:new(cfg_plain)
+        :set_global_option('iproto.listen', {SSL_SOCK})
+        :set_global_option('iproto.drop_stale_connections', true)
+        :set_instance_option('i1', 'iproto.ssl', server_ssl)
+        :config()
+    local cl = cluster_new(cfg_ssl)
+    cl:start({wait_until_ready = false})
+    cluster_set_net_box_opts(cl, client_ca1)
+    cluster_wait_until_ready(cl)
+    done_tm()
+
+    -- Test new conn.
+    -- SSL, client with CA1 certs, CA1: OK, client trust, server trust.
+    -- Stored as old_cn to check it survives the in-place rotation.
+    cluster_check_net_box_conn(cl, client_ca1, 'assert_conn_active', 'old_cn')
+    -- SSL, client with CA2 certs, CA1: error, server don't trust.
+    cluster_check_net_box_conn(cl, client_ca2, 'assert_conn_error')
+
+    done_tm = start_tm('Rotate SSL files in place (CA1 -> CA2).')
+    copy_server_files(CA2_FILE, CA2_SERVER1_CERT_FILE, CA2_SERVER1_KEY_FILE)
+    -- Reload the SAME config (the listen URIs are unchanged).
+    cluster_reload(cl, cfg_ssl, client_ca2)
+    done_tm()
+
+    -- Test old conn survives the reload with the stale-connections drop.
+    utils.conn_checkers.assert_conn_active(cl.old_cn.i1)
+    cluster_close_net_box_conns(cl, 'old_cn')
+
+    -- Test new conn.
+    -- SSL, client with CA1 certs, CA2: error, server don't trust.
+    cluster_check_net_box_conn(cl, client_ca1, 'assert_conn_error')
+    -- SSL, client with CA2 certs, CA2: OK, client trust, server trust.
+    cluster_check_net_box_conn(cl, client_ca2, 'assert_conn_active')
 
     cl:drop()
 end
