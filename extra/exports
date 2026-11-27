@@ -318,6 +318,7 @@ PMurHash32_Process
 PMurHash32_Result
 port_destroy
 random_bytes
+real_random_in_range
 say_check_cfg
 say_from_lua
 say_get_log_level
@@ -436,6 +437,8 @@ tnt_XXH64_copyState
 tnt_XXH64_digest
 tnt_XXH64_reset
 tnt_XXH64_update
+tracer_get_probability
+tracer_set_probability
 tt_strerror
 tt_ulid_compare
 tt_ulid_create
