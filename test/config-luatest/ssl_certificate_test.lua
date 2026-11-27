@@ -7,6 +7,10 @@ local cbuilder = require('luatest.cbuilder')
 local cluster = require('luatest.cluster')
 local server = require('luatest.server')
 
+-- Whether the truncated SSL parameter names are accepted
+-- alongside the full ones. To remove in Tarantool 4.x.
+local SSL_PARAMS_ALLOW_DOUBLE_NAMES = true
+
 local g = t.group()
 
 local test_suite_dir = debug.__dir__
@@ -58,7 +62,10 @@ end)
 
 local function new_fake_config()
     local state = {
-        current_cert = CERT,
+        -- SSL_PARAMS_ALLOW_DOUBLE_NAMES
+        -- By default only full name is defined.
+        current_cert_file = CERT, -- ssl_cert_file value
+        current_cert = nil,       -- ssl_cert value
         alert_values = {},
         status_updates = 0,
         fail_discovery = false,
@@ -80,7 +87,10 @@ local function new_fake_config()
         if state.fail_discovery then
             error('injected discovery failure')
         end
-        if path == 'iproto.ssl.ssl_cert' then
+        if path == 'iproto.ssl.ssl_cert_file' then
+            return state.current_cert_file
+        elseif SSL_PARAMS_ALLOW_DOUBLE_NAMES and
+               path == 'iproto.ssl.ssl_cert' then
             return state.current_cert
         else
             error('unexpected CE configuration path: ' .. path)
@@ -154,6 +164,31 @@ g.test_certificate_discovery = function()
     local ssl_certificate, state = apply_fake_config()
     local records = ssl_certificate._discover()
     t.assert(records[fio.abspath(CERT)].components.iproto)
+    state.current_cert_file = nil
+    t.assert_equals(ssl_certificate._discover(), {})
+end
+
+-- Check short name ('ssl_cert') defined only case.
+g.test_certificate_discovery_short_cert_name = function()
+    t.skip_if(not SSL_PARAMS_ALLOW_DOUBLE_NAMES)
+    local ssl_certificate, state = apply_fake_config()
+    state.current_cert = state.current_cert_file
+    state.current_cert_file = nil
+    local records = ssl_certificate._discover()
+    t.assert(records[fio.abspath(CERT)].components.iproto)
+    state.current_cert = nil
+    t.assert_equals(ssl_certificate._discover(), {})
+end
+
+-- Check both full ('ssl_cert_file') and short name ('ssl_cert')
+-- defined case. The full name overrides short.
+g.test_certificate_discovery_both_cert_name = function()
+    t.skip_if(not SSL_PARAMS_ALLOW_DOUBLE_NAMES)
+    local ssl_certificate, state = apply_fake_config()
+    state.current_cert = MISSING_CERT
+    local records = ssl_certificate._discover()
+    t.assert(records[fio.abspath(CERT)].components.iproto)
+    state.current_cert_file = nil
     state.current_cert = nil
     t.assert_equals(ssl_certificate._discover(), {})
 end
@@ -232,12 +267,12 @@ end
 
 g.test_unreadable_certificate_alert_lifecycle = function()
     local ssl_certificate, state = apply_fake_config()
-    state.current_cert = MISSING_CERT
+    state.current_cert_file = MISSING_CERT
     ssl_certificate._check()
     local _, alert = next(state.alert_values)
     t.assert_equals(alert.type, 'warn')
 
-    state.current_cert = nil
+    state.current_cert_file = nil
     ssl_certificate._check()
     t.assert_equals(next(state.alert_values), nil)
     t.assert_gt(state.status_updates, 0)
@@ -245,11 +280,11 @@ end
 
 g.test_null_configuration = function()
     local ssl_certificate, state = apply_fake_config()
-    state.current_cert = box.NULL
+    state.current_cert_file = box.NULL
     ssl_certificate._check()
     t.assert_equals(next(state.alert_values), nil)
 
-    state.current_cert = nil
+    state.current_cert_file = nil
     ssl_certificate._check()
     t.assert_equals(next(state.alert_values), nil)
 end
@@ -260,7 +295,7 @@ g.test_config_startup_and_reload = function()
     local treegen = require('luatest.treegen')
     local yaml = require('yaml')
     local config = cbuilder:new()
-        :set_global_option('iproto.ssl.ssl_cert', MISSING_CERT)
+        :set_global_option('iproto.ssl.ssl_cert_file', MISSING_CERT)
         :set_global_option('app.file', 'main.lua')
         :add_instance('i-001', {})
         :config()
@@ -306,7 +341,7 @@ end
 
 g.test_periodic_check_during_reload = function()
     local config = cbuilder:new()
-        :set_global_option('iproto.ssl.ssl_cert', MISSING_CERT)
+        :set_global_option('iproto.ssl.ssl_cert_file', MISSING_CERT)
         :add_instance('i-001', {})
         :config()
     local c = cluster:new(config)
