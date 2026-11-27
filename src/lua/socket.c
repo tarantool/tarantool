@@ -185,7 +185,10 @@ struct lbox_sockopt_reg {
 	const char *name;
 	/** Option key */
 	int value;
-	/** 0 - unknown, 1 - int option, 2 - size_t option */
+	/**
+	 * 0 - unknown, 1 - int option, 2 - size_t option,
+	 * 3 - struct timeval option
+	 */
 	int type;
 	/** true if option is writable */
 	bool rw;
@@ -248,10 +251,10 @@ static const struct lbox_sockopt_reg so_opts[] = {
 	{"SO_SNDLOWAT",		SO_SNDLOWAT,		1,	1, },
 #endif
 #ifdef SO_RCVTIMEO
-	{"SO_RCVTIMEO",		SO_RCVTIMEO,		1,	1, },
+	{"SO_RCVTIMEO",		SO_RCVTIMEO,		3,	1, },
 #endif
 #ifdef SO_SNDTIMEO
-	{"SO_SNDTIMEO",		SO_SNDTIMEO,		1,	1, },
+	{"SO_SNDTIMEO",		SO_SNDTIMEO,		3,	1, },
 #endif
 #ifdef SO_REUSEADDR
 	{"SO_REUSEADDR",	SO_REUSEADDR,		1,	1, },
