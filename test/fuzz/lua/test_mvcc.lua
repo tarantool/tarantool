@@ -56,6 +56,13 @@ local params = require('internal.argparse').parse(arg, {
     {'p_commit', 'number'},
     {'max_key', 'number'},
     {'p_null_key', 'number'},
+    {'max_offset', 'number'},
+    {'max_limit', 'number'},
+    {'p_next_page', 'number'},
+    {'prefill_cnt', 'number'},
+    {'p_next_tuples', 'number'},
+    {'p_gc', 'number'},
+    {'p_read_view', 'number'},
 })
 
 local DEFAULT_TEST_DIR_NAME = 'test_mvcc'
@@ -78,6 +85,20 @@ local DEFAULT_P_COMMIT = 0.1
 local DEFAULT_MAX_KEY = 8
 -- Default probability of NULL value for nullable keys.
 local DEFAULT_P_NULL_KEY = 0.1
+-- Default maximum select offset (minimum is 0).
+local DEFAULT_MAX_OFFSET = 4
+-- Default maximum select limit (minimum is 1).
+local DEFAULT_MAX_LIMIT = 4
+-- Default probability of fetching the next page of a paginated select.
+local DEFAULT_P_NEXT_PAGE = 0.5
+-- Default number of random tuples put into each space before a round.
+local DEFAULT_PREFILL_CNT = 32
+-- Default probability of fetching the next tuples of a held iterator.
+local DEFAULT_P_NEXT_TUPLES = 0.5
+-- Default probability of a story garbage collection step between statements.
+local DEFAULT_P_GC = 0.1
+-- Default probability of opening a read view between statements.
+local DEFAULT_P_READ_VIEW = 0.02
 
 if params.help then
     print(([[
@@ -97,10 +118,25 @@ if params.help then
    p_commit <number, %.2f>   - probability of transaction commit
    max_key <number, %d>      - maximum random unsigned key used (minimum is 1)
    p_null_key <number, %.2f> - probability of NULL value for nullable keys
+   max_offset <number, %d>   - maximum select offset (minimum is 0)
+   max_limit <number, %d>    - maximum select limit (minimum is 1)
+   p_next_page <number, %.2f> - probability of fetching the next page of a
+                                paginated select
+   prefill_cnt <number, %d>  - number of random tuples put into each space
+                               before a round
+   p_next_tuples <number, %.2f> - probability of fetching the next tuples of
+                                  a held iterator
+   p_gc <number, %.2f>       - probability of a story garbage collection step
+                               between statements
+   p_read_view <number, %.2f> - probability of opening a read view between
+                                statements
    help (same as -h)         - print this message
 ]]):format(DEFAULT_TEST_DIR_NAME, DEFAULT_N_ROUNDS, DEFAULT_TX_CNT,
            DEFAULT_RO_TX_CNT, DEFAULT_STMT_CNT, DEFAULT_P_ROLLBACK,
-           DEFAULT_P_COMMIT, DEFAULT_MAX_KEY, DEFAULT_P_NULL_KEY))
+           DEFAULT_P_COMMIT, DEFAULT_MAX_KEY, DEFAULT_P_NULL_KEY,
+           DEFAULT_MAX_OFFSET, DEFAULT_MAX_LIMIT, DEFAULT_P_NEXT_PAGE,
+           DEFAULT_PREFILL_CNT, DEFAULT_P_NEXT_TUPLES, DEFAULT_P_GC,
+           DEFAULT_P_READ_VIEW))
     os.exit(0)
 end
 
@@ -124,6 +160,20 @@ local ARG_P_COMMIT = params.p_commit or DEFAULT_P_COMMIT
 local ARG_MAX_KEY = params.max_key or DEFAULT_MAX_KEY
 -- Probability of NULL value for nullable keys.
 local ARG_P_NULL_KEY = params.p_null_key or DEFAULT_P_NULL_KEY
+-- Maximum select offset (minimum is 0).
+local ARG_MAX_OFFSET = params.max_offset or DEFAULT_MAX_OFFSET
+-- Maximum select limit (minimum is 1).
+local ARG_MAX_LIMIT = params.max_limit or DEFAULT_MAX_LIMIT
+-- Probability of fetching the next page of a paginated select.
+local ARG_P_NEXT_PAGE = params.p_next_page or DEFAULT_P_NEXT_PAGE
+-- Number of random tuples put into each space before a round.
+local ARG_PREFILL_CNT = params.prefill_cnt or DEFAULT_PREFILL_CNT
+-- Probability of fetching the next tuples of a held iterator.
+local ARG_P_NEXT_TUPLES = params.p_next_tuples or DEFAULT_P_NEXT_TUPLES
+-- Probability of a story garbage collection step between statements.
+local ARG_P_GC = params.p_gc or DEFAULT_P_GC
+-- Probability of opening a read view between statements.
+local ARG_P_READ_VIEW = params.p_read_view or DEFAULT_P_READ_VIEW
 
 -- Global test constants.
 
@@ -134,6 +184,9 @@ local DML = 0
 local DQL = 1
 -- Transaction control language (BEGIN, COMMIT, ROLLBACK).
 local TCL = 2
+-- Statements executed outside of the transactions, like the story garbage
+-- collection.
+local ENV = 3
 
 -- DML operation subtypes.
 local DELETE = 0
@@ -145,6 +198,18 @@ local UPSERT = 4
 -- DQL operation subtypes.
 local SELECT = 0
 local GET = 1
+local COUNT = 2
+local MIN = 3
+local MAX = 4
+local OFFSET = 5
+local PAGE = 6
+local NEXT_PAGE = 7
+local ITERATOR = 8
+local NEXT_TUPLES = 9
+
+-- Transaction isolation levels. The linearizable level needs synchronous
+-- replication.
+local ISOLATION_LEVELS = {'best-effort', 'read-committed', 'read-confirmed'}
 
 -- Format of test space.
 local SPACE_FORMAT = {
@@ -155,6 +220,10 @@ local SPACE_FORMAT = {
     {'5', type = 'array'},
 }
 
+-- A DQL operation format takes the transaction id (`has_tid`), the space, the
+-- index, the key (`key_cnt` or `full_key`), the iterator (`has_iter`) and the
+-- offset and the limit (`has_window`) or the limit alone (`has_limit`) in this
+-- order.
 local generic_idx_meta = {
     ro_ops = {
         {
@@ -168,18 +237,32 @@ local generic_idx_meta = {
             type = DQL,
             subtype = SELECT,
             full_key = true,
+            has_iter = true,
             fmt = 'box.space.%s.index[%d]:select({%s}, ' ..
                   '{iterator = \'%s\', fullscan = true})',
         },
         {
             type = DQL,
             subtype = GET,
+            full_key = true,
             fmt = 'box.space.%s.index[%d]:get{%s}',
         },
-    }
-}
-generic_idx_meta.ops = {
-        unpack(generic_idx_meta.ro_ops),
+        {
+            type = DQL,
+            subtype = COUNT,
+            key_cnt = 0,
+            fmt = 'box.space.%s.index[%d]:count()',
+        },
+        {
+            type = DQL,
+            subtype = COUNT,
+            full_key = true,
+            has_iter = true,
+            fmt = 'box.space.%s.index[%d]:count({%s}, ' ..
+                  '{iterator = \'%s\'})',
+        },
+    },
+    dml_ops = {
         {
             type = DML,
             subtype = UPDATE,
@@ -206,15 +289,17 @@ generic_idx_meta.ops = {
             subtype = UPSERT,
             fmt = 'box.space.%s:upsert({%s}, {%s, %s})',
         },
+    },
 }
 
-local tree_idx_meta = table.copy(generic_idx_meta)
+local tree_idx_meta = table.deepcopy(generic_idx_meta)
 tree_idx_meta.iters = {'EQ', 'REQ', 'GT', 'GE', 'LT', 'LE'}
 local tree_idx_meta_additional_ops = {
         {
             type = DQL,
             subtype = SELECT,
             key_cnt = 0,
+            has_iter = true,
             fmt = 'box.space.%s.index[%d]:select({}, ' ..
                   '{iterator = \'%s\', fullscan = true})',
         },
@@ -222,16 +307,145 @@ local tree_idx_meta_additional_ops = {
             type = DQL,
             subtype = SELECT,
             key_cnt = 1,
+            has_iter = true,
             fmt = 'box.space.%s.index[%d]:select({%s}, ' ..
                   '{iterator = \'%s\', fullscan = true})',
+        },
+        {
+            type = DQL,
+            subtype = OFFSET,
+            key_cnt = 0,
+            has_iter = true,
+            has_window = true,
+            fmt = 'box.space.%s.index[%d]:select({}, ' ..
+                  '{iterator = \'%s\', offset = %d, limit = %d})',
+        },
+        {
+            type = DQL,
+            subtype = OFFSET,
+            key_cnt = 1,
+            has_iter = true,
+            has_window = true,
+            fmt = 'box.space.%s.index[%d]:select({%s}, ' ..
+                  '{iterator = \'%s\', offset = %d, limit = %d})',
+        },
+        {
+            type = DQL,
+            subtype = OFFSET,
+            full_key = true,
+            has_iter = true,
+            has_window = true,
+            fmt = 'box.space.%s.index[%d]:select({%s}, ' ..
+                  '{iterator = \'%s\', offset = %d, limit = %d})',
+        },
+        {
+            type = DQL,
+            subtype = COUNT,
+            key_cnt = 0,
+            has_iter = true,
+            fmt = 'box.space.%s.index[%d]:count({}, {iterator = \'%s\'})',
+        },
+        {
+            type = DQL,
+            subtype = COUNT,
+            key_cnt = 1,
+            has_iter = true,
+            fmt = 'box.space.%s.index[%d]:count({%s}, ' ..
+                  '{iterator = \'%s\'})',
+        },
+        {
+            type = DQL,
+            subtype = MIN,
+            key_cnt = 0,
+            fmt = 'box.space.%s.index[%d]:min()',
+        },
+        {
+            type = DQL,
+            subtype = MIN,
+            key_cnt = 1,
+            fmt = 'box.space.%s.index[%d]:min({%s})',
+        },
+        {
+            type = DQL,
+            subtype = MIN,
+            full_key = true,
+            fmt = 'box.space.%s.index[%d]:min({%s})',
+        },
+        {
+            type = DQL,
+            subtype = MAX,
+            key_cnt = 0,
+            fmt = 'box.space.%s.index[%d]:max()',
+        },
+        {
+            type = DQL,
+            subtype = MAX,
+            key_cnt = 1,
+            fmt = 'box.space.%s.index[%d]:max({%s})',
+        },
+        {
+            type = DQL,
+            subtype = MAX,
+            full_key = true,
+            fmt = 'box.space.%s.index[%d]:max({%s})',
+        },
+        {
+            type = DQL,
+            subtype = PAGE,
+            has_tid = true,
+            key_cnt = 0,
+            has_iter = true,
+            has_limit = true,
+            fmt = 'select_first_page(%d, \'%s\', %d, {}, \'%s\', %d)',
+        },
+        {
+            type = DQL,
+            subtype = PAGE,
+            has_tid = true,
+            key_cnt = 1,
+            has_iter = true,
+            has_limit = true,
+            fmt = 'select_first_page(%d, \'%s\', %d, {%s}, \'%s\', %d)',
+        },
+        {
+            type = DQL,
+            subtype = PAGE,
+            has_tid = true,
+            full_key = true,
+            has_iter = true,
+            has_limit = true,
+            fmt = 'select_first_page(%d, \'%s\', %d, {%s}, \'%s\', %d)',
+        },
+        {
+            type = DQL,
+            subtype = ITERATOR,
+            has_tid = true,
+            key_cnt = 0,
+            has_iter = true,
+            fmt = 'open_iterator(%d, \'%s\', %d, {}, \'%s\')',
+        },
+        {
+            type = DQL,
+            subtype = ITERATOR,
+            has_tid = true,
+            key_cnt = 1,
+            has_iter = true,
+            fmt = 'open_iterator(%d, \'%s\', %d, {%s}, \'%s\')',
+        },
+        {
+            type = DQL,
+            subtype = ITERATOR,
+            has_tid = true,
+            full_key = true,
+            has_iter = true,
+            fmt = 'open_iterator(%d, \'%s\', %d, {%s}, \'%s\')',
         },
     }
 for _, op in ipairs(tree_idx_meta_additional_ops) do
     table.insert(tree_idx_meta.ro_ops, op)
-    table.insert(tree_idx_meta.ops, op)
 end
 
-local hash_idx_meta = table.copy(generic_idx_meta)
+local hash_idx_meta = table.deepcopy(generic_idx_meta)
 hash_idx_meta.iters = {'EQ'}
 
 local function create_idx_meta(fields, type)
@@ -242,6 +456,7 @@ local function create_idx_meta(fields, type)
     else
         res = table.copy(hash_idx_meta)
     end
+    res.type = type
     res.fields = fields
     return res
 end
@@ -303,6 +518,14 @@ local committed_txs_mask
 local bad_dml_txs_mask
 -- Serial schedule of transactions for the current round.
 local serial
+-- Code putting the initial tuples into the spaces for the current round.
+local prefill_code
+-- Number of committed read-write transactions in the current round.
+local rw_commit_cnt
+-- Read views opened during the current round: the number of read-write
+-- transactions committed before each one and, at the end of the round, the
+-- contents of the memtx indexes it sees.
+local read_views
 -- Server used for executing random transactions with MVCC enabled.
 local random_tx_executor
 -- Server used for checking consistency of executed transactions with MVCC
@@ -310,6 +533,12 @@ local random_tx_executor
 local consistency_checker
 
 local function generate_txn_repro_stmt(stmt)
+    if stmt.type == ENV then
+        if stmt.res == nil then
+            return ('%s\n'):format(stmt.str)
+        end
+        return ('%s -- %s\n'):format(stmt.str, json.encode(stmt.res))
+    end
     return ('tx%d(%q) -- %s\n'):format(stmt.tid, stmt.str,
                                       json.encode(stmt.res))
 end
@@ -426,6 +655,90 @@ local function generate_schema_code()
     return SCHEMA_CODE
 end
 
+-- Helpers of the statements that keep a state across the statements of a
+-- transaction. The state is keyed by the transaction id, so that the serial
+-- re-execution of the statements of a transaction finds the same state.
+local HELPERS_CODE = [[
+-- The last fetched page of each transaction: the select arguments and the
+-- position to continue from.
+pages = {}
+
+function select_first_page(tid, space, idx, key, iter, limit)
+    local tuples, pos = box.space[space].index[idx]:select(key, {
+        iterator = iter, limit = limit, fetch_pos = true, fullscan = true})
+    pages[tid] = {space = space, idx = idx, key = key, iter = iter, pos = pos}
+    return tuples
+end
+
+function select_next_page(tid, limit)
+    local page = pages[tid]
+    if page == nil or page.pos == nil then
+        return {}
+    end
+    local tuples, pos = box.space[page.space].index[page.idx]:select(page.key, {
+        iterator = page.iter, limit = limit, after = page.pos,
+        fetch_pos = true, fullscan = true})
+    page.pos = pos
+    return tuples
+end
+
+-- The iterator held open by each transaction across its other statements.
+iterators = {}
+
+function open_iterator(tid, space, idx, key, iter)
+    local gen, param, state = box.space[space].index[idx]:pairs(key, {
+        iterator = iter}):unwrap()
+    iterators[tid] = {gen = gen, param = param, state = state}
+    return true
+end
+
+function next_tuples(tid, count)
+    local iterator = iterators[tid]
+    local tuples = {}
+    if iterator == nil or iterator.state == nil then
+        return tuples
+    end
+    for _ = 1, count do
+        local tuple
+        iterator.state, tuple = iterator.gen(iterator.param, iterator.state)
+        if iterator.state == nil then
+            break
+        end
+        table.insert(tuples, tuple)
+    end
+    return tuples
+end
+
+-- The read views opened during a round. They are opened back to back, so
+-- they are not throttled.
+read_views = {}
+require('internal.tweaks').read_view_throttle_interval = 0
+
+function open_read_view(i)
+    read_views[i] = box.read_view.open()
+end
+
+-- The contents of the memtx indexes seen by a read view, which is closed.
+function read_view_state(i)
+    local rv = read_views[i]
+    local state = {}
+    for idx_id = 0, #box.space.m.index do
+        state[idx_id + 1] = rv.space.m.index[idx_id]:select({}, {
+            fullscan = true})
+    end
+    rv:close()
+    return state
+end
+
+-- The number of stories of the memtx transaction manager.
+function stories_count()
+    local stats = box.stat.memtx.tx().mvcc.tuples
+    return stats.used.stories.count + stats.tracking.stories.count +
+           stats.read_view.stories.count
+end
+
+]]
+
 local function generate_txn_proxy(id)
     return ('local tx%d = txn_proxy:new()\n'):format(id)
 end
@@ -437,7 +750,7 @@ os.exit()
 
 local function dump_repro()
     repro_file:write(generate_init_code('repro', true) ..
-                     generate_schema_code())
+                     generate_schema_code() .. HELPERS_CODE .. prefill_code)
     for i = 1, ARG_TX_CNT do
         repro_file:write(generate_txn_proxy(i))
     end
@@ -450,7 +763,7 @@ end
 
 local function dump_serial()
     serial_file:write(generate_init_code('serial', false) ..
-                      generate_schema_code())
+                      generate_schema_code() .. HELPERS_CODE .. prefill_code)
     for _, stmt in ipairs(serial) do
         serial_file:write(generate_txn_serial_stmt(stmt))
     end
@@ -460,14 +773,27 @@ end
 local function tx_call(tx, operation)
     local ok, res = pcall(tx._strm.eval, tx._strm, 'return ' .. operation.str)
     table.insert(stmts, {
-        tid  = tx.id,
-        type = operation.type,
-        str  = operation.str,
-        ok   = ok,
-        res  = res,
+        tid     = tx.id,
+        eng     = tx.eng.name,
+        type    = operation.type,
+        str     = operation.str,
+        ordered = operation.ordered,
+        ok      = ok,
+        res     = res,
     })
     if ok and operation.type == DML then
         tx.ro = false
+    end
+    -- A page shorter than the limit ends the scan.
+    if ok and (operation.subtype == PAGE or
+               operation.subtype == NEXT_PAGE) then
+        tx.page = #res == operation.limit
+    end
+    -- Fewer tuples than requested end the iteration.
+    if ok and operation.subtype == ITERATOR then
+        tx.iterator = true
+    elseif ok and operation.subtype == NEXT_TUPLES then
+        tx.iterator = #res == operation.limit
     end
     if not ok then
         if res.message == 'Transaction has been aborted by conflict' then
@@ -488,13 +814,34 @@ local function tx_call(tx, operation)
     return ok, res
 end
 
+-- Execute a statement outside of the transactions on the executor, recording
+-- it and its result for the reproducer.
+local function env_call(str)
+    local stmt = {type = ENV, str = str}
+    table.insert(stmts, stmt)
+    local ok, res = pcall(random_tx_executor.eval, random_tx_executor,
+                          'return ' .. str)
+    if not ok then
+        dump_repro()
+        log.info(('statement \'%s\' failed: %s'):format(str, tostring(res)))
+        os.exit(1)
+    end
+    stmt.res = res
+    return res
+end
+
 local function tx_begin(tx)
     assert(not tx.running and not tx.committed and not tx.aborted)
-    tx({
+    local ok, err = tx({
         tid  = tx.id,
         type = TCL,
-        str  = 'box.begin()',
+        str  = ('box.begin({txn_isolation = \'%s\'})'):format(
+            ISOLATION_LEVELS[math.random(#ISOLATION_LEVELS)]),
     })
+    if not ok then
+        log.info('stream:begin failed: ' .. err.message)
+        os.exit(1)
+    end
     tx.running = true
 end
 
@@ -515,10 +862,14 @@ end
 
 local function tx_commit(tx)
     assert(tx.running and not tx.committed and not tx.aborted)
+    -- A commit not waiting for the WAL write leaves its changes prepared
+    -- for the next statements, which see them depending on their isolation
+    -- level.
     local ok, err = tx({
         tid  = tx.id,
         type = TCL,
-        str  = 'box.commit()',
+        str  = math.random(2) == 1 and 'box.commit()' or
+               'box.commit({wait = \'submit\'})',
     })
     if not ok then
         if err.message ~= 'Transaction has been aborted by conflict' then
@@ -532,6 +883,9 @@ local function tx_commit(tx)
     end
     tx.running = false
     tx.committed = true
+    if not tx.ro then
+        rw_commit_cnt = rw_commit_cnt + 1
+    end
     return true
 end
 
@@ -548,7 +902,10 @@ local function tx_new(conn, id)
         aborted   = false,
         bad_dml   = false,
         committed = false,
+        eng       = ENGINES[math.random(#ENGINES)],
         id        = id,
+        iterator  = false,
+        page      = false,
         ro        = true,
         running   = false,
         _strm     = conn:new_stream(),
@@ -562,7 +919,7 @@ end
 local function gen_array()
     local array = {}
     for _ = 1, math.random(4) do
-        table.insert(array, random_number())
+        table.insert(array, math.random(ARG_MAX_KEY * 8))
     end
     return ('{%s}'):format(table.concat(array, ', '))
 end
@@ -593,32 +950,76 @@ local function gen_tuple()
     return tuple
 end
 
+-- Statements replacing random tuples into the spaces. Replacements failing
+-- on duplicate secondary keys are ignored.
+local function generate_prefill_code()
+    local code = {}
+    for _ = 1, ARG_PREFILL_CNT do
+        for _, eng in ipairs(ENGINES) do
+            table.insert(code, ('pcall(box.space.%s.replace, box.space.%s, ' ..
+                                '{%s})'):format(eng.space, eng.space,
+                                                table.concat(gen_tuple(),
+                                                             ', ')))
+        end
+    end
+    return table.concat(code, '\n') .. '\n'
+end
+
 local function gen_update(fields)
     return {('{\'=\', 3, %s}'):format(gen_field(fields[1])),
             ('{\'=\', 4, %s}'):format(gen_field(fields[2]))}
 end
 
-local function gen_random_operation(ro)
-    local eng = ENGINES[math.random(#ENGINES)]
+local function gen_random_operation(tx)
+    if tx.page and math.random() < ARG_P_NEXT_PAGE then
+        local limit = math.random(ARG_MAX_LIMIT)
+        return {
+            type = DQL,
+            subtype = NEXT_PAGE,
+            ordered = true,
+            limit = limit,
+            str = ('select_next_page(%d, %d)'):format(tx.id, limit),
+        }
+    end
+    if tx.iterator and math.random() < ARG_P_NEXT_TUPLES then
+        local limit = math.random(ARG_MAX_LIMIT)
+        return {
+            type = DQL,
+            subtype = NEXT_TUPLES,
+            ordered = true,
+            limit = limit,
+            str = ('next_tuples(%d, %d)'):format(tx.id, limit),
+        }
+    end
+    local ro = tx.id <= ARG_RO_TX_CNT
+    local eng = tx.eng
     local idx_id = math.random(#eng.idxs) - 1
     local idx = eng.idxs[idx_id + 1]
-    local op = ro and idx.ro_ops[math.random(#idx.ro_ops)] or
-               idx.ops[math.random(#idx.ops)]
+    local ops = (ro or math.random(2) == 1) and idx.ro_ops or idx.dml_ops
+    local op = ops[math.random(#ops)]
     local keys = gen_key(idx.fields)
     local key = table.concat(keys, ', ')
+    -- A tree index returns its tuples in the order of the index.
+    op.ordered = idx.type == 'TREE'
     if op.type == DQL then
-        if op.subtype == SELECT then
-            local iter = idx.iters[math.random(#idx.iters)]
-            if op.key_cnt == 0 then
-                op.str = op.fmt:format(eng.space, idx_id, iter)
-            elseif op.key_cnt == 1 then
-                op.str = op.fmt:format(eng.space, idx_id, keys[1], iter)
-            elseif op.full_key then
-                op.str = op.fmt:format(eng.space, idx_id, key, iter)
-            end
-        elseif op.subtype == GET then
-            op.str = op.fmt:format(eng.space, idx_id, key)
+        local args = op.has_tid and {tx.id, eng.space, idx_id} or
+                     {eng.space, idx_id}
+        if op.key_cnt == 1 then
+            table.insert(args, keys[1])
+        elseif op.full_key then
+            table.insert(args, key)
         end
+        if op.has_iter then
+            table.insert(args, idx.iters[math.random(#idx.iters)])
+        end
+        if op.has_window then
+            table.insert(args, math.random(0, ARG_MAX_OFFSET))
+        end
+        if op.has_window or op.has_limit then
+            op.limit = math.random(ARG_MAX_LIMIT)
+            table.insert(args, op.limit)
+        end
+        op.str = op.fmt:format(unpack(args))
     else
         local tuple = gen_tuple()
         local tuple_str = table.concat(tuple, ', ')
@@ -690,9 +1091,41 @@ local function execute_random_txs()
         if tx == nil then
             break
         end
-        tx_execute_stmt(tx, gen_random_operation(tx.id <= ARG_RO_TX_CNT))
+        tx_execute_stmt(tx, gen_random_operation(tx))
+        if math.random() < ARG_P_GC then
+            env_call(('box.internal.memtx_tx_gc(%d)'):format(
+                math.random(100)))
+        end
+        if math.random() < ARG_P_READ_VIEW then
+            table.insert(read_views, {prefix = rw_commit_cnt})
+            env_call(('open_read_view(%d)'):format(#read_views))
+        end
     end
     txs_stop(txs)
+    -- Wait for the commits not waiting for the WAL write.
+    env_call('box.ctl.wal_sync()')
+end
+
+-- Read the memtx indexes through every read view of the round and close it.
+local function read_read_views()
+    -- The garbage collector must keep what the read views see.
+    env_call('box.internal.memtx_tx_gc(1000000)')
+    for i, rv in ipairs(read_views) do
+        rv.state = env_call(('read_view_state(%d)'):format(i))
+    end
+end
+
+-- With no transaction left, the garbage collector must be able to collect
+-- all the stories.
+local function check_stories_collected()
+    env_call('box.internal.memtx_tx_gc(1000000)')
+    local stories = env_call('stories_count()')
+    if stories ~= 0 then
+        dump_repro()
+        log.info(('%d stories left after the garbage collection'):format(
+            stories))
+        os.exit(1)
+    end
 end
 
 local function cast(v)
@@ -733,7 +1166,9 @@ local function is_less(lhs, rhs)
     return false
 end
 
-local function is_equal(lhs, rhs)
+-- Compare two results. Lists of tuples are compared as sets unless @a ordered
+-- is set.
+local function is_equal(lhs, rhs, ordered)
     lhs = cast(lhs)
     rhs = cast(rhs)
 
@@ -758,8 +1193,10 @@ local function is_equal(lhs, rhs)
         if type(rhs[1]) ~= 'table' then
             return false
         end
-        table.sort(lhs, is_less)
-        table.sort(rhs, is_less)
+        if not ordered then
+            table.sort(lhs, is_less)
+            table.sort(rhs, is_less)
+        end
     end
 
     for k, v in ipairs(lhs) do
@@ -775,7 +1212,71 @@ local function is_equal(lhs, rhs)
     return true
 end
 
+local function memtx_idxs()
+    for _, eng in ipairs(ENGINES) do
+        if eng.name == 'memtx' then
+            return eng.idxs
+        end
+    end
+end
+
+-- Compare the read views opened after @a prefix committed read-write
+-- transactions with the checker after the serial execution of these.
+local function check_read_views(prefix)
+    local idxs = memtx_idxs()
+    for i, rv in ipairs(read_views) do
+        if rv.prefix ~= prefix then
+            goto continue
+        end
+        for idx_id = 0, #idxs - 1 do
+            local got = consistency_checker:eval(
+                ('return box.space.m.index[%d]:select({}, ' ..
+                 '{fullscan = true})'):format(idx_id))
+            local ordered = idxs[idx_id + 1].type == 'TREE'
+            if not is_equal(rv.state[idx_id + 1], got, ordered) then
+                dump_repro()
+                dump_serial()
+                local msg = ('read view %d of index %d of space m differs ' ..
+                             'from the serial state after %d read-write ' ..
+                             'transactions:\nexpected:\n%s\ngot:\n%s\n'):format(
+                             i, idx_id, prefix,
+                             yaml.encode(rv.state[idx_id + 1]),
+                             yaml.encode(got))
+                log.info(msg)
+                os.exit(1)
+            end
+        end
+        ::continue::
+    end
+end
+
+-- A vinyl transaction is re-executed in a transaction of the checker, so that
+-- the reads keeping a state across its statements see its own writes. A memtx
+-- transaction cannot span the requests of a stream without MVCC, so it is
+-- re-executed statement by statement.
 local function try_apply_tx(tx_operations, rw)
+    local first = tx_operations[1]
+    local stream
+    if first ~= nil and first.eng == 'vinyl' then
+        stream = consistency_checker.net_box:new_stream()
+        stream:begin()
+        if rw then
+            table.insert(serial, {tid = first.tid, str = 'box.begin()'})
+        end
+    end
+    local function finish(ok)
+        if stream == nil then
+            return
+        end
+        if ok then
+            stream:commit()
+        else
+            stream:rollback()
+        end
+        if rw then
+            table.insert(serial, {tid = first.tid, str = 'box.commit()'})
+        end
+    end
     for i, operation in ipairs(tx_operations) do
         if not operation.ok then
             goto continue
@@ -786,10 +1287,15 @@ local function try_apply_tx(tx_operations, rw)
         end
 
         local _, res = pcall(function()
-            return consistency_checker:eval('return ' .. operation.str)
+            local code = 'return ' .. operation.str
+            if stream ~= nil then
+                return stream:eval(code)
+            end
+            return consistency_checker:eval(code)
         end)
-        if not is_equal(res, operation.res) then
+        if not is_equal(res, operation.res, operation.ordered) then
             if not rw then
+                finish(false)
                 return false
             end
             dump_repro()
@@ -806,6 +1312,7 @@ local function try_apply_tx(tx_operations, rw)
         end
         ::continue::
     end
+    finish(true)
     return true
 end
 
@@ -820,17 +1327,17 @@ local function try_serialize()
 
     for i = 1, #stmts do
         local stmt = stmts[i]
-        if not committed_txs_mask[stmt.tid] then
+        if stmt.type == ENV or not committed_txs_mask[stmt.tid] then
             goto continue
         end
 
-        if stmt.str:find('begin') and committed_txs_mask[stmt.tid] and
+        if stmt.str:startswith('box.begin') and committed_txs_mask[stmt.tid] and
            ro_txs_mask[stmt.tid] and not bad_dml_txs_mask[stmt.tid] then
             table.insert(ro_txs, stmt.tid)
         end
 
-        if stmt.str:find('commit') and committed_txs_mask[stmt.tid] and
-           not ro_txs_mask[stmt.tid] then
+        if stmt.str:startswith('box.commit') and
+           committed_txs_mask[stmt.tid] and not ro_txs_mask[stmt.tid] then
             table.insert(rw_txs, stmt.tid)
         end
 
@@ -846,8 +1353,9 @@ local function try_serialize()
             ro_txs[i] = nil
         end
     end
+    check_read_views(0)
 
-    for _, rw_tid in ipairs(rw_txs) do
+    for prefix, rw_tid in ipairs(rw_txs) do
         -- Try to serialize read-write transactions.
         try_apply_tx(tx_operations[rw_tid], true)
         -- Afterwards, try to serialize read-only transactions again.
@@ -856,6 +1364,7 @@ local function try_serialize()
                 ro_txs[i] = nil
             end
         end
+        check_read_views(prefix)
     end
 
     if next(ro_txs) ~= nil then
@@ -869,6 +1378,45 @@ local function try_serialize()
             'transactions: ' .. table.concat(failed_ro_set, ', ')
         log.info(msg)
         os.exit(1)
+    end
+end
+
+-- The contents of every index of every space, read with @a eval.
+local function space_states(eval)
+    local states = {}
+    for _, eng in ipairs(ENGINES) do
+        states[eng.space] = {}
+        for idx_id = 0, #eng.idxs - 1 do
+            states[eng.space][idx_id] = eval(
+                ('box.space.%s.index[%d]:select({}, ' ..
+                 '{fullscan = true})'):format(eng.space, idx_id))
+        end
+    end
+    return states
+end
+
+-- Compare the spaces of the executor at the end of the round with the spaces
+-- of the checker after the serial execution of the committed transactions.
+local function check_final_state(expected)
+    local got = space_states(function(str)
+        return consistency_checker:eval('return ' .. str)
+    end)
+    for _, eng in ipairs(ENGINES) do
+        for idx_id = 0, #eng.idxs - 1 do
+            local tuples = expected[eng.space][idx_id]
+            local ordered = eng.idxs[idx_id + 1].type == 'TREE'
+            if not is_equal(tuples, got[eng.space][idx_id], ordered) then
+                dump_repro()
+                dump_serial()
+                local msg = ('final state of index %d of space %s differs ' ..
+                             'from the serial one:\n' ..
+                             'expected:\n%s\ngot:\n%s\n'):format(
+                             idx_id, eng.space, yaml.encode(tuples),
+                             yaml.encode(got[eng.space][idx_id]))
+                log.info(msg)
+                os.exit(1)
+            end
+        end
     end
 end
 
@@ -933,6 +1481,8 @@ local function setup_test()
     consistency_checker:start()
     random_tx_executor:exec(fiber_set_max_slice)
     consistency_checker:exec(fiber_set_max_slice)
+    random_tx_executor:eval(HELPERS_CODE)
+    consistency_checker:eval(HELPERS_CODE)
 
     open_files()
 end
@@ -951,21 +1501,30 @@ local function run_test()
 
     for _ = 1, ARG_N_ROUNDS do
         random_tx_executor:eval(schema_creation_code)
+        prefill_code = generate_prefill_code()
+        random_tx_executor:eval(prefill_code)
 
         stmts = {}
+        rw_commit_cnt = 0
+        read_views = {}
         committed_txs_mask = {}
         ro_txs_mask = {}
         bad_dml_txs_mask = {}
         execute_random_txs()
+        read_read_views()
+        check_stories_collected()
+        local final_state = space_states(env_call)
         random_tx_executor:exec(function()
             box.space.m:drop()
             box.space.v:drop()
         end)
 
         consistency_checker:eval(schema_creation_code)
+        consistency_checker:eval(prefill_code)
 
         serial = {}
         try_serialize()
+        check_final_state(final_state)
         consistency_checker:exec(function()
             box.space.m:drop()
             box.space.v:drop()
