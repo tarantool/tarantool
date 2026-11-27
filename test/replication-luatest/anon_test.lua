@@ -235,3 +235,116 @@ for _, mode in ipairs({'candidate', 'manual', 'voter'}) do
             lg.cluster:drop()
         end
 end
+
+local g4 = t.group('group4')
+
+local function assert_replication_anon_is_empty(srv)
+    srv:exec(function(timeout)
+        t.helpers.retrying({timeout = timeout}, function()
+            t.assert_equals(box.info.replication_anon.count, 0)
+        end)
+        t.assert_equals(box.info.replication_anon(), {})
+    end, {wait_timeout})
+end
+
+local function assert_replication_anon_has_one_entry(srv)
+    srv:exec(function(timeout)
+        t.helpers.retrying({timeout = timeout}, function()
+            t.assert_equals(box.info.replication_anon.count, 1)
+        end)
+        local anon = box.info.replication_anon()
+        local n = 0
+        for _ in pairs(anon) do
+            n = n + 1
+        end
+        t.assert_equals(n, 1)
+    end, {wait_timeout})
+end
+
+g4.before_each(function(lg)
+    lg.cluster = cluster:new({})
+    lg.master = lg.cluster:build_and_add_server({alias = 'master'})
+    lg.replica = lg.cluster:build_and_add_server({
+        alias = 'replica',
+        box_cfg = {
+            replication = {
+                server.build_listen_uri('master', lg.cluster.id),
+            },
+            replication_timeout = 0.1,
+            read_only = true,
+            replication_anon = true,
+        },
+    })
+    lg.master:start()
+end)
+
+g4.after_each(function(lg)
+    lg.cluster:drop()
+end)
+
+--
+-- gh-13746: box.info.replication_anon was not properly updated after an
+-- anonymous replica had been deanonymized.
+--
+g4.test_anon_replication_info_after_deanonymization = function(lg)
+    -- No anonymous replicas before the anon replica is started.
+    assert_replication_anon_is_empty(lg.master)
+
+    -- Once the anon replica is connected, both the master and the anon
+    -- replica itself must report it as an anonymous follower.
+    lg.replica:start()
+    lg.replica:exec(function() t.assert_equals(box.info.id, 0) end)
+    assert_replication_anon_has_one_entry(lg.master)
+    assert_replication_anon_has_one_entry(lg.replica)
+
+    -- Deanonymize the replica.
+    lg.replica:exec(function() box.cfg{replication_anon = false} end)
+    lg.replica:wait_for_vclock_of(lg.master)
+    lg.replica:exec(function() t.assert_not_equals(box.info.id, 0) end)
+    -- After the transition the replica must report itself as registered and
+    -- no longer be counted as anonymous.
+    assert_replication_anon_is_empty(lg.replica)
+    assert_replication_anon_is_empty(lg.master)
+end
+
+--
+-- gh-13747: instance_name must be rejected for an anonymous replica
+-- until it is deanonymized.
+--
+g4.test_forbid_setting_instance_name_for_anon_replica = function(lg)
+    lg.replica:start()
+
+    lg.replica:exec(function()
+        -- Precondition: the instance is anonymous.
+        t.assert_equals(box.info.id, 0)
+        -- A name can't be given to an anonymous replica.
+        t.assert_error_msg_contains('anonymous replica', box.cfg,
+                                    {instance_name = 'replica'})
+        -- Nothing was applied: no name, still anonymous.
+        t.assert_equals(box.info.name, nil)
+        t.assert_equals(box.cfg.instance_name, nil)
+        t.assert_equals(box.info.id, 0)
+    end)
+
+    lg.replica:exec(function()
+        -- An anonymous replica can't become writable on its own.
+        t.assert_error_msg_contains(
+            'the value may be set to false only when ' ..
+            'replication_anon is false', box.cfg, {read_only = false})
+        t.assert_equals(box.info.ro, true)
+    end)
+
+    lg.replica:exec(function()
+        -- Only together with deanonymization can the replica become writable
+        box.cfg{read_only = false, replication_anon = false}
+        t.assert_not_equals(box.info.id, 0)
+        t.helpers.retrying({}, function()
+            t.assert_equals(box.info.ro, false)
+        end)
+        -- Only then can it be given a name.
+        box.cfg{instance_name = 'replica'}
+        t.assert_equals(box.info.name, 'replica')
+    end)
+
+    lg.replica:wait_for_vclock_of(lg.master)
+end
