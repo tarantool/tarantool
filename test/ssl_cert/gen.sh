@@ -44,6 +44,30 @@ gen_cert()
 }
 
 #
+# Generates new intermediate CA signed by the given CA.
+#
+# The new private key and certificate are written to files "${ca}.key" and
+# "${ca}.crt" respectively where "${ca}" is the name of the new CA as given
+# in the first argument. The CA and private key used for signing the new
+# certificate should be located in "${parent}.crt" and "${parent}.key" where
+# "${parent}" is the value of the second argument.
+#
+gen_intermediate_ca()
+{
+    local ca="${1}"
+    local parent="${2}"
+    openssl req -new -nodes -newkey "${NEWKEY_ARG}" -subj \
+        "/CN=intermediate/OU=Unknown/O=Unknown/L=Unknown/ST=unknown/C=AU" \
+        -keyout "${ca}.key" -out "${ca}.csr"
+    printf '%s\n' "basicConstraints=critical,CA:TRUE" \
+        "keyUsage=critical,keyCertSign,cRLSign" > "${ca}.ext"
+    openssl x509 -req -days "${DAYS_ARG}" -extfile "${ca}.ext" \
+        -CAcreateserial -CA "${parent}.crt" -CAkey "${parent}.key" \
+        -in "${ca}.csr" -out "${ca}.crt"
+    rm -f "${ca}.csr" "${ca}.ext"
+}
+
+#
 # Encrypt private key file.
 # $1 - file name without extension
 # $2 - pass phrase
@@ -73,3 +97,14 @@ gen_cert server2_2 ca2
 gen_cert server2_3 ca2
 gen_cert client2 ca2
 gen_cert client2_2 ca2
+
+# The certificates of server3 and client3 are signed by an intermediate CA.
+# The *_chain.crt files hold the certificate followed by the intermediate,
+# and ca3_and_intermediate3.crt trusts both CAs.
+gen_ca ca3
+gen_intermediate_ca intermediate3 ca3
+gen_cert server3 intermediate3
+gen_cert client3 intermediate3
+cat server3.crt intermediate3.crt > server3_chain.crt
+cat client3.crt intermediate3.crt > client3_chain.crt
+cat ca3.crt intermediate3.crt > ca3_and_intermediate3.crt
