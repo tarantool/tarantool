@@ -152,3 +152,47 @@ g.test_nested_subqueries_height = function()
         t.assert_equals(err.message, exp_err)
     end)
 end
+
+--
+-- gh-13358: make sure that long queries with VALUES do not cause a crash.
+--
+g.test_13358_queries_with_values = function()
+    g.server:exec(function()
+        local exp_err = "Number of rows in a VALUES subquery "..
+                        "1000 exceeds the limit (200)"
+        local rows = {}
+        for i = 1, 1000 do rows[i] = '(' .. i .. ')' end
+        local sql = 'SELECT EXISTS (VALUES ' .. table.concat(rows, ', ') .. ');'
+        local _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+
+        sql = 'SELECT 1 WHERE (VALUES ' .. table.concat(rows, ', ') .. ') = 1;'
+        _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+
+        sql = 'SELECT 1 LIMIT (VALUES ' .. table.concat(rows, ', ') .. ');'
+        _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+
+        sql = 'SELECT 1 WHERE 1 BETWEEN (VALUES ' ..
+              table.concat(rows, ', ') .. ') AND 2;'
+        _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+
+        sql = 'SELECT 1 WHERE 1 BETWEEN 0 AND (VALUES ' ..
+              table.concat(rows, ', ') .. ');'
+        _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+
+        rows = {}
+        for i = 1, 1000 do rows[i] = '(' .. i .. ', 1, 2)' end
+        sql = 'SELECT (VALUES ' .. table.concat(rows, ', ') .. ') < (1,2,3);'
+        box.execute(sql)
+
+        rows = {}
+        for i = 1, 1000 do rows[i] = "('a" .. i .. "')" end
+        sql = 'SELECT (VALUES ' ..
+              table.concat(rows, ', ') .. ') COLLATE "unicode";'
+        box.execute(sql)
+    end)
+end
