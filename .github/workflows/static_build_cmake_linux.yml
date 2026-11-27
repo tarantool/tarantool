@@ -91,6 +91,8 @@ jobs:
           submodule: ${{ inputs.submodule }}
           revision: ${{ inputs.revision }}
       - name: test
+        env:
+          ENABLE_COREDUMP_TESTS: 1
         run: make -f .test.mk test-static-cmake
       - name: artifacts
         uses: actions/upload-artifact@v4
