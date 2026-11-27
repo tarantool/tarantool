@@ -465,22 +465,10 @@ g.test_4760_make_sure_names_bindings_parsed_correctly = function(cg)
         t.assert_equals(s.params[3], exp)
 
         exp = {
-            name = "?",
-            type = "ANY",
-        }
-        t.assert_equals(s.params[4], exp)
-
-        exp = {
             name = "@name2",
             type = "ANY",
         }
-        t.assert_equals(s.params[5], exp)
-
-        exp = {
-            name = "?",
-            type = "ANY",
-        }
-        t.assert_equals(s.params[6], exp)
+        t.assert_equals(s.params[4], exp)
         _G.unprepare(s.stmt_id)
     end)
 end
@@ -490,6 +478,7 @@ end
 -- execution.
 g.test_4825_make_sure_values_not_appear_next = function(cg)
     cg.server:exec(function(remote)
+        _G.execute([[SET SESSION "sql_named_var_default_null" = true;]])
         local s = _G.prepare('SELECT :a, :b, :c');
         local exp = {
             {[':a'] = 1},
@@ -561,6 +550,7 @@ g.test_4825_make_sure_values_not_appear_next = function(cg)
         box.cfg{sql_cache_size = 5 * 1024 * 1024}
         box.space.test:drop()
         t.assert_equals(box.space.test, nil)
+        _G.execute([[SET SESSION "sql_named_var_default_null" = false;]])
     end)
 end
 

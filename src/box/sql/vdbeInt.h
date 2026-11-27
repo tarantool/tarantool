@@ -312,6 +312,13 @@ struct Vdbe {
 	 * Each element of array consists of a name and a value.
 	 */
 	const struct sql_bind *bind;
+	/**
+	 * Checks whether anonymous variables mix with other bound variables.
+	 * 0 - only numbered or named variables have been encountered so far;
+	 * 1 - only anonymous variables have been encountered so far;
+	 * 2 - the current variable is the first one encountered.
+	 */
+	int mix_anon_vars;
 };
 
 /*

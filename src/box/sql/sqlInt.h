@@ -870,6 +870,8 @@ struct sql {
 					 */
 enum {
 	SQL_SeqScan = 0x00000008,
+	sql_named_var_default_null = 0x00000010,
+	sql_mixed_anon_vars = 0x00000020,
 	SQL_DEFAULT_FLAGS = SQL_EnableTrigger | SQL_AutoIndex |
 			    SQL_RecTriggers | SQL_SeqScan,
 };
@@ -1216,12 +1218,7 @@ struct Expr {
 		char *zToken;	/* Token value. Zero terminated and dequoted */
 		int iValue;	/* Non-negative integer value if EP_IntValue */
 	} u;
-	/**
-	 * For anonymous variable it is a position in PVList of last name before
-	 * this variable (?). If it takes the value 0 then there is no named
-	 * variable before or then the last variable was numeric ($N).
-	 * For named variable it is its own position in PVList.
-	 */
+	/** Position in PVList for named variable. */
 	int var_base;
 
 	/* If the EP_TokenOnly flag is set in the Expr.flags mask, then no
@@ -1862,17 +1859,8 @@ struct Parse {
 	int iSelectId;		/* ID of current select for EXPLAIN output */
 	int iNextSelectId;	/* Next available select ID for EXPLAIN output */
 	VList *pVList;		/* Mapping between variable names and numbers */
-	/** Information about last named variable before anonymous variables. */
-	struct {
-		/**
-		 * Relative position of the next anonymous variable (?):
-		 * an offset from the named variable when it is set,
-		 * otherwise an absolute position.
-		 */
-		int offset;
-		/** Position of last named variable. */
-		int pos;
-	} var;
+	/** Position of last anonymous variable. */
+	int anon_pos;
 	TriggerPrg *pTriggerPrg;	/* Linked list of coded triggers */
 	With *pWith;		/* Current WITH clause, or NULL */
 	With *pWithToFree;	/* Free this WITH object at the end of the parse */

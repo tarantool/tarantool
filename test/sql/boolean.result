@@ -389,6 +389,10 @@ SELECT GROUP_CONCAT(a, ' +++ ') FROM t0;
  | ---
  | - true
  | ...
+box.execute('SET SESSION "sql_mixed_anon_vars" = true;')
+ | ---
+ | - row_count: 1
+ | ...
 box.execute('SELECT ?, ?, return_type($1), TYPEOF($2);', {true, false})
  | ---
  | - metadata:
@@ -402,6 +406,10 @@ box.execute('SELECT ?, ?, return_type($1), TYPEOF($2);', {true, false})
  |     type: string
  |   rows:
  |   - [true, false, 'boolean', 'boolean']
+ | ...
+box.execute('SET SESSION "sql_mixed_anon_vars" = false;')
+ | ---
+ | - row_count: 1
  | ...
 
 parameters = {}
