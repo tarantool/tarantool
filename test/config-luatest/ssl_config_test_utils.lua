@@ -113,14 +113,4 @@ function M.conn_checkers.assert_conn_reset(conn)
     end)
 end
 
-function M.assert_conn_reset_if_enabled(conn, enabled)
-    checks('table', 'boolean')
-    if not enabled then
-        M.conn_checkers.assert_conn_active(conn)
-        return
-    end
-
-    M.conn_checkers.assert_conn_reset(conn)
-end
-
 return M
