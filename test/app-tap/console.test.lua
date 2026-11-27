@@ -26,9 +26,9 @@ test:plan(78)
 local server = console.listen(CONSOLE_SOCKET)
 test:ok(server ~= nil, "console.listen started")
 local client = socket.tcp_connect("unix/", CONSOLE_SOCKET)
+test:ok(client ~= nil, "connect to console")
 local handshake = client:read{chunk = 128}
 test:ok(string.match(handshake, '^Tarantool .*console') ~= nil, 'Handshake')
-test:ok(client ~= nil, "connect to console")
 
 --
 -- gh-2677: box.session.push, text protocol support.
