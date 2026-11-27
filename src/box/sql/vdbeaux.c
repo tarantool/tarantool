@@ -1530,7 +1530,7 @@ vdbe_metadata_delete(struct Vdbe *v)
 			free(v->metadata[i].collation);
 			free(v->metadata[i].span);
 		}
-		free(v->metadata);
+		sql_xfree(v->metadata);
 	}
 }
 
@@ -1545,14 +1545,9 @@ sqlVdbeSetNumCols(Vdbe * p, int nResColumn)
 {
 	vdbe_metadata_delete(p);
 	p->nResColumn = (u16) nResColumn;
-	p->metadata = (struct sql_column_metadata *)
-		calloc(nResColumn, sizeof(struct sql_column_metadata));
-	if (p->metadata == NULL) {
-		diag_set(OutOfMemory,
-			 nResColumn * sizeof(struct sql_column_metadata),
-			 "calloc", "metadata");
-		return;
-	}
+	size_t size = nResColumn * sizeof(*p->metadata);
+	p->metadata = sql_xmalloc(size);
+	memset(p->metadata, 0, size);
 	for (int i = 0; i < nResColumn; ++i)
 		p->metadata[i].nullable = -1;
 
@@ -1592,7 +1587,7 @@ vdbe_metadata_set_col_collation(struct Vdbe *p, int idx, const char *coll,
 {
 	assert(idx < p->nResColumn);
 	if (p->metadata[idx].collation != NULL)
-		free(p->metadata[idx].collation);
+		sql_xfree(p->metadata[idx].collation);
 	p->metadata[idx].collation = strndup(coll, coll_len);
 	if (p->metadata[idx].collation == NULL) {
 		diag_set(OutOfMemory, coll_len + 1, "strndup", "collation");
