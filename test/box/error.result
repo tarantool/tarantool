@@ -374,7 +374,6 @@ t;
  |   158: box.error.SQL_BIND_PARAMETER_MAX
  |   159: box.error.SQL_EXECUTE
  |   160: box.error.UPDATE_DECIMAL_OVERFLOW
- |   161: box.error.SQL_BIND_NOT_FOUND
  |   162: box.error.ACTION_MISMATCH
  |   163: box.error.VIEW_MISSING_SQL
  |   164: box.error.FOREIGN_KEY_CONSTRAINT
