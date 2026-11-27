@@ -1630,8 +1630,13 @@ memtx_space_finish_alter(struct space *old_space, struct space *new_space)
 	struct memtx_space *old_memtx_space = (struct memtx_space *)old_space;
 	struct memtx_space *new_memtx_space = (struct memtx_space *)new_space;
 
+	/*
+	 * In the middle of alter index uses MVCC state of the old, not
+	 * truncated space. So `index_size` can become negative (substraction
+	 * of invisible tuples from zero).
+	 */
 	bool is_empty = new_space->index_count == 0 ||
-			index_size(new_space->index[0]) == 0;
+			index_size(new_space->index[0]) <= 0;
 	if (!is_empty) {
 		new_memtx_space->tuple_stat[TUPLE_ARENA_MEMTX] =
 			old_memtx_space->tuple_stat[TUPLE_ARENA_MEMTX];

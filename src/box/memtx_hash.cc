@@ -273,7 +273,7 @@ memtx_hash_index_size(struct index *base)
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 	struct space *space = space_by_id(base->def->space_id);
 	/* Substract invisible count. */
-	return light_index_count(&index->hash_table) -
+	return (int64_t)light_index_count(&index->hash_table) -
 	       memtx_tx_track_count(in_txn(), space, base, ITER_GE, NULL, 0);
 }
 
