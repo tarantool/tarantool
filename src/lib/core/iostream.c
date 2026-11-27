@@ -90,6 +90,7 @@ static const struct iostream_vtab plain_iostream_vtab = {
 	/* .read = */ plain_iostream_read,
 	/* .write = */ plain_iostream_write,
 	/* .writev = */ plain_iostream_writev,
+	/* .has_pending = */ NULL,
 };
 
 int
