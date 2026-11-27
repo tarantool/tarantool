@@ -222,7 +222,7 @@ evio_service_entry_accept_cb(ev_loop *loop, ev_io *watcher, int events)
 static int
 evio_service_entry_reuse_addr(const struct uri *u)
 {
-	if (u->host != NULL && strcmp(u->host, URI_HOST_UNIX) != 0)
+	if (u->host == NULL || strcmp(u->host, URI_HOST_UNIX) != 0)
 		return 0;
 
 	struct sockaddr_un un = { 0 };

@@ -4,6 +4,7 @@
  * Copyright 2026, Tarantool AUTHORS, please see AUTHORS file.
  */
 
+#include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -12,6 +13,7 @@
 
 #include "coio.h"
 #include "diag.h"
+#include "evio.h"
 #include "fiber.h"
 #include "memory.h"
 #include "uri/uri.h"
@@ -69,11 +71,50 @@ test_unix_path(void)
 	footer();
 }
 
+static void
+test_tcp_listen_port(void)
+{
+	header();
+	plan(2);
+
+	int cwd = open(".", O_RDONLY);
+	fail_unless(cwd >= 0);
+	char dir[] = "./coio-XXXXXX";
+	fail_unless(mkdtemp(dir) != NULL);
+	fail_unless(chdir(dir) == 0);
+	struct sockaddr_un addr = {.sun_family = AF_UNIX, .sun_path = "0"};
+	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+	fail_unless(fd >= 0);
+	fail_unless(bind(fd, (struct sockaddr *)&addr, sizeof(addr)) == 0);
+	fail_unless(close(fd) == 0);
+
+	struct evio_service service;
+	evio_service_create(loop(), &service, "test", NULL, NULL);
+	struct uri_set uris;
+	fail_unless(uri_set_create(&uris, addr.sun_path) == 0);
+	is(evio_service_start(&service, &uris), 0,
+	   "listen on a TCP port specified without a host");
+	bool socket_exists = access(addr.sun_path, F_OK) == 0;
+	ok(socket_exists,
+	   "preserve the Unix socket with the same name as the TCP port");
+	evio_service_stop(&service);
+	uri_set_destroy(&uris);
+
+	if (socket_exists)
+		fail_unless(unlink(addr.sun_path) == 0);
+	fail_unless(fchdir(cwd) == 0);
+	fail_unless(close(cwd) == 0);
+	fail_unless(rmdir(dir) == 0);
+	check_plan();
+	footer();
+}
+
 static int
 main_f(va_list ap)
 {
 	(void)ap;
 	test_unix_path();
+	test_tcp_listen_port();
 	ev_break(loop(), EVBREAK_ALL);
 	return 0;
 }
@@ -94,7 +135,7 @@ int
 main(void)
 {
 	header();
-	plan(1);
+	plan(2);
 	test_coio_connect();
 	footer();
 	return check_plan();
