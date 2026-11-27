@@ -726,6 +726,28 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 			}
 			break;
 		}
+	case TK_CASE: {
+			/**
+			 * Verify that the vectors in the `CASE` expression
+			 * have the same length.
+			 */
+			if (pExpr->pLeft == NULL)
+				break;
+			int len_left = sqlExprVectorSize(pExpr->pLeft);
+			for (int i = 0; i < pExpr->x.pList->nExpr - 1;
+			     i = i + 2) {
+				struct Expr *expr = pExpr->x.pList->a[i].pExpr;
+				int len_right = sqlExprVectorSize(expr);
+				if (len_left != len_right) {
+					diag_set(ClientError,
+						 ER_SQL_COLUMN_COUNT,
+						 len_left, len_right);
+					pParse->is_aborted = true;
+					break;
+				}
+			}
+			break;
+		}
 	case TK_BETWEEN:
 	case TK_EQ:
 	case TK_NE:
