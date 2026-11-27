@@ -4330,6 +4330,12 @@ is_simple_count(struct Select *select, struct AggInfo *agg_info)
 		return NULL;
 	if (NEVER(agg_info->nFunc == 0))
 		return NULL;
+	/**
+	 * Check that there isn't another aggregate function anywhere else
+	 * in the query (for example, in the `HAVING` clause).
+	 */
+	if (agg_info->nFunc > 1)
+		return NULL;
 	if (strcmp(agg_info->aFunc->func->def->name, "COUNT") != 0 ||
 	    (agg_info->aFunc->pExpr->x.pList != NULL &&
 	     agg_info->aFunc->pExpr->x.pList->nExpr > 0))

@@ -44,6 +44,30 @@ g.test_select_null = function(cg)
     end)
 end
 
+--
+-- Make sure that no crash on comparison in `HAVING` with aggregate function
+-- with arguments after `COUNT(*)`
+--
+g.test_13358_aggregate_function_after_count = function(cg)
+    cg.server:exec(function()
+        box.execute([[CREATE TABLE t (a INT PRIMARY KEY, b INT);]])
+        box.execute([[INSERT INTO t VALUES (1, 10), (2, 10), (3, 20);]])
+
+        local res = box.execute([[SELECT COUNT(*) FROM t HAVING COUNT(a) > 0;]])
+        t.assert_equals(res.rows, {{3}})
+        res = box.execute([[SELECT COUNT(*) FROM t HAVING SUM(a) > 0;]])
+        t.assert_equals(res.rows, {{3}})
+        res = box.execute([[SELECT COUNT(*) FROM t HAVING AVG(a) > 0;]])
+        t.assert_equals(res.rows, {{3}})
+        res = box.execute([[SELECT COUNT(*) FROM t HAVING MIN(a) > 0;]])
+        t.assert_equals(res.rows, {{3}})
+        res = box.execute([[SELECT COUNT(*) FROM t HAVING MAX(a) > 0;]])
+        t.assert_equals(res.rows, {{3}})
+
+        box.execute([[DROP TABLE t;]])
+    end)
+end
+
 g = t.group("dup")
 
 g.before_all(function(cg)
