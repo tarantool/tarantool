@@ -193,6 +193,7 @@ static const struct engine_vtab blackhole_engine_vtab = {
 	/* .abort_with_conflict = */ generic_engine_abort_with_conflict,
 	/* .bootstrap = */ generic_engine_bootstrap,
 	/* .begin_initial_recovery = */ generic_engine_begin_initial_recovery,
+	/* .recover_snapshot = */ generic_engine_recover_snapshot,
 	/* .begin_final_recovery = */ generic_engine_begin_final_recovery,
 	/* .begin_hot_standby = */ generic_engine_begin_hot_standby,
 	/* .end_recovery = */ generic_engine_end_recovery,
