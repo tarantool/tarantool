@@ -1,5 +1,46 @@
 local utils = {}
 
+-- Accept empty tables and arrays with consecutive integer keys starting at 1.
+-- Return an error format string and its arguments for invalid tables.
+function utils.table_is_array(data)
+    assert(type(data) == 'table')
+
+    -- Check that all the keys are numeric.
+    local key_count = 0
+    local min_key = 1/0  -- +inf
+    local max_key = -1/0 -- -inf
+    for k, _ in pairs(data) do
+        if type(k) ~= 'number' then
+            return false, 'An array contains a non-numeric key: %q', k
+        end
+        if k - math.floor(k) ~= 0 then
+            return false, 'An array contains a non-integral numeric key: %s', k
+        end
+        key_count = key_count + 1
+        min_key = math.min(min_key, k)
+        max_key = math.max(max_key, k)
+    end
+
+    -- An empty array is a valid array.
+    if key_count == 0 then
+        return true
+    end
+
+    -- Check that the array starts from 1 and has no holes.
+    if min_key ~= 1 then
+        return false, 'An array must start from index 1, got min index %d',
+            min_key
+    end
+
+    -- Check that the array has no holes.
+    if max_key ~= key_count then
+        return false, 'An array must not have holes, got a table with %d ' ..
+            'integer fields with max index %d', key_count, max_key
+    end
+
+    return true
+end
+
 -- Used to give a hint that the table should be serialized in MsgPack as map
 -- and not as a array. Typical use is to give hint for empty table when it is
 -- not possible to infer type from table content.

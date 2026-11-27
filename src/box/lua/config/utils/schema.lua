@@ -20,6 +20,7 @@ local json = require('json')
 local units = require('internal.config.utils.units')
 local tarantool = require('tarantool')
 local funcutils = require('internal.config.utils.funcutils')
+local table_is_array = require('internal.utils').table_is_array
 
 local json_noexc = json.new()
 json_noexc.cfg({encode_use_tostring = true})
@@ -29,7 +30,6 @@ local schema_mt = {}
 
 local scalars = {}
 
-local table_is_array
 local map_impl
 local normalize_f
 
@@ -555,56 +555,6 @@ end
 -- }}} Derived schema node type constructors: enum, set
 
 -- {{{ <schema object>:validate()
-
--- Verify that the given table adheres array requirements.
---
--- It accepts an array without holes.
---
--- Strictly speaking,
---
--- * If the table is empty it is OK.
--- * If the table is non-empty, the constraints are the following:
---   * all keys are numeric, without a fractional part
---   * the lower key is 1
---   * the higher key is equal to the number of items
-table_is_array = function(data)
-    assert(type(data) == 'table')
-
-    -- Check that all the keys are numeric.
-    local key_count = 0
-    local min_key = 1/0  -- +inf
-    local max_key = -1/0 -- -inf
-    for k, _ in pairs(data) do
-        if type(k) ~= 'number' then
-            return false, 'An array contains a non-numeric key: %q', k
-        end
-        if k - math.floor(k) ~= 0 then
-            return false, 'An array contains a non-integral numeric key: %s', k
-        end
-        key_count = key_count + 1
-        min_key = math.min(min_key, k)
-        max_key = math.max(max_key, k)
-    end
-
-    -- An empty array is a valid array.
-    if key_count == 0 then
-        return true
-    end
-
-    -- Check that the array starts from 1 and has no holes.
-    if min_key ~= 1 then
-        return false, 'An array must start from index 1, got min index %d',
-            min_key
-    end
-
-    -- Check that the array has no holes.
-    if max_key ~= key_count then
-        return false, 'An array must not have holes, got a table with %d ' ..
-            'integer fields with max index %d', key_count, max_key
-    end
-
-    return true
-end
 
 -- Whether the given record or map definitely can't accept a
 -- non-empty array.
