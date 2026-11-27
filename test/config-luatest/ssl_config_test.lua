@@ -17,8 +17,6 @@ local clock = require('clock')
 -- {{{ Common test config.
 
 local common = {
-    -- https://github.com/tarantool/tarantool/pull/13070
-    cfg_conn_reset_option = false,
     -- https://github.com/tarantool/tarantool-ee/issues/1667
     gh1667_solved = true,
     -- https://github.com/tarantool/tarantool-ee/issues/1672
@@ -56,7 +54,7 @@ local test_cfg = {
     },
 }
 
--- }}} General test config.
+-- }}} Common test config.
 
 -- {{{ Configure Lua search path
 
@@ -295,6 +293,9 @@ local function cluster_config_base(opts)
 
     local c = cbuilder:new(nil) -- start from cbuilder base_config
         :set_global_option('iproto.listen', {PLAIN_SOCK})
+        -- Corresponding tests explicitly drop stale connections
+        -- or enable this option for the cluster.
+        :set_global_option('iproto.drop_stale_connections', false)
     for _, i in ipairs(instances) do
         c:add_instance(i, {})
     end
@@ -624,7 +625,8 @@ local function cluster_drop_stale_iproto_connections(cluster)
     end)
 end
 
--- Checks existing conn to server is closed after security options changed.
+-- Checks existing stale conn to server is closed after security options
+-- changed.
 g.test_net_box_conn = function()
     t.skip_if(want_to_skip.test_net_box_conn)
     local tc = test_cfg.test_net_box_conn
@@ -641,7 +643,6 @@ g.test_net_box_conn = function()
     })
     cl:start({wait_until_ready = false})
     cluster_wait_until_ready(cl)
-    cluster_drop_stale_iproto_connections(cl)
     done_tm()
 
     -- Test new conn.
@@ -656,11 +657,14 @@ g.test_net_box_conn = function()
         :set_instance_option('i1', 'iproto.ssl', CERTS.NC_CA1_S1)
         :config()
     cluster_reload(cl, cfg_ssl0, {'ssl'})
-    cluster_drop_stale_iproto_connections(cl)
     done_tm()
 
-    -- Test old conn became invalid.
-    utils.assert_conn_reset_if_enabled(cl.old_cn.i1, true)
+    -- Test old conn alive after reloading.
+    utils.conn_checkers.assert_conn_active(cl.old_cn.i1)
+    -- Test old conn became invalid after drop stale.
+    cluster_drop_stale_iproto_connections(cl)
+    utils.conn_checkers.assert_conn_reset(cl.old_cn.i1)
+
     cluster_close_net_box_conns(cl, 'old_cn')
     -- Test new conn.
     -- Non SSL: error.
@@ -682,11 +686,14 @@ g.test_net_box_conn = function()
         :set_instance_option('i1', 'iproto.ssl', CERTS.CA1_S1)
         :config()
     cluster_reload(cl, cfg_ssl1, CERTS.CA1_C1)
-    cluster_drop_stale_iproto_connections(cl)
     done_tm()
 
-    -- Test old conn became invalid.
-    utils.assert_conn_reset_if_enabled(cl.old_cn.i1, true)
+    -- Test old conn alive after reloading.
+    utils.conn_checkers.assert_conn_active(cl.old_cn.i1)
+    -- Test old conn became invalid after drop stale.
+    cluster_drop_stale_iproto_connections(cl)
+    utils.conn_checkers.assert_conn_reset(cl.old_cn.i1)
+
     cluster_close_net_box_conns(cl, 'old_cn')
     -- Test new conn.
     -- Non SSL: error.
@@ -708,11 +715,14 @@ g.test_net_box_conn = function()
         :set_instance_option('i1', 'iproto.ssl', CERTS.CA2_S1)
         :config()
     cluster_reload(cl, cfg_ssl2, CERTS.CA2_C1)
-    cluster_drop_stale_iproto_connections(cl)
     done_tm()
 
-    -- Test old conn became invalid.
-    utils.assert_conn_reset_if_enabled(cl.old_cn.i1, true)
+    -- Test old conn alive after reloading.
+    utils.conn_checkers.assert_conn_active(cl.old_cn.i1)
+    -- Test old conn became invalid after drop stale.
+    cluster_drop_stale_iproto_connections(cl)
+    utils.conn_checkers.assert_conn_reset(cl.old_cn.i1)
+
     cluster_close_net_box_conns(cl, 'old_cn')
     -- Test new conn.
     -- Non SSL: error.
@@ -1092,8 +1102,8 @@ end
 -- 1) Test call() 'box.info{}'.
 -- 2) Test connect() to all other servers, cache connections
 -- to check it at next step (after reloading the config).
-local function cluster_check_connpool(cl, opts)
-    checks('table', {
+local function cluster_check_connpool(cl, cn_alive_expected, opts)
+    checks('table', '?boolean', {
         skip = '?boolean',
         store_to = '?string',
         -- Dump servers conf before test.
@@ -1109,10 +1119,7 @@ local function cluster_check_connpool(cl, opts)
 
     -- Arguments to pass to the server instance.
     local a = {
-        fetch_schema_stick = test_cfg
-            .test_replication_and_connpool_ssl_reconfig
-            .fetch_schema_stick,
-        cn_reset_enabled = common.cfg_conn_reset_option,
+        cn_alive_expected = cn_alive_expected,
         store_to = opts.store_to,
         debug_log_call_info = opts.debug_log_call_info or false,
         instances = cluster_collect_instances(cl),
@@ -1169,18 +1176,24 @@ local function cluster_check_connpool(cl, opts)
                 -- else args.store_to ~= nil
                 local old_conn = _G[args.store_to][remote]
                 _G[args.store_to][remote] = conn
-                if old_conn then
-                    utils.assert_conn_reset_if_enabled(old_conn,
-                        args.cn_reset_enabled)
+                if old_conn and args.cn_alive_expected ~= nil then
+                    if args.cn_alive_expected then
+                        utils.conn_checkers.assert_conn_active(old_conn)
+                    else
+                        utils.conn_checkers.assert_conn_reset(old_conn)
+                    end
                 end
             end
 
             for _, i in ipairs(args.instances) do
                 if i ~= self_alias then
-                    -- If call come after connect(),
-                    -- fetch_schema_stick became useless.
-                    call(self_alias, i)
+                    -- call() can't be successful immediately after the
+                    -- connpool cached connection was failed. But such a fail
+                    -- is an expected behavior for
+                    -- `iproto.drop_stale_connections` (gh-13843).
+                    -- With this context a connect() must precede a call().
                     connect(i)
+                    call(self_alias, i)
                 end
             end
         end, {a, server.alias})
@@ -1189,7 +1202,8 @@ end
 
 -- Check repl peer conn ssl parameters are equal to config values
 -- after the config was reloaded.
--- Check connpool old connections became invalid.
+-- Check connpool old connections became invalid after dropping
+-- stale connections.
 g.test_replication_and_connpool_ssl_reconfig = function()
     t.skip_if(want_to_skip.test_replication_and_connpool_ssl_reconfig)
     local tc = test_cfg.test_replication_and_connpool_ssl_reconfig
@@ -1249,7 +1263,7 @@ g.test_replication_and_connpool_ssl_reconfig = function()
         gh1672_solved = true,
         gh1672_case = false,
     }, check_repl_common_opts):tomap())
-    cluster_check_connpool(cl, check_connpool_opts)
+    cluster_check_connpool(cl, nil, check_connpool_opts)
 
     done_tm = start_tm('Reload with SSL certs, no CA.')
     local cfg_ssl0 = cbuilder:new(cfg_plain)
@@ -1268,7 +1282,9 @@ g.test_replication_and_connpool_ssl_reconfig = function()
         gh1672_solved = common.gh1672_solved,
         gh1672_case = false,
     }, check_repl_common_opts):tomap())
-    cluster_check_connpool(cl, check_connpool_opts)
+    cluster_check_connpool(cl, true, check_connpool_opts)
+    cluster_drop_stale_iproto_connections(cl)
+    cluster_check_connpool(cl, false, check_connpool_opts)
 
     done_tm = start_tm('Reload with same SSL certs from CA1.')
     local cfg_ssl1 = cbuilder:new(cfg_plain)
@@ -1287,7 +1303,9 @@ g.test_replication_and_connpool_ssl_reconfig = function()
         gh1672_solved = common.gh1672_solved,
         gh1672_case = true,
     }, check_repl_common_opts):tomap())
-    cluster_check_connpool(cl, check_connpool_opts)
+    cluster_check_connpool(cl, true, check_connpool_opts)
+    cluster_drop_stale_iproto_connections(cl)
+    cluster_check_connpool(cl, false, check_connpool_opts)
 
     done_tm = start_tm('Reload with other SSL certs from CA2.')
     local cfg_ssl2 = cbuilder:new(cfg_plain)
@@ -1306,7 +1324,9 @@ g.test_replication_and_connpool_ssl_reconfig = function()
         gh1672_solved = common.gh1672_solved,
         gh1672_case = false,
     }, check_repl_common_opts):tomap())
-    cluster_check_connpool(cl, check_connpool_opts)
+    cluster_check_connpool(cl, true, check_connpool_opts)
+    cluster_drop_stale_iproto_connections(cl)
+    cluster_check_connpool(cl, false, check_connpool_opts)
 
     done_tm = start_tm('Reload with same SSL certs from CA2, ciphers limited.')
     local cfg_ssl3 = cbuilder:new(cfg_plain)
@@ -1325,7 +1345,9 @@ g.test_replication_and_connpool_ssl_reconfig = function()
         gh1672_solved = common.gh1672_solved,
         gh1672_case = false,
     }, check_repl_common_opts):tomap())
-    cluster_check_connpool(cl, check_connpool_opts)
+    cluster_check_connpool(cl, true, check_connpool_opts)
+    cluster_drop_stale_iproto_connections(cl)
+    cluster_check_connpool(cl, false, check_connpool_opts)
 
     cl:drop()
 end
