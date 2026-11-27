@@ -118,7 +118,7 @@ local function split_lines(content)
 end
 
 local function directive_name(line)
-    return line:match('^%-%-%-@([%a_][%w_]*)')
+    return line:match('^%s*%-%-%-@([%a_][%w_]*)')
 end
 
 local function strip(line)
@@ -340,12 +340,12 @@ local function generate(out_file, files, return_name)
         local nlines = #lines
         local i = 1
         while i <= nlines do
-            if lines[i]:sub(1, 3) ~= '---' then
+            if strip(lines[i]):sub(1, 3) ~= '---' then
                 i = i + 1
             else
                 local directives = {}
                 local j = i
-                while j <= nlines and lines[j]:sub(1, 3) == '---' do
+                while j <= nlines and strip(lines[j]):sub(1, 3) == '---' do
                     local name = directive_name(lines[j])
                     if name ~= nil then
                         table.insert(directives, name)

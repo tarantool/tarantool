@@ -227,6 +227,56 @@ local modules = {
             },
         },
     },
+    {
+        name = 'log',
+        source = 'src/lua/log.lua',
+        fixtures = 'test/app-luatest/emmylua/log',
+        type_name = 'log',
+        fields = {
+            warn = 'Log a message with the warn level',
+            info = 'Log a message with the info level',
+            error = 'Log a message with the error level',
+            verbose = 'Log a message with the verbose level',
+            debug = 'Log a message with the debug level',
+            new = 'Create a new logger',
+            rotate = 'Rotate the log',
+            pid = 'Return a PID of a logger',
+            level = 'Set the log level',
+            log_format = 'Set the log format',
+            cfg = 'Configure logging options',
+        },
+        objects = {
+            {
+                fixture = 'object.lua',
+                type_name = 'log',
+                fields = {
+                    warn = 'Log a message with the warn level',
+                    new = 'Create a new logger',
+                    cfg = 'Configure logging options',
+                },
+            },
+            {
+                fixture = 'cfg.lua',
+                type_name = 'log.cfg_options',
+                fields = {
+                    level = 'the level of detail',
+                    format = 'the log format',
+                    log = "where to send the log's output",
+                },
+            },
+            {
+                fixture = 'cfg_object.lua',
+                type_name = 'log.cfg_object',
+                fields = {
+                    log = "where to send the log's output",
+                    nonblock = 'Tarantool does not block',
+                    level = 'the level of detail',
+                    format = 'the log format',
+                    modules = 'configure the specified log levels',
+                },
+            },
+        },
+    },
 }
 
 local function normalize(value)

@@ -81,6 +81,57 @@ local S_VERBOSE = ffi.C.S_VERBOSE
 local S_DEBUG = ffi.C.S_DEBUG
 local S_ERROR = ffi.C.S_ERROR
 
+---Tarantool provides a set of options used to configure logging in various
+---ways: you can set a level of logging, specify where to send the log's
+---output, configure a log format, and so on. The `log` module allows you to
+---configure logging in your application and provides additional
+---capabilities, for example, logging custom messages and rotating log
+---files.
+local log = {}
+
+---@class log.cfg_options
+---@field log? string where to send the log's output, for example, to a
+---    file, pipe, or system logger.
+---@field nonblock? boolean if true, Tarantool does not block during logging
+---    when the system is not ready for writing, and drops the message
+---    instead.
+---@field level? number|string the level of detail the log has.
+---@field format? string the log format: 'plain' or 'json'.
+---@field modules? table<string, string|number> configure the specified log
+---    levels for different modules.
+
+---@class log.cfg_object: log.cfg_options
+---@field __call fun(cfg?: log.cfg_options): nil
+
+---@alias log.write_fn (fun(message: any)) & (fun(fmt: string, ...: any))
+
+---@class log
+---@field warn log.write_fn Log a message with the warn level.
+---@field info log.write_fn Log a message with the info level.
+---@field error log.write_fn Log a message with the error level.
+---@field verbose log.write_fn Log a message with the verbose level.
+---@field debug log.write_fn Log a message with the debug level.
+---@field level fun(level: number|string) Set the log level.
+---@field new fun(name: string): log Create a new logger with the specified
+---    name.
+---@field rotate fun() Rotate the log. For example, you need to call this
+---    function to continue logging after a log rotation program renames or
+---    moves a file with the latest logs.
+---@field pid fun(): number? Return a PID of a logger. You can use this PID to
+---    send a signal to a log rotation program, so it can rotate logs.
+---@field log_format fun(format: string) Set the log format.
+---@field cfg log.cfg_object Configure logging options. For
+---    example, to send the log to a file, a pipe, or a system logger:
+---    ```lua
+---    log.cfg { log = 'tarantool.log' }
+---    log.cfg { log = '| cronolog tarantool.log' }
+---    log.cfg { log = 'syslog:server=unix:/dev/log' }
+---    ```
+---    To set the log level:
+---    ```lua
+---    log.cfg { level = 'verbose' }
+---    ```
+
 local json = require("json").new()
 json.cfg{
     encode_invalid_numbers = true,
@@ -255,19 +306,185 @@ local function say_closure(self, lvl)
     end
 end
 
-local log_error = say_closure(nil, S_ERROR)
-local log_warn = say_closure(nil, S_WARN)
-local log_info = say_closure(nil, S_INFO)
-local log_verbose = say_closure(nil, S_VERBOSE)
-local log_debug = say_closure(nil, S_DEBUG)
+---Log a message with the error level.
+---
+---* A message can be a string.
+---* A message may contain C-style format specifiers `%d` or `%s`. Example:
+---* A message may be a scalar data type or a table. Example:
+---
+---The actual output will be a line in the log, containing:
+---* The current timestamp
+---* A module name
+---* 'E', 'W', 'I', 'V' or 'D' depending on the called function.
+---* `message`.
+---
+---**Example:**
+---
+--- ```lua
+--- local log = require('log')
+--- log.cfg { level = 'verbose' }
+--- log.warn('Warning message')
+--- log.info('Tarantool version: %s', box.info.version)
+--- log.error({ 500, 'Internal error' })
+--- log.debug('Debug message')
+--- ```
+---
+---Note that the message will not be logged if the severity level
+---corresponding to the called function is less than `log.level`.
+---
+---@overload fun(message: any)
+---@param fmt string
+---@param ... any
+function log.error(fmt, ...)
+    say(nil, S_ERROR, fmt, ...)
+end
+---Log a message with the warn level.
+---
+---* A message can be a string.
+---* A message may contain C-style format specifiers `%d` or `%s`. Example:
+---* A message may be a scalar data type or a table. Example:
+---
+---The actual output will be a line in the log, containing:
+---* The current timestamp
+---* A module name
+---* 'E', 'W', 'I', 'V' or 'D' depending on the called function.
+---* `message`.
+---
+---**Example:**
+---
+--- ```lua
+--- local log = require('log')
+--- log.cfg { level = 'verbose' }
+--- log.warn('Warning message')
+--- log.info('Tarantool version: %s', box.info.version)
+--- log.error({ 500, 'Internal error' })
+--- log.debug('Debug message')
+--- ```
+---
+---Note that the message will not be logged if the severity level
+---corresponding to the called function is less than `log.level`.
+---
+---@overload fun(message: any)
+---@param fmt string
+---@param ... any
+function log.warn(fmt, ...)
+    say(nil, S_WARN, fmt, ...)
+end
+---Log a message with the info level.
+---
+---* A message can be a string.
+---* A message may contain C-style format specifiers `%d` or `%s`. Example:
+---* A message may be a scalar data type or a table. Example:
+---
+---The actual output will be a line in the log, containing:
+---* The current timestamp
+---* A module name
+---* 'E', 'W', 'I', 'V' or 'D' depending on the called function.
+---* `message`.
+---
+---**Example:**
+---
+--- ```lua
+--- local log = require('log')
+--- log.cfg { level = 'verbose' }
+--- log.warn('Warning message')
+--- log.info('Tarantool version: %s', box.info.version)
+--- log.error({ 500, 'Internal error' })
+--- log.debug('Debug message')
+--- ```
+---
+---Note that the message will not be logged if the severity level
+---corresponding to the called function is less than `log.level`.
+---
+---@overload fun(message: any)
+---@param fmt string
+---@param ... any
+function log.info(fmt, ...)
+    say(nil, S_INFO, fmt, ...)
+end
+---Log a message with the verbose level.
+---
+---* A message can be a string.
+---* A message may contain C-style format specifiers `%d` or `%s`. Example:
+---* A message may be a scalar data type or a table. Example:
+---
+---The actual output will be a line in the log, containing:
+---* The current timestamp
+---* A module name
+---* 'E', 'W', 'I', 'V' or 'D' depending on the called function.
+---* `message`.
+---
+---**Example:**
+---
+--- ```lua
+--- local log = require('log')
+--- log.cfg { level = 'verbose' }
+--- log.warn('Warning message')
+--- log.info('Tarantool version: %s', box.info.version)
+--- log.error({ 500, 'Internal error' })
+--- log.debug('Debug message')
+--- ```
+---
+---Note that the message will not be logged if the severity level
+---corresponding to the called function is less than `log.level`.
+---
+---@overload fun(message: any)
+---@param fmt string
+---@param ... any
+function log.verbose(fmt, ...)
+    say(nil, S_VERBOSE, fmt, ...)
+end
+---Log a message with the debug level.
+---
+---* A message can be a string.
+---* A message may contain C-style format specifiers `%d` or `%s`. Example:
+---* A message may be a scalar data type or a table. Example:
+---
+---The actual output will be a line in the log, containing:
+---* The current timestamp
+---* A module name
+---* 'E', 'W', 'I', 'V' or 'D' depending on the called function.
+---* `message`.
+---
+---**Example:**
+---
+--- ```lua
+--- local log = require('log')
+--- log.cfg { level = 'verbose' }
+--- log.warn('Warning message')
+--- log.info('Tarantool version: %s', box.info.version)
+--- log.error({ 500, 'Internal error' })
+--- log.debug('Debug message')
+--- ```
+---
+---Note that the message will not be logged if the severity level
+---corresponding to the called function is less than `log.level`.
+---
+---@overload fun(message: any)
+---@param fmt string
+---@param ... any
+function log.debug(fmt, ...)
+    say(nil, S_DEBUG, fmt, ...)
+end
 
 -- Rotate log (basically reopen the log file and
 -- start writting into it).
+---Rotate the log.
+---
+---For example, you need to call this function to continue logging after a
+---log rotation program renames or moves a file with the latest logs.
+---
+---@return nil
 local function log_rotate()
     ffi.C.say_logrotate()
 end
 
--- Returns pid of a pipe process.
+---Return a PID of a logger.
+---
+---You can use this PID to send a signal to a log rotation program, so it
+---can rotate logs.
+---
+---@return number? pid
 local function log_pid()
     return tonumber(ffi.C.log_pid)
 end
@@ -360,6 +577,10 @@ local function box_cfg_update(key)
     end
 end
 
+---Set log level.
+---
+---@param level number|string the new log level, either a number or a string
+---    such as 'verbose'.
 local function set_log_level(level)
     box.internal.check_cfg_option_type(option_types.level, 'level', level)
     local cfg = table.copy(log_cfg)
@@ -372,9 +593,12 @@ local function set_log_level(level)
 
     box_cfg_update('level')
 
-    log_debug("log: level set to %s", level)
+    log.debug("log: level set to %s", level)
 end
 
+---Set log format.
+---
+---@param format string the new log format: 'plain' or 'json'.
 local function set_log_format(format)
     box.internal.check_cfg_option_type(option_types.format, 'format', format)
     local cfg = table.copy(log_cfg)
@@ -386,7 +610,7 @@ local function set_log_format(format)
 
     box_cfg_update('format')
 
-    log_debug("log: format set to '%s'", format)
+    log.debug("log: format set to '%s'", format)
 end
 
 local function set_log_modules(modules)
@@ -407,6 +631,19 @@ local function set_log_modules(modules)
     ffi.C.say_set_modules(cfg)
 end
 
+---Configure logging options.
+---
+---The following options are available:
+---
+---* `level`: specify the level of detail the log has.
+---* `log`: specify where to send the log's output, for example, to a file,
+---  pipe, or system logger.
+---* `nonblock`: if true, Tarantool does not block during logging when the
+---  system is not ready for writing, and drops the message instead.
+---* `format`: specify the log format: 'plain' or 'json'.
+---* `modules`: configure the specified log levels for different modules.
+---
+---@param cfg log.cfg_options the logging options.
 local function log_configure(self, cfg, box_api)
     if not box_api then
         if cfg == nil then
@@ -434,7 +671,7 @@ local function log_configure(self, cfg, box_api)
 
     box_cfg_update()
 
-    log_debug("log.cfg({log=%s, level=%s, nonblock=%s, format=%s})",
+    log.debug("log.cfg({log=%s, level=%s, nonblock=%s, format=%s})",
               cfg.log, cfg.level, cfg.nonblock, cfg.format)
 end
 
@@ -443,20 +680,36 @@ local compat_v16 = {
     logger_pid = function()
         if not compat_warning_said then
             compat_warning_said = true
-            log_warn('logger_pid() is deprecated, please use pid() instead')
+            log.warn('logger_pid() is deprecated, please use pid() instead')
         end
         return log_pid()
     end;
 }
 
--- Log registry. It stores loggers, created by log_new, each of them having a
+-- Log registry. It stores loggers, created by log.new, each of them having a
 -- custom name. Allows to return same logger on consequent require('log') calls.
 local log_registry = {}
--- Forward declaration.
-local log_main
 
 -- Create a logger with a custom name.
-local function log_new(name)
+---Create a new logger with the specified name.
+---
+---*Since 2.11.0*
+---
+---You can configure a specific log level for a new logger using the
+---`log.modules` configuration property.
+---
+---**Example:**
+---
+---```lua
+---local module1_log = require('log').new('module1')
+---local module2_log = require('log').new('module2')
+---module1_log.verbose('module1 message')
+---module2_log.error('module2 message')
+---```
+---
+---@param name string a logger name.
+---@return log logger a logger instance.
+function log.new(name)
     if type(name) ~= 'string' then
         box.error(box.error.ILLEGAL_PARAMS, 'name should be a string')
     end
@@ -465,36 +718,57 @@ local function log_new(name)
         return log_registry[name]
     end
 
-    local log = table.copy(log_main)
-    log.name = name
-    log.error = say_closure(log, S_ERROR)
-    log.warn = say_closure(log, S_WARN)
-    log.info = say_closure(log, S_INFO)
-    log.verbose = say_closure(log, S_VERBOSE)
-    log.debug = say_closure(log, S_DEBUG)
-    log_registry[name] = log
-    return log
+    local logger = table.copy(log)
+    logger.name = name
+    logger.error = say_closure(logger, S_ERROR)
+    logger.warn = say_closure(logger, S_WARN)
+    logger.info = say_closure(logger, S_INFO)
+    logger.verbose = say_closure(logger, S_VERBOSE)
+    logger.debug = say_closure(logger, S_DEBUG)
+    log_registry[name] = logger
+    return logger
 end
 
--- Main logger, returned by the non-overloaded require('log')
-log_main = {
-    warn = log_warn,
-    info = log_info,
-    verbose = log_verbose,
-    debug = log_debug,
-    error = log_error,
-    new = log_new,
-}
-
 if fiber._internal.cord_is_main then
-    log_main.rotate = log_rotate
-    log_main.pid = log_pid
-    log_main.level = set_log_level
-    log_main.log_format = set_log_format
-    log_main.cfg = setmetatable(log_cfg, {
+    ---Rotate the log. For example, you need to call this function to
+    ---continue logging after a log rotation program renames or moves a
+    ---file with the latest logs.
+    ---@return nil
+    function log.rotate()
+        log_rotate()
+    end
+    ---Return a PID of a logger. You can use this PID to send a signal to
+    ---a log rotation program, so it can rotate logs.
+    ---@return number? pid
+    function log.pid()
+        return log_pid()
+    end
+    ---Set the log level.
+    ---@param level number|string the new log level, either a number or a
+    ---    string such as 'verbose'.
+    function log.level(level)
+        set_log_level(level)
+    end
+    ---Set the log format.
+    ---@param format string the new log format: 'plain' or 'json'.
+    function log.log_format(format)
+        set_log_format(format)
+    end
+    ---Configure logging options. For example, to send the log to a file,
+    ---a pipe or a system logger:
+    ---```lua
+    ---log.cfg { log = 'file.log' }
+    ---log.cfg { log = '| cronolog file.log' }
+    ---log.cfg { log = 'syslog:server=unix:/dev/log' }
+    ---```
+    ---To set the log level:
+    ---```lua
+    ---log.cfg { level = 'verbose' }
+    ---```
+    log.cfg = setmetatable(log_cfg, {
         __call = function(self, cfg) log_configure(self, cfg, false) end,
     })
-    log_main.box_api = {
+    log.box_api = {
         cfg = function()
             log_configure(log_cfg, box_to_log_cfg(box.cfg), true)
         end,
@@ -502,7 +776,7 @@ if fiber._internal.cord_is_main then
     }
 end
 
-setmetatable(log_main, {
+setmetatable(log, {
     __serialize = function(self)
         local res = table.copy(self)
         res.box_api = nil
@@ -511,4 +785,4 @@ setmetatable(log_main, {
     __index = compat_v16;
 })
 
-return log_main
+return log
