@@ -2231,6 +2231,8 @@ I['memtx.use_sort_data'] = format_text([[
 I['metrics'] = format_text([[
     The `metrics` section provides the ability to collect and expose
     Tarantool metrics (e.g. network, cpu, memtx and others).
+    The `failover` group collects coordinator metrics only when a source
+    is registered by Tarantool Enterprise; it collects nothing in plain CE.
 ]])
 
 I['metrics.exclude'] = format_text([[

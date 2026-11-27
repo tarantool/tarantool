@@ -54,6 +54,7 @@ local builtin_metrics = {
     system = true,
     replicas = true,
     info = true,
+    failover = true,
     slab = true,
     runtime = true,
     memory = true,

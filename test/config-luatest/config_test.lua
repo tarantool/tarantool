@@ -905,6 +905,15 @@ g.test_metrics_options_default = function()
         t.assert_equals(box.cfg.metrics.include, {'all'})
         t.assert_equals(box.cfg.metrics.exclude, { })
         t.assert_equals(box.cfg.metrics.labels, {alias = 'instance-001'})
+        t.assert_equals(require('config'):is_metric_enabled('failover'), true)
+        for _, observation in ipairs(require('metrics').collect{
+            invoke_callbacks = true,
+        }) do
+            t.assert_not_equals(observation.metric_name,
+                                'tarantool_coordinator_active')
+            t.assert_not_equals(observation.metric_name,
+                                'tarantool_instance_status')
+        end
     end)
 end
 
@@ -1088,6 +1097,33 @@ local function start_server_with_metrics_config(metrics_config)
     }
     g.server = server:new(opts)
     g.server:start()
+end
+
+-- A configured CE instance can collect failover without an EE provider.
+g.test_metrics_failover_include = function()
+    start_server_with_metrics_config([[
+        metrics:
+          include: [failover]
+    ]])
+    g.server:exec(function()
+        t.assert_equals(box.cfg.metrics.include, {'failover'})
+        t.assert_equals(require('config'):is_metric_enabled('failover'), true)
+        t.assert_equals(require('metrics').collect{invoke_callbacks = true}, {})
+    end)
+end
+
+-- Exclusion takes priority over explicitly including the failover group.
+g.test_metrics_failover_exclude = function()
+    start_server_with_metrics_config([[
+        metrics:
+          include: [failover]
+          exclude: [failover]
+    ]])
+    g.server:exec(function()
+        t.assert_equals(box.cfg.metrics.exclude, {'failover'})
+        t.assert_equals(require('config'):is_metric_enabled('failover'), false)
+        t.assert_equals(require('metrics').collect{invoke_callbacks = true}, {})
+    end)
 end
 
 g.test_is_metric_enabled_default = function()
