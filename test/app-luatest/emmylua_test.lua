@@ -227,6 +227,49 @@ local modules = {
             },
         },
     },
+    {
+        name = 'msgpack',
+        source = 'src/lua/msgpack_stub.lua',
+        fixtures = 'test/app-luatest/emmylua/msgpack',
+        type_name = 'msgpack',
+        fields = {
+            encode = 'Convert a Lua object to a raw MsgPack string',
+            decode = 'Convert a raw MsgPack string to a Lua object',
+            object = 'Create a MsgPack object',
+            new = 'Create a new MsgPack serializer',
+            NULL = 'Analog of Lua',
+            cfg = 'Change MsgPack configuration settings',
+        },
+        objects = {
+            {
+                fixture = 'cfg.lua',
+                type_name = 'msgpack.cfg',
+                fields = {
+                    encode_max_depth =
+                        'The maximum recursion depth for encoding',
+                    encode_deep_as_nil = 'Whether to crop tables',
+                },
+            },
+            {
+                fixture = 'object.lua',
+                type_name = 'msgpack_object',
+                fields = {
+                    decode = 'Decode MsgPack data',
+                    iterator = 'Create an iterator over the MsgPack data',
+                    get = 'Get an element of the MsgPack array',
+                },
+            },
+            {
+                fixture = 'iterator.lua',
+                type_name = 'iterator_object',
+                fields = {
+                    take = 'Return a MsgPack value under the iterator cursor',
+                    take_array = 'Copy the specified number of MsgPack values',
+                    skip = 'Advance the iterator cursor',
+                },
+            },
+        },
+    },
 }
 
 local function normalize(value)

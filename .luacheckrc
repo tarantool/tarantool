@@ -90,6 +90,14 @@ files["src/lua/pickle_stub.lua"] = {
         "212",
     },
 }
+files["src/lua/msgpack_stub.lua"] = {
+    ignore = {
+        -- Unused arguments in annotation-only stub functions.
+        "212",
+        -- Object tables are used as namespaces for annotated methods.
+        "241",
+    },
+}
 files["test/box/box.lua"] = {
     globals = {
         "cfg_filter",
