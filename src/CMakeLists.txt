@@ -76,6 +76,7 @@ lua_source(lua_sources lua/varbinary.lua varbinary_lua)
 lua_source(lua_sources lua/protobuf_wireformat.lua protobuf_wireformat_lua)
 lua_source(lua_sources lua/protobuf.lua protobuf_lua)
 lua_source(lua_sources lua/version.lua version_lua)
+lua_source(lua_sources lua/tracer.lua tracer_lua)
 
 lua_stub(iconv FILES lua/iconv.lua RETURN iconv)
 lua_stub(tap FILES lua/tap.lua RETURN tap)

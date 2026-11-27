@@ -794,6 +794,12 @@ struct fiber {
 		/** Length of `audit_context`. */
 		size_t audit_context_len;
 
+		/**
+		 * Tracing data in OpenTelemetry format.
+		 * Is propagated to all child fibers.
+		 * ID of current span.
+		 */
+		uint64_t span_id;
 	} storage;
 	/** An object to wait for incoming message or a reader. */
 	struct ipc_wait_pad *wait_pad;
