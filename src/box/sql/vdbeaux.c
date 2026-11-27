@@ -1412,6 +1412,10 @@ sqlVdbeFreeCursor(struct VdbeCursor *pCx)
 		sql_cursor_close(pCx->uc.pCursor);
 			break;
 		}
+	case CURTYPE_EPHEMERAL: {
+		sql_ephemeral_delete(pCx->uc.eph_space);
+		break;
+		}
 	}
 }
 

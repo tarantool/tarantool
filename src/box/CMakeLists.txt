@@ -97,6 +97,7 @@ set(sql_sources
     sql/cursor.c
     sql/build.c
     sql/delete.c
+    sql/ephemeral_space.c
     sql/expr.c
     sql/func.c
     sql/global.c
