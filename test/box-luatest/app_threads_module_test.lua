@@ -42,8 +42,11 @@ g.test_threads_config_propagation = function()
         },
     }
     cluster.server:exec(function(expected_threads_info)
+        local threads = require('threads')
         t.assert_equals(box.cfg.app_threads, 6)
-        t.assert_equals(require('threads').info(), expected_threads_info)
+        t.assert_equals(threads.group_name, expected_threads_info.group_name)
+        t.assert_equals(threads.thread_id, expected_threads_info.thread_id)
+        t.assert_equals(threads.info(), expected_threads_info)
     end, {expected_threads_info})
     --
     -- Check that the threads configuration is updated only after
@@ -60,12 +63,16 @@ g.test_threads_config_propagation = function()
         :config()
     cluster:reload(config)
     cluster.server:exec(function(expected_threads_info)
-        t.assert_covers(require('config'):info().alerts[1], {
+        local config = require('config')
+        local threads = require('threads')
+        t.assert_covers(config:info().alerts[1], {
             message = 'box_cfg.apply: threads configuration ' ..
                       'will not be set until the instance is restarted',
         })
         t.assert_equals(box.cfg.app_threads, 6)
-        t.assert_equals(require('threads').info(), expected_threads_info)
+        t.assert_equals(threads.group_name, expected_threads_info.group_name)
+        t.assert_equals(threads.thread_id, expected_threads_info.thread_id)
+        t.assert_equals(threads.info(), expected_threads_info)
     end, {expected_threads_info})
     cluster.server:restart()
     local expected_threads_info = {
@@ -80,8 +87,11 @@ g.test_threads_config_propagation = function()
         },
     }
     cluster.server:exec(function(expected_threads_info)
+        local threads = require('threads')
         t.assert_equals(box.cfg.app_threads, 10)
-        t.assert_equals(require('threads').info(), expected_threads_info)
+        t.assert_equals(threads.group_name, expected_threads_info.group_name)
+        t.assert_equals(threads.thread_id, expected_threads_info.thread_id)
+        t.assert_equals(threads.info(), expected_threads_info)
     end, {expected_threads_info})
     --
     -- Check configuration in other threads.
@@ -104,7 +114,12 @@ g.test_threads_config_propagation = function()
         expected_threads_info.thread_id = thread_id
         expected_threads_info.group_name = group_name
         cluster.server:exec(function(expected_threads_info)
-            t.assert_equals(require('threads').info(), expected_threads_info)
+            local threads = require('threads')
+            t.assert_equals(threads.group_name,
+                            expected_threads_info.group_name)
+            t.assert_equals(threads.thread_id,
+                            expected_threads_info.thread_id)
+            t.assert_equals(threads.info(), expected_threads_info)
         end, {expected_threads_info}, {_thread_id = i})
     end
 end
@@ -115,6 +130,8 @@ end
 local function test_threads_not_configured()
     local threads = require('threads')
     t.assert_equals(box.cfg.app_threads, 0)
+    t.assert_equals(threads.thread_id, 1)
+    t.assert_equals(threads.group_name, 'tx')
     t.assert_equals(threads.info(), {
         thread_id = 1,
         group_name = 'tx',

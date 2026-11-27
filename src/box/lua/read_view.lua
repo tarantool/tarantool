@@ -234,8 +234,7 @@ end
 -- Returns a path used to acquire a reference to a read view in a thread.
 --
 local function thread_ref_path()
-    local info = threads.info()
-    return {'thread', info.group_name, info.thread_id}
+    return {'thread', threads.group_name, threads.thread_id}
 end
 
 --
