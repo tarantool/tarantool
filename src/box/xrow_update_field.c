@@ -601,7 +601,7 @@ xrow_update_op_do_splice(struct xrow_update_op *op,
 	int32_t str_len = xrow_update_string_size(str);
 
 	if (arg->offset < 0) {
-		if (-arg->offset > str_len + 1)
+		if (-(int64_t)arg->offset > str_len + 1)
 			return xrow_update_err_splice_bound(op);
 		arg->offset += str_len + 1;
 	} else if (arg->offset > str_len) {
@@ -609,7 +609,7 @@ xrow_update_op_do_splice(struct xrow_update_op *op,
 	}
 	assert(arg->offset >= 0 && arg->offset <= str_len);
 	if (arg->cut_length < 0) {
-		if (-arg->cut_length > (str_len - arg->offset))
+		if (-(int64_t)arg->cut_length > (str_len - arg->offset))
 			arg->cut_length = 0;
 		else
 			arg->cut_length += str_len - arg->offset;
