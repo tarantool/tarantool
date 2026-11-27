@@ -50,6 +50,11 @@ enum relay_state {
 	 */
 	RELAY_OFF,
 	/**
+	 * Applier has connected to the master and is receiving a read view
+	 * (initial join or fetch snapshot).
+	 */
+	RELAY_JOIN,
+	/**
 	 * Applier has connected to the master.
 	 */
 	RELAY_FOLLOW,
@@ -132,6 +137,8 @@ relay_filter_raft(struct xrow_header *packet, uint32_t version_id);
 /**
  * Send initial JOIN rows to the replica
  *
+ * @param replica   replica receiving the read view, or NULL if its UUID is
+ *                  unknown
  * @param io        client connection
  * @param sync      sync from incoming JOIN request
  * @param vclock[out] vclock of the read view sent to the replica
@@ -139,8 +146,8 @@ relay_filter_raft(struct xrow_header *packet, uint32_t version_id);
  * @param cursor    cursor for checkpoint join, if NULL - read-view join.
  */
 void
-relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
-		   uint32_t replica_version_id,
+relay_initial_join(struct replica *replica, struct iostream *io, uint64_t sync,
+		   struct vclock *vclock, uint32_t replica_version_id,
 		   struct checkpoint_cursor *cursor);
 
 /**

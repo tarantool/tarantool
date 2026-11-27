@@ -63,6 +63,7 @@
 #include "tt_static.h"
 #include "memory.h"
 #include "ssl_error.h"
+#include "reflection.h"
 
 STRS(applier_state, applier_STATE);
 
@@ -109,7 +110,6 @@ applier_log_error(struct applier *applier, struct error *e, bool try_reconnect)
 	case APPLIER_FOLLOW:
 	case APPLIER_WAIT_SNAPSHOT:
 	case APPLIER_FETCH_SNAPSHOT:
-	case APPLIER_FINAL_JOIN:
 		say_info("can't read row");
 		break;
 	default:
@@ -792,7 +792,7 @@ applier_wait_snapshot(struct applier *applier)
 	 * response, but a stream of rows from checkpoint.
 	 */
 	if (applier->version_id >= version_id(1, 7, 0)) {
-		/* Decode JOIN/FETCH_SNAPSHOT response */
+		/* Decode FETCH_SNAPSHOT response */
 		coio_read_xrow(io, ibuf, &row);
 		if (iproto_type_is_error(row.type)) {
 			xrow_decode_error_xc(&row); /* re-throw error */
@@ -871,9 +871,44 @@ applier_wait_snapshot(struct applier *applier)
 	box_init_instance_vclock(&vclock);
 }
 
+bool
+applier_is_registered(const struct applier *applier)
+{
+	const struct ballot *ballot = &applier->ballot;
+	for (int i = 0; i < ballot->registered_replica_uuids_size; ++i) {
+		if (tt_uuid_is_equal(&ballot->registered_replica_uuids[i],
+				     &INSTANCE_UUID))
+			return true;
+	}
+	return false;
+}
+
 static void
 applier_fetch_snapshot(struct applier *applier)
 {
+	/* Fail before fetching data so bootstrap can choose another master. */
+	if (!cfg_replication_anon && applier->ballot.is_anon) {
+		tnt_raise(ClientError, ER_UNSUPPORTED, "Anonymous replica",
+			  "registration of non-anonymous nodes.");
+	}
+	/*
+	 * A non-anonymous instance registers itself after the initial
+	 * checkpoint, and a read-only master can't do that. Fail before any
+	 * data is fetched: the checkpoint can't be rolled back, so otherwise
+	 * the bootstrap would have no way to complete, while the bootstrap
+	 * loop may still choose another master or self-bootstrap now.
+	 *
+	 * An instance which the master already has in _cluster needs no write,
+	 * so it may be served by a read-only master. A master which hasn't
+	 * finished its own bootstrap is asked anyway and reports ER_LOADING.
+	 */
+	if (!cfg_replication_anon && applier->ballot.is_booted &&
+	    applier->ballot.is_ro && !applier_is_registered(applier)) {
+		say_info("can't bootstrap from the read-only master at %s: "
+			 "this instance has no ID there",
+			 applier_addr_str(applier));
+		tnt_raise(ClientError, ER_READONLY);
+	}
 	/* Send FETCH SNAPSHOT request */
 	struct iostream *io = &applier->io;
 	struct xrow_header row;
@@ -944,8 +979,7 @@ static struct applier_tx_row *
 tx_alloc_row(struct applier *applier)
 {
 	assert(cord_is_main());
-	assert(applier->state == APPLIER_FINAL_JOIN ||
-	       applier->state == APPLIER_REGISTER);
+	assert(applier->state == APPLIER_REGISTER);
 	(void)applier;
 	size_t size;
 	struct applier_tx_row *tx_row =
@@ -960,8 +994,7 @@ static void
 tx_save_body(struct applier *applier, struct xrow_header *row)
 {
 	assert(cord_is_main());
-	assert(applier->state == APPLIER_FINAL_JOIN ||
-	       applier->state == APPLIER_REGISTER);
+	assert(applier->state == APPLIER_REGISTER);
 	(void)applier;
 	assert(row->bodycnt <= 1);
 	if (!row->is_commit && row->bodycnt == 1) {
@@ -1089,11 +1122,31 @@ applier_wait_register(struct applier *applier)
 		}
 		if (applier_apply_tx(applier, &tx.rows) != 0)
 			diag_raise();
+		/*
+		 * Deletions from _cluster release IDs only on commit. A later
+		 * row in this stream may reuse one of those IDs.
+		 */
+		struct applier_tx_row *tx_row;
+		stailq_foreach_entry(tx_row, &tx.rows, next) {
+			if (iproto_type_is_dml(tx_row->row.type) &&
+			    tx_row->req.dml.space_id == BOX_CLUSTER_ID) {
+				if (journal_sync(NULL) != 0)
+					diag_raise();
+				break;
+			}
+		}
 	}
+	/*
+	 * Registration becomes visible only on commit. Async registrations
+	 * commit on WAL completion. For synchronous registrations,
+	 * apply_synchro_req() has already written and applied the CONFIRM.
+	 */
+	if (journal_sync(NULL) != 0)
+		diag_raise();
 }
 
 static void
-applier_register(struct applier *applier, bool was_anon)
+applier_register(struct applier *applier)
 {
 	/* Send REGISTER request */
 	struct iostream *io = &applier->io;
@@ -1108,60 +1161,9 @@ applier_register(struct applier *applier, bool was_anon)
 	row.type = IPROTO_REGISTER;
 	coio_write_xrow(io, &row);
 
-	/*
-	 * Register may serve as a retry for final join. Set corresponding
-	 * states to unblock anyone who's waiting for final join to start or
-	 * end.
-	 */
-	applier_set_state(applier, was_anon ? APPLIER_REGISTER :
-					      APPLIER_FINAL_JOIN);
+	applier_set_state(applier, APPLIER_REGISTER);
 	applier_wait_register(applier);
-	applier_set_state(applier, was_anon ? APPLIER_REGISTERED :
-					      APPLIER_JOINED);
-	applier_set_state(applier, APPLIER_READY);
-}
-
-/**
- * Execute and process JOIN request (bootstrap the instance).
- */
-static void
-applier_join(struct applier *applier)
-{
-	/* Send JOIN request */
-	struct iostream *io = &applier->io;
-	struct xrow_header row;
-	uint64_t prev_row_count;
-	struct join_request req;
-	memset(&req, 0, sizeof(req));
-	req.instance_uuid = INSTANCE_UUID;
-	strlcpy(req.instance_name, cfg_instance_name, NODE_NAME_SIZE_MAX);
-	req.version_id = tarantool_version_id();
-	RegionGuard region_guard(&fiber()->gc);
-	xrow_encode_join(&row, &req);
-	coio_write_xrow(io, &row);
-
-	applier_set_state(applier, APPLIER_WAIT_SNAPSHOT);
-
-	applier_wait_snapshot(applier);
-
-	say_info("initial data received");
-
-	applier_set_state(applier, APPLIER_FINAL_JOIN);
-
-	prev_row_count = applier->row_count;
-	applier_wait_register(applier);
-	if (applier->row_count == prev_row_count) {
-		/*
-		 * We didn't receive any rows during registration.
-		 * Proceed to "subscribe" and do not finish bootstrap
-		 * until replica id is received.
-		 */
-		return;
-	}
-
-	say_info("final data received");
-
-	applier_set_state(applier, APPLIER_JOINED);
+	applier_set_state(applier, APPLIER_REGISTERED);
 	applier_set_state(applier, APPLIER_READY);
 }
 
@@ -1942,13 +1944,6 @@ applier_process_batch(struct cmsg *base)
 		} else if (applier_apply_tx(applier, &tx->rows) != 0) {
 			diag_raise();
 		}
-		if (applier->state == APPLIER_FINAL_JOIN &&
-		    instance_id != REPLICA_ID_NIL) {
-			say_info("final data received");
-			applier_set_state(applier, APPLIER_JOINED);
-			applier_set_state(applier, APPLIER_READY);
-			applier_set_state(applier, APPLIER_FOLLOW);
-		}
 	}
 
 	/* Return the message to applier thread. */
@@ -2491,14 +2486,6 @@ applier_subscribe(struct applier *applier)
 			applier_set_state(applier, APPLIER_SYNC);
 		else
 			applier_set_state(applier, APPLIER_FOLLOW);
-	} else {
-		/*
-		 * Tarantool < 1.7.0 sends replica id during
-		 * "subscribe" stage. We can't finish bootstrap
-		 * until it is received.
-		 */
-		assert(applier->state == APPLIER_FINAL_JOIN);
-		assert(applier->version_id < version_id(1, 7, 0));
 	}
 
 	/* Re-enable warnings after successful execution of SUBSCRIBE */
@@ -2554,6 +2541,85 @@ applier_subscribe(struct applier *applier)
 	unreachable();
 }
 
+/** Information about how to handle an applier error. */
+struct applier_error_info {
+	/** Next state for the applier. */
+	enum applier_state next_state;
+	/** Whether to try reconnecting after this error. */
+	bool try_reconnect;
+	/** Whether to log this error. */
+	bool log_error;
+};
+
+/* Classify an error and return an appropriate action info. */
+static struct applier_error_info
+applier_classify_error(struct error *e)
+{
+	if (type_cast(ClientError, e) != NULL) {
+		switch (box_error_code(e)) {
+		/* Autobootstrap. */
+		case ER_LOADING:
+		/*
+		 * The instance is not anonymous, and is registered, but its ID
+		 * is not delivered to all the nodes in the cluster yet, and
+		 * some nodes may ask to retry connection later, until they
+		 * receive _cluster record of this instance. From some third
+		 * node, for example.
+		 */
+		case ER_TOO_EARLY_SUBSCRIBE:
+		/* Join failure due to synchronous transaction rollback. */
+		case ER_SYNC_QUORUM_TIMEOUT:
+		case ER_SYNC_ROLLBACK:
+		/* Invalid configuration. */
+		case ER_CFG:
+		case ER_ACCESS_DENIED:
+		case ER_NO_SUCH_USER:
+		case ER_CREDS_MISMATCH:
+			return {APPLIER_LOADING, true, true};
+		/* System error from master instance. */
+		case ER_SYSTEM:
+		case ER_SSL:
+		/*
+		 * Real tarantool can't have a nil UUID. This must be a
+		 * cartridge remote control instance. The error is transient,
+		 * since remote control will be replaced by a normal tarantool
+		 * node sooner or later.
+		 */
+		case ER_NIL_UUID:
+			return {APPLIER_DISCONNECTED, true, true};
+		default:
+			return {APPLIER_STOPPED, false, true};
+		}
+	}
+	/*
+	 * Xlog gap error can't be a critical error. Because it is totally
+	 * normal during bootstrap. Consider the case: node1 is a leader,
+	 * it is booted with vclock {1: 3}. Node2 connects and fetches
+	 * snapshot of node1, it also gets vclock {1: 3}. Then node1 writes
+	 * something and its vclock becomes {1: 4}. Now node3 boots from node1,
+	 * and gets the same vclock. Vclocks now look like this:
+	 *
+	 * - node1: {1: 4}, leader, has {1: 3} snap.
+	 * - node2: {1: 3}, booted from node1, has only snap.
+	 * - node3: {1: 4}, booted from node1, has only snap.
+	 *
+	 * If the cluster is a fullmesh, node2 will send subscribe requests
+	 * with vclock {1: 3}. If node3 receives it, it will respond with
+	 * xlog gap error, because it only has a snap with {1: 4}, nothing
+	 * else. In that case node2 should retry connecting to node3, and in
+	 * the meantime try to get newer changes from node1.
+	 */
+	if (type_cast(XlogGapError, e) != NULL)
+		return {APPLIER_LOADING, true, true};
+	/* Network and system errors - disconnect and retry. */
+	if (type_cast(SocketError, e) != NULL ||
+	    type_cast(SystemError, e) != NULL ||
+	    type_cast(SSLError, e) != NULL)
+		return {APPLIER_DISCONNECTED, true, true};
+
+    return {APPLIER_STOPPED, false, true};
+}
+
 static inline void
 applier_disconnect(struct applier *applier, enum applier_state state)
 {
@@ -2581,19 +2647,10 @@ applier_f(va_list ap)
 	 */
 	struct session *session = session_new_on_demand();
 	session_set_type(session, SESSION_TYPE_APPLIER);
-	/*
-	 * The instance saves replicaset anon cfg-value on bootstrap.
-	 * If a freshly started instance sees it has received
-	 * REPLICASET_UUID but hasn't yet registered, it must be an
-	 * anonymous replica, hence the default value 'true'.
-	 */
-	bool was_anon = true;
 
 	/* Re-connect loop */
 	while (true) {
-		bool try_reconnect = true;
-		bool log_error = true;
-		applier_state applier_next_state = APPLIER_OFF;
+		struct applier_error_info err_info;
 		FiberGCChecker gc_check;
 		try {
 			/*
@@ -2604,22 +2661,17 @@ applier_f(va_list ap)
 			applier_connect(applier);
 			if (tt_uuid_is_nil(&REPLICASET_UUID)) {
 				/*
-				 * Execute JOIN if this is a bootstrap.
-				 * In case of anonymous replication, don't
-				 * join but just fetch master's snapshot.
-				 *
-				 * The join will pause the applier
-				 * until WAL is created.
+				 * Bootstrap: always fetch snapshot first.
+				 * Named replicas will register after the
+				 * initial checkpoint is built, so that
+				 * unconfirmed sync txns cannot deadlock
+				 * the bootstrap (#11039).
 				 */
-				was_anon = cfg_replication_anon;
-				if (was_anon)
-					applier_fetch_snapshot(applier);
-				else
-					applier_join(applier);
+				applier_fetch_snapshot(applier);
 			}
 			/*
 			 * The instance transitioned from anonymous or is
-			 * retrying final join.
+			 * retrying registration.
 			 */
 			bool need_id = box_is_anon() &&
 				       !cfg_replication_anon;
@@ -2631,7 +2683,13 @@ applier_f(va_list ap)
 				*cfg_instance_name != 0 &&
 				strcmp(INSTANCE_NAME, cfg_instance_name) != 0;
 			if (need_id || need_name) {
-				applier_register(applier, was_anon);
+				/*
+				 * Startup configures Raft and may finish while
+				 * we are paused at REGISTERED or READY.
+				 */
+				bool configure_raft =
+					need_id && box_is_configured();
+				applier_register(applier);
 				/*
 				 * It's hard to catch the exact moment when
 				 * instance id settles, for example, it could
@@ -2640,7 +2698,7 @@ applier_f(va_list ap)
 				 * `applier_subscribe` starts, because we'll
 				 * start receiving raft messages there.
 				 */
-				if (need_id && was_anon) {
+				if (configure_raft) {
 					assert(instance_id != 0);
 					raft_cfg_instance_id(box_raft(),
 							     instance_id);
@@ -2653,98 +2711,27 @@ applier_f(va_list ap)
 			 */
 			unreachable();
 			return 0;
-		} catch (ClientError *e) {
-			if (e->errcode() == ER_CONNECTION_TO_SELF &&
-			    tt_uuid_is_equal(&applier->uuid, &INSTANCE_UUID)) {
-				/* Connection to itself, stop applier */
-				applier_next_state = APPLIER_OFF;
-				try_reconnect = false;
-				log_error = false;
-			} else if (e->errcode() == ER_LOADING) {
-				/* Autobootstrap */
-				applier_next_state = APPLIER_LOADING;
-			} else if (e->errcode() == ER_TOO_EARLY_SUBSCRIBE) {
-				/*
-				 * The instance is not anonymous, and is
-				 * registered, but its ID is not delivered to
-				 * all the nodes in the cluster yet, and some
-				 * nodes may ask to retry connection later,
-				 * until they receive _cluster record of this
-				 * instance. From some third node, for example.
-				 */
-				applier_next_state = APPLIER_LOADING;
-			} else if (e->errcode() == ER_SYNC_QUORUM_TIMEOUT ||
-				   e->errcode() == ER_SYNC_ROLLBACK) {
-				/*
-				 * Join failure due to synchronous
-				 * transaction rollback.
-				 */
-				applier_next_state = APPLIER_LOADING;
-			} else if (e->errcode() == ER_CFG ||
-				   e->errcode() == ER_ACCESS_DENIED ||
-				   e->errcode() == ER_NO_SUCH_USER ||
-				   e->errcode() == ER_CREDS_MISMATCH) {
-				/* Invalid configuration */
-				applier_next_state = APPLIER_LOADING;
-			} else if (e->errcode() == ER_SYSTEM ||
-				   e->errcode() == ER_SSL) {
-				/* System error from master instance. */
-				applier_next_state = APPLIER_DISCONNECTED;
-			} else if (e->errcode() == ER_NIL_UUID) {
-				/*
-				 * Real tarantool can't have a nil UUID. This
-				 * must be a cartridge remote control instance.
-				 * The error is transient, since remote control
-				 * will be replaced by a normal tarantool node
-				 * sooner or later.
-				 */
-				applier_next_state = APPLIER_DISCONNECTED;
-			} else {
-				/* Unrecoverable errors */
-				applier_next_state = APPLIER_STOPPED;
-				try_reconnect = false;
-			}
-		} catch (XlogGapError *e) {
-			/*
-			 * Xlog gap error can't be a critical error. Because it
-			 * is totally normal during bootstrap. Consider the
-			 * case: node1 is a leader, it is booted with vclock
-			 * {1: 3}. Node2 connects and fetches snapshot of node1,
-			 * it also gets vclock {1: 3}. Then node1 writes
-			 * something and its vclock becomes {1: 4}. Now node3
-			 * boots from node1, and gets the same vclock. Vclocks
-			 * now look like this:
-			 *
-			 * - node1: {1: 4}, leader, has {1: 3} snap.
-			 * - node2: {1: 3}, booted from node1, has only snap.
-			 * - node3: {1: 4}, booted from node1, has only snap.
-			 *
-			 * If the cluster is a fullmesh, node2 will send
-			 * subscribe requests with vclock {1: 3}. If node3
-			 * receives it, it will respond with xlog gap error,
-			 * because it only has a snap with {1: 4}, nothing else.
-			 * In that case node2 should retry connecting to node3,
-			 * and in the meantime try to get newer changes from
-			 * node1.
-			 */
-			applier_next_state = APPLIER_LOADING;
-		} catch (FiberIsCancelled *e) {
-			if (!diag_is_empty(&applier->diag)) {
-				applier_disconnect(applier, APPLIER_STOPPED);
-			} else {
-				applier_set_last_error(applier, e);
-				applier_disconnect(applier, APPLIER_OFF);
-			}
-			break;
-		} catch (SocketError *e) {
-			applier_next_state = APPLIER_DISCONNECTED;
-		} catch (SystemError *e) {
-			applier_next_state = APPLIER_DISCONNECTED;
-		} catch (SSLError *e) {
-			applier_next_state = APPLIER_DISCONNECTED;
 		} catch (Exception *e) {
-			applier_next_state = APPLIER_STOPPED;
-			try_reconnect = false;
+			/* Connection to itself - stop applier permanently */
+			if (type_cast(ClientError, e) != NULL &&
+			    box_error_code(e) == ER_CONNECTION_TO_SELF &&
+			    tt_uuid_is_equal(&applier->uuid, &INSTANCE_UUID)) {
+				applier_disconnect(applier, APPLIER_OFF);
+				break;
+			}
+			/* FiberIsCancelled breaks the reconnect loop */
+			if (type_cast(FiberIsCancelled, e)) {
+				if (!diag_is_empty(&applier->diag)) {
+					applier_disconnect(applier,
+							   APPLIER_STOPPED);
+				} else {
+					applier_set_last_error(applier, e);
+					applier_disconnect(applier,
+							   APPLIER_OFF);
+				}
+				break;
+			}
+			err_info = applier_classify_error(e);
 		}
 		/*
 		 * If the master restarts during the initial join state and
@@ -2764,18 +2751,19 @@ applier_f(va_list ap)
 			say_info("Error occurred during fetching snapshot, "
 				 "but some data has "
 				 "been applied. Stopping applier");
-			applier_next_state = APPLIER_STOPPED;
-			try_reconnect = false;
+			err_info.next_state = APPLIER_STOPPED;
+			err_info.try_reconnect = false;
 		}
 
 		struct error *err = diag_last_error(diag_get());
 		if (err != NULL) {
 			applier_set_last_error(applier, err);
-			if (log_error)
-				applier_log_error(applier, err, try_reconnect);
+			if (err_info.log_error)
+				applier_log_error(applier, err,
+						  err_info.try_reconnect);
 		}
-		applier_disconnect(applier, applier_next_state);
-		if (!try_reconnect)
+		applier_disconnect(applier, err_info.next_state);
+		if (!err_info.try_reconnect)
 			break;
 		/* Put fiber_sleep() out of catch block.
 		 *

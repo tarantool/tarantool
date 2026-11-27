@@ -167,7 +167,7 @@ box.cfg{checkpoint_count = checkpoint_count}
 -- Make the master fail join after sending data. Check that
 -- files written during failed rebootstrap attempt are removed
 -- by garbage collector.
-box.error.injection.set('ERRINJ_RELAY_FINAL_JOIN', true)
+box.error.injection.set('ERRINJ_RELAY_FETCH_SNAPSHOT_FAIL', true)
 ---
 - ok
 ...
@@ -201,7 +201,7 @@ old_files = box.space.mem:get('files')[2]
 new_files = test_run:eval("replica", "fio = require('fio') return fio.glob(fio.pathjoin(box.cfg.vinyl_dir, box.space.test.id, 0, '*'))")[1]
 ---
 ...
-#old_files == #new_files
+#new_files == #old_files
 ---
 - true
 ...
@@ -209,7 +209,7 @@ test_run:cmd("stop server replica")
 ---
 - true
 ...
-box.error.injection.set('ERRINJ_RELAY_FINAL_JOIN', false)
+box.error.injection.set('ERRINJ_RELAY_FETCH_SNAPSHOT_FAIL', false)
 ---
 - ok
 ...

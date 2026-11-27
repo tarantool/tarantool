@@ -766,11 +766,22 @@ recovery_journal_write(struct journal *base,
 	return 0;
 }
 
+/** Recovery journal writes complete immediately. */
+static int
+recovery_journal_sync(struct journal *base, struct vclock *out)
+{
+	struct recovery_journal *journal = (struct recovery_journal *)base;
+	if (out != NULL)
+		vclock_copy(out, journal->vclock);
+	return 0;
+}
+
 static void
 recovery_journal_create(struct vclock *v)
 {
 	static struct recovery_journal journal;
-	journal_create(&journal.base, recovery_journal_write, NULL, NULL, NULL);
+	journal_create(&journal.base, recovery_journal_write,
+		       recovery_journal_sync, NULL, NULL);
 	journal.vclock = v;
 	journal_set(&journal.base);
 }
@@ -2751,27 +2762,37 @@ box_set_replication_skip_conflict(void)
 	replication_skip_conflict = cfg_geti("replication_skip_conflict");
 }
 
-/** Register on the master instance. Could be initial join or a name change. */
+/**
+ * Finish registration with other appliers paused before subscribing and
+ * throw ER_CANNOT_REGISTER if the join master is missing or not connected,
+ * or an exception on failure.
+ */
 static void
 box_register_on_master(void)
+{
+	struct replica *master = replicaset_find_join_master();
+	if (master == NULL || master->applier == NULL ||
+	    tt_uuid_is_equal(&master->uuid, &INSTANCE_UUID) ||
+	    master->applier->state != APPLIER_CONNECTED)
+		tnt_raise(ClientError, ER_CANNOT_REGISTER);
+
+	struct applier *master_applier = master->applier;
+	applier_resume_to_state(master_applier, APPLIER_REGISTERED,
+				TIMEOUT_INFINITY);
+	applier_resume_to_state(master_applier, APPLIER_READY,
+				TIMEOUT_INFINITY);
+}
+
+/** Register on the master instance. Could be initial join or a name change. */
+static void
+box_register_on_master_and_sync(void)
 {
 	/*
 	 * Restart the appliers so as they would notice the change (need an ID,
 	 * need a new name).
 	 */
 	box_restart_replication();
-	struct replica *master = replicaset_find_join_master();
-	if (master == NULL || master->applier == NULL ||
-	    tt_uuid_is_equal(&master->uuid, &INSTANCE_UUID) ||
-	    master->applier->state != APPLIER_CONNECTED) {
-		tnt_raise(ClientError, ER_CANNOT_REGISTER);
-	} else {
-		struct applier *master_applier = master->applier;
-		applier_resume_to_state(master_applier, APPLIER_REGISTERED,
-					TIMEOUT_INFINITY);
-		applier_resume_to_state(master_applier, APPLIER_READY,
-					TIMEOUT_INFINITY);
-	}
+	box_register_on_master();
 	replicaset_follow();
 	replicaset_sync();
 }
@@ -2791,7 +2812,7 @@ box_set_replication_anon(void)
 	cfg_replication_anon = new_anon;
 	box_broadcast_ballot();
 	if (!new_anon) {
-		box_register_on_master();
+		box_register_on_master_and_sync();
 		assert(!box_is_anon());
 	} else {
 		/*
@@ -2928,7 +2949,7 @@ box_set_instance_name(void)
 	/* Nil means the config doesn't care, allows to use any name. */
 	if (*name != 0) {
 		if (box_is_ro())
-			box_register_on_master();
+			box_register_on_master_and_sync();
 		else
 			box_register_replica(&INSTANCE_UUID, name);
 	}
@@ -4457,21 +4478,19 @@ static void
 box_register_replica(const struct tt_uuid *uuid,
 		     const char *name)
 {
-	struct replica *replica = replica_by_uuid(uuid);
 	/*
 	 * Find required changes.
 	 */
-	bool need_name = false;
-	bool need_id = false;
-	if (replica == NULL) {
-		need_name = *name != 0;
-		need_id = true;
-	} else {
-		need_name = strcmp(replica->name, name) != 0;
-		need_id = replica->id == REPLICA_ID_NIL;
-	}
-	if (!need_name && !need_id)
+	struct replica_def def;
+	if (schema_find_replica_by_uuid(uuid, REPLICA_ID_NIL, &def) != 0)
+		diag_raise();
+	bool need_id = def.id == REPLICA_ID_NIL;
+	if (!need_id && strcmp(def.name, name) == 0) {
+		struct box_checkpoint checkpoint;
+		if (box_checkpoint_build_in_memory(&checkpoint) != 0)
+			diag_raise();
 		return;
+	}
 	/*
 	 * Apply the changes.
 	 */
@@ -4480,21 +4499,34 @@ box_register_replica(const struct tt_uuid *uuid,
 		int rc;
 		if (*name == 0) {
 			rc = boxk(IPROTO_UPDATE, BOX_CLUSTER_ID,
-				  "[%u][[%s%dNIL]]", (unsigned)replica->id, "=",
+				  "[%u][[%s%dNIL]]", (unsigned)def.id, "=",
 				  BOX_CLUSTER_FIELD_NAME);
 		} else {
 			rc = boxk(IPROTO_UPDATE, BOX_CLUSTER_ID,
-				  "[%u][[%s%d%s]]", (unsigned)replica->id, "=",
+				  "[%u][[%s%d%s]]", (unsigned)def.id, "=",
 				  BOX_CLUSTER_FIELD_NAME, name);
 		}
 		if (rc != 0)
 			diag_raise();
 		return;
 	}
-	struct replica *other = replica_by_name(name);
-	if (other != NULL && other != replica) {
+	struct replica_def other;
+	if (schema_find_replica_by_name(name, REPLICA_ID_NIL, &other) != 0)
+		diag_raise();
+	if (other.id != REPLICA_ID_NIL) {
+		/*
+		 * Do not steal a live replica's name: bootstrap must report
+		 * the same duplicate-name error as JOIN does. gh-12984 allows
+		 * replacement only when the old applier is absent/stopped.
+		 */
+		struct replica *old = replica_by_uuid(&other.uuid);
+		if (old != NULL && replica_has_alive_connections(old)) {
+			tnt_raise(ClientError, ER_INSTANCE_NAME_DUPLICATE,
+				  node_name_str(name),
+				  tt_uuid_str(&other.uuid));
+		}
 		if (boxk(IPROTO_UPDATE, BOX_CLUSTER_ID, "[%u][[%s%d%s]]",
-			 (unsigned)other->id, "=", BOX_CLUSTER_FIELD_UUID,
+			 (unsigned)other.id, "=", BOX_CLUSTER_FIELD_UUID,
 			 tt_uuid_str(uuid)) != 0)
 			diag_raise();
 		return;
@@ -4677,9 +4709,11 @@ box_process_fetch_snapshot(struct iostream *io,
 	/* Send the snapshot data to the instance. */
 	say_info("sending read-view to replica at %s", sio_socketname(io->fd));
 	struct vclock start_vclock;
-	relay_initial_join(io, header->sync, &start_vclock, req.version_id,
-			   cursor_ptr);
+	relay_initial_join(replica, io, header->sync, &start_vclock,
+			   req.version_id, cursor_ptr);
 	say_info("read-view sent.");
+	ERROR_INJECT(ERRINJ_RELAY_FETCH_SNAPSHOT_FAIL,
+		     tnt_raise(ClientError, ER_INJECTION, "fetch snapshot"));
 
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
@@ -4731,24 +4765,6 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	if (tt_uuid_is_equal(&req.instance_uuid, &INSTANCE_UUID))
 		tnt_raise(ClientError, ER_CONNECTION_TO_SELF);
 
-	/*
-	 * We only get register requests from instances which need some actual
-	 * registration - name, id.
-	 */
-	struct replica *replica = replica_by_uuid(&req.instance_uuid);
-	bool need_id = false;
-	bool need_name = false;
-	if (replica == NULL) {
-		need_id = true;
-		need_name = *req.instance_name != 0;
-	} else {
-		need_id = replica->id == REPLICA_ID_NIL;
-		need_name = strcmp(req.instance_name, replica->name) != 0;
-	}
-	if (!need_id && !need_name) {
-		tnt_raise(ClientError, ER_REPLICA_NOT_ANON,
-			  tt_uuid_str(&req.instance_uuid));
-	}
 	if (box_is_anon()) {
 		tnt_raise(ClientError, ER_UNSUPPORTED, "Anonymous replica",
 			  "registration of non-anonymous nodes.");
@@ -4761,6 +4777,7 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 
 	struct vclock start_vclock;
 	box_localize_vclock(&req.vclock, &start_vclock);
+	struct replica *replica = replica_by_uuid(&req.instance_uuid);
 	auto replica_guard = box_connect_replica(&req.instance_uuid,
 						 &start_vclock, &replica);
 
@@ -4768,6 +4785,7 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 		 tt_uuid_str(&req.instance_uuid), sio_socketname(io->fd));
 	ERROR_INJECT_YIELD(ERRINJ_REPLICA_JOIN_DELAY);
 	box_register_replica(&req.instance_uuid, req.instance_name);
+	ERROR_INJECT_YIELD(ERRINJ_REPLICA_REGISTER_DELAY);
 
 	replica = replica_by_uuid(&req.instance_uuid);
 	if (replica == NULL)
@@ -4884,7 +4902,7 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	     strcmp(replica->name, req.instance_name) != 0)) {
 		struct replica *other = replica_by_name(req.instance_name);
 		if (other != NULL && other != replica &&
-		    replica_has_connections(other)) {
+		    replica_has_alive_connections(other)) {
 			tnt_raise(ClientError, ER_INSTANCE_NAME_DUPLICATE,
 				  node_name_str(req.instance_name),
 				  tt_uuid_str(&other->uuid));
@@ -4901,8 +4919,8 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	 * Initial stream: feed replica with dirty data from engines.
 	 */
 	struct vclock start_vclock;
-	relay_initial_join(io, header->sync, &start_vclock, req.version_id,
-			   NULL);
+	relay_initial_join(replica, io, header->sync, &start_vclock,
+			   req.version_id, NULL);
 	say_info("initial data sent.");
 	/**
 	 * Register the replica after sending the last row but before sending
@@ -5304,9 +5322,14 @@ check_bootstrap_unanimity(void)
 	}
 }
 
-/** Ensure the configured and stored global identifiers (UUID) match. */
+/**
+ * Ensure the configured and stored global identifiers (names, UUID) match.
+ *
+ * If @a require_name is set, the instance name must be known by now. It is
+ * not when the check is done before the registration of a joining replica.
+ */
 static int
-check_global_ids_integrity(void)
+check_global_ids_integrity(bool require_name)
 {
 	char cluster_name[NODE_NAME_SIZE_MAX];
 	char replicaset_name[NODE_NAME_SIZE_MAX];
@@ -5338,11 +5361,24 @@ check_global_ids_integrity(void)
 			 tt_uuid_str(&REPLICASET_UUID));
 		return -1;
 	}
-	if (*instance_name != 0 && strcmp(instance_name, INSTANCE_NAME) != 0) {
-		diag_set(ClientError, ER_INSTANCE_NAME_MISMATCH,
-			 node_name_str(instance_name),
-			 node_name_str(INSTANCE_NAME));
-		return -1;
+	/*
+	 * A checkpoint taken before registration does not have our name yet,
+	 * so the name is unknown until the registration row is recovered from
+	 * WAL or the registration is done on the master.
+	 */
+	if (!box_is_anon() && *instance_name != 0) {
+		if (*INSTANCE_NAME == '\0' && require_name) {
+			diag_set(ClientError, ER_UNKNOWN_REPLICA,
+				 tt_uuid_str(&INSTANCE_UUID),
+				 tt_uuid_str(&REPLICASET_UUID));
+				return -1;
+		}
+		if (strcmp(instance_name, INSTANCE_NAME) != 0) {
+			diag_set(ClientError, ER_INSTANCE_NAME_MISMATCH,
+				 node_name_str(instance_name),
+				 node_name_str(INSTANCE_NAME));
+			return -1;
+		}
 	}
 	return 0;
 }
@@ -5455,8 +5491,8 @@ bootstrap_from_master(struct replica *master)
 		 applier_addr_str(applier));
 
 	/*
-	 * Send JOIN request to master
-	 * See box_process_join().
+	 * Send FETCH_SNAPSHOT request to master.
+	 * See box_process_fetch_snapshot().
 	 */
 	assert(!tt_uuid_is_nil(&INSTANCE_UUID));
 	try {
@@ -5479,23 +5515,18 @@ bootstrap_from_master(struct replica *master)
 	 * Process initial data (snapshot or dirty disk data).
 	 */
 	engine_begin_initial_recovery_xc(NULL);
-	enum applier_state wait_state = cfg_replication_anon ?
-					APPLIER_FETCHED_SNAPSHOT :
-					APPLIER_FINAL_JOIN;
-	applier_resume_to_state(applier, wait_state, TIMEOUT_INFINITY);
+	applier_resume_to_state(applier, APPLIER_FETCHED_SNAPSHOT,
+				TIMEOUT_INFINITY);
 
 	box_run_on_recovery_state(RECOVERY_STATE_SNAPSHOT_RECOVERED);
 
 	/*
-	 * Process final data (WALs).
+	 * Finalize recovery. WALs will be received later via
+	 * REGISTER and SUBSCRIBE after the initial checkpoint.
 	 */
 	engine_begin_final_recovery_xc();
 	recovery_journal_create(&instance_vclock_storage);
 
-	if (!cfg_replication_anon) {
-		applier_resume_to_state(applier, APPLIER_JOINED,
-					TIMEOUT_INFINITY);
-	}
 	/* Finalize the new replica */
 	engine_end_recovery_xc();
 	if (box_set_replication_synchro_queue_max_size() != 0)
@@ -5506,7 +5537,7 @@ bootstrap_from_master(struct replica *master)
 	assert(applier->state == APPLIER_READY);
 
 	/*
-	 * An engine may write to WAL on its own during the join
+	 * An engine may write to WAL on its own during the bootstrap
 	 * stage (e.g. Vinyl's deferred DELETEs). That's OK - those
 	 * records will pass through the recovery journal and wind
 	 * up in the initial checkpoint. However, we must enable
@@ -5522,6 +5553,13 @@ bootstrap_from_master(struct replica *master)
 	if (gc_checkpoint() != 0) {
 		say_error("failed to create a checkpoint");
 		diag_raise();
+	}
+
+	if (!cfg_replication_anon && box_is_anon()) {
+		applier_resume_to_state(applier, APPLIER_REGISTERED,
+					TIMEOUT_INFINITY);
+		applier_resume_to_state(applier, APPLIER_READY,
+					TIMEOUT_INFINITY);
 	}
 
 	box_run_on_recovery_state(RECOVERY_STATE_WAL_RECOVERED);
@@ -5599,7 +5637,7 @@ bootstrap(bool *is_bootstrap_leader)
 			break;
 		}
 		if (bootstrap_from_master(master)) {
-			if (check_global_ids_integrity() != 0)
+			if (check_global_ids_integrity(false) != 0)
 				diag_raise();
 			*is_bootstrap_leader = false;
 			break;
@@ -5833,7 +5871,7 @@ local_recovery(const struct vclock *checkpoint_vclock)
 	if (box_set_replication_synchro_queue_max_size() != 0)
 		diag_raise();
 
-	if (check_global_ids_integrity() != 0)
+	if (check_global_ids_integrity(false) != 0)
 		diag_raise();
 	box_run_on_recovery_state(RECOVERY_STATE_WAL_RECOVERED);
 }
@@ -6008,12 +6046,25 @@ box_cfg_xc(void)
 	assert(current_journal != &bootstrap_journal);
 
 	/*
-	 * Check for correct registration of the instance in _cluster
-	 * The instance won't exist in _cluster space if it is an
-	 * anonymous replica, add it manually.
+	 * The master may have registered us before a replica's crash, while
+	 * the local _cluster row was not persisted. Only retry if a master
+	 * knows us (i.e. our UUID presents in the master's _cluster).
 	 */
-	if (cfg_replication_anon != box_is_anon())
-		panic("'replication_anon' cfg didn't work");
+	if (cfg_replication_anon != box_is_anon()) {
+		if (!cfg_replication_anon && box_is_anon() &&
+		    replicaset_is_registered_remotely()) {
+			box_register_on_master();
+			if (check_global_ids_integrity(true) != 0)
+				diag_raise();
+		} else {
+			/*
+			 * If the master deliberately removed our replica from
+			 * the _cluster we should panic according to gh-10088.
+			 */
+			panic("'replication_anon' cfg didn't work");
+		}
+	}
+	/* Anonymous replicas have no _cluster row to create the self object. */
 	struct replica *self = replica_by_uuid(&INSTANCE_UUID);
 	if (!cfg_replication_anon) {
 		if (self == NULL || self->id == REPLICA_ID_NIL) {

@@ -195,12 +195,15 @@ g_no_names.test_instance_uuid_require = function(g)
         rs.instances['instance-001'].database = nil
 
         local iconfig = _G.cluster_config:instantiate(config, 'instance-001')
-        local msg = 'Instance name for instance-001 is not set in snapshot'
-        t.assert_error_msg_contains(msg, function()
-            return _G.configdata.new(iconfig, config, 'instance-001')
-        end)
+        -- Must not raise any more, the name is expected from WAL.
+        _G.configdata.new(iconfig, config, 'instance-001')
         _G.box_cfg_restore()
     end, {g.config})
+    -- The warning is emitted by the server under test, so read its log.
+    t.helpers.retrying({timeout = 10}, function()
+        t.assert(g.server:grep_log(
+            'Instance name for instance%-001 is not set in the snapshot'))
+    end)
 end
 
 g_no_names.test_replicaset_uuid_require = function(g)
