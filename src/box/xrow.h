@@ -609,6 +609,8 @@ struct ballot {
 	struct tt_uuid registered_replica_uuids[VCLOCK_MAX];
 	/** Number of replicas registered in the replica set. */
 	int registered_replica_uuids_size;
+	/** One of enum replication_mode values; legacy/unknown if absent. */
+	uint32_t replication_mode;
 };
 
 /**
@@ -1137,10 +1139,8 @@ struct begin_request {
 	 * Must be ono of enum txn_isolation_level values.
 	 */
 	uint32_t txn_isolation;
-	/**
-	 * is_sync that determines the synchronism of transactions.
-	 */
-	bool is_sync;
+	/** The is_sync option: -1 if omitted, 0 for false, 1 for true. */
+	int is_sync;
 };
 
 /**
@@ -1158,10 +1158,8 @@ xrow_decode_begin(const struct xrow_header *row, struct begin_request *request);
  * COMMIT request.
  */
 struct commit_request {
-	/**
-	 * is_sync that determines the synchronism of transactions.
-	 */
-	bool is_sync;
+	/** The is_sync option: -1 if omitted, 0 for false, 1 for true. */
+	int is_sync;
 };
 
 /**

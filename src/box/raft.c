@@ -141,8 +141,7 @@ box_raft_update_synchro_queue(struct raft *raft)
 			errcode = box_error_code(err);
 			diag_log();
 			if (!fiber_is_cancelled() &&
-			    (errcode == ER_QUORUM_WAIT ||
-			    errcode == ER_IN_ANOTHER_PROMOTE)) {
+			    errcode == ER_QUORUM_WAIT) {
 				try_again = true;
 				fiber_sleep(0);
 			}
@@ -520,13 +519,7 @@ done:
 int
 box_raft_try_promote(void)
 {
-	static bool is_in_raft_promote = false;
-	if (is_in_raft_promote) {
-		diag_set(ClientError, ER_IN_ANOTHER_PROMOTE);
-		return -1;
-	}
 	struct raft *raft = box_raft();
-	is_in_raft_promote = true;
 	assert(raft->is_enabled);
 	assert(box_election_mode == ELECTION_MODE_MANUAL ||
 	       box_election_mode == ELECTION_MODE_CANDIDATE ||
@@ -560,7 +553,6 @@ box_raft_try_promote(void)
 		 * Otherwise it can lead to memory leaks.
 		 */
 		diag_destroy(&ctx.diag);
-		is_in_raft_promote = false;
 		return 0;
 	}
 
@@ -574,7 +566,6 @@ box_raft_try_promote(void)
 		diag_set(TimedOut);
 	}
 
-	is_in_raft_promote = false;
 	return -1;
 }
 
@@ -691,6 +682,16 @@ box_raft_on_wal_error_f(struct watcher *watcher)
 bool
 box_raft_is_ro(void)
 {
+	/*
+	 * Old compat permits box.ctl.promote() with election_mode = 'off'.
+	 * Enabling async through compat leaves election_mode unchanged,
+	 * so the limbo may remain in TXN_LIMBO_STATE_LEADER with matching Raft
+	 * and limbo terms. In order to force RO in such case, the check below
+	 * is needed.
+	 */
+	if (replication_mode == REPLICATION_MODE_ASYNC &&
+	    txn_limbo_has_owner(&txn_limbo))
+		return true;
 	if (txn_limbo.state == TXN_LIMBO_STATE_REPLICA)
 		return true;
 	struct raft *raft = box_raft();

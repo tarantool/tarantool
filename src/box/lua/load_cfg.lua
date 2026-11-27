@@ -191,6 +191,7 @@ local default_cfg = {
     checkpoint_count    = 2,
     worker_pool_threads = 4,
     election_mode       = 'off',
+    replication_mode    = 'async',
     election_timeout    = 5,
     election_fencing_mode = 'soft',
     replication_timeout = 1,
@@ -403,6 +404,7 @@ local template_cfg = {
     txn_isolation = 'string, number',
     worker_pool_threads = 'number',
     election_mode       = 'string',
+    replication_mode    = 'string',
     election_timeout    = 'number',
     election_fencing_mode = 'string',
     replication_timeout = 'number',
@@ -654,7 +656,6 @@ local dynamic_cfg = {
         require('title').update(box.cfg.custom_proc_title)
     end,
     force_recovery          = private.cfg_set_force_recovery,
-    election_mode           = private.cfg_set_election_mode,
     election_timeout        = private.cfg_set_election_timeout,
     election_fencing_mode = private.cfg_set_election_fencing_mode,
     replication_timeout     = private.cfg_set_replication_timeout,
@@ -671,7 +672,6 @@ local dynamic_cfg = {
     replication_linearizable_quorum =
         private.cfg_set_replication_linearizable_quorum,
     replication_skip_conflict = private.cfg_set_replication_skip_conflict,
-    replication_anon        = private.cfg_set_replication_anon,
     replication_anon_ttl    = private.cfg_set_replication_anon_ttl,
     bootstrap_strategy      = private.cfg_set_bootstrap_strategy,
     bootstrap_leader        = private.cfg_set_bootstrap_leader,
@@ -717,6 +717,15 @@ local dynamic_cfg = {
 -- to "safe" value given in `revert_fallback`. "safe" in sense that
 -- reverting to it should always be successful.
 local dynamic_cfg_modules = {
+    replication_mode_group = {
+        cfg = private.cfg_set_replication_mode_group,
+        options = {
+            replication_mode = true,
+            election_mode = true,
+            replication_anon = true,
+        },
+        skip_at_load = true,
+    },
     listen = {
         cfg = private.cfg_set_listen,
         options = {
@@ -811,10 +820,9 @@ local dynamic_cfg_order = {
     -- would try to deanon the old `replication` before applying
     -- the new one. This should be fixed when box.cfg is able to
     -- apply some parameters together and atomically.
-    replication_anon        = 250,
+    replication_mode_group  = 250,
     -- Cleanup delay should be ignored if replication_anon is set.
     wal_cleanup_delay       = 260,
-    election_mode           = 300,
     election_timeout        = 320,
     election_fencing_mode   = 320,
 }
@@ -836,7 +844,6 @@ local dynamic_cfg_skip_at_load = {
     quiver_memory           = ifdef_quiver(true),
     quiver_run_size         = ifdef_quiver(true),
     too_long_threshold      = true,
-    election_mode           = true,
     election_timeout        = true,
     election_fencing_mode   = true,
     replication             = true,
@@ -851,7 +858,6 @@ local dynamic_cfg_skip_at_load = {
     replication_synchro_queue_max_size = true,
     replication_linearizable_quorum = true,
     replication_skip_conflict = true,
-    replication_anon        = true,
     txn_synchro_timeout     = true,
     bootstrap_strategy      = true,
     bootstrap_leader        = true,

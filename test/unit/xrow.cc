@@ -36,6 +36,7 @@ extern "C" {
 #include "box/error.h"
 #include "box/xrow.h"
 #include "box/iproto_constants.h"
+#include "box/replication.h"
 #include "tt_uuid.h"
 #include "version.h"
 #include "random.h"
@@ -1484,13 +1485,85 @@ test_xrow_decode_error_gh_9136(void)
 	footer();
 }
 
+/** Ballot mode round-trips and absence in a fresh ballot. */
+static void
+test_ballot_replication_mode(void)
+{
+	header();
+	plan(22);
+	char buf[4096];
+	struct ballot ballot = {};
+	struct ballot decoded = {};
+	struct xrow_header row = {};
+	row.type = IPROTO_OK;
+	row.bodycnt = 1;
+	row.body[0].iov_base = buf;
+	const enum replication_mode modes[] = {
+		REPLICATION_MODE_SYNC, REPLICATION_MODE_ASYNC,
+		REPLICATION_MODE_LEGACY,
+	};
+	for (unsigned i = 0; i < lengthof(modes); ++i) {
+		ballot.replication_mode = modes[i];
+		char *end = mp_encode_ballot(buf, &ballot);
+		row.body[0].iov_len = end - buf;
+		ok((size_t)(end - buf) <= mp_sizeof_ballot_max(&ballot),
+		   "encoded ballot fits the size bound");
+		is(xrow_decode_ballot(&row, &decoded), 0, "decode ballot");
+		is(decoded.replication_mode, modes[i], "mode round-trip");
+	}
+	struct watch_request event = {};
+	event.data = buf;
+	event.data_end = buf + row.body[0].iov_len;
+	decoded.replication_mode = REPLICATION_MODE_SYNC;
+	bool is_empty;
+	is(xrow_decode_ballot_event(&event, &decoded, &is_empty), 0,
+	   "decode legacy event after dedicated mode");
+	is(decoded.replication_mode, REPLICATION_MODE_LEGACY,
+	   "omitted mode clears the previous value");
+	const unsigned key = IPROTO_BALLOT_REPLICATION_MODE;
+	size_t size = mp_format(buf, sizeof(buf), "{%u{%u%u}}",
+				IPROTO_BALLOT, key, 1);
+	row.body[0].iov_len = size;
+	is(xrow_decode_ballot(&row, &decoded), 0, "decode async wire code");
+	is(decoded.replication_mode, REPLICATION_MODE_ASYNC, "1 means async");
+	size = mp_format(buf, sizeof(buf), "{%u{%u%u}}",
+			 IPROTO_BALLOT, key, 2);
+	row.body[0].iov_len = size;
+	is(xrow_decode_ballot(&row, &decoded), 0, "decode sync wire code");
+	is(decoded.replication_mode, REPLICATION_MODE_SYNC, "2 means sync");
+	const uint64_t bad_modes[] = {
+		0, 3, UINT64_C(0x100000001), UINT64_MAX,
+	};
+	for (unsigned i = 0; i < lengthof(bad_modes); ++i) {
+		size = mp_format(buf, sizeof(buf), "{%u{%u%llu}}",
+				 IPROTO_BALLOT, key,
+				 (unsigned long long)bad_modes[i]);
+		row.body[0].iov_len = size;
+		is(xrow_decode_ballot(&row, &decoded), -1, "invalid mode");
+	}
+	size = mp_format(buf, sizeof(buf), "{%u{%u%s}}",
+			 IPROTO_BALLOT, key, "sync");
+	row.body[0].iov_len = size;
+	is(xrow_decode_ballot(&row, &decoded), -1, "string mode is invalid");
+	size = mp_format(buf, sizeof(buf), "{%u{%u%d}}",
+			 IPROTO_BALLOT, key, -1);
+	row.body[0].iov_len = size;
+	is(xrow_decode_ballot(&row, &decoded), -1, "negative mode is invalid");
+	size = mp_format(buf, sizeof(buf), "{%u{%u%b}}",
+			 IPROTO_BALLOT, key, true);
+	row.body[0].iov_len = size;
+	is(xrow_decode_ballot(&row, &decoded), -1, "boolean mode is invalid");
+	check_plan();
+	footer();
+}
+
 int
 main(void)
 {
 	memory_init();
 	fiber_init(fiber_c_invoke);
 	header();
-	plan(15);
+	plan(16);
 
 	random_init();
 
@@ -1510,6 +1583,7 @@ main(void)
 	test_xrow_decode_error_gh_9098();
 	test_xrow_decode_error_gh_9136();
 	test_xrow_decode_synchro_types();
+	test_ballot_replication_mode();
 
 	random_free();
 	fiber_free();

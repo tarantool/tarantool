@@ -52,7 +52,8 @@ g.test_concurrent_promote_after_box_cfg = function(cg)
         local err
         ok, err = f:join()
         t.assert_not(ok)
-        t.assert_equals(err.message, 'box.ctl.promote() is already running')
+        local msg = 'box.ctl.promote/demote() is already running'
+        t.assert_equals(err.message, msg)
     end)
 end
 
@@ -94,7 +95,7 @@ end)
 g.test_concurrent_promote_during_box_cfg = function(cg)
     cg.server1:exec(function()
         t.assert_not(_G.promote_ok)
-        local msg = 'box.ctl.promote() is already running'
+        local msg = 'box.ctl.promote/demote() is already running'
         t.assert_equals(_G.promote_err.message, msg)
         t.assert_equals(box.info.election.leader, box.info.id)
         t.helpers.retrying({timeout = 120}, function()

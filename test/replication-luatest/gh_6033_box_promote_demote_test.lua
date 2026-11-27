@@ -201,8 +201,8 @@ g_common.test_raft_leader_promote = function(g)
     end)
     luatest.assert_not(ok, string.format(
         'Promoting current RAFT leader that has not finished promotion fails'))
-    local msg = 'box.ctl.promote/demote does not support simultaneous ' ..
-                    'invocations'
+    local msg = 'box.ctl.promote/demote() is already running'
+    luatest.assert_equals(err.code, box.error.IN_ANOTHER_PROMOTE)
     luatest.assert_equals(err.message, msg)
     wal_delay_end(g.server_1)
     fiber_join(g.server_1, f)
@@ -310,9 +310,16 @@ g_common.test_simultaneous_demote = function(g)
         return pcall(box.ctl.demote)
     end)
     luatest.assert_not(ok)
-    luatest.assert_equals(err.code, box.error.UNSUPPORTED)
-    luatest.assert_str_contains(err.message, "box.ctl.promote/demote");
-    luatest.assert_str_contains(err.message, "simultaneous invocations");
+    luatest.assert_equals(err.code, box.error.IN_ANOTHER_PROMOTE)
+    local msg = 'box.ctl.promote/demote() is already running'
+    luatest.assert_equals(err.message, msg)
+
+    local ok, err = g.server_1:exec(function()
+        return pcall(box.ctl.promote)
+    end)
+    luatest.assert_not(ok)
+    luatest.assert_equals(err.code, box.error.IN_ANOTHER_PROMOTE)
+    luatest.assert_equals(err.message, msg)
 
     wal_delay_end(g.server_1)
     fiber_join(g.server_1, f)

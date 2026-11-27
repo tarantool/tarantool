@@ -314,6 +314,7 @@ g.test_defaults = function()
             use_mvcc_engine = false,
         },
         replication = {
+            mode = 'async',
             failover = 'off',
             anon = false,
             anon_ttl = 60 * 60,
@@ -442,6 +443,7 @@ g.test_defaults = function()
             },
         },
         compat = {
+            box_cfg_replication_mode = 'old',
             json_escape_forward_slash = 'new',
             yaml_pretty_multiline = 'new',
             fiber_channel_close_mode = 'new',

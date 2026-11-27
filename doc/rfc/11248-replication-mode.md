@@ -74,7 +74,7 @@ Newly added:
 * `box.ctl.txn_sync()` to wait for transactions already committing when the
   call starts, including their local WAL writes and synchronous confirmation.
 
-* `box.ctl.replicaset_sync({timeout = N, include_anon = B})` to wait for every
+* `box.ctl.replication_sync({timeout = N, include_anon = B})` to wait for every
   replica in `_cluster` to reach the caller's vclock captured at the start
   of the call. `include_anon = true` also waits for connected anonymous
   replicas; the default is `false`.
@@ -247,6 +247,18 @@ connections, before loading the snapshot, replaying local WAL, or building
 indexes. An explicit mismatch must fail `box.cfg()`. An unavailable peer or a
 missing mode cannot be validated at this stage.
 
+Mode validation does not extend the initial connection wait. The bootstrap
+strategy, connection quorum, and timeout retain their existing semantics. In
+particular, local recovery with `bootstrap_strategy = 'legacy'` and
+`replication_connect_quorum = 0` can proceed before receiving any ballots.
+Peers that connect later are checked by their appliers, which retry on a
+mismatch without failing local recovery.
+
+Hot standby does not support this early check. It recovers the local snapshot
+and follows local WAL without connecting to peers. Modes are checked when it
+acquires the WAL directory lock and starts network replication. An explicit
+mismatch at that point still fails the initial `box.cfg()`.
+
 Check the mode on every connection and reconnect. If both nodes report a mode,
 the values must match, regardless of version. If either omits the field, allow
 the connection: it means legacy behavior, not `'async'`.
@@ -307,6 +319,11 @@ switch of the `compat.box_cfg_replication_mode` to `'new'`:
 2. Before entering async, require an empty limbo and no unfinished promotions
    or demotions. An existing limbo owner is allowed.
 
+YAML reloads apply compat before `box.cfg()`. Before enabling `'new'`, prepare
+mode and election settings that satisfy the new rules while compat is still
+`'old'`, then reload with `'new'`. Mode, election and compat changes are not an
+atomic operation.
+
 These checks are local. The caller must coordinate the nodes. There are no
 checks for transactions in progress, replication status, or vclocks of connected
 replicas: the switch of mode happens like never, so no need to protect it that
@@ -323,7 +340,7 @@ These helpers are available under both compat settings:
   WAL write, and for confirmation in limbo (the local write of `CONFIRM` is
   also covered). It reports an error if an awaited transaction is rolled back.
   Alternative 3.9 discusses the API naming.
-- `box.ctl.replicaset_sync({timeout = N, include_anon = B})` captures the
+- `box.ctl.replication_sync({timeout = N, include_anon = B})` captures the
   caller's `box.info.vclock` at the start of the call and waits for every
   replica in `_cluster` to reach it, ignoring component zero. `include_anon`
   defaults to `false`; when `true`, also wait for anonymous replicas connected
@@ -340,7 +357,7 @@ retry that step before continuing.
    to block background writes too.
 2. Call `box.ctl.txn_sync()` on every node (`box.ctl.wal_sync()` also suffices
    here). After all calls succeed, call
-   `box.ctl.replicaset_sync({include_anon = true})` on every registered node
+   `box.ctl.replication_sync({include_anon = true})` on every registered node
    and wait for all calls to finish.
 3. Set `replication_mode = 'sync'` on every node, together with
    `election_mode = 'manual'` on the intended leader, `'manual'` or `'voter'`
@@ -386,14 +403,14 @@ rebootstrap the affected replicas from it.
 2. Call `box.ctl.txn_sync()` on every node to finish pending commits,
    including synchronous confirmation.
 3. After these calls succeed everywhere, call
-   `box.ctl.replicaset_sync({include_anon = true})` on every registered node
+   `box.ctl.replication_sync({include_anon = true})` on every registered node
    and wait for all calls to finish. This also replicates `CONFIRM` and
    `ROLLBACK` records before changing modes.
 4. Set `replication_mode = 'async'` with `election_mode = 'off'` everywhere.
    Wait for every node to switch and replication to reconnect if needed.
    Keep writes stopped: the limbos are empty, but still have an owner.
 5. On the limbo owner, call `box.ctl.demote()`, then
-   `box.ctl.replicaset_sync({include_anon = true})`. Wait for it to finish:
+   `box.ctl.replication_sync({include_anon = true})`. Wait for it to finish:
    every replica must apply `DEMOTE` and clear its limbo owner.
 6. Restore writers.
 
@@ -454,7 +471,7 @@ empty, ownerless async limbos, skip these steps and switch nodes in any order.
 3. Set `compat.box_cfg_replication_mode = 'new'` on the master.
 4. (mixed -> *, async -> sync, sync -> async) On the master, call
    `box.ctl.txn_sync()` to finish pending commits started under `'old'`.
-   Then call `box.ctl.replicaset_sync({include_anon = true})` and wait for it
+   Then call `box.ctl.replication_sync({include_anon = true})` and wait for it
    to finish. New writes can continue.
 5. Switch the replicas to `'new'`.
 6. (recommended) Restart replication.
@@ -482,7 +499,7 @@ To recover from an incompatible WAL record in 3.x/4.x:
    appliers.
 2. Once all writers produce transactions in the target mode, call
    `box.ctl.txn_sync()` on every node. After these calls succeed, call
-   `box.ctl.replicaset_sync({include_anon = true})` on every registered node
+   `box.ctl.replication_sync({include_anon = true})` on every registered node
    and wait for all calls to finish. Writes can continue.
 3. Switch the caught-up replicas back to `'new'` and reconnect.
 
@@ -511,7 +528,7 @@ For a replicaset with one writable master, keep the same master:
 1. (from async) If pending or continuing writes touch spaces with stored
    `is_sync = true`, pause writes. While every node is still `'new'`, call
    `box.ctl.txn_sync()` on the master, then
-   `box.ctl.replicaset_sync({include_anon = true})`, and wait for it to finish.
+   `box.ctl.replication_sync({include_anon = true})`, and wait for it to finish.
    Keep writes paused until step 3. From sync, writes can continue; legacy
    receivers accept the pending sync WAL.
 2. Switch all receiving replicas, including anonymous ones, to `'old'`, then
@@ -722,7 +739,7 @@ box.ctl.wal_sync({include_synchro_queue = true})
 ```
 
 This avoids adding a function, and the option name matches
-`replicaset_sync({include_anon = true})`. But WAL is a lower-level subsystem:
+`replication_sync({include_anon = true})`. But WAL is a lower-level subsystem:
 it handles rows and other WAL work, while transactions and the synchronous
 queue depend on it. Adding this option makes its API aware of a higher-level
 concept. Unlike `include_anon` in the replication API, it crosses that
@@ -797,7 +814,7 @@ For a replicaset with one writable master:
    read-only.
 4. (mixed -> sync, async -> sync) On the former master, call
    `box.ctl.txn_sync()`, then
-   `box.ctl.replicaset_sync({include_anon = true})`. The new master can keep
+   `box.ctl.replication_sync({include_anon = true})`. The new master can keep
    accepting writes during this wait.
 5. Restart the former master as a read-only replica on the target version,
    with the target mode and compat `'new'`. Wait for it to reach `'running'`.

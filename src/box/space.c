@@ -60,6 +60,7 @@
 #include "port.h"
 #include "tweaks.h"
 #include "txn_limbo.h"
+#include "replication.h"
 #include "sql.h"
 #include "arrow_ipc.h"
 
@@ -1532,7 +1533,10 @@ system_spaces_update_is_sync_state(bool is_sync)
 		assert(space->lua_ref != LUA_NOREF);
 		lua_rawgeti(tarantool_L, LUA_REGISTRYINDEX, space->lua_ref);
 		lua_getfield(tarantool_L, -1, "state");
-		lua_pushboolean(tarantool_L, space->state.is_sync);
+		if (replication_mode_enable)
+			lua_pushnil(tarantool_L);
+		else
+			lua_pushboolean(tarantool_L, space->state.is_sync);
 		lua_setfield(tarantool_L, -2, "is_sync");
 		lua_pop(tarantool_L, 2);
 	}
@@ -1546,6 +1550,36 @@ extern void
 system_spaces_update_is_sync_state_from_compat(void)
 {
 	system_spaces_update_is_sync_state(txn_limbo_has_owner(&txn_limbo));
+}
+
+/** Preserve Lua table identity and stored flags on compat changes. */
+static int
+space_update_replication_mode_cb(struct space *space, void *arg)
+{
+	(void)arg;
+	struct lua_State *L = tarantool_L;
+	if (space->lua_ref == LUA_NOREF)
+		return 0;
+	lua_rawgeti(L, LUA_REGISTRYINDEX, space->lua_ref);
+	if (replication_mode_enable)
+		lua_pushnil(L);
+	else
+		lua_pushboolean(L, space->def->opts.is_sync);
+	lua_setfield(L, -2, "is_sync");
+	lua_getfield(L, -1, "state");
+	if (replication_mode_enable)
+		lua_pushnil(L);
+	else
+		lua_pushboolean(L, space->state.is_sync);
+	lua_setfield(L, -2, "is_sync");
+	lua_pop(L, 2);
+	return 0;
+}
+
+void
+space_update_replication_mode(void)
+{
+	space_foreach(space_update_replication_mode_cb, NULL);
 }
 
 void

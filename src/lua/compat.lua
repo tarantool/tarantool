@@ -15,7 +15,11 @@ ffi.cdef[[
      * compat action.
      */
     void
-    system_spaces_update_is_sync_state_from_compat(void)
+    system_spaces_update_is_sync_state_from_compat(void);
+
+    /** Update advertised features when tuple compatibility changes. */
+    void
+    lbox_iproto_set_tuple_extension(bool enabled);
 ]]
 
 local options_format = {
@@ -25,6 +29,11 @@ local options_format = {
     run_action_now = 'boolean/nil',
     action         = 'function/nil',
 }
+
+local BOX_CFG_REPLICATION_MODE_BRIEF = [[
+Enable dedicated synchronous or asynchronous replication with replication_mode.
+The old behavior permits per-space and per-transaction is_sync options.
+]]
 
 local JSON_ESCAPE_BRIEF = [[
 Whether to escape the forward slash symbol '/' using a backslash in a
@@ -334,8 +343,9 @@ local options = {
         default = 'new',
         obsolete = nil,
         brief = BOX_TUPLE_EXTENSION_BRIEF,
-        run_action_now = true,
-        action = tweak_action('box_tuple_extension', false, true)
+        action = function(is_new)
+            ffi.C.lbox_iproto_set_tuple_extension(is_new)
+        end,
     },
     box_space_max = {
         default = 'new',
@@ -354,6 +364,14 @@ local options = {
         obsolete = nil,
         brief = BOX_ERROR_SERIALIZE_VERBOSE,
         action = tweak_action('box_error_serialize_verbose', false, true),
+    },
+    box_cfg_replication_mode = {
+        default = 'old',
+        obsolete = nil,
+        brief = BOX_CFG_REPLICATION_MODE_BRIEF,
+        action = function(is_new)
+            box.internal.cfg_set_replication_mode_compat(is_new)
+        end,
     },
     box_consider_system_spaces_synchronous = {
       default = 'old',

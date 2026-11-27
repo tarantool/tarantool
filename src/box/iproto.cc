@@ -2672,6 +2672,21 @@ tx_inject_delay(void)
 	});
 }
 
+/** Validate the is_sync transaction option in the TX thread. */
+static int
+tx_check_is_sync(int is_sync)
+{
+	if (is_sync != -1 && replication_mode_enable) {
+		diag_set(IllegalParams, "unexpected option 'is_sync'");
+		return -1;
+	}
+	if (is_sync == 0) {
+		diag_set(IllegalParams, "is_sync can only be true");
+		return -1;
+	}
+	return 0;
+}
+
 static void
 tx_process_begin(struct cmsg *m)
 {
@@ -2679,9 +2694,11 @@ tx_process_begin(struct cmsg *m)
 	struct obuf *out;
 	struct obuf_svp header;
 	uint32_t txn_isolation = msg->begin.txn_isolation;
-	bool is_sync = msg->begin.is_sync;
+	int is_sync = msg->begin.is_sync;
 
 	if (tx_check_msg(msg) != 0)
+		goto error;
+	if (tx_check_is_sync(is_sync) != 0)
 		goto error;
 
 	if (box_txn_begin() != 0)
@@ -2700,7 +2717,7 @@ tx_process_begin(struct cmsg *m)
 		(void)rc;
 		goto error;
 	}
-	if (is_sync)
+	if (is_sync == 1)
 		box_txn_make_sync();
 
 	out = iproto_msg_obuf(msg);
@@ -2722,12 +2739,14 @@ tx_process_commit(struct cmsg *m)
 	struct iproto_msg *msg = tx_accept_msg(m);
 	struct obuf *out;
 	struct obuf_svp header;
-	bool is_sync = msg->commit.is_sync;
+	int is_sync = msg->commit.is_sync;
 
 	if (tx_check_msg(msg) != 0)
 		goto error;
+	if (tx_check_is_sync(is_sync) != 0)
+		goto error;
 
-	if (is_sync)
+	if (is_sync == 1)
 		box_txn_make_sync();
 
 	if (box_txn_commit() != 0)
@@ -3150,9 +3169,9 @@ error:
 static void
 tx_process_id(struct iproto_connection *con, const struct id_request *id)
 {
-	extern bool box_tuple_extension;
 	con->session->meta.features = id->features;
-	if (!box_tuple_extension)
+	if (!iproto_features_test(&IPROTO_CURRENT_FEATURES,
+				  IPROTO_FEATURE_CALL_RET_TUPLE_EXTENSION))
 		iproto_features_clear(&con->session->meta.features,
 				      IPROTO_FEATURE_CALL_RET_TUPLE_EXTENSION);
 }

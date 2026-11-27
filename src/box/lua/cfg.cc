@@ -326,11 +326,24 @@ lbox_cfg_set_worker_pool_threads(struct lua_State *L)
 	return 0;
 }
 
+/** Keep mode validation ahead of registration and election side effects. */
 static int
-lbox_cfg_set_election_mode(struct lua_State *L)
+lbox_cfg_set_replication_mode_group(struct lua_State *L)
 {
-	if (box_set_election_mode() != 0)
-		luaT_error(L);
+	try {
+		box_set_replication_mode_group();
+	} catch (Exception *) {
+		return luaT_error(L);
+	}
+	return 0;
+}
+
+/** Change compatibility, including before the initial box.cfg(). */
+static int
+lbox_cfg_set_replication_mode_compat(struct lua_State *L)
+{
+	if (box_set_replication_mode_compat(lua_toboolean(L, 1)) != 0)
+		return luaT_error(L);
 	return 0;
 }
 
@@ -438,17 +451,6 @@ lbox_cfg_set_replication_sync_timeout(struct lua_State *L)
 {
 	try {
 		box_set_replication_sync_timeout();
-	} catch (Exception *) {
-		luaT_error(L);
-	}
-	return 0;
-}
-
-static int
-lbox_cfg_set_replication_anon(struct lua_State *L)
-{
-	try {
-		box_set_replication_anon();
 	} catch (Exception *) {
 		luaT_error(L);
 	}
@@ -585,7 +587,8 @@ box_lua_cfg_init(struct lua_State *L)
 		{"cfg_set_vinyl_cache", lbox_cfg_set_vinyl_cache},
 		{"cfg_set_vinyl_timeout", lbox_cfg_set_vinyl_timeout},
 		{"cfg_set_force_recovery", lbox_cfg_set_force_recovery},
-		{"cfg_set_election_mode", lbox_cfg_set_election_mode},
+		{"cfg_set_replication_mode_group", lbox_cfg_set_replication_mode_group},
+		{"cfg_set_replication_mode_compat", lbox_cfg_set_replication_mode_compat},
 		{"cfg_set_election_timeout", lbox_cfg_set_election_timeout},
 		{"cfg_set_election_fencing_mode", lbox_cfg_set_election_fencing_mode},
 		{"cfg_set_replication_timeout", lbox_cfg_set_replication_timeout},
@@ -598,7 +601,6 @@ box_lua_cfg_init(struct lua_State *L)
 		{"cfg_set_replication_synchro_timeout", lbox_cfg_set_replication_synchro_timeout},
 		{"cfg_set_replication_sync_timeout", lbox_cfg_set_replication_sync_timeout},
 		{"cfg_set_replication_skip_conflict", lbox_cfg_set_replication_skip_conflict},
-		{"cfg_set_replication_anon", lbox_cfg_set_replication_anon},
 		{"cfg_set_replication_anon_ttl", lbox_cfg_set_replication_anon_ttl},
 		{"cfg_set_replicaset_name", lbox_cfg_set_replicaset_name},
 		{"cfg_set_instance_name", lbox_cfg_set_instance_name},

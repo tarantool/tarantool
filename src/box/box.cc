@@ -73,6 +73,8 @@
 #include "checkpoint.h"
 #include "coio.h"
 #include "replication.h" /* replica */
+#include "iproto_features.h"
+#include "lua/iproto.h"
 #include "title.h"
 #include "xrow.h"
 #include "xrow_io.h"
@@ -307,6 +309,16 @@ TWEAK_DOUBLE(box_shutdown_timeout);
 
 double box_fiber_pool_idle_timeout = FIBER_POOL_IDLE_TIMEOUT;
 TWEAK_DOUBLE(box_fiber_pool_idle_timeout);
+
+/**
+ * The Raft worker is claiming the synchronous queue. Automatic elections can
+ * start this work without a public promote call, and it can outlive a caller
+ * that timed out or was cancelled. Public promote and demote must not interfere
+ * with it, they may disrupt ongoing elections.
+ */
+static bool is_in_raft_promote = false;
+/** A guard to block multiple simultaneous promote()/demote() invocations. */
+static bool is_in_box_promote = false;
 
 static int
 box_run_on_recovery_state(enum box_recovery_state state)
@@ -1300,6 +1312,94 @@ box_check_election_mode(enum election_mode *mode)
 	return 0;
 }
 
+/** Validate the mode against the current election and limbo state. */
+static int
+box_check_replication_mode(enum replication_mode *new_mode)
+{
+	const char *name = cfg_gets("replication_mode");
+	if (strcmp(name, "async") == 0) {
+		*new_mode = REPLICATION_MODE_ASYNC;
+	} else if (strcmp(name, "sync") == 0) {
+		*new_mode = REPLICATION_MODE_SYNC;
+	} else {
+		diag_set(ClientError, ER_CFG, "replication_mode",
+			 "the value must be 'sync' or 'async'");
+		return -1;
+	}
+	enum election_mode election;
+	if (box_check_election_mode(&election) != 0)
+		return -1;
+	if (!replication_mode_enable) {
+		*new_mode = REPLICATION_MODE_LEGACY;
+		return 0;
+	}
+	bool anon = cfg_geti("replication_anon") != 0;
+	bool must_be_off = *new_mode == REPLICATION_MODE_ASYNC || anon;
+	if ((election == ELECTION_MODE_OFF) != must_be_off) {
+		diag_set(ClientError, ER_CFG, "replication_mode",
+			 must_be_off ? "requires election_mode = 'off'" :
+			 "requires election_mode = 'manual', 'voter' or "
+			 "'candidate' on a registered replica");
+		return -1;
+	}
+	if (is_box_configured && *new_mode == REPLICATION_MODE_ASYNC &&
+	    replication_mode != REPLICATION_MODE_ASYNC &&
+	    (!txn_limbo_is_empty(&txn_limbo) || is_in_raft_promote ||
+	     is_in_box_promote || txn_limbo.is_transition_in_progress)) {
+		diag_set(ClientError, ER_CFG, "replication_mode",
+			 "async requires an empty synchronous queue and no "
+			 "unfinished promotion or demotion");
+		return -1;
+	}
+	return 0;
+}
+
+/** Publish the effective replication mode without yielding. */
+static void
+box_apply_replication_mode(enum replication_mode mode)
+{
+	replication_mode = mode;
+	if (is_box_configured) {
+		box_update_ro_summary();
+		box_broadcast_ballot();
+	}
+}
+
+int
+box_set_replication_mode_compat(bool enabled)
+{
+	/** The check does not yield, so a rejected value cannot be observed. */
+	bool old_enabled = replication_mode_enable;
+	replication_mode_enable = enabled;
+	enum replication_mode mode = REPLICATION_MODE_LEGACY;
+	if (is_box_configured && box_check_replication_mode(&mode) != 0) {
+		replication_mode_enable = old_enabled;
+		return -1;
+	}
+	if (replication_mode_enable) {
+		iproto_features_clear(&IPROTO_CURRENT_FEATURES,
+				      IPROTO_FEATURE_IS_SYNC);
+	} else {
+		iproto_features_set(&IPROTO_CURRENT_FEATURES,
+				    IPROTO_FEATURE_IS_SYNC);
+	}
+	lbox_iproto_update_protocol_features(tarantool_L);
+	if (is_box_configured)
+		space_update_replication_mode();
+	box_apply_replication_mode(mode);
+	return 0;
+}
+
+int
+box_set_replication_mode(void)
+{
+	enum replication_mode mode;
+	if (box_check_replication_mode(&mode) != 0)
+		return -1;
+	box_apply_replication_mode(mode);
+	return 0;
+}
+
 static double
 box_check_election_timeout(void)
 {
@@ -2287,6 +2387,9 @@ box_check_config(void)
 		diag_raise();
 	if (box_check_election_mode(&election_mode) != 0)
 		diag_raise();
+	enum replication_mode mode;
+	if (box_check_replication_mode(&mode) != 0)
+		diag_raise();
 	enum ro_cfg ro_mode;
 	if (box_check_ro_cfg(&ro_mode) != 0)
 		diag_raise();
@@ -2362,14 +2465,21 @@ box_set_auth_type(void)
 	return 0;
 }
 
+/** Apply a validated election mode without yielding or failing. */
+static void
+box_apply_election_mode(enum election_mode mode)
+{
+	box_raft_cfg_election_mode(mode);
+	box_broadcast_ballot();
+}
+
 int
 box_set_election_mode(void)
 {
 	enum election_mode mode;
 	if (box_check_election_mode(&mode) != 0)
 		return -1;
-	box_raft_cfg_election_mode(mode);
-	box_broadcast_ballot();
+	box_apply_election_mode(mode);
 	return 0;
 }
 
@@ -2776,12 +2886,12 @@ box_register_on_master(void)
 	replicaset_sync();
 }
 
-void
-box_set_replication_anon(void)
+/** Apply a validated anonymous setting. Registration may yield and fail. */
+static void
+box_apply_replication_anon(bool new_anon)
 {
 	assert(is_box_configured);
 	assert(cfg_replication_anon == box_is_anon());
-	bool new_anon = box_check_replication_anon();
 	if (new_anon == cfg_replication_anon)
 		return;
 	auto guard = make_scoped_guard([&]{
@@ -2802,6 +2912,32 @@ box_set_replication_anon(void)
 			  "cannot be turned on after bootstrap"
 			  " has finished");
 	}
+	guard.is_active = false;
+}
+
+void
+box_set_replication_mode_group(void)
+{
+	bool anon = box_check_replication_anon();
+	enum replication_mode mode;
+	if (box_check_replication_mode(&mode) != 0)
+		diag_raise();
+	enum election_mode election;
+	if (box_check_election_mode(&election) != 0)
+		diag_raise();
+	/*
+	 * Registration reconnects the appliers, which must check the requested
+	 * replication mode. Restore it if registration fails. Elections stay
+	 * disabled until the replica has an ID.
+	 */
+	enum replication_mode old_mode = replication_mode;
+	box_apply_replication_mode(mode);
+	auto guard = make_scoped_guard([&] {
+		box_apply_replication_mode(old_mode);
+	});
+	box_apply_replication_anon(anon);
+	/* Registration cannot be undone; everything below must succeed. */
+	box_apply_election_mode(election);
 	guard.is_active = false;
 }
 
@@ -3047,21 +3183,15 @@ box_wait_linearization_point(double timeout)
 	return txn_limbo_wait_last_txn(&txn_limbo, &is_rollback, timeout);
 }
 
-/** A guard to block multiple simultaneous promote()/demote() invocations. */
-static bool is_in_box_promote = false;
-
 int
 box_promote_qsync(void)
 {
-	if (is_in_box_promote) {
-		diag_set(ClientError, ER_IN_ANOTHER_PROMOTE);
-		return -1;
-	}
+	assert(!is_in_raft_promote);
 	assert(is_box_configured);
 	assert(box_raft()->state == RAFT_STATE_LEADER);
-	is_in_box_promote = true;
+	is_in_raft_promote = true;
 	auto promote_guard = make_scoped_guard([&] {
-		is_in_box_promote = false;
+		is_in_raft_promote = false;
 	});
 	return txn_limbo_promote(&txn_limbo, IPROTO_RAFT_PROMOTE,
 				 TIMEOUT_INFINITY);
@@ -3070,8 +3200,13 @@ box_promote_qsync(void)
 int
 box_check_promote(void) {
 	if (is_in_box_promote) {
-		diag_set(ClientError, ER_UNSUPPORTED, "box.ctl.promote/demote",
-			 "simultaneous invocations");
+		diag_set(ClientError, ER_IN_ANOTHER_PROMOTE);
+		return -1;
+	}
+	if (is_in_raft_promote) {
+		diag_set(ClientError, ER_UNSUPPORTED,
+			 "box.ctl.promote/demote()",
+			 "execution during Raft background promotion");
 		return -1;
 	}
 	if (cfg_replication_anon) {
@@ -3133,6 +3268,12 @@ box_promote(void)
 		return 0;
 	if (box_check_promote() != 0)
 		return -1;
+	if (replication_mode_enable &&
+	    box_election_mode == ELECTION_MODE_OFF) {
+		diag_set(ClientError, ER_UNSUPPORTED, "election_mode='off'",
+			 "manual elections");
+		return -1;
+	}
 	struct raft *raft = box_raft();
 	if (box_election_mode == ELECTION_MODE_VOTER) {
 		assert(raft->state == RAFT_STATE_FOLLOWER);
@@ -3146,6 +3287,10 @@ box_promote(void)
 	 */
 	if (txn_limbo.state == TXN_LIMBO_STATE_LEADER)
 		return 0;
+	is_in_box_promote = true;
+	auto promote_guard = make_scoped_guard([&] {
+		is_in_box_promote = false;
+	});
 	if (box_raft_try_promote() != 0)
 		return -1;
 	assert(raft->state == RAFT_STATE_LEADER);
@@ -5123,8 +5268,20 @@ box_process_vote(struct ballot *ballot)
 	enum ro_cfg ro_mode = RO_CFG_TRUE;
 	VERIFY(box_check_ro_cfg(&ro_mode) == 0);
 	ballot->is_ro_cfg = ro_mode == RO_CFG_TRUE;
-	const char *mode_name = cfg_gets("election_mode");
-	enum election_mode mode = election_mode_by_name(mode_name);
+	/*
+	 * During reconfiguration, cfg_gets() sees the requested election mode
+	 * before it is applied. An anonymous replica keeps elections off until
+	 * registration succeeds. Reading the requested mode in a ballot sent
+	 * before registration or during rollback could set both is_anon and
+	 * can_lead, violating the assertion below. Use the applied
+	 * box_election_mode instead.
+	 *
+	 * At startup, ballots need the configured mode for bootstrap before the
+	 * runtime election settings are initialized after recovery.
+	 */
+	enum election_mode mode = box_election_mode;
+	if (!is_box_configured)
+		mode = election_mode_by_name(cfg_gets("election_mode"));
 	assert(mode != ELECTION_MODE_INVALID);
 	ballot->can_lead = mode == ELECTION_MODE_CANDIDATE ||
 			   mode == ELECTION_MODE_MANUAL;
@@ -5152,6 +5309,7 @@ box_process_vote(struct ballot *ballot)
 	assert(i < VCLOCK_MAX);
 
 	ballot->registered_replica_uuids_size = i;
+	ballot->replication_mode = replication_mode;
 }
 
 /** Fill _schema space with initial data on bootstrap. */
@@ -5923,6 +6081,8 @@ box_cfg_xc(void)
 	if (box_set_wal_queue_max_size() != 0)
 		diag_raise();
 	cfg_replication_anon = box_check_replication_anon();
+	if (box_set_replication_mode() != 0)
+		diag_raise();
 	box_broadcast_ballot();
 	/*
 	 * Must be set before opening the server port, because it may be
@@ -6040,6 +6200,13 @@ box_cfg_xc(void)
 	 */
 	if (!is_bootstrap_leader)
 		box_check_waiting_for_own_rows();
+
+	if (replication_mode == REPLICATION_MODE_ASYNC &&
+	    !txn_limbo_is_empty(&txn_limbo)) {
+		tnt_raise(ClientError, ER_CFG, "replication_mode",
+			  "async requires an empty synchronous queue "
+			  "after recovery");
+	}
 
 	/* Follow replica */
 	replicaset_follow();

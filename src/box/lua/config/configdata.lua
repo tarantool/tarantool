@@ -636,14 +636,8 @@ local function validate_failover(found, peers, failover, leader)
             local is_anon = instance_config:get(peer.iconfig_def,
                 'replication.anon')
 
-            -- This option is allowed only in the global scope,
-            -- so it can't vary across peers of the same
-            -- replicaset, but it is taken on each loop iteration
-            -- for simplicity.
-            local mode_path = {'failover', 'replicasets', found.replicaset_name,
-                'synchro_mode'}
-            local synchro_mode = instance_config:get(peer.iconfig_def,
-                mode_path)
+            local synchro_mode = instance_config:is_supervised_sync(
+                peer.iconfig_def, found.replicaset_name)
 
             -- The election_mode value is deduced automatically,
             -- but if a user set the same value explicitly, it is
@@ -695,6 +689,52 @@ local function validate_failover(found, peers, failover, leader)
                     'specifically for this particular instance'):format(
                     election_mode, peer_name, found.replicaset_name,
                     found.group_name, failover), 0)
+            end
+        end
+    end
+end
+
+-- Validate the desired configuration, independently of live compat settings.
+-- Instance sources (for example environment) must agree with the replicaset.
+local function validate_replication_mode(found, peers, iconfig_def, failover)
+    local compat_path = 'compat.box_cfg_replication_mode'
+    local compat_value = instance_config:get(iconfig_def, compat_path)
+    local mode = instance_config:get(iconfig_def, 'replication.mode')
+    for name, peer in pairs(peers) do
+        local peer_compat = instance_config:get(peer.iconfig_def, compat_path)
+        local peer_mode = instance_config:get(peer.iconfig_def,
+            'replication.mode')
+        if peer_compat ~= compat_value or peer_mode ~= mode then
+            error(('replication.mode and compat.box_cfg_replication_mode ' ..
+                'must agree across replicaset %q, including instance %q')
+                :format(found.replicaset_name, name), 0)
+        end
+        if compat_value == 'new' then
+            local path = {'failover', 'replicasets', found.replicaset_name,
+                'synchro_mode'}
+            if instance_config:get(peer.iconfig, path) ~= nil then
+                error(('failover.replicasets.%s.synchro_mode is forbidden ' ..
+                    'under compat.box_cfg_replication_mode = "new"; use ' ..
+                    'replication.mode'):format(found.replicaset_name), 0)
+            end
+            if mode == 'sync' and failover ~= 'election' and
+               failover ~= 'supervised' then
+                error('replication.mode = "sync" requires ' ..
+                    'replication.failover = "election" or "supervised"', 0)
+            end
+            local anon = instance_config:get(peer.iconfig_def,
+                'replication.anon')
+            local election = instance_config:get(peer.iconfig_def,
+                'replication.election_mode')
+            if failover == 'supervised' then
+                election = mode == 'sync' and not anon and 'manual' or 'off'
+            elseif election == nil then
+                election = failover == 'election' and not anon and
+                    'candidate' or 'off'
+            end
+            if (election == 'off') ~= (mode == 'async' or anon) then
+                error(('replication.mode = %q conflicts with election mode ' ..
+                    '%q for instance %q'):format(mode, election, name), 0)
             end
         end
     end
@@ -1104,6 +1144,7 @@ local function new(iconfig, cconfig, instance_name)
     local failover = instance_config:get(iconfig_def, 'replication.failover')
     local leader = found.replicaset.leader
     validate_failover(found, peers, failover, leader)
+    validate_replication_mode(found, peers, iconfig_def, failover)
 
     local failover_config = instance_config:get(iconfig_def, 'failover')
     validate_failover_config(instances, failover_config)

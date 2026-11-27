@@ -13,6 +13,13 @@ extern "C" {
 struct lua_State;
 
 /**
+ * Refresh box.iproto.protocol_features in the main thread and broadcast the
+ * current feature set to application threads.
+ */
+void
+lbox_iproto_update_protocol_features(struct lua_State *L);
+
+/**
  * Initializes `box.iproto` submodule for working with Tarantool network
  * subsystem.
  */

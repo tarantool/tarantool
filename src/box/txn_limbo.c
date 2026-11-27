@@ -283,6 +283,8 @@ txn_limbo_on_ack_f(struct trigger *t, void *event)
 	struct txn_limbo *limbo = t->data;
 	assert(t == &limbo->on_ack);
 	const struct replication_ack *ack = event;
+	if (ack->source->anon || ack->source->id == REPLICA_ID_NIL)
+		return 0;
 	/*
 	 * If the limbo has no owner, this will be ack for 0 LSN (since acks
 	 * have vclock[0] decoded as 0 on the receiving side, regardless what
@@ -290,7 +292,7 @@ txn_limbo_on_ack_f(struct trigger *t, void *event)
 	 */
 	int64_t lsn = vclock_get(ack->vclock, limbo->queue.owner_id);
 	assert(limbo->queue.owner_id != REPLICA_ID_NIL || lsn == 0);
-	txn_limbo_ack(limbo, ack->source, lsn);
+	txn_limbo_ack(limbo, ack->source->id, lsn);
 	return 0;
 }
 

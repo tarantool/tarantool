@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "txn.h"
+#include "replication.h"
 #include "memtx_tx.h"
 #include "txn_limbo.h"
 #include "engine.h"
@@ -973,7 +974,8 @@ txn_journal_entry_new(struct txn *txn)
 			       !space_is_sync(stmt->space) ||
 			       space_id(stmt->space) == BOX_TRUNCATE_ID);
 			is_sync = is_sync ||
-				(stmt->space != NULL &&
+				(replication_mode == REPLICATION_MODE_LEGACY &&
+				 stmt->space != NULL &&
 				 space_is_sync(stmt->space) &&
 				 stmt->row->group_id != GROUP_LOCAL);
 		}
@@ -985,6 +987,10 @@ txn_journal_entry_new(struct txn *txn)
 
 		req->approx_len += xrow_approx_len(stmt->row);
 	}
+	if (replication_mode == REPLICATION_MODE_SYNC &&
+	    txn->n_applier_rows == 0 && !txn_limbo.is_in_recovery &&
+	    !txn_is_fully_local(txn))
+		is_sync = true;
 	if (!txn_has_flag(txn, TXN_FORCE_ASYNC) && !is_fully_nop) {
 		if (is_sync) {
 			/*
@@ -1468,6 +1474,14 @@ box_txn_set_timeout(double timeout)
 void
 box_txn_make_sync(void)
 {
+	if (replication_mode_enable) {
+		struct txn *txn = in_txn();
+		if (txn != NULL) {
+			txn->status = TXN_ABORTED;
+			txn_set_flags(txn, TXN_IS_ABORTED_BY_DEPRECATED_API);
+		}
+		return;
+	}
 	txn_set_xrow_flags(IPROTO_FLAG_WAIT_ACK);
 }
 
@@ -1524,7 +1538,10 @@ txn_check_space_linearizability(const struct txn *txn,
 	 * The only exception are local and data-temporary spaces, which only
 	 * store updates present on this particular node.
 	 */
-	if (!space_is_sync(space) && !space_is_data_temporary(space) &&
+	bool is_sync = replication_mode == REPLICATION_MODE_LEGACY ?
+		space_is_sync(space) :
+		replication_mode == REPLICATION_MODE_SYNC;
+	if (!is_sync && !space_is_data_temporary(space) &&
 	    !space_is_local(space)) {
 		diag_set(ClientError, ER_UNSUPPORTED,
 			 tt_sprintf("space \"%s\"", space_name(space)),

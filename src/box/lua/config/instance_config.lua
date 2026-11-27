@@ -340,6 +340,16 @@ local function feedback_apply_default_if(_data, _w)
     return box.internal.feedback_daemon ~= nil
 end
 
+-- The coordinator may manage replicasets with different compat selections.
+-- Derive its internal synchronous policy from the managed replicaset's config.
+local function is_supervised_sync(self, iconfig, replicaset_name)
+    if self:get(iconfig, 'compat.box_cfg_replication_mode') == 'new' then
+        return self:get(iconfig, 'replication.mode') == 'sync'
+    end
+    return self:get(iconfig,
+        {'failover', 'replicasets', replicaset_name, 'synchro_mode'}) == true
+end
+
 return schema.new('instance_config', schema.record({
     config = schema.record({
         reload = schema.enum({
@@ -1283,6 +1293,11 @@ return schema.new('instance_config', schema.record({
         }),
     }),
     replication = schema.record({
+        mode = schema.enum({'async', 'sync'}, {
+            default = 'async',
+            box_cfg = 'replication_mode',
+            validate = validators['replication.mode'],
+        }),
         failover = schema.enum({
             -- No failover ('off').
             --
@@ -2311,6 +2326,10 @@ return schema.new('instance_config', schema.record({
     }),
     -- Compatibility options.
     compat = schema.record({
+        box_cfg_replication_mode = schema.enum({'old', 'new'}, {
+            default = 'old',
+            validate = validators['compat.box_cfg_replication_mode'],
+        }),
         json_escape_forward_slash = schema.enum({
             'old',
             'new',
@@ -2523,6 +2542,7 @@ return schema.new('instance_config', schema.record({
         base_dir = base_dir,
         prepare_file_path = prepare_file_path,
         enhance_uri_ssl_params = enhance_uri_ssl_params,
+        is_supervised_sync = is_supervised_sync,
     },
     _extra_annotations = {
         descriptions = descriptions.instance_descriptions,

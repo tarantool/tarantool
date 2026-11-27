@@ -41,12 +41,14 @@
 #include "box/lua/trigger.h"
 
 #include "box/box.h"
+#include "box/checkpoint.h"
 #include "box/schema.h"
 #include "box/engine.h"
 #include "box/memtx_engine.h"
 #include "box/raft.h"
 #include "box/replication.h"
 #include "box/security.h"
+#include "box/txn.h"
 #include "box/wal.h"
 
 #include "core/event.h"
@@ -203,6 +205,66 @@ lbox_ctl_wal_sync(struct lua_State *L)
 	return 0;
 }
 
+/** Lua binding for the transaction checkpoint barrier. */
+static int
+lbox_ctl_txn_sync(struct lua_State *L)
+{
+	if (box_check_configured() != 0)
+		return luaT_error(L);
+	if (in_txn() != NULL) {
+		diag_set(ClientError, ER_ACTIVE_TRANSACTION);
+		return luaT_error(L);
+	}
+	struct box_checkpoint checkpoint;
+	if (box_checkpoint_build_in_memory(&checkpoint) != 0)
+		return luaT_error(L);
+	return 0;
+}
+
+/** Lua binding for the downstream replication barrier. */
+static int
+lbox_ctl_replication_sync(struct lua_State *L)
+{
+	if (box_check_configured() != 0)
+		return luaT_error(L);
+	double timeout = TIMEOUT_INFINITY;
+	bool include_anon = false;
+	if (lua_gettop(L) > 1 ||
+	    (!lua_isnoneornil(L, 1) && !lua_istable(L, 1)))
+		return luaL_error(L, "Usage: box.ctl.replication_sync([opts])");
+	if (lua_istable(L, 1)) {
+		lua_pushnil(L);
+		while (lua_next(L, 1) != 0) {
+			const char *key = lua_type(L, -2) == LUA_TSTRING ?
+				lua_tostring(L, -2) : "";
+			if (strcmp(key, "timeout") == 0) {
+				if (lua_type(L, -1) != LUA_TNUMBER ||
+				    !(lua_tonumber(L, -1) >= 0)) {
+					diag_set(IllegalParams, "timeout must "
+						 "be a nonnegative number");
+					return luaT_error(L);
+				}
+				timeout = lua_tonumber(L, -1);
+			} else if (strcmp(key, "include_anon") == 0) {
+				if (!lua_isboolean(L, -1)) {
+					diag_set(IllegalParams, "include_anon "
+						 "must be a boolean");
+					return luaT_error(L);
+				}
+				include_anon = lua_toboolean(L, -1);
+			} else {
+				diag_set(IllegalParams, "Unknown option '%s'",
+					 key);
+				return luaT_error(L);
+			}
+			lua_pop(L, 1);
+		}
+	}
+	if (replication_sync(timeout, include_anon) != 0)
+		return luaT_error(L);
+	return 0;
+}
+
 static int
 lbox_ctl_replica_gc(struct lua_State *L)
 {
@@ -249,6 +311,8 @@ static const struct luaL_Reg lbox_ctl_lib[] = {
 	{"set_on_shutdown_timeout", lbox_ctl_set_on_shutdown_timeout},
 	{"iproto_lockdown", lbox_ctl_set_iproto_lockdown},
 	{"wal_sync", lbox_ctl_wal_sync},
+	{"txn_sync", lbox_ctl_txn_sync},
+	{"replication_sync", lbox_ctl_replication_sync},
 	{"replica_gc", lbox_ctl_replica_gc},
 	{"liveness_probe", lbox_ctl_liveness_probe},
 	{NULL, NULL}

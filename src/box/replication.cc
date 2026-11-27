@@ -65,6 +65,8 @@ double replication_synchro_timeout = 5.0; /* seconds */
 double replication_sync_timeout = 300.0; /* seconds */
 bool replication_skip_conflict = false;
 int replication_threads = 1;
+bool replication_mode_enable = false;
+enum replication_mode replication_mode = REPLICATION_MODE_LEGACY;
 
 bool cfg_replication_anon = true;
 struct tt_uuid cfg_bootstrap_leader_uuid;
@@ -1402,6 +1404,11 @@ replicaset_connect(const struct uri_set *uris,
 	}
 	replicaset_connect_wakeup_cond = NULL;
 	cond_guard.is_active = false;
+	for (int i = 0; i < count; i++) {
+		if (!box_is_configured() &&
+		    applier_check_replication_mode(appliers[i]) != 0)
+			diag_raise();
+	}
 	if (state.connected < count) {
 		say_crit("failed to connect to %d out of %d replicas",
 			 count - state.connected, count);
@@ -1578,6 +1585,78 @@ replicaset_sync(void)
 	 * correct.
 	 */
 	fiber_testcancel();
+}
+
+/** A captured replication barrier, independent of subsequent membership. */
+struct replication_sync_context {
+	/** Replicas which have not yet acknowledged the target. */
+	struct tt_uuid *pending;
+	/** Number of pending replicas. */
+	int count;
+	/** Vclock captured before the first yield. */
+	struct vclock target;
+	/** Signaled when a captured replica makes progress. */
+	struct fiber_cond cond;
+};
+
+/** Remember completion before a replica can disconnect or be removed. */
+static int
+replication_sync_on_ack(struct trigger *trigger, void *event)
+{
+	struct replication_sync_context *ctx =
+		(struct replication_sync_context *)trigger->data;
+	const struct replication_ack *ack = (struct replication_ack *)event;
+	if (vclock_compare_ignore0(&ctx->target, ack->vclock) > 0)
+		return 0;
+	for (int i = 0; i < ctx->count; ++i) {
+		if (tt_uuid_is_equal(&ctx->pending[i], &ack->source->uuid)) {
+			ctx->pending[i] = ctx->pending[--ctx->count];
+			fiber_cond_signal(&ctx->cond);
+			break;
+		}
+	}
+	return 0;
+}
+
+int
+replication_sync(double timeout, bool include_anon)
+{
+	struct replication_sync_context ctx;
+	ctx.count = 0;
+	vclock_copy_ignore0(&ctx.target, instance_vclock);
+	int capacity = replicaset.registered_count + replicaset.anon_count;
+	ctx.pending = (struct tt_uuid *)xmalloc(sizeof(*ctx.pending) *
+					      MAX(capacity, 1));
+	fiber_cond_create(&ctx.cond);
+	auto guard = make_scoped_guard([&] {
+		fiber_cond_destroy(&ctx.cond);
+		free(ctx.pending);
+	});
+	replicaset_foreach(replica) {
+		if (tt_uuid_is_equal(&replica->uuid, &INSTANCE_UUID))
+			continue;
+		if (replica->id == REPLICA_ID_NIL &&
+		    !(include_anon && replica->anon &&
+		      replica->has_incoming_connection))
+			continue;
+		const struct vclock *acked = relay_vclock(replica->relay);
+		if (vclock_compare_ignore0(&ctx.target, acked) <= 0)
+			continue;
+		assert(ctx.count < capacity);
+		ctx.pending[ctx.count++] = replica->uuid;
+	}
+	struct trigger on_ack;
+	trigger_create(&on_ack, replication_sync_on_ack, &ctx, NULL);
+	trigger_add(&replicaset.on_ack, &on_ack);
+	auto trigger_guard = make_scoped_guard([&] {
+		trigger_clear(&on_ack);
+	});
+	double deadline = fiber_clock() + timeout;
+	while (ctx.count > 0) {
+		if (fiber_cond_wait_deadline(&ctx.cond, deadline) != 0)
+			return -1;
+	}
+	return 0;
 }
 
 void
@@ -1932,12 +2011,9 @@ check_vclock_sync_on_ack(struct trigger *trigger, void *event)
 	struct replication_ack *ack = (struct replication_ack *)event;
 	struct sync_trigger_data *data =
 		(struct sync_trigger_data *)trigger->data;
-	uint32_t id = ack->source;
-	/*
-	 * Messages from anon replicas are skipped on a lower level, as having
-	 * no weight on any decision making.
-	 */
-	assert(id != REPLICA_ID_NIL);
+	uint32_t id = ack->source->id;
+	if (ack->source->anon || id == REPLICA_ID_NIL)
+		return 0;
 	uint64_t sync = data->vclock_syncs[id];
 	int accounted_count = bit_count_u32(data->collected_vclock_map);
 	if (!bit_test(&data->collected_vclock_map, id) && sync > 0 &&

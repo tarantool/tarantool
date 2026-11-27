@@ -517,7 +517,10 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 
 	/* space.is_sync */
 	lua_pushstring(L, "is_sync");
-	lua_pushboolean(L, space->def->opts.is_sync);
+	if (replication_mode_enable)
+		lua_pushnil(L);
+	else
+		lua_pushboolean(L, space->def->opts.is_sync);
 	lua_settable(L, i);
 
 	lua_pushstring(L, "enabled");
@@ -527,7 +530,10 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 	/* space.state table */
 	lua_pushstring(L, "state");
 	lua_createtable(L, 0, 1);
-	lua_pushboolean(L, space_is_sync(space));
+	if (replication_mode_enable)
+		lua_pushnil(L);
+	else
+		lua_pushboolean(L, space_is_sync(space));
 	lua_setfield(L, -2, "is_sync");
 	lua_settable(L, i);
 

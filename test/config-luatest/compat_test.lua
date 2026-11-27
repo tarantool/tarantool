@@ -57,7 +57,7 @@ end
 -- the configuration.
 local function switch(cluster, option_name, startup_config, v)
     local config = cbuilder:new(startup_config)
-        :set_instance_option('instance-001', 'compat', {
+        :set_global_option('compat', {
             [option_name] = v ~= 'default' and v or box.NULL,
         })
         :config()
@@ -69,11 +69,10 @@ end
 local function gen_startup_case(option_name, v)
     return function()
         local startup_config = cbuilder:new()
-            :add_instance('instance-001', {
-                compat = {
-                    [option_name] = v ~= 'default' and v or nil,
-                },
+            :set_global_option('compat', {
+                [option_name] = v ~= 'default' and v or nil,
             })
+            :add_instance('instance-001', {})
             :config()
 
         local cluster = cluster:new(startup_config)
@@ -112,12 +111,11 @@ end
 local function gen_reload_failure_case(option_name, startup_value, reload_value)
     return function()
         local startup_config = cbuilder:new()
-            :add_instance('instance-001', {
-                compat = {
-                    [option_name] = startup_value ~= 'default' and
-                        startup_value or nil,
-                },
+            :set_global_option('compat', {
+                [option_name] = startup_value ~= 'default' and
+                    startup_value or nil,
             })
+            :add_instance('instance-001', {})
             :config()
 
         local cluster = cluster:new(startup_config)
@@ -175,12 +173,11 @@ end
 local function gen_reload_success_case(option_name, startup_value, reload_value)
     return function()
         local startup_config = cbuilder:new()
-            :add_instance('instance-001', {
-                compat = {
-                    [option_name] = startup_value ~= 'default' and
-                        startup_value or nil,
-                },
+            :set_global_option('compat', {
+                [option_name] = startup_value ~= 'default' and
+                    startup_value or nil,
             })
+            :add_instance('instance-001', {})
             :config()
 
         local cluster = cluster:new(startup_config)

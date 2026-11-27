@@ -122,6 +122,29 @@ enum bootstrap_strategy {
 /** Instance's bootstrap strategy. Controls replication reconfiguration. */
 extern enum bootstrap_strategy bootstrap_strategy;
 
+/**
+ * Effective replication policy. The sync and async values are used in ballots.
+ * Legacy also denotes an unknown peer mode.
+ */
+enum replication_mode {
+	REPLICATION_MODE_LEGACY = 0,
+	REPLICATION_MODE_ASYNC = 1,
+	REPLICATION_MODE_SYNC = 2,
+};
+
+/** Whether dedicated replication modes are enabled by compatibility. */
+extern bool replication_mode_enable;
+/** Effective local replication mode. */
+extern enum replication_mode replication_mode;
+
+/** Return the name of a replication mode. */
+static inline const char *
+replication_mode_str(enum replication_mode mode)
+{
+	return mode == REPLICATION_MODE_SYNC ? "sync" :
+		mode == REPLICATION_MODE_ASYNC ? "async" : "legacy";
+}
+
 enum replicaset_state {
 	REPLICASET_BOOTSTRAP,
 	REPLICASET_JOIN,
@@ -329,8 +352,12 @@ typedef rb_tree(struct replica) replica_hash_t;
 
 /** Ack which is passed to on ack triggers. */
 struct replication_ack {
-	/** Replica ID of the ACK source. */
-	uint32_t source;
+	/**
+	 * Source replica. It is safe to use this pointer in an ACK handler
+	 * as long as the handler does not yield. Removing it from _cluster only
+	 * clears its ID while has_incoming_connection keeps it alive.
+	 */
+	const struct replica *source;
 	/** Confirmed vclock. */
 	const struct vclock *vclock;
 	/** Vclock sync received with ACK. */
@@ -697,6 +724,14 @@ replicaset_add_anon(const struct tt_uuid *replica_uuid);
 int
 replicaset_collect_confirmed_vclock(struct vclock *confirmed_vclock,
 				    double deadline);
+
+/**
+ * Wait for captured replicas to acknowledge the current instance vclock.
+ * Includes all registered replicas and optionally connected anonymous ones.
+ * Ignores component zero. Returns -1 with a diagnostic on timeout/cancellation.
+ */
+int
+replication_sync(double timeout, bool include_anon);
 
 #if defined(__cplusplus)
 } /* extern "C" */

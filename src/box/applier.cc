@@ -650,6 +650,20 @@ err:
 	diag_raise();
 }
 
+int
+applier_check_replication_mode(const struct applier *applier)
+{
+	enum replication_mode remote =
+		(enum replication_mode)applier->ballot.replication_mode;
+	if (replication_mode == REPLICATION_MODE_LEGACY ||
+	    remote == REPLICATION_MODE_LEGACY || remote == replication_mode)
+		return 0;
+	diag_set(ClientError, ER_REPLICATION_MODE_MISMATCH,
+		 replication_mode_str(replication_mode),
+		 replication_mode_str(remote));
+	return -1;
+}
+
 /**
  * Connect to a remote host and authenticate the client.
  */
@@ -726,6 +740,8 @@ applier_connect(struct applier *applier)
 	fiber_wakeup(applier->ballot_watcher);
 
 	applier_wait_first_ballot(applier);
+	if (applier_check_replication_mode(applier) != 0)
+		diag_raise();
 
 	applier_set_state(applier, APPLIER_CONNECTED);
 
@@ -1538,7 +1554,7 @@ apply_plain_tx(uint32_t replica_id, struct stailq *rows)
 	 * for the last txn row.
 	 */
 	if ((item->row.flags & IPROTO_FLAG_WAIT_ACK) != 0)
-		box_txn_make_sync();
+		txn_set_xrow_flags(IPROTO_FLAG_WAIT_ACK);
 	size_t size;
 	struct trigger *on_rollback, *on_wal_write;
 	on_rollback = region_alloc_object(&txn->region, typeof(*on_rollback),
@@ -1657,6 +1673,46 @@ applier_process_heartbeat(struct applier *applier, struct applier_tx_row *txr)
 	return 0;
 }
 
+/**
+ * Validate original WAL flags before synchro filtering can replace rows with
+ * NOPs. A relay's mode says nothing about the originator's compatibility.
+ * JOIN metadata and local recovery do not pass through this function.
+ */
+static int
+applier_check_tx_replication_mode(struct stailq *rows)
+{
+	if (replication_mode == REPLICATION_MODE_LEGACY)
+		return 0;
+	struct xrow_header *last = &stailq_last_entry(
+		rows, struct applier_tx_row, next)->row;
+	struct replica *origin = replica_by_id(last->replica_id);
+	if (origin == NULL || origin->applier == NULL ||
+	    origin->applier->ballot.replication_mode == REPLICATION_MODE_LEGACY)
+		return 0;
+	const char *reason = NULL;
+	if (replication_mode == REPLICATION_MODE_ASYNC) {
+		if (last->wait_sync || last->wait_ack)
+			reason = "synchronous transaction in async mode";
+		else if (last->type == IPROTO_RAFT_PROMOTE &&
+			 last->replica_id != REPLICA_ID_NIL)
+			reason = "promotion in async mode";
+	} else if (iproto_type_is_dml(last->type) && !last->wait_ack) {
+		struct applier_tx_row *item;
+		stailq_foreach_entry(item, rows, next) {
+			if (item->row.type != IPROTO_NOP) {
+				reason = "async transaction in sync mode";
+				break;
+			}
+		}
+	}
+	if (reason == NULL)
+		return 0;
+	diag_set(ClientError, ER_REPLICATION_MODE_WAL,
+		 replication_mode_str(replication_mode), last->replica_id,
+		 last->lsn, reason);
+	return -1;
+}
+
 static int
 applier_apply_tx(struct applier *applier, struct stailq *rows)
 {
@@ -1721,6 +1777,9 @@ applier_apply_tx(struct applier *applier, struct stailq *rows)
 			}
 		}
 	}
+	rc = applier_check_tx_replication_mode(rows);
+	if (rc != 0)
+		goto finish;
 	rc = applier_synchro_filter_tx(rows);
 	if (rc != 0)
 		goto finish;
@@ -2681,6 +2740,8 @@ applier_f(va_list ap)
 				 */
 				applier_next_state = APPLIER_LOADING;
 			} else if (e->errcode() == ER_CFG ||
+				   e->errcode() ==
+				   ER_REPLICATION_MODE_MISMATCH ||
 				   e->errcode() == ER_ACCESS_DENIED ||
 				   e->errcode() == ER_NO_SUCH_USER ||
 				   e->errcode() == ER_CREDS_MISMATCH) {
