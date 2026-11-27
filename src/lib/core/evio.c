@@ -215,6 +215,19 @@ evio_service_entry_accept_cb(ev_loop *loop, ev_io *watcher, int events)
 	diag_log();
 }
 
+/** Build the address without truncating the socket path. */
+static int
+evio_unix_addr_create(struct sockaddr_un *addr, const char *path)
+{
+	*addr = (struct sockaddr_un){.sun_family = AF_UNIX};
+	if (strlcpy(addr->sun_path, path, sizeof(addr->sun_path)) >=
+	    sizeof(addr->sun_path)) {
+		diag_set(IllegalParams, "Unix socket path is too long");
+		return -1;
+	}
+	return 0;
+}
+
 /*
  * Check if the UNIX socket exists and no one is
  * listening on it. Unlink the file if it's the case.
@@ -225,10 +238,10 @@ evio_service_entry_reuse_addr(const struct uri *u)
 	if (u->host == NULL || strcmp(u->host, URI_HOST_UNIX) != 0)
 		return 0;
 
-	struct sockaddr_un un = { 0 };
+	struct sockaddr_un un;
 	assert(u->service != NULL);
-	strlcpy(un.sun_path, u->service, sizeof(un.sun_path));
-	un.sun_family = AF_UNIX;
+	if (evio_unix_addr_create(&un, u->service) != 0)
+		return -1;
 
 	int cl_fd = sio_socket(un.sun_family, SOCK_STREAM, 0);
 	if (cl_fd < 0)
@@ -362,6 +375,10 @@ evio_service_bind_uri(struct evio_service *service, const struct uri *u)
 {
 	assert(u->service != NULL);
 	if (u->host != NULL && strcmp(u->host, URI_HOST_UNIX) == 0) {
+		struct sockaddr_un un;
+		if (evio_unix_addr_create(&un, u->service) != 0)
+			return -1;
+
 		struct evio_service_entry *entry =
 			xmalloc(sizeof(struct evio_service_entry));
 		evio_service_entry_create(entry, service);
@@ -377,11 +394,8 @@ evio_service_bind_uri(struct evio_service *service, const struct uri *u)
 		uri_destroy(&entry->uri);
 		uri_copy(&entry->uri, u);
 
-		/* UNIX domain socket */
-		struct sockaddr_un *un = (struct sockaddr_un *)&entry->addr;
-		entry->addr_len = sizeof(*un);
-		strlcpy(un->sun_path, u->service, sizeof(un->sun_path));
-		un->sun_family = AF_UNIX;
+		memcpy(&entry->addrstorage, &un, sizeof(un));
+		entry->addr_len = sizeof(un);
 		return evio_service_entry_bind_addr(entry);
 	}
 	/* IP socket */
