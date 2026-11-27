@@ -5,9 +5,10 @@ local t = require('luatest')
 
 --
 -- The test checks that unknown IPROTO keys are silently ignored by both
--- net.box client and IPROTO server.
+-- net.box client and IPROTO server. Unassigned keys below the max known
+-- key are checked too (gh-13282).
 --
-local g = t.group()
+local g = t.group(nil, {{unknown_key = 9999}, {unknown_key = 0x16}})
 
 local iproto_key = box.iproto.key
 local iproto_type = box.iproto.type
@@ -40,7 +41,7 @@ g.test_select = function(cg)
         [iproto_key.SPACE_ID] = 272, -- _schema
         [iproto_key.KEY] = {'some_key'},
         [iproto_key.LIMIT] = 0,
-        [9999] = 'foobar',
+        [cg.params.unknown_key] = 'foobar',
     })
     conn:close()
 end
@@ -54,7 +55,7 @@ g.test_replace = function(cg)
     }, {
         [iproto_key.SPACE_ID] = 272, -- _schema
         [iproto_key.TUPLE] = {'some_key'},
-        [9999] = 'foobar',
+        [cg.params.unknown_key] = 'foobar',
     })
     conn:close()
 end
@@ -68,7 +69,7 @@ g.test_delete = function(cg)
     }, {
         [iproto_key.SPACE_ID] = 272, -- _schema
         [iproto_key.KEY] = {'some_key'},
-        [9999] = 'foobar',
+        [cg.params.unknown_key] = 'foobar',
     })
     conn:close()
 end
@@ -81,7 +82,7 @@ g.test_begin = function(cg)
         [iproto_key.STREAM_ID] = 42,
         [9999] = 'foobar',
     }, {
-        [9999] = 'foobar',
+        [cg.params.unknown_key] = 'foobar',
     })
     conn:close()
 end
@@ -99,7 +100,7 @@ g.test_commit = function(cg)
         [iproto_key.STREAM_ID] = 42,
         [9999] = 'foobar',
     }, {
-        [9999] = 'foobar',
+        [cg.params.unknown_key] = 'foobar',
     })
     conn:close()
 end
@@ -117,7 +118,7 @@ g.test_rollback = function(cg)
         [iproto_key.STREAM_ID] = 42,
         [9999] = 'foobar',
     }, {
-        [9999] = 'foobar',
+        [cg.params.unknown_key] = 'foobar',
     })
     conn:close()
 end
@@ -130,7 +131,7 @@ g.test_call = function(cg)
         [9999] = 'foobar',
     }, {
         [iproto_key.FUNCTION_NAME] = 'box.session.uid',
-        [9999] = 'foobar',
+        [cg.params.unknown_key] = 'foobar',
     })
     conn:close()
 end
@@ -143,7 +144,7 @@ g.test_eval = function(cg)
         [9999] = 'foobar',
     }, {
         [iproto_key.EXPR] = 'return box.session.uid()',
-        [9999] = 'foobar',
+        [cg.params.unknown_key] = 'foobar',
     })
     conn:close()
 end
@@ -156,7 +157,7 @@ g.test_execute = function(cg)
         [9999] = 'foobar',
     }, {
         [iproto_key.SQL_TEXT] = 'SELECT 1',
-        [9999] = 'foobar',
+        [cg.params.unknown_key] = 'foobar',
     })
     conn:close()
 end
@@ -169,7 +170,7 @@ g.test_watch_once = function(cg)
         [9999] = 'foobar',
     }, {
         [iproto_key.EVENT_KEY] = 'some_key',
-        [9999] = 'foobar',
+        [cg.params.unknown_key] = 'foobar',
     })
     conn:close()
 end
@@ -179,9 +180,9 @@ g.test_ping = function(cg)
     test_request(conn, {
         [iproto_key.REQUEST_TYPE] = iproto_type.PING,
         [iproto_key.SYNC] = conn:_next_sync(),
-        [9999] = 'foobar',
+        [cg.params.unknown_key] = 'foobar',
     }, {
-        [9999] = 'foobar',
+        [cg.params.unknown_key] = 'foobar',
     })
     conn:close()
 end
@@ -191,11 +192,11 @@ g.test_auth = function(cg)
     test_request(conn, {
         [iproto_key.REQUEST_TYPE] = iproto_type.AUTH,
         [iproto_key.SYNC] = conn:_next_sync(),
-        [9999] = 'foobar',
+        [cg.params.unknown_key] = 'foobar',
     }, {
         [iproto_key.USER_NAME] = 'guest',
         [iproto_key.TUPLE] = {},
-        [9999] = 'foobar',
+        [cg.params.unknown_key] = 'foobar',
     })
     conn:close()
 end
