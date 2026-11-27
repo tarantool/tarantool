@@ -36,3 +36,35 @@ g.test_integer_overflow_in_printf = function(cg)
         t.assert_equals(err.message, exp)
     end)
 end
+
+--
+-- gh-13682: SQL-standard SUBSTRING syntax.
+--
+g.test_substring_sql_standard_syntax = function(cg)
+    cg.server:exec(function()
+        local res = box.execute(
+            [[SELECT SUBSTRING('abcdef' FROM 2);]])
+        t.assert_equals(res.rows, {{'bcdef'}})
+
+        res = box.execute(
+            [[SELECT SUBSTRING('abcdef' FROM 2 FOR 3);]])
+        t.assert_equals(res.rows, {{'bcd'}})
+
+        res = box.execute(
+            [[SELECT substring('abcdef' FROM 2 FOR 2);]])
+        t.assert_equals(res.rows, {{'bc'}})
+    end)
+end
+
+--
+-- gh-13682: SUBSTRING must not be a reserved keyword.
+--
+g.test_substring_as_table_name = function(cg)
+    cg.server:exec(function()
+        box.execute([[CREATE TABLE substring (id INTEGER PRIMARY KEY);]])
+        box.execute([[INSERT INTO substring VALUES (1);]])
+        local res = box.execute([[SELECT * FROM substring WHERE id = 1;]])
+        t.assert_equals(res.rows, {{1}})
+        box.execute([[DROP TABLE substring;]])
+    end)
+end

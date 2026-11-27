@@ -1008,8 +1008,51 @@ trim_operands(A) ::= expr(Y). {
   A = ast_expr_list_append(ctx->region, NULL, Y);
 }
 
-expr(A) ::= id(X) LP distinct(D) exprlist(Y) RP. {
-  A = ast_expr_new_function(ctx->region, &X, D == SF_Distinct, Y);
+expr(A) ::= id(X) LP expr(S) FROM expr(F) RP. {
+    A = NULL;
+    if (X.n != strlen("SUBSTRING") ||
+        sql_strnicmp(X.z, "SUBSTRING", X.n) != 0) {
+        diag_set(ClientError, ER_SQL_SYNTAX_NEAR_TOKEN, ctx->line,
+                 tt_cstr(X.z, X.n));
+        ctx->is_aborted = true;
+    } else {
+        Token substr = X;
+        substr.z = "SUBSTR";
+        substr.n = strlen(substr.z);
+        struct ast_expr_list *args =
+            ast_expr_list_append(ctx->region, NULL, S);
+        args = ast_expr_list_append(ctx->region, args, F);
+        A = ast_expr_new_function(ctx->region, &substr, false, args);
+    }
+}
+
+expr(A) ::= id(X) LP expr(S) FROM expr(F) FOR expr(L) RP. {
+    A = NULL;
+    if (X.n != strlen("SUBSTRING") ||
+        sql_strnicmp(X.z, "SUBSTRING", X.n) != 0) {
+        diag_set(ClientError, ER_SQL_SYNTAX_NEAR_TOKEN, ctx->line,
+                 tt_cstr(X.z, X.n));
+        ctx->is_aborted = true;
+    } else {
+        Token substr = X;
+        substr.z = "SUBSTR";
+        substr.n = strlen(substr.z);
+        struct ast_expr_list *args =
+            ast_expr_list_append(ctx->region, NULL, S);
+        args = ast_expr_list_append(ctx->region, args, F);
+        args = ast_expr_list_append(ctx->region, args, L);
+        A = ast_expr_new_function(ctx->region, &substr, false, args);
+    }
+}
+
+expr(A) ::= id(X) LP exprlist(Y) RP. {
+    A = ast_expr_new_function(ctx->region, &X, false, Y);
+}
+expr(A) ::= id(X) LP DISTINCT exprlist(Y) RP. {
+    A = ast_expr_new_function(ctx->region, &X, true, Y);
+}
+expr(A) ::= id(X) LP ALL exprlist(Y) RP. {
+    A = ast_expr_new_function(ctx->region, &X, false, Y);
 }
 expr(A) ::= CHAR(X) LP distinct(D) exprlist(Y) RP. {
   A = ast_expr_new_function(ctx->region, &X, D == SF_Distinct, Y);
