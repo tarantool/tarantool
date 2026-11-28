@@ -15,10 +15,8 @@
 struct ann_flat_entry {
 	/** Opaque label supplied by the caller. */
 	uint64_t label;
-	/** Native or packed coordinates. */
-	const void *vector;
-	/** Shared coordinate owner, or NULL for a backend-owned copy. */
-	struct ann_vector *shared;
+	/** Coordinate owner retained until this entry is released. */
+	struct ann_vector *vector;
 	/** Whether the current view may return this version. */
 	bool live;
 };
@@ -39,6 +37,8 @@ struct ann_backend {
 	struct ann_change *pending;
 	/** Current charged bytes, including a prepared change. */
 	uint64_t resident_bytes;
+	/** Bytes of backend-owned coordinate payloads. */
+	uint64_t vector_bytes;
 };
 
 /** Prepared insert or retire with enough state for allocation-free undo. */
@@ -51,10 +51,8 @@ struct ann_change {
 	enum ann_change_kind kind;
 	/** Target label. */
 	uint64_t label;
-	/** Prepared vector, transferred to an entry on apply. */
-	const void *vector;
-	/** Shared owner transferred to an entry on apply. */
-	struct ann_vector *shared;
+	/** Coordinate reference transferred to an entry on apply. */
+	struct ann_vector *vector;
 	/** Target slot for a retire. */
 	uint32_t slot;
 	/** True after a successful application. */
@@ -82,22 +80,23 @@ ann_flat_free(struct ann_backend *backend, void *ptr, size_t size)
 	backend->memory.free(backend->memory.ctx, ptr, size);
 }
 
-static size_t
-ann_flat_vector_size(const struct ann_backend *backend)
+/** Charge copied coordinates to Flat until their last reference is released. */
+static void *
+ann_flat_vector_alloc(void *ctx, size_t size)
 {
-	return (size_t)backend->config.dimension * sizeof(float);
+	struct ann_backend *backend = ctx;
+	void *ptr = ann_flat_alloc(backend, size);
+	if (ptr != NULL)
+		backend->vector_bytes += size - ann_vector_overhead();
+	return ptr;
 }
 
-/** Shared payloads are charged to their coordinate owner. */
 static void
-ann_flat_release_vector(struct ann_backend *backend, const void *vector,
-			struct ann_vector *shared)
+ann_flat_vector_free(void *ctx, void *ptr, size_t size)
 {
-	if (shared != NULL)
-		ann_vector_unref(shared);
-	else
-		ann_flat_free(backend, (void *)vector,
-			      ann_flat_vector_size(backend));
+	struct ann_backend *backend = ctx;
+	backend->vector_bytes -= size - ann_vector_overhead();
+	ann_flat_free(backend, ptr, size);
 }
 
 static enum ann_status
@@ -134,14 +133,12 @@ ann_flat_destroy(struct ann_backend *backend)
 		return;
 	for (struct ann_change *change = backend->pending; change != NULL;) {
 		struct ann_change *previous = change->previous;
-		ann_flat_release_vector(backend, change->vector,
-					change->shared);
+		ann_vector_unref(change->vector);
 		ann_flat_free(backend, change, sizeof(*change));
 		change = previous;
 	}
 	for (uint32_t i = 0; i < backend->count; ++i)
-		ann_flat_release_vector(backend, backend->entries[i].vector,
-					backend->entries[i].shared);
+		ann_vector_unref(backend->entries[i].vector);
 	ann_flat_free(backend, backend->entries,
 		      (size_t)backend->capacity * sizeof(*backend->entries));
 	backend->memory.free(backend->memory.ctx, backend, sizeof(*backend));
@@ -239,16 +236,16 @@ ann_flat_prepare_impl(struct ann_backend *backend, enum ann_change_kind kind,
 	change->slot = kind == ANN_RETIRE ? (uint32_t)slot : backend->count;
 	if (kind == ANN_INSERT && shared != NULL) {
 		ann_vector_ref(shared);
-		change->shared = shared;
-		change->vector = vector;
+		change->vector = shared;
 	} else if (kind == ANN_INSERT) {
-		size_t size = ann_flat_vector_size(backend);
-		change->vector = ann_flat_alloc(backend, size);
+		struct ann_memory memory = {
+			backend, ann_flat_vector_alloc, ann_flat_vector_free,
+		};
+		change->vector = ann_vector_new(&memory, vector, dimension);
 		if (change->vector == NULL) {
 			ann_flat_free(backend, change, sizeof(*change));
 			return ANN_OUT_OF_MEMORY;
 		}
-		memcpy((void *)change->vector, vector, size);
 	}
 	backend->pending = change;
 	*out = change;
@@ -311,10 +308,8 @@ ann_flat_apply(struct ann_change *change,
 			&backend->entries[backend->count++];
 		entry->label = change->label;
 		entry->vector = change->vector;
-		entry->shared = change->shared;
 		entry->live = true;
 		change->vector = NULL;
-		change->shared = NULL;
 	} else {
 		backend->entries[change->slot].live = false;
 	}
@@ -336,7 +331,7 @@ ann_flat_rollback(struct ann_change *change)
 	if (change->kind == ANN_INSERT) {
 		struct ann_flat_entry *entry =
 			&backend->entries[--backend->count];
-		ann_flat_release_vector(backend, entry->vector, entry->shared);
+		ann_vector_unref(entry->vector);
 	} else {
 		backend->entries[change->slot].live = true;
 	}
@@ -352,7 +347,7 @@ ann_flat_finish(struct ann_change *change)
 	struct ann_backend *backend = change->backend;
 	assert(backend->pending == change);
 	backend->pending = change->previous;
-	ann_flat_release_vector(backend, change->vector, change->shared);
+	ann_vector_unref(change->vector);
 	ann_flat_free(backend, change, sizeof(*change));
 }
 
@@ -390,8 +385,7 @@ ann_flat_reclaim(struct ann_backend *backend, uint64_t label)
 	int64_t slot = ann_flat_find(backend, label);
 	if (slot < 0 || backend->entries[slot].live)
 		return ANN_NOT_FOUND;
-	ann_flat_release_vector(backend, backend->entries[slot].vector,
-				backend->entries[slot].shared);
+	ann_vector_unref(backend->entries[slot].vector);
 	backend->entries[slot] = backend->entries[--backend->count];
 	return ANN_OK;
 }
@@ -438,23 +432,22 @@ ann_flat_search(struct ann_backend *backend, const float *query,
 		if (opts->filter == NULL) {
 			if (!entry->live)
 				continue;
-		} else if (!opts->filter->accept(entry->label, entry->shared,
+		} else if (!opts->filter->accept(entry->label, entry->vector,
 						 opts->filter->ctx)) {
 			continue;
 		}
 		double distance;
-		bool packed = entry->shared != NULL &&
-			      ann_vector_is_borrowed(entry->shared);
-		status = ann_distance_raw(query, false, entry->vector, packed,
-					  backend->config.dimension,
-					  backend->config.metric, opts->control,
-					  &distance);
+		status = ann_distance_raw(
+			query, false, ann_vector_data(entry->vector),
+			ann_vector_is_borrowed(entry->vector),
+			backend->config.dimension, backend->config.metric,
+			opts->control, &distance);
 		if (status != ANN_OK)
 			return status;
 		if (opts->stats != NULL)
 			++opts->stats->computed_distances;
 		struct ann_candidate candidate = {
-			entry->label, distance, entry->shared,
+			entry->label, distance, entry->vector,
 		};
 		if (count == opts->candidate_limit &&
 		    !ann_candidate_before(&candidate, &out[count - 1]))
@@ -482,14 +475,10 @@ ann_flat_stat(const struct ann_backend *backend, struct ann_backend_stats *out)
 	memset(out, 0, sizeof(*out));
 	out->capacity = backend->capacity;
 	out->resident_bytes = backend->resident_bytes;
+	out->vector_bytes = backend->vector_bytes;
 	out->lookup_bytes = (uint64_t)backend->capacity *
 			    sizeof(*backend->entries);
 	for (uint32_t i = 0; i < backend->count; ++i) {
-		if (backend->entries[i].vector != NULL &&
-		    backend->entries[i].shared == NULL)
-			out->vector_bytes +=
-				(uint64_t)backend->config.dimension *
-				sizeof(float);
 		if (backend->entries[i].live)
 			++out->live;
 		else

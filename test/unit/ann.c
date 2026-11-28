@@ -548,11 +548,23 @@ stop_search(void *ctx)
 	return true;
 }
 
+/** A predicate can inspect coordinates inserted through the copying API. */
+static bool
+accept_copied_vector(uint64_t label, const struct ann_vector *vector, void *ctx)
+{
+	const float *expected = ctx;
+	if (label != 17 || vector == NULL ||
+	    ann_vector_is_borrowed(vector) || ann_vector_dimension(vector) != 2)
+		return false;
+	const float *actual = ann_vector_data(vector);
+	return actual[0] == expected[0] && actual[1] == expected[1];
+}
+
 /** Both backends obey the same contract without implementation extensions. */
 static void
 test_backend_contract(const char *algorithm)
 {
-	plan(36);
+	plan(40);
 	const struct ann_backend_ops *ops = ann_backend_find(algorithm);
 	fail_unless(ops != NULL);
 	struct owner owner = {0};
@@ -562,6 +574,32 @@ test_backend_contract(const char *algorithm)
 	is(ops->create(&config, &memory, &backend), ANN_OK,
 	   "%s creates through the common factory", algorithm);
 	is(ops->reserve(backend, 8), ANN_OK, "reserve before mutation");
+	float expected[] = {1, 2}, input[] = {1, 2};
+	struct ann_change *copied = NULL;
+	is(ops->prepare(backend, ANN_INSERT, 17, input, 2, &copied), ANN_OK,
+	   "prepare privately owned coordinates");
+	input[0] = 0;
+	is(ops->apply(copied, NULL), ANN_OK, "publish copied coordinates");
+	struct ann_search_control copy_control = search_control(1000000);
+	struct ann_filter copy_filter = {accept_copied_vector, expected};
+	struct ann_search_opts copy_opts = {
+		.candidate_limit = 1,
+		.query_dimension = 2,
+		.control = &copy_control,
+		.filter = &copy_filter,
+	};
+	struct ann_candidate copy_found;
+	uint32_t copy_count;
+	ok(ops->search(backend, expected, &copy_opts, &copy_found,
+		       &copy_count) == ANN_OK && copy_count == 1 &&
+	   copy_found.distance == 0 && copy_found.vector != NULL,
+	   "filter and result borrow the original copy");
+	struct ann_backend_stats copy_stats;
+	ops->stat(backend, &copy_stats);
+	is(copy_stats.vector_bytes, sizeof(input),
+	   "charge the coordinate payload once to its backend");
+	ops->rollback(copied);
+	ops->finish(copied);
 	is(ops->prepare_shared(backend, 17, NULL, NULL), ANN_INVALID,
 	   "invalid shared payload is rejected");
 	is(ann_vector_new(&memory, NULL, 2), NULL,

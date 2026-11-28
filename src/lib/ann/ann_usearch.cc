@@ -133,6 +133,8 @@ struct ann_backend {
 	struct ann_hnsw_config options;
 	/** Owned bytes including pages pinned by snapshots and undo records. */
 	uint64_t retained_bytes = sizeof(*this);
+	/** Copied coordinate bytes retained by this generation's roots. */
+	uint64_t vector_bytes = 0;
 	/** Mutable graph, released at generation retirement. */
 	std::optional<AnnGraph> graph;
 	/** Immutable root borrowed by readers without taking references. */
@@ -209,6 +211,25 @@ ann_usearch_free(void *ctx, void *ptr, size_t size)
 	auto *backend = static_cast<struct ann_backend *>(ctx);
 	backend->retained_bytes -= size;
 	backend->memory.free(backend->memory.ctx, ptr, size);
+}
+
+/** External shared coordinates bypass these copy accounting callbacks. */
+static void *
+ann_usearch_vector_alloc(void *ctx, size_t size)
+{
+	auto *backend = static_cast<struct ann_backend *>(ctx);
+	void *ptr = ann_usearch_alloc(backend, size);
+	if (ptr != nullptr)
+		backend->vector_bytes += size - ann_vector_overhead();
+	return ptr;
+}
+
+static void
+ann_usearch_vector_free(void *ctx, void *ptr, size_t size)
+{
+	auto *backend = static_cast<struct ann_backend *>(ctx);
+	backend->vector_bytes -= size - ann_vector_overhead();
+	ann_usearch_free(backend, ptr, size);
 }
 
 /** Mix nearby labels before masking the lookup slot. */
@@ -645,8 +666,9 @@ ann_usearch_prepare_impl(struct ann_backend *backend,
 		ann_vector_ref(shared);
 		change->vector = shared;
 	} else if (kind == ANN_INSERT) {
-		struct ann_memory memory = {backend, ann_usearch_alloc,
-					    ann_usearch_free};
+		struct ann_memory memory = {
+			backend, ann_usearch_vector_alloc, ann_usearch_vector_free,
+		};
 		change->vector = ann_vector_new(
 			&memory, static_cast<const float *>(vector), dimension);
 		if (change->vector == nullptr) {
@@ -1040,6 +1062,7 @@ ann_usearch_stat(const struct ann_backend *backend,
 {
 	memset(out, 0, sizeof(*out));
 	out->resident_bytes = backend->retained_bytes;
+	out->vector_bytes = backend->vector_bytes;
 	out->graph_layers = 1;
 	if (backend->graph) {
 		out->capacity = backend->capacity;
@@ -1052,7 +1075,8 @@ ann_usearch_stat(const struct ann_backend *backend,
 			(uint64_t)backend->lookup_capacity *
 			 sizeof(*backend->lookup);
 	}
-	out->graph_bytes = out->resident_bytes - out->lookup_bytes;
+	out->graph_bytes = out->resident_bytes - out->lookup_bytes -
+			   out->vector_bytes;
 }
 
 extern "C" const struct ann_backend_ops ann_usearch_ops = {
