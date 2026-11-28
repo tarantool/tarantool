@@ -24,7 +24,7 @@ local msgpackffi = require('msgpackffi')
 
 local ffi = require('ffi')
 ffi.cdef([[
-    struct index_read_view_iterator { char pad[80]; };
+    struct index_read_view_iterator { char pad[88]; };
     int box_index_read_view_tuple_position(
             struct space_read_view_handle *space, uint32_t index_id,
             const char *tuple, const char *tuple_end,
