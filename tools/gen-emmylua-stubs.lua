@@ -182,20 +182,71 @@ local function emit_type(statement, declared, body)
     end
 end
 
+-- Return the change of the table nesting depth for a line. Braces in
+-- comments and strings are ignored. `state` keeps the state of a
+-- multi-line string between calls.
+local function brace_delta(line, state)
+    local delta = 0
+    local i = 1
+    while i <= #line do
+        if state.quote ~= nil then
+            if state.quote == 'long' then
+                if line:sub(i, i + #state.close - 1) == state.close then
+                    i = i + #state.close
+                    state.quote = nil
+                else
+                    i = i + 1
+                end
+            else
+                local char = line:sub(i, i)
+                if char == '\\' then
+                    i = i + 2
+                elseif char == state.quote then
+                    state.quote = nil
+                    i = i + 1
+                else
+                    i = i + 1
+                end
+            end
+        else
+            local char = line:sub(i, i)
+            if char == '-' and line:sub(i + 1, i + 1) == '-' then
+                break
+            elseif char == '"' or char == "'" then
+                state.quote = char
+                i = i + 1
+            elseif char == '[' then
+                local eq = line:sub(i):match('^%[(=*)%[')
+                if eq ~= nil then
+                    state.quote = 'long'
+                    state.close = ']' .. eq .. ']'
+                    i = i + #eq + 2
+                else
+                    i = i + 1
+                end
+            elseif char == '{' then
+                delta = delta + 1
+                i = i + 1
+            elseif char == '}' then
+                delta = delta - 1
+                i = i + 1
+            else
+                i = i + 1
+            end
+        end
+    end
+    return delta
+end
+
 -- The lines of a table constructor that starts at `index`, up to the
 -- closing brace, taking nested tables into account.
 local function collect_table(lines, index)
     local depth = 0
     local collected = {}
+    local state = {}
     for i = index, #lines do
         table.insert(collected, lines[i])
-        for char in lines[i]:gmatch('[{}]') do
-            if char == '{' then
-                depth = depth + 1
-            else
-                depth = depth - 1
-            end
-        end
+        depth = depth + brace_delta(lines[i], state)
         if depth == 0 then
             return collected
         end

@@ -225,6 +225,34 @@ function Client:did_open(path, text)
     })
 end
 
+function Client:wait_diagnostics(uri, timeout)
+    local deadline = fiber.clock() + (timeout or 10)
+    for _, notification in ipairs(self.notifications) do
+        if notification.method == 'textDocument/publishDiagnostics' and
+                notification.params ~= nil and
+                notification.params.uri == uri then
+            return notification.params.diagnostics or {}
+        end
+    end
+    while fiber.clock() < deadline do
+        local remaining = math.max(0.1, deadline - fiber.clock())
+        local ok, message =
+            pcall(self._read_message, self, math.min(1, remaining))
+        if ok then
+            if message.method ~= nil and message.id ~= nil then
+                self:_handle_server_request(message)
+            elseif message.method == 'textDocument/publishDiagnostics' and
+                    message.params ~= nil and
+                    message.params.uri == uri then
+                return message.params.diagnostics or {}
+            elseif message.method ~= nil then
+                table.insert(self.notifications, message)
+            end
+        end
+    end
+    return {}
+end
+
 function Client:close()
     if self.closed then
         return
