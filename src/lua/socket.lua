@@ -55,6 +55,13 @@ ffi.cdef[[
         const void *needle, size_t needlelen);
 ]]
 
+-- The layout of struct timeval depends on the platform: tv_usec is 32-bit on
+-- macOS and long elsewhere. The type is anonymous not to clash with struct
+-- timeval declared by other modules.
+local timeval_t = ffi.typeof(jit.os == 'OSX' and
+    'struct { long tv_sec; int32_t tv_usec; }' or
+    'struct { long tv_sec; long tv_usec; }')
+
 local gc_socket_t = ffi.metatype(ffi.typeof('struct gc_socket'), {
     __gc = function (socket)
         if socket.fd < 0 then return end
@@ -500,6 +507,26 @@ local function socket_setsockopt(self, level, name, value)
         return true
     end
 
+    if info.type == 3 then
+        if type(value) ~= 'number' then
+            error(format("Socket option %s expects a number", name))
+        end
+        -- A NaN or an out of range number can't be converted to an integer.
+        if not (value >= 0 and value <= 2147483647) then
+            self._errno = boxerrno.EINVAL
+            return false
+        end
+        local usec = math.floor(value * 1e6 + 0.5)
+        local tv = timeval_t(math.floor(usec / 1e6), usec % 1e6)
+        local res = ffi.C.setsockopt(fd,
+            level, info.iname, tv, ffi.sizeof(timeval_t))
+        if res < 0 then
+            self._errno = boxerrno()
+            return false
+        end
+        return true
+    end
+
     if name == 'SO_LINGER' then
         error("Use s:linger(active[, timeout])")
     end
@@ -551,6 +578,17 @@ local function socket_getsockopt(self, level, name)
         value = ffi.string(value, tonumber(len[0]))
         cord_ibuf_put(ibuf)
         return value
+    end
+
+    if info.type == 3 then
+        local tv = timeval_t()
+        local len = ffi.new('size_t[1]', ffi.sizeof(timeval_t))
+        local res = ffi.C.getsockopt(fd, level, info.iname, tv, len)
+        if res < 0 then
+            self._errno = boxerrno()
+            return nil
+        end
+        return tonumber(tv.tv_sec) + tonumber(tv.tv_usec) / 1e6
     end
 
     if name == 'SO_LINGER' then
