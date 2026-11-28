@@ -347,6 +347,19 @@ local function doc_above(lines, index)
     return block
 end
 
+-- Whether the annotation block declares a module value field, that is,
+-- it has a `---@type` tag. Such an assignment is emitted by the main
+-- pass as a field declaration, not by the export pass.
+local function is_value_doc(doc)
+    for _, line in ipairs(doc) do
+        local name = directive_name(line)
+        if name ~= nil and VALUE_TAGS[name] then
+            return true
+        end
+    end
+    return false
+end
+
 -- Whether the statement is a top-level `<return_name>.<name> = <value>`
 -- assignment that the export pass rewrites. Function literals are
 -- declared by emit_function() and are not handled by the export pass.
@@ -498,13 +511,35 @@ local function generate(out_file, files, return_name)
     end
 
     if return_name ~= nil and not return_emitted and
-            declared[return_name] and #export_assignments > 0 then
+            #export_assignments > 0 then
         local assigned = {}
         local first = true
         for _, item in ipairs(export_assignments) do
             local value = export_value(
                 item.expr, assigned, declared, names, return_name)
+            local declaration = nil
             if value ~= nil then
+                declaration =
+                    return_name .. '.' .. item.name .. ' = ' .. value
+                assigned[item.name] = true
+            elseif is_value_doc(item.doc) then
+                -- A `---@type` annotated assignment declares a module
+                -- value field rather than an exported name (for example
+                -- `mod.NULL = 0`): emit it as a field.
+                declaration = return_name .. '.' .. item.name .. ' = nil'
+            elseif item.expr:match('^function%s*%(') == nil then
+                io.stderr:write(string.format(
+                    "gen-emmylua-stubs: %s:%d: cannot resolve '%s.%s = %s'\n",
+                    item.path, item.line, return_name, item.name, item.expr))
+            end
+            if declaration ~= nil then
+                -- The module root may be declared only by the
+                -- annotations, for example `local mod = {}` without a
+                -- doc block. Declare it here if nothing else did.
+                if not declared[return_name] and not roots[return_name] then
+                    roots[return_name] = true
+                    table.insert(order, return_name)
+                end
                 if first then
                     if body[#body] ~= '' then
                         table.insert(body, '')
@@ -514,13 +549,7 @@ local function generate(out_file, files, return_name)
                 for _, line in ipairs(item.doc) do
                     table.insert(body, line)
                 end
-                table.insert(body,
-                             return_name .. '.' .. item.name .. ' = ' .. value)
-                assigned[item.name] = true
-            elseif item.expr:match('^function%s*%(') == nil then
-                io.stderr:write(string.format(
-                    "gen-emmylua-stubs: %s:%d: cannot resolve '%s.%s = %s'\n",
-                    item.path, item.line, return_name, item.name, item.expr))
+                table.insert(body, declaration)
             end
         end
     end
