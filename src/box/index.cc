@@ -237,7 +237,10 @@ range_validate(struct index_def *index_def,
 	if (cmp > 0 || (cmp == 0 &&
 			begin_part_count != 0 && end_part_count != 0 &&
 			begin_part_count >= end_part_count)) {
-		diag_set(IllegalParams, "begin_key must be < end_key");
+		struct error *e = diag_set(IllegalParams,
+					   "begin_key must be < end_key");
+		error_set_key(e, "begin_key", begin_key, begin_part_count);
+		error_set_key(e, "end_key", end_key, end_part_count);
 		return -1;
 	}
 	return 0;
@@ -941,7 +944,10 @@ iterator_position_validate(const char *pos, uint32_t pos_part_count,
 	}
 	return 0;
 fail:
-	diag_set(ClientError, ER_ITERATOR_POSITION);
+	struct error *e = diag_set(ClientError, ER_ITERATOR_POSITION);
+	error_set_key(e, "position", pos, pos_part_count);
+	error_set_key(e, "key", key, key_part_count);
+	error_set_index(e, index_def);
 	return -1;
 }
 
