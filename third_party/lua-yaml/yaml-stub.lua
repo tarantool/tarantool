@@ -1,0 +1,372 @@
+-- luacheck: ignore 212 unused arguments: this file only holds annotations.
+---@diagnostic disable: missing-return
+
+---@class yaml
+---@field cfg yaml.cfg the module configuration.
+---@field NULL ffi.cdata* a value comparable to Lua "nil".
+---@field encode yaml.encode_fn
+---@field decode yaml.decode_fn
+---@field new fun(): yaml
+
+---@alias yaml.encode_options yaml.tag_pair | yaml.no_tags
+
+---@class yaml.no_tags
+---@field tag_handle? nil
+---@field tag_prefix? nil
+
+---@class yaml.tag_pair
+---@field tag_prefix string the tag prefix.
+---@field tag_handle string the tag handle.
+
+---@alias yaml.encode_fn fun(value: any,
+---    options?: yaml.encode_options): string?, string?
+---@alias yaml.decode_fn (fun(document: string,
+---    options: yaml.decode_tag_options): string?, string?)
+---    & (fun(document: string, options?: yaml.decode_options): any...)
+
+---@class yaml.decode_tag_options
+---@field tag_only true return the tag handle and prefix instead of the
+---    decoded documents.
+
+---@class yaml.decode_options
+---@field tag_only? boolean return the tag handle and prefix instead of the
+---    decoded documents.
+
+---@class yaml.cfg_options
+---@field encode_invalid_numbers? boolean a flag saying whether to enable
+---    encoding of NaN and Inf numbers. Default: true.
+---@field encode_number_precision? integer the precision of floating point
+---    numbers. Default: 14.
+---@field encode_load_metatables? boolean a flag saying whether the
+---    serializer will follow the `__serialize` metatable field. Default: true.
+---@field encode_use_tostring? boolean a flag saying whether to use
+---    `tostring()` for unknown types. Default: false.
+---@field encode_invalid_as_nil? boolean a flag saying whether to use NULL
+---    for non-recognized types. Default: false.
+---@field encode_sparse_convert? boolean a flag saying whether to handle
+---    excessively sparse arrays as maps. Default: true.
+---@field encode_sparse_ratio? integer 1/`encode_sparse_ratio` is the
+---    permissible percentage of missing values in a sparse array. Default: 2.
+---@field encode_sparse_safe? integer a limit ensuring that small Lua arrays
+---    are always encoded as sparse arrays (instead of generating an error or
+---    encoding as map). Default: 10.
+---@field decode_invalid_numbers? boolean a flag saying whether to enable
+---    decoding of NaN and Inf numbers. Default: true.
+---@field decode_save_metatables? boolean a flag saying whether to set
+---    metatables for all arrays and maps. Default: true.
+
+---@class yaml.cfg: yaml.cfg_options
+---@operator call(yaml.cfg_options): void
+
+---Convert a Lua object to a YAML string.
+---@param value any either a scalar value or a Lua table value.
+---@param options? yaml.encode_options tag options.
+---@return string? result The YAML string, or nil for an invalid tag directive.
+---@return string? err Tag error message on failure. Other errors may raise.
+local function encode(value, options) end
+
+---Convert a YAML string to a Lua object.
+---@param document string a string formatted as YAML.
+---@param options? yaml.decode_options decoding options.
+---@return any... documents one value per document; none for an
+---    empty stream.
+---@overload fun(document: string, options: yaml.decode_tag_options):
+---    string?, string?
+local function decode(document, options) end
+
+---Create a new YAML serializer with the default configuration.
+---@return yaml result a new YAML serializer.
+local function new() end
+
+---@type yaml.cfg
+local cfg = {}
+
+---@type ffi.cdata*
+local NULL = {}
+
+---The `yaml` module takes strings in YAML format and decodes them, or takes
+---a series of non-YAML values and encodes them.
+---
+---**Example:**
+---
+---```tarantoolsession
+---tarantool> yaml = require('yaml')
+------
+---...
+---tarantool> y = yaml.encode({'a', 1, 'b', 2})
+------
+---...
+---tarantool> z = yaml.decode(y)
+------
+---...
+---tarantool> z[1], z[2], z[3], z[4]
+------
+---- a
+---- 1
+---- b
+---- 2
+---...
+---tarantool> if yaml.NULL == nil then print('hi') end
+---hi
+------
+---...
+---```
+---
+---The YAML collection style can be specified with `__serialize`:
+---
+---* `__serialize="sequence"` or `__serialize="array"` for a Block Sequence
+---  array,
+---* `__serialize="seq"` for a Flow Sequence array,
+---* `__serialize="mapping"` for a Block Mapping map,
+---* `__serialize="map"` for a Flow Mapping map.
+---
+---Serializing array- or map-like tables containing 'A' and 'B' with
+---different `__serialize` values brings different results:
+---
+---```tarantoolsession
+---tarantool> yaml = require('yaml')
+------
+---...
+---tarantool> yaml.encode(setmetatable({'A', 'B'}, {__serialize='seq'}))
+------
+---- |
+---  --- ['A', 'B']
+---  ...
+---...
+---tarantool> yaml.encode(setmetatable({'A', 'B'}, {__serialize='map'}))
+------
+---- |
+---  --- {1: 'A', 2: 'B'}
+---  ...
+---...
+---tarantool> array_like_table = {'A', 'B'}
+---tarantool> yaml.encode(setmetatable(array_like_table, {__serialize='seq'}))
+------
+---- |
+---  --- ['A', 'B']
+---  ...
+---...
+---tarantool> yaml.encode(setmetatable(array_like_table,
+---                                  {__serialize='sequence'}))
+---tarantool> yaml.encode(setmetatable(array_like_table,
+---                                  {__serialize='array'}))
+------
+---- |
+---  ---
+---  - A
+---  - B
+---  ...
+---...
+---tarantool> yaml.encode(setmetatable(array_like_table, {__serialize='map'}))
+------
+---- |
+---  --- {1: 'A', 2: 'B'}
+---  ...
+---...
+---tarantool> yaml.encode(setmetatable(array_like_table,
+---                                  {__serialize='mapping'}))
+------
+---- |
+---  ---
+---  1: A
+---  2: B
+---  ...
+---...
+---tarantool> map_like_table = {f1 = 'A', f2 = 'B'}
+---tarantool> yaml.encode(setmetatable(map_like_table, {__serialize='seq'}))
+---tarantool> yaml.encode(setmetatable(map_like_table,
+---                                  {__serialize='sequence'}))
+---tarantool> yaml.encode(setmetatable(map_like_table, {__serialize='array'}))
+------
+---- |
+---  --- []
+---  ...
+---...
+---tarantool> yaml.encode(setmetatable(map_like_table, {__serialize='map'}))
+------
+---- |
+---  --- {'f2': 'B', 'f1': 'A'}
+---  ...
+---...
+---tarantool> yaml.encode(setmetatable(map_like_table,
+---                                  {__serialize='mapping'}))
+------
+---- |
+---  ---
+---  f2: B
+---  f1: A
+---  ...
+---...
+---```
+local yaml = {
+    ---Convert a Lua object to a YAML string.
+    ---
+    ---The YAML output structure can be specified with `__serialize`:
+    ---
+    ---* `'seq'`, `'sequence'`, `'array'`: table encoded as an array
+    ---* `'map'`, `'mapping'`: table encoded as a map
+    ---* a function: the meta-method called to unpack a serializable
+    ---  representation of table, cdata, or userdata objects
+    ---
+    ---```tarantoolsession
+    ---tarantool> yaml.encode(setmetatable({'A', 'B'}, {__serialize='seq'}))
+    ------
+    ---- |
+    ---  --- ['A', 'B']
+    ---  ...
+    ---...
+    ---tarantool> yaml.encode(setmetatable({'A', 'B'}, {__serialize='map'}))
+    ------
+    ---- |
+    ---  --- {1: 'A', 2: 'B'}
+    ---  ...
+    ---...
+    ---```
+    ---
+    ---`'seq'` or `'map'` also enable the flow (compact) mode for the YAML
+    ---serializer (`flow="[1,2,3]"` vs `block=" - 1\n - 2\n - 3\n"`).
+    ---If the tag directive is invalid, return `nil` and an error message.
+    encode = encode,
+    ---Convert a YAML string to a Lua object.
+    ---
+    ---If the string contains several YAML documents, the function returns one
+    ---value for each document.
+    ---
+    ---**Note on `decode_save_metatables`**
+    ---
+    ---You may want to change the result's metatable to get block-formatted
+    ---`encode()` for better readability, but be careful to do it correctly.
+    ---
+    ---The decoder uses globally defined tables as metatables for arrays
+    ---and maps.
+    ---You must not change entries of the `decode()` result's table metatable,
+    ---because it affects all results and may lead to undefined behavior of
+    ---other code.
+    ---
+    ---The correct way is to assign a new metatable:
+    ---
+    ---```tarantoolsession
+    ---tarantool> t1 = yaml.decode(yaml.encode({[1] = 'a', x = 'b'}))
+    ---tarantool> yaml.encode(t1)
+    ------
+    ---- |
+    ---  --- {'x': 'b', 1: 'a'}
+    ---  ...
+    ---...
+    ---tarantool> my_mt = {__serialize = 'mapping'}
+    ---tarantool> setmetatable(t1, my_mt)
+    ---tarantool> yaml.encode(t1)
+    ------
+    ---- |
+    ---  ---
+    ---  x: b
+    ---  1: a
+    ---  ...
+    ---...
+    ---```
+    ---With `tag_only = true`, return the handle and prefix for one tag,
+    ---nil for no tag, or nil and an error message for multiple tags.
+    decode = decode,
+    ---Create a new YAML serializer with the default configuration.
+    new = new,
+    ---Set values affecting the behavior of `encode()` and `decode()`.
+    ---
+    ---The values are all either integers or boolean `true`/`false`.
+    ---
+    ---**Note on `decode_save_metatables`**
+    ---
+    ---Do not change the metatable like this:
+    ---
+    ---```tarantoolsession
+    ---tarantool> t1 = yaml.decode(yaml.encode({[1] = 'a', x = 'b'}))
+    ---tarantool> getmetatable(t1).__serialize
+    ------
+    ---- map
+    ---...
+    ---tarantool> getmetatable(t1).__serialize = 'mapping' -- (!) bad
+    ---tarantool> t2 = yaml.decode(yaml.encode({[1] = 'a', x = 'b'}))
+    ---tarantool> yaml.encode(t2) -- (!) got 'block' maps for all results
+    ------
+    ---- |
+    ---  ---
+    ---  x: b
+    ---  1: a
+    ---  ...
+    ---...
+    ---```
+    ---
+    ---**Sparse arrays features:**
+    ---
+    ---During encoding, the YAML encoder tries to classify a table into one of
+    ---four kinds:
+    ---
+    ---* Map: at least one table index is not an unsigned integer.
+    ---* Regular array: all array indexes are available.
+    ---* Sparse array: at least one array index is missing.
+    ---* Excessively sparse array: the number of values missing exceeds the
+    ---  configured ratio.
+    ---
+    ---An array is excessively sparse when **all** the following conditions are
+    ---met:
+    ---
+    ---* `encode_sparse_ratio` > 0
+    ---* `max(table)` > `encode_sparse_safe`
+    ---* `max(table)` > `count(table)` * `encode_sparse_ratio`
+    ---
+    ---The YAML encoder will never consider an array to be excessively sparse
+    ---when `encode_sparse_ratio = 0`. The `encode_sparse_safe` limit ensures
+    ---that small Lua arrays are always encoded as sparse arrays.
+    ---
+    ---By default, attempting to encode an excessively sparse array will
+    ---generate an error. If `encode_sparse_convert` is set to `true`,
+    ---excessively sparse arrays will be handled as maps.
+    ---
+    ---**`yaml.cfg()` example 1:**
+    ---
+    ---The following code will encode 0/0 as NaN ("not a number") and 1/0 as
+    ---Inf ("infinity"), rather than returning nil or an error message:
+    ---
+    ---```lua
+    ---yaml = require('yaml')
+    ---yaml.cfg{encode_invalid_numbers = true}
+    ---x = 0/0
+    ---y = 1/0
+    ---yaml.encode({1, x, y, 2})
+    ---```
+    ---
+    ---The result of the `yaml.encode()` request will look like this:
+    ---
+    ---```tarantoolsession
+    ---tarantool> yaml.encode({1, x, y, 2})
+    ------
+    ---- '[1,nan,inf,2]
+    ---...
+    ---```
+    ---
+    ---**`yaml.cfg` example 2:**
+    ---
+    ---To avoid generating errors on attempts to encode unknown data types as
+    ---userdata/cdata, you can use this code:
+    ---
+    ---```tarantoolsession
+    ---tarantool> httpc = require('http.client').new()
+    ------
+    ---...
+    ---tarantool> yaml.encode(httpc.curl)
+    ------
+    ---- error: unsupported Lua type 'userdata'
+    ---...
+    ---tarantool> yaml.encode(httpc.curl, {encode_use_tostring=true})
+    ------
+    ---- '"userdata: 0x010a4ef2a0"'
+    ---...
+    ---```
+    ---
+    ---Similar configuration settings exist for the JSON and MsgPack modules.
+    cfg = cfg,
+    ---A value comparable to Lua "nil" which may be useful as a placeholder
+    ---in a tuple.
+    NULL = NULL,
+}
+
+return yaml

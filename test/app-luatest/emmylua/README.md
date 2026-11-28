@@ -7,11 +7,13 @@ the annotations:
 
 - the value returned by `require(<module>)` has an inferred type;
 - that type has the documented functions and fields;
-- every documented function and field has a description.
+- every documented function and field has a description;
+- a call expression exposes the documented signature.
 
-The test intentionally does not check signature help, inlay hints,
-diagnostics, or generated stubs. It is a regression test for the
-annotations themselves, not for the whole LSP feature set.
+The test intentionally does not check inlay hints, diagnostics, or
+generated stubs. Signature help is checked only for the fixtures listed
+in `signatures`. It is a regression test for the annotations themselves,
+not for the whole LSP feature set.
 
 ## Files
 
@@ -65,14 +67,19 @@ For each specification the test:
    documentation contains the expected phrase.
 6. Repeats the field and documentation checks for every object
    fixture of the module.
+7. For every entry in `signatures`, opens its fixture, requests
+   signature help inside the call marked with `--[[@lsp:call]]` and
+   checks that one of the signatures contains the expected phrase.
 
 An object fixture obtains the object type either with the module's
 constructor, for example `varbinary.new('data')`, or from a value
 returned by a module function, for example `xlog.pairs()`.
 
-Only `---@field` annotations are checked. Metamethods declared with
-`---@operator` are not class members, so they do not show up in
-completion and are not covered by these checks.
+Only `---@field` annotations are checked as object members. A
+metamethod declared with `---@operator` is not a class member, so it
+does not show up in completion: a call operator is checked with
+signature help instead. The `signatures` list also covers parameter
+types that are unions or aliases.
 
 ## Markers
 
@@ -86,6 +93,14 @@ varbinary.--[[@lsp:module_fields]]
 ```lua
 local bin--[[@lsp:object]] = varbinary.new('data')
 bin.--[[@lsp:object_fields]]
+```
+
+```lua
+cfg(--[[@lsp:call]]{encode_invalid_numbers = false})
+```
+
+```lua
+yaml.encode(--[[@lsp:call]]{})
 ```
 
 The test finds the marker, converts its offset to an LSP line and
