@@ -9,6 +9,30 @@ local root = emmylua.source_root()
 -- add a spec and a fixture directory with module.lua and object.lua.
 local modules = {
     {
+        name = 'fun',
+        source = 'third_party/luafun/fun.lua',
+        fixtures = 'test/app-luatest/emmylua/fun',
+        type_name = 'fun',
+        fields = {
+            each = 'for each iteration value',
+            map = 'Return a new iterator by applying',
+            filter = 'Return a new iterator of those elements',
+            totable = 'Collect all iteration values',
+        },
+        objects = {
+            {
+                fixture = 'iterator.lua',
+                type_name = 'fun.Iterator',
+                fields = {
+                    gen = 'The underlying generator function',
+                    param = 'The generator parameter',
+                    state = 'The current generator state',
+                    unwrap = 'the triplet',
+                },
+            },
+        },
+    },
+    {
         name = 'strict',
         source = 'src/lua/strict.lua',
         fixtures = 'test/app-luatest/emmylua/strict',
