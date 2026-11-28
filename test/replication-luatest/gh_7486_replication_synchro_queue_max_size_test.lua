@@ -102,6 +102,64 @@ g.test_max_size_update_dynamically = function(cg)
     end)
 end
 
+g.after_test('test_max_size_increase_wakes_up_waiters', function(cg)
+    cg.master:exec(function()
+        box.cfg{
+            replication_synchro_queue_max_size = 1,
+            replication_synchro_quorum = 1,
+        }
+    end)
+end)
+
+g.test_max_size_increase_wakes_up_waiters = function(cg)
+    cg.master:exec(function(wait_timeout)
+        local fiber = require('fiber')
+        local s = box.space.test
+        local lsn = box.info.lsn
+        box.cfg{replication_synchro_quorum = 2}
+        -- Start a transaction in a new fiber and check that it is waiting
+        -- for free space in the full queue: it is not submitted to the
+        -- queue and not written to WAL.
+        local function start_blocked(key)
+            local len = box.info.synchro.queue.len
+            local f = fiber.new(s.insert, s, {key})
+            f:set_joinable(true)
+            fiber.yield()
+            t.assert_equals(f:status(), 'suspended')
+            t.assert_equals(box.info.synchro.queue.len, len)
+            t.assert_equals(box.info.lsn, lsn)
+            return f
+        end
+        local function wait_lsn(expected)
+            t.helpers.retrying({timeout = wait_timeout}, function()
+                t.assert_equals(box.info.lsn, expected)
+            end)
+        end
+        -- The first transaction fills the queue and waits for the quorum.
+        local f1 = fiber.new(s.insert, s, {1})
+        f1:set_joinable(true)
+        lsn = lsn + 1
+        wait_lsn(lsn)
+        -- Raising the limit lets the waiting transaction go to WAL.
+        local f2 = start_blocked(2)
+        box.cfg{replication_synchro_queue_max_size = 16 * 1024 * 1024}
+        lsn = lsn + 1
+        wait_lsn(lsn)
+        -- Same for removing the limit.
+        box.cfg{replication_synchro_queue_max_size = 1}
+        local f3 = start_blocked(3)
+        box.cfg{replication_synchro_queue_max_size = 0}
+        lsn = lsn + 1
+        wait_lsn(lsn)
+        t.assert_equals(box.info.synchro.queue.len, 3)
+        box.cfg{replication_synchro_quorum = 1}
+        t.assert((f1:join()))
+        t.assert((f2:join()))
+        t.assert((f3:join()))
+        t.assert_equals(s:select(), {{1}, {2}, {3}})
+    end, {wait_timeout})
+end
+
 g.test_recovery_with_small_max_size = function(cg)
     t.tarantool.skip_if_not_debug()
 
