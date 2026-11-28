@@ -1,3 +1,61 @@
+---@alias experimental.connpool.mode
+---| 'ro'
+---| 'rw'
+---| 'prefer_ro'
+---| 'prefer_rw'
+
+---@class experimental.connpool
+---@field connect fun(instance_name: string,
+---    opts?: experimental.connpool.connect_options): any
+---@field filter fun(opts?: experimental.connpool.filter_options): string[]
+---@field call fun(func_name: string, args?: any[],
+---    opts?: experimental.connpool.call_options): any
+---@field set_idle_timeout fun(idle_timeout: number)
+
+---Options passed to `connpool.connect()`.
+---@class experimental.connpool.connect_options
+---@field connect_timeout? number a connection timeout in seconds.
+---@field wait_connected? boolean whether to block until the connection is
+---    established. The default is true.
+---@field fetch_schema? boolean whether to fetch schema changes from a
+---    remote instance.
+
+---Options used to filter instances.
+---@class experimental.connpool.filter_options
+---@field groups? string[] names of groups.
+---@field replicasets? string[] names of replica sets.
+---@field instances? string[] names of instances.
+---@field labels? table<string, string> labels an instance has.
+---@field roles? string[] roles of an instance.
+---@field sharding_roles? string[] sharding roles of an instance. Possible
+---    roles are `router` and `storage`; `rebalancer` is not supported.
+---@field mode? 'ro' | 'rw' a mode that allows filtering candidates based
+---    on their read-only status. The default is nil: don't check the
+---    read-only status.
+---@field skip_connection_check? boolean skip the connection check. The
+---    default is false.
+
+---Options passed to `connpool.call()`.
+---@class experimental.connpool.call_options
+---@field groups? string[] names of groups.
+---@field replicasets? string[] names of replica sets.
+---@field instances? string[] names of instances.
+---@field labels? table<string, string> labels an instance has.
+---@field roles? string[] roles of an instance.
+---@field sharding_roles? string[] sharding roles of an instance. Possible
+---    roles are `router` and `storage`; `rebalancer` is not supported.
+---@field prefer_local? boolean whether to prefer a local instance to
+---    execute the call on. The default is true.
+---@field mode? experimental.connpool.mode a mode that allows filtering
+---    candidates. The default is nil. Possible values: `ro`, `rw`,
+---    `prefer_ro`, `prefer_rw`.
+---@field timeout? number a connection timeout in seconds.
+---@field buffer? ffi.cdata* a buffer used to read a returned value.
+---@field on_push? fun(ctx: any, msg: any) a push callback.
+---@field on_push_ctx? any a push callback argument.
+---@field is_async? boolean whether to wait for the result. The default
+---    is false.
+
 local fiber = require('fiber')
 local clock = require('clock')
 local config = require('config')
@@ -373,10 +431,30 @@ end
 
 local pool = create_pool()
 
+---Set the default time in which instances not used within the `connect()`
+---method would be closed.
+---
+---Note that specifying a new timeout does not cause recalculation of the
+---existing deadlines.
+---
+---@param idle_timeout number the idle timeout in seconds.
 local function set_idle_timeout(idle_timeout)
     pool:set_idle_timeout(idle_timeout)
 end
 
+---Create a connection to the specified instance.
+---
+---Raises an error if the connection cannot be established.
+---
+---**Example:**
+---
+--- ```lua
+--- local conn = connpool.connect('storage-b-002', {fetch_schema = true})
+--- ```
+---
+---@param instance_name string an instance name.
+---@param opts? experimental.connpool.connect_options connection options.
+---@return any conn a net.box connection.
 local function connect(instance_name, opts)
     checks('string', {
         connect_timeout = '?number',
@@ -499,6 +577,17 @@ local function is_candidate_match_dynamic(instance_name, opts)
     return is_mode_match(opts.mode, instance_name)
 end
 
+---Get names of instances that match the specified conditions.
+---
+---**Example:**
+---
+--- ```lua
+--- local instance_names = connpool.filter({roles = {'roles.crud-storage'},
+---                                         labels = {dc = 'east'}})
+--- ```
+---
+---@param opts? experimental.connpool.filter_options filtering options.
+---@return string[] instance_names an array of instance names.
 local function filter(opts)
     checks({
         groups = '?table',
@@ -708,6 +797,45 @@ local function get_connection(opts)
     return nil, "connection to candidates failed"
 end
 
+---@class connpool.async_call_options: experimental.connpool.call_options
+---@field is_async true Return a future without waiting for the response.
+---    Use `future:wait_result()` to wait for the remote call to complete.
+
+---@class connpool.buffered_call_options: experimental.connpool.call_options
+---@field buffer buffer_object A buffer created by `buffer.ibuf()`. The
+---    response is written to this buffer instead of being decoded.
+---@field is_async? false Omit this option or set it to `false` to wait for
+---    the response and return the number of bytes written.
+
+---Execute the specified function on a remote instance.
+---
+---By default, wait for the response and return all values returned by the
+---remote function as separate Lua values. If `opts.is_async` is `true`,
+---return a future instead. For a synchronous call with `opts.buffer`,
+---return the number of bytes written to the buffer.
+---
+---```lua
+---local pool = require('experimental.connpool')
+---local first, second = pool.call('pair')
+---
+---local future = pool.call('pair', nil, {is_async = true})
+---local values = future:wait_result(3)
+---
+---local buf = require('buffer').ibuf()
+---local bytes = pool.call('pair', nil, {buffer = buf})
+---```
+---
+---@overload fun(func_name: string, args: any[]|nil,
+---    opts: connpool.async_call_options): net_box_future
+---@overload fun(func_name: string, args: any[]|nil,
+---    opts: connpool.buffered_call_options): integer
+---@param func_name string Name of the function to call on the remote instance.
+---@param args? any[] Positional arguments for the remote function. Pass `nil`
+---    if the function takes no arguments and you need to supply `opts`.
+---@param opts? experimental.connpool.call_options Instance selection
+---    and request options.
+---@return any... result Remote return values, a future, or a byte count,
+---    depending on the call mode.
 local function call(func_name, args, opts)
     checks('string', '?table', {
         groups = '?table',
@@ -759,10 +887,67 @@ local function call(func_name, args, opts)
     return conn:call(func_name, args, net_box_call_opts)
 end
 
-return {
+---*Since 3.1.0*
+---
+---The `connpool` module (available as `experimental.connpool`) provides a
+---set of features for connecting to remote cluster instances and for
+---executing remote procedure calls on an instance that satisfies the
+---specified criteria.
+---
+---**Important:** `experimental.connpool` is an experimental module and is
+---subject to changes.
+---
+---Note that the execution time for `experimental.connpool` functions depends
+---on the number of instances and the time required to connect to each
+---instance.
+---
+---**Loading a module:**
+---
+---```lua
+---local connpool = require('experimental.connpool')
+---```
+---
+local connpool = {
+    ---Create a connection to the specified instance.
+    ---
+    ---Raises an error if the connection cannot be established.
+    ---
+    ---**Example:**
+    ---
+    --- ```lua
+    --- local conn = connpool.connect('storage-b-002',
+    ---     {fetch_schema = true})
+    --- ```
     connect = connect,
+    ---Get names of instances that match the specified conditions.
+    ---
+    ---**Example:**
+    ---
+    --- ```lua
+    --- local instance_names = connpool.filter(
+    ---     {roles = {'roles.crud-storage'}, labels = {dc = 'east'}})
+    --- ```
     filter = filter,
+    ---Execute the specified function on a remote instance.
+    ---
+    ---The function is executed on behalf of the user that maintains
+    ---replication in the cluster.
+    ---
+    ---**Example:**
+    ---
+    --- ```lua
+    --- local buckets_count = connpool.call(
+    ---     'vshard.storage.buckets_count', nil,
+    ---     {roles = {'roles.crud-storage'}, labels = {dc = 'east'},
+    ---      mode = 'ro'})
+    --- ```
     call = call,
-
+    ---Set the default time in which instances not used within the
+    ---`connect()` method would be closed.
+    ---
+    ---Note that specifying a new timeout does not cause recalculation of
+    ---the existing deadlines.
     set_idle_timeout = set_idle_timeout,
 }
+
+return connpool

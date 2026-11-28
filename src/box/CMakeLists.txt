@@ -34,6 +34,7 @@ lua_source(lua_sources lua/healthcheck_defaults.lua healthcheck_defaults_lua)
 
 lua_stub(console FILES lua/console.lua RETURN M)
 lua_stub(xlog FILES lua/xlog.lua RETURN xlog)
+lua_stub(experimental/connpool FILES lua/connpool.lua RETURN connpool)
 
 # {{{ config
 lua_source(lua_sources lua/config/applier/app.lua          config_applier_app_lua)

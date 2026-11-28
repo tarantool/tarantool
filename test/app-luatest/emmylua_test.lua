@@ -248,6 +248,76 @@ local modules = {
             },
         },
     },
+    {
+        name = 'experimental/connpool',
+        source = 'src/box/lua/connpool.lua',
+        fixtures = 'test/app-luatest/emmylua/connpool',
+        fields = {
+            connect = 'Create a connection',
+            filter = 'Get names of instances',
+            call = 'Execute the specified function',
+            set_idle_timeout = 'Set the default time',
+        },
+        objects = {
+            {
+                fixture = 'connect_options.lua',
+                type_name = 'experimental.connpool.connect_options',
+                fields = {
+                    connect_timeout = 'a connection timeout',
+                    wait_connected = 'whether to block',
+                    fetch_schema = 'whether to fetch schema',
+                },
+            },
+            {
+                fixture = 'filter_options.lua',
+                type_name = 'experimental.connpool.filter_options',
+                fields = {
+                    groups = 'names of groups',
+                    replicasets = 'names of replica sets',
+                    instances = 'names of instances',
+                    labels = 'labels an instance has',
+                    roles = 'roles of an instance',
+                    sharding_roles = 'sharding roles',
+                    mode = 'a mode that allows filtering',
+                    skip_connection_check = 'skip the connection check',
+                },
+            },
+            {
+                fixture = 'call_options.lua',
+                type_name = 'experimental.connpool.call_options',
+                fields = {
+                    groups = 'names of groups',
+                    replicasets = 'names of replica sets',
+                    instances = 'names of instances',
+                    labels = 'labels an instance has',
+                    roles = 'roles of an instance',
+                    sharding_roles = 'sharding roles',
+                    prefer_local = 'whether to prefer a local instance',
+                    mode = 'a mode that allows filtering',
+                    timeout = 'a connection timeout',
+                    buffer = 'a buffer used to read a returned value',
+                    on_push = 'a push callback',
+                    on_push_ctx = 'a push callback argument',
+                    is_async = 'whether to wait for the result',
+                },
+            },
+            {
+                fixture = 'async_call_options.lua',
+                type_name = 'connpool.async_call_options',
+                fields = {
+                    is_async = 'Return a future',
+                },
+            },
+            {
+                fixture = 'buffered_call_options.lua',
+                type_name = 'connpool.buffered_call_options',
+                fields = {
+                    buffer = 'A buffer created by',
+                    is_async = 'Omit this option',
+                },
+            },
+        },
+    },
 }
 
 local function normalize(value)
@@ -349,9 +419,9 @@ local function run_module_test(spec)
     local resources = fio.pathjoin(workspace, 'resources')
     local client = nil
     local ok, err = xpcall(function()
-        emmylua.copy_file(
-            fio.pathjoin(root, spec.source),
-            fio.pathjoin(workspace, spec.name .. '.lua'))
+        local module_path = fio.pathjoin(workspace, spec.name .. '.lua')
+        fio.mktree(fio.dirname(module_path))
+        emmylua.copy_file(fio.pathjoin(root, spec.source), module_path)
         copy_fixtures(workspace, spec)
 
         client = emmylua.new_client({
