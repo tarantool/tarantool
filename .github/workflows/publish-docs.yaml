@@ -64,6 +64,7 @@ jobs:
         uses: ./.github/actions/setup-emmylua-analyzer
         with:
           doc-cli: "true"
+          doc-cli-rev: 70dbcf4db9a240a970dab317b56a01e6ac2ff65e
 
       - name: Setup Doxygen
         run: sudo apt install -y doxygen
