@@ -128,6 +128,17 @@ create_unit_test(PREFIX tt_pthread
                  LIBRARIES unit pthread
 )
 
+create_unit_test(PREFIX ann_memory
+                 SOURCES ann_memory.c ann_errinj.c core_test_utils.c
+                         ${PROJECT_SOURCE_DIR}/src/box/ann_memory.c
+                 LIBRARIES ann core unit)
+
+create_unit_test(PREFIX ann_tuple_map
+                 SOURCES ann_tuple_map.c ann_errinj.c core_test_utils.c
+                         ${PROJECT_SOURCE_DIR}/src/box/ann_tuple_map.c
+                         ${PROJECT_SOURCE_DIR}/src/box/ann_memory.c
+                 LIBRARIES core unit)
+
 create_unit_test(PREFIX heap
                  SOURCES heap.c
                  LIBRARIES unit

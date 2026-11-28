@@ -1940,6 +1940,9 @@ local errinj_blacklist = {
     ERRINJ_TUPLE_FIELD = true,
     ERRINJ_WAL_DELAY_COUNTDOWN = true,
 
+    -- VECTOR allocation failures have dedicated unit and Luatest coverage.
+    ERRINJ_VECTOR_ALLOC = true,
+
     -- These injections were added after the initial audit and are not
     -- triaged yet.
     ERRINJ_BUILD_INDEX_DISABLE_YIELD = true,
