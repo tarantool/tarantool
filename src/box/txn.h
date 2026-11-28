@@ -464,7 +464,8 @@ struct txn {
 	 */
 	int64_t psn;
 	/**
-	 * Read view of that TX. The TX can see only changes with ps < rv_psn.
+	 * Read view of that TX. The TX can see only changes with psn < rv_psn,
+	 * except in system spaces, which must stay consistent with the caches.
 	 * Is nonzero if and only if status = TXN_IN_READ_VIEW.
 	 */
 	int64_t rv_psn;

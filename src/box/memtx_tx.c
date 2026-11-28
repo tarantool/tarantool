@@ -2082,8 +2082,12 @@ memtx_tx_story_insert_is_visible(struct memtx_story *story, struct txn *txn,
 		return true;
 	}
 
+	/*
+	 * System spaces must ignore read views to stay consistent with the
+	 * schema cache, which isn't versioned.
+	 */
 	int64_t rv_psn = INT64_MAX;
-	if (txn != NULL && txn->rv_psn != 0)
+	if (txn != NULL && txn->rv_psn != 0 && !space_is_system(story->space))
 		rv_psn = txn->rv_psn;
 
 	if (is_prepared_ok && story->add_psn != 0 && story->add_psn < rv_psn)
@@ -2168,7 +2172,7 @@ memtx_tx_story_delete_is_visible(struct memtx_story *story, struct txn *txn,
 	assert(!*is_own_change);
 
 	int64_t rv_psn = INT64_MAX;
-	if (txn != NULL && txn->rv_psn != 0)
+	if (txn != NULL && txn->rv_psn != 0 && !space_is_system(story->space))
 		rv_psn = txn->rv_psn;
 
 	if (is_prepared_ok && story->del_psn != 0 && story->del_psn < rv_psn)
