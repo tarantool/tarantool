@@ -227,6 +227,45 @@ local modules = {
             },
         },
     },
+    {
+        name = 'socket',
+        source = 'src/lua/socket.lua',
+        fixtures = 'test/app-luatest/emmylua/socket',
+        type_name = 'socket_module',
+        fields = {
+            tcp_connect = 'Connect a socket to a remote host',
+            getaddrinfo = 'useful for finding information',
+            tcp_server = 'makes Tarantool act as a server',
+        },
+        objects = {
+            {
+                fixture = 'object.lua',
+                type_name = 'socket_object',
+                fields = {
+                    send = 'Send data over a connected socket',
+                    recv = 'Read `size` bytes',
+                    close = 'Close (destroy) a socket',
+                },
+            },
+            {
+                fixture = 'call.lua',
+                type_name = 'socket_object',
+                fields = {
+                    send = 'Send data over a connected socket',
+                    close = 'Close (destroy) a socket',
+                },
+            },
+            {
+                fixture = 'narrowing.lua',
+                type_name = 'socket_object',
+                fields = {
+                    send = 'Send data over a connected socket',
+                    close = 'Close (destroy) a socket',
+                },
+                non_nullable = true,
+            },
+        },
+    },
 }
 
 local function normalize(value)
@@ -401,6 +440,23 @@ local function run_module_test(spec)
                 t.assert(not header:find(forbidden, 1, true),
                     ('%s: object type contains %s: %s'):format(
                         object.type_name, forbidden, header))
+            end
+            if object.non_nullable then
+                -- The hover appends the class fields in braces after the
+                -- type. A nullable field there (for example
+                -- `_errno: integer?`) does not make the variable nullable,
+                -- so only the type itself is checked.
+                local type_text = object_type:match('^(.-)%s*{') or
+                    object_type
+                t.assert_not_str_contains(type_text, '?', false,
+                    ('%s: object type is nullable: %s'):format(
+                        object.type_name, object_type))
+                t.assert_not_str_contains(type_text, '|nil', false,
+                    ('%s: object type is nullable: %s'):format(
+                        object.type_name, object_type))
+                t.assert_not_str_contains(type_text, '| nil', false,
+                    ('%s: object type is nullable: %s'):format(
+                        object.type_name, object_type))
             end
 
             local object_items = client:request_until(

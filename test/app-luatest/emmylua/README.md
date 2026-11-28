@@ -67,12 +67,16 @@ For each specification the test:
    fixture of the module.
 
 An object fixture obtains the object type either with the module's
-constructor, for example `varbinary.new('data')`, or from a value
-returned by a module function, for example `xlog.pairs()`.
+constructor, for example `varbinary.new('data')`, from a value
+returned by a module function, for example `xlog.pairs()`, or by
+calling a callable module table, for example
+`socket('AF_INET', 'SOCK_STREAM', 'tcp')`.
 
-Only `---@field` annotations are checked. Metamethods declared with
-`---@operator` are not class members, so they do not show up in
-completion and are not covered by these checks.
+Only `---@field` annotations are checked on the object type.
+Metamethods declared with `---@operator` are not class members, so
+they do not show up in completion. An operator can still be covered
+indirectly through the type of its result, as the `socket` call
+operator is.
 
 ## Markers
 
