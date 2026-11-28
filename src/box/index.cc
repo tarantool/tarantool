@@ -59,13 +59,9 @@ BuildUnsupportedIndexFeature(const char *file, unsigned line,
 			index_def->space_name, index_def->engine_name, what);
 }
 
-/**
- * Add key as the last error payload field with name "key". The key
- * is MsgPack array without array prefix. The size of the array
- * is given by part_count.
- */
-static void
-error_set_key(struct error *error, const char *key, uint32_t part_count)
+void
+error_set_key(struct error *error, const char *name, const char *key,
+	      uint32_t part_count)
 {
 	const char *key_end = key;
 	for (uint32_t i = 0; i < part_count; i++)
@@ -75,7 +71,7 @@ error_set_key(struct error *error, const char *key, uint32_t part_count)
 	char *key_buf = (char *)xregion_alloc(&fiber()->gc, key_buf_size);
 	char *key_pos = (char *)mp_encode_array(key_buf, part_count);
 	memcpy(key_pos, key, key_end - key);
-	error_set_mp(error, "key", key_buf, key_buf_size);
+	error_set_mp(error, name, key_buf, key_buf_size);
 	region_truncate(&fiber()->gc, region_svp);
 }
 
@@ -191,7 +187,8 @@ iterator_validate(struct index_def *index_def, enum iterator_type type,
 	return 0;
 error:
 	error_set_index(diag_last_error(diag_get()), index_def);
-	error_set_key(diag_last_error(diag_get()), key_begin, part_count);
+	error_set_key(diag_last_error(diag_get()), "key", key_begin,
+		      part_count);
 	return -1;
 }
 
@@ -216,7 +213,7 @@ exact_key_validate(struct index_def *index_def, const char *key,
 		goto error;
 	return 0;
 error:
-	error_set_key(diag_last_error(diag_get()), key, part_count);
+	error_set_key(diag_last_error(diag_get()), "key", key, part_count);
 	error_set_index(diag_last_error(diag_get()), index_def);
 	return -1;
 }

@@ -910,6 +910,14 @@ void
 error_set_index(struct error *error, const struct index_def *index_def);
 
 /**
+ * Add a payload field @a name to the error holding the key. The key is
+ * @a part_count MsgPack values without the array header.
+ */
+void
+error_set_key(struct error *error, const char *name, const char *key,
+	      uint32_t part_count);
+
+/**
  * Initialize an index instance.
  * Note, this function copies the given index definition.
  */
