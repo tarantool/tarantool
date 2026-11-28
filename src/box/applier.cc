@@ -2729,13 +2729,18 @@ applier_f(va_list ap)
 			 */
 			applier_next_state = APPLIER_LOADING;
 		} catch (FiberIsCancelled *e) {
-			if (!diag_is_empty(&applier->diag)) {
-				applier_disconnect(applier, APPLIER_STOPPED);
+			try_reconnect = false;
+			log_error = false;
+			if (diag_is_empty(&applier->diag)) {
+				applier_next_state = APPLIER_OFF;
 			} else {
-				applier_set_last_error(applier, e);
-				applier_disconnect(applier, APPLIER_OFF);
+				/*
+				 * The applier is killed for a reason. It must
+				 * stay the last error.
+				 */
+				applier_next_state = APPLIER_STOPPED;
+				diag_clear(diag_get());
 			}
-			break;
 		} catch (SocketError *e) {
 			applier_next_state = APPLIER_DISCONNECTED;
 		} catch (SystemError *e) {
@@ -2745,6 +2750,17 @@ applier_f(va_list ap)
 		} catch (Exception *e) {
 			applier_next_state = APPLIER_STOPPED;
 			try_reconnect = false;
+		}
+		/*
+		 * The cancellation doesn't always arrive as FiberIsCancelled.
+		 * A yield not checking for it, like the detach from the applier
+		 * thread on the way out of subscribe, consumes the wakeup and
+		 * lets another error through. That error is reported as usual,
+		 * but a cancelled applier must not reconnect.
+		 */
+		if (fiber_is_cancelled() && try_reconnect) {
+			try_reconnect = false;
+			applier_next_state = APPLIER_STOPPED;
 		}
 		/*
 		 * If the master restarts during the initial join state and
@@ -2760,7 +2776,8 @@ applier_f(va_list ap)
 		 */
 		if ((applier->state == APPLIER_WAIT_SNAPSHOT ||
 		     applier->state == APPLIER_FETCH_SNAPSHOT) &&
-		    applier->row_count > 0) {
+		    applier->row_count > 0 &&
+		    !fiber_is_cancelled()) {
 			say_info("Error occurred during fetching snapshot, "
 				 "but some data has "
 				 "been applied. Stopping applier");
