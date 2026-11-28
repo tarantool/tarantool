@@ -8,6 +8,7 @@
 #include "key_list.h"
 #include "memtx_engine.h"
 #include "memtx_tx.h"
+#include "memtx_vector.h"
 #include "tuple.h"
 
 /** Wrapper around `replace_entry`. */
@@ -97,6 +98,10 @@ memtx_index_replace_entry(struct index *index,
 void
 memtx_index_replace_rollback(struct index *index, struct rlist *results)
 {
+	if (index->def->type == VECTOR) {
+		memtx_vector_index_replace_finish(index, results, true);
+		return;
+	}
 	bool is_mk_or_func = index->def->key_def->is_multikey ||
 			     index->def->key_def->for_func_index;
 	(void)is_mk_or_func;
@@ -403,6 +408,10 @@ memtx_index_replace_regular(struct index *index, struct tuple *old_tuple,
 void
 memtx_index_replace_results_cleanup(struct index *index, struct rlist *results)
 {
+	if (index->def->type == VECTOR) {
+		memtx_vector_index_replace_finish(index, results, false);
+		return;
+	}
 	if (!index->def->key_def->for_func_index)
 		return;
 	struct memtx_index_replace_result *result;
@@ -432,6 +441,9 @@ memtx_index_replace(struct index *index, struct tuple *old_tuple,
 	if (index->def->key_def->for_func_index &&
 	    index->def->key_def->func_index_func == NULL)
 		memtx_index_replace_result_new(results);
+	else if (index->def->type == VECTOR)
+		rc = memtx_vector_index_replace(index, old_tuple, new_tuple,
+						results);
 	else if (index->def->key_def->is_multikey)
 		rc = memtx_index_replace_multikey(index, old_tuple, new_tuple,
 						  mode, results);

@@ -98,6 +98,7 @@ const uint32_t field_mp_type[] = {
 	/* [FIELD_TYPE_DECIMAL64]  =  */ 0, /* only MP_DECIMAL is supported */
 	/* [FIELD_TYPE_DECIMAL128] =  */ 0, /* only MP_DECIMAL is supported */
 	/* [FIELD_TYPE_DECIMAL256] =  */ 0, /* only MP_DECIMAL is supported */
+	/* [FIELD_TYPE_EMBEDDING] = */ 0,
 };
 
 static_assert(lengthof(field_mp_type) == field_type_MAX,
@@ -134,6 +135,7 @@ const uint32_t field_ext_type[] = {
 	/* [FIELD_TYPE_DECIMAL64]  = */ 1U << MP_DECIMAL,
 	/* [FIELD_TYPE_DECIMAL128] = */ 1U << MP_DECIMAL,
 	/* [FIELD_TYPE_DECIMAL256] = */ 1U << MP_DECIMAL,
+	/* [FIELD_TYPE_EMBEDDING] = */ 1U << MP_EMBEDDING,
 };
 
 static_assert(lengthof(field_ext_type) == field_type_MAX,
@@ -169,6 +171,7 @@ const char *field_type_strs[] = {
 	/* [FIELD_TYPE_DECIMAL64]  = */ "decimal64",
 	/* [FIELD_TYPE_DECIMAL128] = */ "decimal128",
 	/* [FIELD_TYPE_DECIMAL256] = */ "decimal256",
+	/* [FIELD_TYPE_EMBEDDING] = */ "embedding",
 };
 
 static_assert(lengthof(field_type_strs) == field_type_MAX,
@@ -207,6 +210,7 @@ const bool field_type_is_fixed_signed[] = {
 	/* [FIELD_TYPE_DECIMAL64]  = */ false,
 	/* [FIELD_TYPE_DECIMAL128] = */ false,
 	/* [FIELD_TYPE_DECIMAL256] = */ false,
+	/* [FIELD_TYPE_EMBEDDING] = */ false,
 };
 
 static_assert(lengthof(field_type_is_fixed_signed) == field_type_MAX,
@@ -245,6 +249,7 @@ const bool field_type_is_fixed_unsigned[] = {
 	/* [FIELD_TYPE_DECIMAL64]  = */ false,
 	/* [FIELD_TYPE_DECIMAL128] = */ false,
 	/* [FIELD_TYPE_DECIMAL256] = */ false,
+	/* [FIELD_TYPE_EMBEDDING] = */ false,
 };
 
 static_assert(lengthof(field_type_is_fixed_unsigned) == field_type_MAX, "Each "
@@ -280,6 +285,7 @@ const int64_t field_type_min_value[] = {
 	/* [FIELD_TYPE_DECIMAL64]  = */ 0,
 	/* [FIELD_TYPE_DECIMAL128] = */ 0,
 	/* [FIELD_TYPE_DECIMAL256] = */ 0,
+	/* [FIELD_TYPE_EMBEDDING] = */ 0,
 };
 
 static_assert(lengthof(field_type_min_value) == field_type_MAX,
@@ -315,6 +321,7 @@ const uint64_t field_type_max_value[] = {
 	/* [FIELD_TYPE_DECIMAL64]  = */ 0,
 	/* [FIELD_TYPE_DECIMAL128] = */ 0,
 	/* [FIELD_TYPE_DECIMAL256] = */ 0,
+	/* [FIELD_TYPE_EMBEDDING] = */ 0,
 };
 
 static_assert(lengthof(field_type_max_value) == field_type_MAX,
@@ -350,6 +357,7 @@ const bool field_type_is_fixed_decimal[] = {
 	/* [FIELD_TYPE_DECIMAL64]  = */ true,
 	/* [FIELD_TYPE_DECIMAL128] = */ true,
 	/* [FIELD_TYPE_DECIMAL256] = */ true,
+	/* [FIELD_TYPE_EMBEDDING] = */ false,
 };
 
 static_assert(lengthof(field_type_is_fixed_decimal) == field_type_MAX,
@@ -386,6 +394,7 @@ const int field_type_decimal_precision[] = {
 	/* [FIELD_TYPE_DECIMAL64]  = */ 18,
 	/* [FIELD_TYPE_DECIMAL128] = */ 38,
 	/* [FIELD_TYPE_DECIMAL256] = */ 76,
+	/* [FIELD_TYPE_EMBEDDING] = */ 0,
 };
 
 static_assert(lengthof(field_type_decimal_precision) == field_type_MAX,

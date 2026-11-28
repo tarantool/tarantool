@@ -41,6 +41,8 @@
 #include "memtx_tree.h"
 #include "memtx_rtree.h"
 #include "memtx_bitset.h"
+#include "memtx_vector.h"
+#include "clock.h"
 #include "memtx_engine.h"
 #include "column_mask.h"
 #include "sequence.h"
@@ -325,6 +327,17 @@ memtx_space_replace_all_keys(struct space *space, struct tuple *old_tuple,
 			     enum dup_replace_mode mode,
 			     struct tuple **result)
 {
+	struct txn *txn = in_txn();
+	if (txn != NULL && txn->isolation == TXN_ISOLATION_LINEARIZABLE) {
+		for (uint32_t i = 0; i < space->index_count; ++i) {
+			struct index *index = space->index[i];
+			if (index->def->type == VECTOR) {
+				diag_set(UnsupportedIndexFeature, index->def,
+					 "linearizable transactions");
+				return -1;
+			}
+		}
+	}
 	return memtx_tx_add_stmt(space, old_tuple, new_tuple, mode, result);
 }
 
@@ -881,6 +894,7 @@ static int
 memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 {
 	struct key_def *key_def = index_def->key_def;
+	const struct index_opts *opts = &index_def->opts;
 
 	if (key_def->is_nullable) {
 		if (index_def->iid == 0) {
@@ -919,6 +933,69 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 	case TREE:
 		/* TREE index has no limitations. */
 		break;
+	case VECTOR:
+		if (index_def->iid == 0) {
+			diag_set(ClientError, ER_MODIFY_INDEX,
+				 index_def->name, space_name(space),
+				 "VECTOR must be a secondary index");
+			return -1;
+		}
+		if (opts->distance_kind == INDEX_DISTANCE_RTREE) {
+			diag_set(ClientError, ER_MODIFY_INDEX,
+				 index_def->name, space_name(space),
+				 "RTREE distance is not valid for VECTOR");
+			return -1;
+		}
+		if (opts->vector_m < 4 || opts->vector_m > 64 ||
+		    opts->vector_ef_construction < opts->vector_m ||
+		    opts->vector_ef_construction > 8192 ||
+		    opts->vector_ef_search < 1 ||
+		    opts->vector_ef_search > 8192) {
+			diag_set(ClientError, ER_MODIFY_INDEX,
+				 index_def->name, space_name(space),
+				 "HNSW options are outside server bounds");
+			return -1;
+		}
+		if (key_def->part_count != 1) {
+			diag_set(ClientError, ER_MODIFY_INDEX,
+				 index_def->name, space_name(space),
+				 "Vector index key can not be multipart");
+			return -1;
+		}
+		if (index_def->opts.is_unique) {
+			diag_set(ClientError, ER_MODIFY_INDEX,
+				 index_def->name, space_name(space),
+				 "Vector index can not be unique");
+			return -1;
+		}
+		if (key_def->parts[0].type != FIELD_TYPE_EMBEDDING) {
+			diag_set(ClientError, ER_MODIFY_INDEX,
+				 index_def->name, space_name(space),
+				 "Vector index field type must be EMBEDDING");
+			return -1;
+		}
+		if (key_def->is_multikey) {
+			diag_set(ClientError, ER_MODIFY_INDEX,
+				 index_def->name, space_name(space),
+				 "Vector index cannot be multikey");
+			return -1;
+		}
+		if (key_def->for_func_index) {
+			diag_set(ClientError, ER_MODIFY_INDEX,
+				 index_def->name, space_name(space),
+				 "Vector index can not use a function");
+			return -1;
+		}
+		if (index_def->opts.dimension < 1 ||
+		    index_def->opts.dimension > MEMTX_VECTOR_MAX_DIMENSION) {
+			diag_set(ClientError, ER_MODIFY_INDEX,
+				 index_def->name, space_name(space),
+				 tt_sprintf("Vector index dimension must be "
+					    "between 1 and %d",
+					    MEMTX_VECTOR_MAX_DIMENSION));
+			return -1;
+		}
+		return 0;
 	case RTREE:
 		if (key_def->part_count != 1) {
 			diag_set(ClientError, ER_MODIFY_INDEX,
@@ -1064,6 +1141,8 @@ memtx_space_create_index(struct space *space, struct index_def *index_def)
 		return memtx_tree_index_new(memtx, index_def);
 	case RTREE:
 		return memtx_rtree_index_new(memtx, index_def);
+	case VECTOR:
+		return memtx_vector_index_new(memtx, index_def);
 	case BITSET:
 		return memtx_bitset_index_new(memtx, index_def);
 	default:
@@ -1119,10 +1198,8 @@ struct memtx_ddl_state {
 	/*
 	 * List of all transactional triggers created by the DDL for concurrent
 	 * statements. They must be destroyed when the DDL is over since the
-	 * object is going to be invalidated. It is OK because all owners of
-	 * the triggers are already prepared and on their rollback the DDL
-	 * will be rolled back as well and on their commit we won't need the
-	 * triggers anymore.
+	 * object is going to be invalidated. A successful VECTOR build
+	 * detaches its triggers and pins the new index until their decisions.
 	 *
 	 * NB: must be used only without MVCC, otherwise something must have
 	 * gone wrong.
@@ -1276,6 +1353,10 @@ struct memtx_build_stmt_trigger {
 	struct trigger on_commit;
 	/** State of the DDL. */
 	struct memtx_ddl_state *state;
+	/** Index pinned after a successful build while DML is pending. */
+	struct index *index;
+	/** Statement with versions mirrored in the private index. */
+	struct txn_stmt *stmt;
 };
 
 /**
@@ -1290,6 +1371,11 @@ memtx_build_on_replace_rollback(struct trigger *base, void *event)
 		container_of(base, struct memtx_build_stmt_trigger,
 			     on_rollback);
 	struct memtx_ddl_state *state = trigger->state;
+	if (state == NULL) {
+		/* The DDL is rolled back along with this prepared writer. */
+		index_unref(trigger->index);
+		return 0;
+	}
 
 	/* The trigger is fired and will be deleted - remove from the state. */
 	rlist_del_entry(trigger, in_state);
@@ -1339,13 +1425,16 @@ memtx_build_on_replace_rollback(struct trigger *base, void *event)
 		if (undo->new_tuple != NULL)
 			tuple_unref(undo->new_tuple);
 	}
+	if (state->index->def->type == VECTOR && undo->new_tuple != NULL &&
+	    (undo->old_tuples == NULL ||
+	     undo->old_tuples->tuple != undo->new_tuple))
+		memtx_index_gc_tuple(state->index, undo->new_tuple);
 
 	return 0;
 }
 
 /**
- * Deletes the transactional statement triggers from
- * memtx_ddl_state::stmt_triggers since they are going to be deleted.
+ * Retire versions mirrored by the online build when the statement commits.
  */
 static int
 memtx_build_on_replace_commit(struct trigger *base, void *event)
@@ -1353,7 +1442,23 @@ memtx_build_on_replace_commit(struct trigger *base, void *event)
 	(void)event;
 	struct memtx_build_stmt_trigger *trigger =
 		container_of(base, struct memtx_build_stmt_trigger, on_commit);
-	rlist_del_entry(trigger, in_state);
+	struct index *index = trigger->index;
+	if (trigger->state != NULL) {
+		rlist_del_entry(trigger, in_state);
+		index = trigger->state->index;
+	}
+	if (index->def->type == VECTOR) {
+		/* Engine commit sees only the indexes of the writer's space. */
+		struct memtx_stmt_rollback_info *undo =
+			trigger->stmt->engine_savepoint;
+		struct tuple *old_tuple;
+		memtx_tuple_list_foreach(undo->old_tuples, old_tuple, {
+			if (old_tuple != undo->new_tuple)
+				memtx_index_gc_tuple(index, old_tuple);
+		});
+	}
+	if (trigger->state == NULL)
+		index_unref(index);
 	return 0;
 }
 
@@ -1419,6 +1524,8 @@ memtx_build_on_replace(struct trigger *trigger, void *event)
 				     struct memtx_build_stmt_trigger);
 	rlist_add_entry(&state->stmt_triggers, stmt_trigger, in_state);
 	stmt_trigger->state = state;
+	stmt_trigger->index = NULL;
+	stmt_trigger->stmt = stmt;
 
 	trigger_create(&stmt_trigger->on_rollback,
 		       memtx_build_on_replace_rollback, NULL, NULL);
@@ -1479,6 +1586,11 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 	inj = errinj(ERRINJ_BUILD_INDEX_DISABLE_YIELD, ERRINJ_BOOL);
 	if (inj != NULL && inj->bparam == true)
 		can_yield = false;
+	if (new_index->def->type == VECTOR && !can_yield) {
+		diag_set(ClientError, ER_VECTOR_UNSUPPORTED);
+		iterator_delete(it);
+		return -1;
+	}
 
 	struct memtx_engine *memtx = (struct memtx_engine *)src_space->engine;
 	struct memtx_ddl_state state;
@@ -1520,6 +1632,7 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 	int rc;
 	struct tuple *tuple;
 	size_t count = 0;
+	int64_t vector_yield_deadline = clock_monotonic64() + 1000000;
 	while ((rc = iterator_next_internal(it, &tuple)) == 0 &&
 	       tuple != NULL) {
 		struct key_def *key_def = new_index->def->key_def;
@@ -1563,9 +1676,13 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 		 */
 		state.cursor = tuple;
 		tuple_ref(state.cursor);
-		if (++count % MEMTX_DDL_YIELD_LOOPS == 0 &&
-		    memtx->state == MEMTX_OK)
+		bool must_yield = new_index->def->type == VECTOR ?
+			clock_monotonic64() >= vector_yield_deadline :
+			++count % MEMTX_DDL_YIELD_LOOPS == 0;
+		if (must_yield && memtx->state == MEMTX_OK) {
 			fiber_sleep(0);
+			vector_yield_deadline = clock_monotonic64() + 1000000;
+		}
 		/*
 		 * Sleep after at least one tuple is inserted to test
 		 * on_replace triggers for index build.
@@ -1589,10 +1706,20 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 	}
 	iterator_delete(it);
 	if (can_yield) {
-		struct memtx_build_stmt_trigger *trg;
-		rlist_foreach_entry(trg, &state.stmt_triggers, in_state) {
-			trigger_clear(&trg->on_rollback);
-			trigger_clear(&trg->on_commit);
+		while (!rlist_empty(&state.stmt_triggers)) {
+			struct memtx_build_stmt_trigger *trg;
+			trg = rlist_shift_entry(&state.stmt_triggers,
+						struct memtx_build_stmt_trigger,
+						in_state);
+			if (rc != 0 || new_index->def->type != VECTOR) {
+				trigger_clear(&trg->on_rollback);
+				trigger_clear(&trg->on_commit);
+				continue;
+			}
+			/* The writer can finish after index publication. */
+			trg->state = NULL;
+			trg->index = new_index;
+			index_ref(new_index);
 		}
 		diag_destroy(&state.diag);
 		trigger_clear(&on_replace);

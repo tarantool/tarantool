@@ -46,6 +46,7 @@ enum index_type {
 	TREE,     /* TREE Index */
 	BITSET,   /* BITSET Index */
 	RTREE,    /* R-Tree Index */
+	VECTOR,   /* Vector Index */
 	index_type_MAX,
 };
 
@@ -67,6 +68,25 @@ enum rtree_index_distance_type {
 };
 extern const char *rtree_index_distance_type_strs[];
 
+/** Which index family supplied the distance option. */
+enum index_distance_kind {
+	INDEX_DISTANCE_DEFAULT,
+	INDEX_DISTANCE_RTREE,
+	INDEX_DISTANCE_VECTOR,
+};
+
+/** VECTOR distance functions; independent of RTREE distance. */
+enum vector_index_distance_type {
+	VECTOR_INDEX_DISTANCE_L2,
+	VECTOR_INDEX_DISTANCE_COSINE,
+	VECTOR_INDEX_DISTANCE_IP,
+};
+
+/** VECTOR algorithms supported by memtx. */
+enum vector_index_algorithm {
+	VECTOR_INDEX_ALGORITHM_HNSW,
+};
+
 /** Index options */
 struct index_opts {
 	/**
@@ -82,6 +102,22 @@ struct index_opts {
 	 * RTREE distance type.
 	 */
 	enum rtree_index_distance_type distance;
+	/** Which family explicitly supplied distance. */
+	enum index_distance_kind distance_kind;
+	/** VECTOR distance function. */
+	enum vector_index_distance_type vector_distance;
+	/** VECTOR algorithm. */
+	enum vector_index_algorithm vector_algorithm;
+	/** Whether an algorithm was explicitly configured. */
+	bool vector_algorithm_is_set;
+	/** Whether algorithm-specific options were supplied. */
+	bool vector_opts_is_set;
+	/** HNSW maximum graph connectivity. */
+	uint32_t vector_m;
+	/** HNSW construction search width. */
+	uint32_t vector_ef_construction;
+	/** Default HNSW query search width. */
+	uint32_t vector_ef_search;
 	/**
 	 * Vinyl index options.
 	 */
@@ -159,6 +195,12 @@ index_opts_is_equal(const struct index_opts *o1, const struct index_opts *o2)
 	if (o1->dimension != o2->dimension)
 		return false;
 	if (o1->distance != o2->distance)
+		return false;
+	if (o1->vector_distance != o2->vector_distance ||
+	    o1->vector_algorithm != o2->vector_algorithm ||
+	    o1->vector_m != o2->vector_m ||
+	    o1->vector_ef_construction != o2->vector_ef_construction ||
+	    o1->vector_ef_search != o2->vector_ef_search)
 		return false;
 	if (o1->range_size != o2->range_size)
 		return false;

@@ -77,9 +77,13 @@ if (TARGET_OS_NETBSD)
         -fno-exceptions)
 endif()
 
+add_library(mp_embedding STATIC mp_embedding.c)
+target_link_libraries(mp_embedding ${MSGPUCK_LIBRARIES} m)
+
 add_library(core STATIC ${core_sources})
 
-target_link_libraries(core salad small uri decNumber bit tzcode misc digest
+target_link_libraries(core mp_embedding salad small uri decNumber bit tzcode
+                      misc digest
                       ${LIBEV_LIBRARIES}
                       ${LIBEIO_LIBRARIES} ${LIBCORO_LIBRARIES}
                       ${MSGPUCK_LIBRARIES} ${ICU_LIBRARIES}

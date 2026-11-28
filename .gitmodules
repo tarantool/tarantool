@@ -63,3 +63,6 @@
 [submodule "luatest"]
 	path = luatest
 	url = https://github.com/tarantool/luatest.git
+[submodule "third_party/USearch"]
+	path = third_party/USearch
+	url = https://github.com/mandesero/USearch.git

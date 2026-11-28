@@ -38,6 +38,7 @@
 #include "say.h"
 
 #include "lib/core/decimal.h"
+#include "mp_embedding.h"
 #include "mp_extension_types.h"
 #include "tt_uuid.h"
 
@@ -629,6 +630,23 @@ out:
 	emit_brace_close(d, indent);
 }
 
+/** Render packed coordinates as a Lua array, like the other text codecs. */
+static void
+dump_embedding(struct lua_dumper *d, struct node *nd, int indent)
+{
+	const char *data = nd->field.sval.data;
+	uint32_t dimension = nd->field.sval.len / sizeof(float);
+	lua_createtable(d->L, dimension, 0);
+	for (uint32_t i = 0; i < dimension; ++i) {
+		lua_pushnumber(d->L, embedding_f32le_load(data, i));
+		lua_rawseti(d->L, -2, i + 1);
+	}
+	nd->field.type = MP_ARRAY;
+	nd->field.size = dimension;
+	dump_array(d, nd, indent);
+	lua_pop(d->L, 1);
+}
+
 /**
  * Dump a map entry.
  */
@@ -845,6 +863,9 @@ dump_node(struct lua_dumper *d, struct node *nd, int indent)
 		break;
 	case MP_EXT:
 		switch (field->ext_type) {
+		case MP_EMBEDDING:
+			dump_embedding(d, nd, indent);
+			break;
 		case MP_DECIMAL:
 			nd->mask |= NODE_QUOTE;
 			str = decimal_str(field->decval);

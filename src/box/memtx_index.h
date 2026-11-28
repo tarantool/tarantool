@@ -113,6 +113,8 @@ struct memtx_index_vtab {
 	int (*build_next)(struct index *index, struct tuple *tuple);
 	/** Finish index build. */
 	void (*end_build)(struct index *index);
+	/** Release storage for a tuple version approved by memtx story GC. */
+	void (*gc_tuple)(struct index *index, struct tuple *tuple);
 };
 
 static inline int
@@ -169,6 +171,15 @@ memtx_index_replace_entry(struct index *index,
 			  struct memtx_index_entry new_entry,
 			  enum dup_replace_mode mode,
 			  struct tuple **result);
+
+/** Release version storage when an index implements the optional hook. */
+static inline void
+memtx_index_gc_tuple(struct index *index, struct tuple *tuple)
+{
+	struct memtx_index_vtab *vtab = (struct memtx_index_vtab *)index->vtab;
+	if (vtab->gc_tuple != NULL)
+		vtab->gc_tuple(index, tuple);
+}
 
 static inline void
 memtx_index_begin_build(struct index *index)

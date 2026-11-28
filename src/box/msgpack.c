@@ -37,6 +37,7 @@
 #include "mp_uuid.h"
 #include "mp_datetime.h"
 #include "mp_interval.h"
+#include "mp_embedding.h"
 #include "mp_compression.h"
 #include "mp_tuple.h"
 
@@ -64,6 +65,8 @@ msgpack_fprint_ext(FILE *file, const char **data, int depth)
 		return mp_fprint_compression(file, data, len);
 	case MP_INTERVAL:
 		return mp_fprint_interval(file, data, len);
+	case MP_EMBEDDING:
+		return mp_fprint_embedding(file, data, len);
 	default:
 		*data = orig;
 		return mp_fprint_ext_default(file, data, depth);
@@ -89,6 +92,8 @@ msgpack_snprint_ext(char *buf, int size, const char **data, int depth)
 		return mp_snprint_compression(buf, size, data, len);
 	case MP_INTERVAL:
 		return mp_snprint_interval(buf, size, data, len);
+	case MP_EMBEDDING:
+		return mp_snprint_embedding(buf, size, data, len);
 	default:
 		*data = orig;
 		return mp_snprint_ext_default(buf, size, data, depth);
@@ -111,6 +116,13 @@ msgpack_check_ext_data(int8_t type, const char *data, uint32_t len)
 		goto out;
 	}
 	switch (type) {
+	case MP_EMBEDDING:
+		if (mp_validate_embedding(data, len) != 0) {
+			diag_set(ClientError, ER_INVALID_MSGPACK,
+				 "cannot unpack embedding");
+			goto out;
+		}
+		break;
 	case MP_DECIMAL:
 		if (mp_validate_decimal(data, len) != 0) {
 			diag_set(ClientError, ER_INVALID_MSGPACK,

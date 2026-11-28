@@ -78,6 +78,8 @@ extern __thread uint32_t CTID_CHAR_PTR;
 extern __thread uint32_t CTID_CONST_CHAR_PTR;
 /** Type ID of struct varbinary. */
 extern __thread uint32_t CTID_VARBINARY;
+/** Type ID of struct embedding. */
+extern __thread uint32_t CTID_EMBEDDING;
 extern __thread uint32_t CTID_UUID;
 extern __thread uint32_t CTID_DATETIME;
 /** Type ID of struct interval. */
@@ -107,6 +109,14 @@ luaT_pushvarbinary(struct lua_State *L, const char *data, uint32_t len);
  */
 const char *
 luaT_tovarbinary(struct lua_State *L, int index, uint32_t *len);
+
+/** Push an embedding whose payload has already been validated. */
+void
+luaT_pushembedding(struct lua_State *L, const char *data, uint32_t len);
+
+/** Return an embedding payload or NULL for another Lua type. */
+const char *
+luaT_toembedding(struct lua_State *L, int index, uint32_t *len);
 
 /**
  * Push vclock to the Lua stack as a plain Lua table.

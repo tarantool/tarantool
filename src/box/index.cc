@@ -40,10 +40,12 @@
 #include "rmean.h"
 #include "info/info.h"
 #include "memtx_tx.h"
+#include "memtx_vector.h"
 #include "box.h"
 #include "base64.h"
 #include "scoped_guard.h"
 #include "memory.h"
+#include "mp_embedding.h"
 
 struct rlist box_on_select = RLIST_HEAD_INITIALIZER(box_on_select);
 
@@ -108,6 +110,7 @@ iterator_validate(struct index_def *index_def, enum iterator_type type,
 			(1U << ITER_LT) | (1U << ITER_LE) |
 			(1U << ITER_GT) | (1U << ITER_GE) |
 			(1U << ITER_OVERLAPS) | (1U << ITER_NEIGHBOR),
+		/* [VECTOR] = */ (1U << ITER_NEIGHBOR) | (1U << ITER_ALL),
 	};
 	if (((1U << type) & supported_types[index_def->type]) == 0) {
 		diag_set(UnsupportedIndexFeature, index_def,
@@ -167,6 +170,16 @@ iterator_validate(struct index_def *index_def, enum iterator_type type,
 					goto error;
 				mp_next(&key);
 			}
+		}
+	} else if (index_def->type == VECTOR) {
+		uint32_t dimension = 0;
+		if (part_count == 1 && mp_typeof(*key) == MP_ARRAY)
+			dimension = mp_decode_array(&key);
+		else if (part_count == 1 && mp_typeof(*key) == MP_EXT)
+			mp_decode_embedding(&key, &dimension);
+		if (dimension != index_def->opts.dimension) {
+			diag_set(ClientError, ER_VECTOR_INVALID);
+			return -1;
 		}
 	} else {
 		if (part_count > index_def->key_def->part_count) {
@@ -445,6 +458,10 @@ box_index_tuple_position(uint32_t space_id, uint32_t index_id,
 	struct index *index = index_find(space, index_id);
 	if (index == NULL)
 		return -1;
+	if (index->def->type == VECTOR) {
+		diag_set(ClientError, ER_VECTOR_UNSUPPORTED);
+		return -1;
+	}
 	return box_iterator_position_from_tuple(tuple, tuple_end,
 						index->def->cmp_def,
 						packed_pos, packed_pos_end);
@@ -779,6 +796,26 @@ box_index_stat(uint32_t space_id, uint32_t index_id,
 		return -1;
 	index_stat(index, info);
 	return 0;
+}
+
+int
+box_index_rebuild(uint32_t space_id, uint32_t index_id)
+{
+	struct space *space = space_cache_find(space_id);
+	if (space == NULL || access_check_space(space, PRIV_W) != 0)
+		return -1;
+	struct index *index = index_find(space, index_id);
+	if (index == NULL)
+		return -1;
+	if (index->def->type != VECTOR) {
+		diag_set(ClientError, ER_VECTOR_UNSUPPORTED);
+		return -1;
+	}
+	if (in_txn() != NULL) {
+		diag_set(ClientError, ER_ACTIVE_TRANSACTION);
+		return -1;
+	}
+	return memtx_vector_index_rebuild(index);
 }
 
 int

@@ -213,6 +213,32 @@ local function check_select_opts(opts, key_is_nil, level)
 end
 box.internal.check_select_opts = check_select_opts
 
+local function check_vector_select_opts(opts, request_options, level,
+                                        limit_error)
+    level = level and level + 1 or 3
+    if type(opts) ~= 'table' or type(opts.limit) ~= 'number' or
+       opts.limit % 1 ~= 0 or opts.limit < 0 or opts.limit > 1024 then
+        box.error({code = limit_error or box.error.VECTOR_INVALID,
+                   reason = 'VECTOR limit must be an integer from 0 to 1024'},
+                  level)
+    end
+    for name in pairs(opts) do
+        local transport = request_options ~= nil and
+                          request_options[name] ~= nil and
+                          name ~= 'offset' and name ~= 'after' and
+                          name ~= 'fetch_pos'
+        if name ~= 'iterator' and name ~= 'limit' and not transport then
+            box.error({code = box.error.VECTOR_UNSUPPORTED,
+                       reason = 'Unsupported VECTOR select option: ' ..
+                                tostring(name)}, level)
+        end
+    end
+    if check_iterator_type(opts, false, level) ~= box.index.NEIGHBOR then
+        box.error(box.error.VECTOR_UNSUPPORTED, level)
+    end
+end
+box.internal.check_vector_select_opts = check_vector_select_opts
+
 -- Public isolation level map string -> number.
 box.txn_isolation_level = {
     ['default'] = 0,

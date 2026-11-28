@@ -56,6 +56,7 @@ static __thread uint32_t CTID_STRUCT_IBUF_PTR;
 __thread uint32_t CTID_CHAR_PTR;
 __thread uint32_t CTID_CONST_CHAR_PTR;
 __thread uint32_t CTID_VARBINARY;
+__thread uint32_t CTID_EMBEDDING;
 __thread uint32_t CTID_UUID;
 __thread uint32_t CTID_DATETIME = 0;
 __thread uint32_t CTID_INTERVAL = 0;
@@ -208,22 +209,22 @@ error:
 }
 
 /*
- * Note: varbinary is a VLS object so we can't use luaL_pushcdata and
- * luaL_checkcdata helpers.
+ * Variable-sized cdata need their allocated length, which the fixed-size
+ * luaL_pushcdata and luaL_checkcdata helpers do not preserve.
  */
-void
-luaT_pushvarbinary(struct lua_State *L, const char *data, uint32_t len)
+static void
+luaT_pushvls(struct lua_State *L, uint32_t id, const char *data, uint32_t len)
 {
-	assert(CTID_VARBINARY != 0);
+	assert(id != 0);
 	/* Calculate the cdata size. */
 	CTState *cts = ctype_cts(L);
-	CType *ct = ctype_raw(cts, CTID_VARBINARY);
+	CType *ct = ctype_raw(cts, id);
 	CTSize size;
-	CTInfo info = lj_ctype_info(cts, CTID_VARBINARY, &size);
+	CTInfo info = lj_ctype_info(cts, id, &size);
 	size = lj_ctype_vlsize(cts, ct, (CTSize)len);
 	assert(size != CTSIZE_INVALID);
 	/* Allocate a new cdata. */
-	GCcdata *cd = lj_cdata_newx(cts, CTID_VARBINARY, size, info);
+	GCcdata *cd = lj_cdata_newx(cts, id, size, info);
 	/* Anchor the uninitialized cdata with the stack. */
 	TValue *o = L->top;
 	setcdataV(L, o, cd);
@@ -233,20 +234,45 @@ luaT_pushvarbinary(struct lua_State *L, const char *data, uint32_t len)
 	lj_gc_check(L);
 }
 
-const char *
-luaT_tovarbinary(struct lua_State *L, int index, uint32_t *len)
+/** Return a VLS payload after checking its exact cdata type. */
+static const char *
+luaT_tovls(struct lua_State *L, int index, uint32_t id, uint32_t *len)
 {
-	assert(CTID_VARBINARY != 0);
+	assert(id != 0);
 	TValue *o = index2adr(L, index);
 	if (!tviscdata(o))
 		return NULL;
 	GCcdata *cd = cdataV(o);
-	if (cd->ctypeid != CTID_VARBINARY)
+	if (cd->ctypeid != id)
 		return NULL;
 	CTSize size = cdatavlen(cd);
 	assert(size != CTSIZE_INVALID);
 	*len = size;
 	return cdataptr(cd);
+}
+
+void
+luaT_pushvarbinary(struct lua_State *L, const char *data, uint32_t len)
+{
+	luaT_pushvls(L, CTID_VARBINARY, data, len);
+}
+
+const char *
+luaT_tovarbinary(struct lua_State *L, int index, uint32_t *len)
+{
+	return luaT_tovls(L, index, CTID_VARBINARY, len);
+}
+
+void
+luaT_pushembedding(struct lua_State *L, const char *data, uint32_t len)
+{
+	luaT_pushvls(L, CTID_EMBEDDING, data, len);
+}
+
+const char *
+luaT_toembedding(struct lua_State *L, int index, uint32_t *len)
+{
+	return luaT_tovls(L, index, CTID_EMBEDDING, len);
 }
 
 struct tt_uuid *
@@ -1101,6 +1127,10 @@ tarantool_lua_utils_init(struct lua_State *L)
 	assert(rc == 0);
 	CTID_VARBINARY = luaL_ctypeid(L, "struct varbinary");
 	assert(CTID_VARBINARY != 0);
+	rc = luaL_cdef(L, "struct embedding { char data[?]; };");
+	assert(rc == 0);
+	CTID_EMBEDDING = luaL_ctypeid(L, "struct embedding");
+	assert(CTID_EMBEDDING != 0);
 	rc = luaL_cdef(L, "struct tt_uuid {"
 				  "uint32_t time_low;"
 				  "uint16_t time_mid;"

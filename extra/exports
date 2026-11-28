@@ -724,3 +724,11 @@ luaM_sysprof_stop
 luaopen_misc
 
 # }}} LuaJIT API
+
+# Packed embedding coordinates.
+embedding_f32_from_double
+embedding_f32le_load
+embedding_f32le_store
+mp_validate_embedding
+mp_sizeof_embedding
+mp_encode_embedding

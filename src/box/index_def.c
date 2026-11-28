@@ -36,7 +36,9 @@
 #include "fiber.h"
 #include "tt_static.h"
 
-const char *index_type_strs[] = { "HASH", "TREE", "BITSET", "RTREE" };
+#include <strings.h>
+
+const char *index_type_strs[] = { "HASH", "TREE", "BITSET", "RTREE", "VECTOR" };
 
 const char *rtree_index_distance_type_strs[] = { "EUCLID", "MANHATTAN" };
 
@@ -44,6 +46,14 @@ const struct index_opts index_opts_default = {
 	/* .unique              = */ true,
 	/* .dimension           = */ 2,
 	/* .distance            = */ RTREE_INDEX_DISTANCE_TYPE_EUCLID,
+	/* .distance_kind       = */ INDEX_DISTANCE_DEFAULT,
+	/* .vector_distance     = */ VECTOR_INDEX_DISTANCE_COSINE,
+	/* .vector_algorithm    = */ VECTOR_INDEX_ALGORITHM_HNSW,
+	/* .vector_algorithm_is_set = */ false,
+	/* .vector_opts_is_set  = */ false,
+	/* .vector_m            = */ 16,
+	/* .vector_ef_construction = */ 200,
+	/* .vector_ef_search    = */ 64,
 	/* .range_size          = */ 0,
 	/* .page_size           = */ 8192,
 	/* .run_count_per_level = */ 2,
@@ -56,6 +66,125 @@ const struct index_opts index_opts_default = {
 	/* .covered_field_count = */ 0,
 	/* .aggregates          = */ NULL,
 };
+
+/** Compare a MsgPack string with one index option token. */
+static bool
+index_option_is(const char *value, uint32_t len, const char *expected)
+{
+	return strlen(expected) == len &&
+	       strncasecmp(value, expected, len) == 0;
+}
+
+/** Decode RTREE and VECTOR distances into separate option fields. */
+static int
+index_opts_parse_distance(const char **data, void *raw_opts,
+			  struct region *region)
+{
+	(void)region;
+	if (mp_typeof(**data) != MP_STR) {
+		diag_set(IllegalParams, "'distance' must be a string");
+		return -1;
+	}
+	struct index_opts *opts = (struct index_opts *)raw_opts;
+	uint32_t len;
+	const char *value = mp_decode_str(data, &len);
+	if (index_option_is(value, len, "euclid")) {
+		opts->distance = RTREE_INDEX_DISTANCE_TYPE_EUCLID;
+		opts->distance_kind = INDEX_DISTANCE_RTREE;
+	} else if (index_option_is(value, len, "manhattan")) {
+		opts->distance = RTREE_INDEX_DISTANCE_TYPE_MANHATTAN;
+		opts->distance_kind = INDEX_DISTANCE_RTREE;
+	} else if (index_option_is(value, len, "l2")) {
+		opts->vector_distance = VECTOR_INDEX_DISTANCE_L2;
+		opts->distance_kind = INDEX_DISTANCE_VECTOR;
+	} else if (index_option_is(value, len, "cosine")) {
+		opts->vector_distance = VECTOR_INDEX_DISTANCE_COSINE;
+		opts->distance_kind = INDEX_DISTANCE_VECTOR;
+	} else if (index_option_is(value, len, "ip")) {
+		opts->vector_distance = VECTOR_INDEX_DISTANCE_IP;
+		opts->distance_kind = INDEX_DISTANCE_VECTOR;
+	} else {
+		diag_set(IllegalParams,
+			 "distance must be either 'euclid' or 'manhattan'");
+		return -1;
+	}
+	return 0;
+}
+
+/** Decode the VECTOR algorithm name. */
+static int
+index_opts_parse_algorithm(const char **data, void *raw_opts,
+			   struct region *region)
+{
+	(void)region;
+	if (mp_typeof(**data) != MP_STR) {
+		diag_set(IllegalParams, "'algorithm' must be a string");
+		return -1;
+	}
+	uint32_t len;
+	const char *value = mp_decode_str(data, &len);
+	if (!index_option_is(value, len, "hnsw")) {
+		diag_set(IllegalParams, "unknown VECTOR algorithm");
+		return -1;
+	}
+	struct index_opts *opts = (struct index_opts *)raw_opts;
+	opts->vector_algorithm = VECTOR_INDEX_ALGORITHM_HNSW;
+	opts->vector_algorithm_is_set = true;
+	return 0;
+}
+
+/** Decode bounded HNSW build and default search options. */
+static int
+index_opts_parse_vector_opts(const char **data, void *raw_opts,
+			     struct region *region)
+{
+	(void)region;
+	if (mp_typeof(**data) != MP_MAP) {
+		diag_set(IllegalParams, "'opts' must be a map");
+		return -1;
+	}
+	struct index_opts *opts = (struct index_opts *)raw_opts;
+	opts->vector_opts_is_set = true;
+	uint32_t count = mp_decode_map(data);
+	unsigned seen = 0;
+	for (uint32_t i = 0; i < count; ++i) {
+		if (mp_typeof(**data) != MP_STR) {
+			diag_set(IllegalParams,
+				 "HNSW option name must be a string");
+			return -1;
+		}
+		uint32_t len;
+		const char *name = mp_decode_str(data, &len);
+		unsigned field;
+		if (index_option_is(name, len, "m")) {
+			field = 1;
+		} else if (index_option_is(name, len, "ef_construction")) {
+			field = 2;
+		} else if (index_option_is(name, len, "ef_search")) {
+			field = 4;
+		} else {
+			diag_set(IllegalParams, "unknown HNSW option");
+			return -1;
+		}
+		if ((seen & field) != 0 || mp_typeof(**data) != MP_UINT) {
+			diag_set(IllegalParams, "invalid HNSW option value");
+			return -1;
+		}
+		seen |= field;
+		uint64_t value = mp_decode_uint(data);
+		if (value > UINT32_MAX) {
+			diag_set(IllegalParams, "HNSW option is too large");
+			return -1;
+		}
+		if (field == 1)
+			opts->vector_m = value;
+		else if (field == 2)
+			opts->vector_ef_construction = value;
+		else
+			opts->vector_ef_search = value;
+	}
+	return 0;
+}
 
 /**
  * Parse index hint option from msgpack.
@@ -148,8 +277,9 @@ index_opts_parse_aggregates(const char **data, void *opts,
 const struct opt_def index_opts_reg[] = {
 	OPT_DEF("unique", OPT_BOOL, struct index_opts, is_unique),
 	OPT_DEF("dimension", OPT_INT64, struct index_opts, dimension),
-	OPT_DEF_ENUM("distance", rtree_index_distance_type, struct index_opts,
-		     distance, NULL),
+	OPT_DEF_CUSTOM("distance", index_opts_parse_distance),
+	OPT_DEF_CUSTOM("algorithm", index_opts_parse_algorithm),
+	OPT_DEF_CUSTOM("opts", index_opts_parse_vector_opts),
 	OPT_DEF("range_size", OPT_INT64, struct index_opts, range_size),
 	OPT_DEF("page_size", OPT_INT64, struct index_opts, page_size),
 	OPT_DEF("run_count_per_level", OPT_INT64, struct index_opts, run_count_per_level),
@@ -326,6 +456,15 @@ index_def_to_key_def(struct rlist *index_defs, int *size)
 int
 index_def_check(struct index_def *index_def, const char *space_name)
 {
+	const struct index_opts *opts = &index_def->opts;
+	if (index_def->type != VECTOR &&
+	    (opts->distance_kind == INDEX_DISTANCE_VECTOR ||
+	     opts->vector_algorithm_is_set || opts->vector_opts_is_set)) {
+		diag_set(ClientError, ER_MODIFY_INDEX, index_def->name,
+			 space_name,
+			 "VECTOR options require a VECTOR index");
+		return -1;
+	}
 	if (index_def->iid >= BOX_INDEX_MAX) {
 		diag_set(ClientError, ER_MODIFY_INDEX, index_def->name,
 			 space_name, "index id too big");
@@ -383,7 +522,8 @@ index_def_check_field_types(struct index_def *index_def, const char *space_name)
 		enum field_type type = key_def->parts[i].type;
 
 		if (type == FIELD_TYPE_ANY || type == FIELD_TYPE_INTERVAL ||
-		    type == FIELD_TYPE_ARRAY || type == FIELD_TYPE_MAP) {
+		    type == FIELD_TYPE_ARRAY || type == FIELD_TYPE_MAP ||
+		    type == FIELD_TYPE_EMBEDDING) {
 			diag_set(ClientError, ER_MODIFY_INDEX,
 				 index_def->name, space_name,
 				 tt_sprintf("field type '%s' is not supported",

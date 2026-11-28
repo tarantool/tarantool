@@ -98,6 +98,14 @@ endfunction()
 
 add_library(unit STATIC unit.c)
 
+create_unit_test(PREFIX embedding
+                 SOURCES embedding.c
+                 LIBRARIES mp_embedding unit)
+
+create_unit_test(PREFIX ann
+                 SOURCES ann.c
+                 LIBRARIES ann_backends unit)
+
 if(TARGET_OS_DARWIN AND ENABLE_BACKTRACE)
     add_library(dladdr_no_symbol SHARED dladdr_no_symbol.c)
     # The first function precedes every exported symbol and has no local symbol.
@@ -119,6 +127,26 @@ create_unit_test(PREFIX tt_pthread
                  SOURCES tt_pthread.c
                  LIBRARIES unit pthread
 )
+
+create_unit_test(PREFIX ann_memory
+                 SOURCES ann_memory.c ann_errinj.c core_test_utils.c
+                         ${PROJECT_SOURCE_DIR}/src/box/ann_memory.c
+                 LIBRARIES ann_backends core unit)
+
+create_unit_test(PREFIX ann_tuple_map
+                 SOURCES ann_tuple_map.c ann_errinj.c core_test_utils.c
+                         ${PROJECT_SOURCE_DIR}/src/box/ann_tuple_map.c
+                         ${PROJECT_SOURCE_DIR}/src/box/ann_memory.c
+                 LIBRARIES core unit)
+
+create_unit_test(PREFIX ann_usearch
+                 SOURCES ann_usearch.cc ann_errinj.c core_test_utils.c
+                         ${PROJECT_SOURCE_DIR}/src/box/ann_memory.c
+                 LIBRARIES ann_backends core unit)
+target_compile_features(ann_usearch.test PRIVATE cxx_std_20)
+target_include_directories(ann_usearch.test SYSTEM PRIVATE
+                           ${PROJECT_SOURCE_DIR}/third_party/USearch/include
+                           ${PROJECT_SOURCE_DIR}/third_party/USearch/c)
 
 create_unit_test(PREFIX heap
                  SOURCES heap.c

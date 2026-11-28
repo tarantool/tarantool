@@ -26,6 +26,7 @@
  *
  */
 
+#include "mp_embedding.h"
 #include "lyaml.h"
 
 #include "trivia/util.h"
@@ -777,6 +778,20 @@ static int dump_node(struct lua_yaml_dumper *dumper)
       break;
    case MP_EXT:
       switch (field.ext_type) {
+      case MP_EMBEDDING:
+      {
+         lua_createtable(dumper->L, field.sval.len / 4, 0);
+         for (uint32_t i = 0; i < field.sval.len / 4; ++i) {
+            lua_pushnumber(dumper->L,
+                           embedding_f32le_load(field.sval.data, i));
+            lua_rawseti(dumper->L, -2, i + 1);
+         }
+         field.type = MP_ARRAY;
+         field.size = field.sval.len / 4;
+         int rc = dump_array(dumper, &field, anchor);
+         lua_pop(dumper->L, 1);
+         return rc;
+      }
       case MP_DECIMAL:
          str = decimal_str(field.decval);
          len = strlen(str);

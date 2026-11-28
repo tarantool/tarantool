@@ -211,6 +211,10 @@ set(box_sources
     memtx_hash.cc
     memtx_tree.cc
     memtx_rtree.cc
+    memtx_vector.cc
+    memtx_vector_read.c
+    ann_memory.c
+    ann_tuple_map.c
     memtx_bitset.cc
     memtx_tx.c
     module_cache.c
@@ -424,7 +428,7 @@ add_custom_command(OUTPUT ${SQL_BIN_DIR}/opcodes.c
         ${SQL_BIN_DIR}/opcodes.h)
 
 target_link_libraries(box box_error tuple xrow xlog vclock digest raft
-    node_name ${common_libraries} ${EXTRA_BOX_LINK_LIBRARIES})
+    node_name ann_backends ${common_libraries} ${EXTRA_BOX_LINK_LIBRARIES})
 
 if(MIMALLOC_OVERRIDE_CPP)
     target_link_libraries(box bundled-mimalloc)

@@ -32,6 +32,7 @@
 #include "memtx_tx.h"
 #include "memtx_space.h"
 #include "memtx_index.h"
+#include "memtx_vector.h"
 
 #include <assert.h>
 #include <limits.h>
@@ -1942,6 +1943,9 @@ memtx_tx_story_full_unlink_story_gc_step(struct memtx_story *story)
 		struct memtx_story_link *link;
 		rlist_foreach_entry(link, &story->link[i].list, link)
 			memtx_tx_story_full_unlink_story_link_gc_step(link);
+		struct index *index = story->space->index[i];
+		if (story->del_psn > 0 && index->def->type == VECTOR)
+			memtx_index_gc_tuple(index, story->tuple);
 	}
 }
 
@@ -2632,6 +2636,19 @@ memtx_tx_handle_gap_write(struct memtx_story_link *link,
 	}
 }
 
+/** Make a full-index reader depend on a tuple removed from that index. */
+static void
+memtx_tx_handle_full_scan_delete(struct space *space,
+				 struct memtx_story *story, uint32_t ind)
+{
+	struct index *index = space->index[ind];
+	struct gap_item_base *item, *tmp;
+	rlist_foreach_entry_safe(item, &index->read_gaps, in_read_gaps, tmp) {
+		if (item->type == GAP_FULL_SCAN)
+			memtx_tx_track_read_story(item->txn, space, story);
+	}
+}
+
 /**
  * Helper of memtx_tx_history_add_stmt, that sets @a result pointer to
  * @old_tuple and reference is if necessary.
@@ -2848,6 +2865,8 @@ memtx_tx_history_add_delete_stmt(struct txn_stmt *stmt,
 		memtx_tx_story_add_index_links(del_story, space->index[i]);
 	for (uint32_t i = 0; i < space->index_count; i++) {
 		struct index *index = space->index[i];
+		if (index->def->type == VECTOR)
+			memtx_tx_handle_full_scan_delete(space, del_story, i);
 		struct memtx_story_link *link;
 		rlist_foreach_entry(link, &del_story->link[i].list, link)
 			memtx_tx_handle_counted_write(space, index, link);
@@ -2947,6 +2966,9 @@ memtx_tx_add_stmt(struct space *space, struct tuple *old_tuple,
 	 */
 	for (i++; i < space->index_count; i++) {
 		struct index *index = space->index[i];
+		if (index->def->type == VECTOR)
+			memtx_vector_index_set_replace_source(
+				index, primary_replaced);
 		if (memtx_index_replace(index,
 					use_mvcc ? NULL : primary_replaced,
 					new_tuple,

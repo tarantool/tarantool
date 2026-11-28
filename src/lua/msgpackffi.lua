@@ -6,6 +6,7 @@ local buffer = require('buffer')
 local builtin = ffi.C
 local msgpack = require('msgpack') -- .NULL, .array_mt, .map_mt, .cfg
 local varbinary = require('varbinary')
+require('embedding')
 local int8_ptr_t = ffi.typeof('int8_t *')
 local uint8_ptr_t = ffi.typeof('uint8_t *')
 local uint16_ptr_t = ffi.typeof('uint16_t *')
@@ -382,6 +383,14 @@ on_encode(ffi.typeof('bool'), encode_bool_cdata)
 on_encode(ffi.typeof('float'), encode_float)
 on_encode(ffi.typeof('double'), encode_double)
 on_encode(ffi.typeof('struct varbinary'), encode_bin)
+on_encode(ffi.typeof('struct embedding'), function(buf, value)
+    local len = ffi.sizeof(value)
+    if builtin.mp_validate_embedding(value.data, len) ~= 0 then
+        error('invalid embedding')
+    end
+    local size = builtin.mp_sizeof_embedding(len / 4)
+    builtin.mp_encode_embedding(buf:alloc(size), value.data, len / 4)
+end)
 on_encode(ffi.typeof('decimal_t'), encode_decimal)
 on_encode(ffi.typeof('struct tt_uuid'), encode_uuid)
 on_encode(ffi.typeof('const struct error &'), encode_error)
@@ -585,6 +594,17 @@ local function decode_map(data, size, level)
 end
 
 local ext_decoder = {
+
+    -- MP_EMBEDDING
+    [9] = function(data, len)
+        if builtin.mp_validate_embedding(data[0], len) ~= 0 then
+            error('invalid embedding')
+        end
+        local value = ffi.new('struct embedding', len)
+        ffi.copy(value.data, data[0], len)
+        data[0] = data[0] + len
+        return value
+    end,
     -- MP_UNKNOWN_EXTENSION
     [0] = function(data, len) error("unsupported extension type") end, -- luacheck: no unused args
     -- MP_DECIMAL

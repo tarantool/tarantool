@@ -357,6 +357,10 @@ box_index_stat(uint32_t space_id, uint32_t index_id,
 int
 box_index_compact(uint32_t space_id, uint32_t index_id);
 
+/** Rebuild a VECTOR generation, yielding between private graph updates. */
+int
+box_index_rebuild(uint32_t space_id, uint32_t index_id);
+
 struct iterator {
 	/** Weak reference to the index this iterator is for. */
 	struct index_weak_ref index_ref;
