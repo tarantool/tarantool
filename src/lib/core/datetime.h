@@ -425,7 +425,7 @@ datetime_validate(const struct datetime *date)
 	    unlikely(date->tzoffset > TZOFFSET_MAX))
 		return false;
 	if (unlikely(date->tzindex < 0) ||
-	    unlikely(date->tzindex > MAX_TZINDEX))
+	    unlikely(date->tzindex >= MAX_TZINDEX))
 		return false;
 	return true;
 }
