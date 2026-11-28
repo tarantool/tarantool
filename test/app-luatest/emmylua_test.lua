@@ -227,6 +227,30 @@ local modules = {
             },
         },
     },
+    {
+        name = 'csv',
+        source = 'src/lua/csv.lua',
+        fixtures = 'test/app-luatest/emmylua/csv',
+        fields = {
+            iterate = 'Iterate through CSV records',
+            load = 'Get CSV-formatted input',
+            dump = 'Get table input and return a CSV-formatted string',
+        },
+        objects = {
+            {
+                fixture = 'options.lua',
+                type_name = 'csv.options',
+                fields = {
+                    delimiter = 'single-byte character to designate ' ..
+                        'end-of-field',
+                    quote_char = 'single-byte character to designate ' ..
+                        'encloser of string',
+                    chunk_size = 'number of characters to read at once',
+                    skip_head_lines = 'number of lines to skip at the start',
+                },
+            },
+        },
+    },
 }
 
 local function normalize(value)
