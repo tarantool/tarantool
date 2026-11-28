@@ -77,42 +77,26 @@ local MODULEPATH = fio.pathjoin(BUILDDIR, 'perf', 'lua',
 
 package.cpath = MODULEPATH .. ';' .. package.cpath
 
-local function die(fmt, ...)
-    local msg = fmt:format(...)
-    if log.cfg.log ~= nil then
-        log.error(msg)
-    end
-    io.stderr:write(msg .. '\n')
-    os.exit(1)
-end
-
-local function do_or_die(func, ...)
-    local ok, err = pcall(func, ...)
-    if not ok then
-        die('%s', err)
-    end
-end
-
 if params.field_type ~= 'unsigned' and params.field_type ~= 'string' then
-    die("Unsupported field type")
+    benchmark.die("Unsupported field type")
 end
 
 if params.field_type == 'string' then
     if params.column_count ~= 2 then
-        die('Field type "string" requires exactly 2 columns')
+        benchmark.die('Field type "string" requires exactly 2 columns')
     end
     if params.str_len_min > params.str_len_max then
-        die('Minimum length cannot be greater than maximum length')
+        benchmark.die('Minimum length cannot be greater than maximum length')
     end
 end
 
 if params.fill_ratio > 1 then
-    die("Fill ratio must be in the range from 0 to 1")
+    benchmark.die("Fill ratio must be in the range from 0 to 1")
 end
 
 local has_column_scan, test_module = pcall(require, 'column_scan_module')
 if not has_column_scan then
-    die('Lua module "column_scan_module" is not found')
+    benchmark.die('Lua module "column_scan_module" is not found')
 end
 local test_funcs = {}
 
@@ -203,7 +187,7 @@ local function gen_insert(space_id, column_count, row_count, field_type,
     box.commit()
 end
 
-do_or_die(box.once, 'init', function()
+benchmark.do_or_die(box.once, 'init', function()
     log.info('Creating the test space...')
     local format = {}
     table.insert(format, {'field_1', 'unsigned'})
@@ -299,7 +283,7 @@ local function run_test(test)
     repeat
         supported = func()
         if not supported then
-            die('Unexpected test skipping')
+            benchmark.die('Unexpected test skipping')
         end
         delta_real = clock.time() - real_time_start
         count = count + 1
@@ -321,7 +305,7 @@ math.randomseed(seed)
 for _, test in ipairs(TESTS) do
     if test.type == params.field_type then
         log.info('Running test %s...', test.name)
-        do_or_die(run_test, test)
+        benchmark.do_or_die(run_test, test)
     end
 end
 
