@@ -35,10 +35,10 @@ local conv_rv_error = ffi.cast('void *', -1)
 ---terminal.
 local iconv = {}
 
----@class iconv.converter: ffi.cdata*
----
 ---An `iconv` converter object that converts a string from one encoding to
----another. Call it as a function to convert a string.
+---another. Call it as a function to convert a string. The `__tostring`
+---metamethod returns a string representation of the converter, so
+---`tostring(converter)` works.
 ---
 ---If anything in `input_string` cannot be converted, there will be an error
 ---message and the result string will be unchanged.
@@ -71,9 +71,7 @@ local iconv = {}
 ---- '0414'
 ---...
 ---```
----@field __tostring fun(
----    self: iconv.converter
----): string Returns a string representation of the converter.
+---@class iconv.converter: ffi.cdata*
 ---@operator call(string): string
 
 ---@param data string the string to be converted (the "from" string)

@@ -126,11 +126,11 @@ local varbinary_t = ffi.typeof('struct varbinary')
 ---
 local varbinary = {}
 
----@class varbinary_object: ffi.cdata*
----
 ---A `varbinary` object is a variable-length binary object. It equals
 ---another `varbinary` object or a string if it contains the same data.
 ---The length of the binary data in bytes is returned by the `#` operator.
+---The `__tostring` metamethod converts the object to a string, so
+---`tostring(bin)` returns the binary data.
 ---
 ---**Equality example:**
 ---
@@ -147,13 +147,9 @@ local varbinary = {}
 ---print(#bin) -- 4
 ---print(#bin_hex) -- 2
 ---```
+---@class varbinary_object: ffi.cdata*
 ---@operator eq(varbinary_object|string): boolean
 ---@operator len: integer
----@field __tostring fun(
----    self: varbinary_object
----): string Returns the binary data in a plain string.
----
----    Defines the `tostring()` function for varbinary objects.
 
 ---Check that the given object is a `varbinary` object.
 ---
