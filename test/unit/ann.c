@@ -223,7 +223,7 @@ test_lifecycle(void)
 {
 	plan(38);
 	const struct ann_backend_ops *ops = ann_backend_find("flat");
-	ok(ops != NULL,
+	ok(ops != NULL && ann_backend_find("hnsw") != NULL,
 	   "reference and production algorithms are registered");
 	struct owner first = {0}, second = {0};
 	struct ann_memory first_mem = owner_memory(&first);
@@ -652,10 +652,105 @@ test_backend_contract(const char *algorithm)
 	check_plan();
 }
 
+/** Snapshots preserve nodes across reuse, undo and generation retirement. */
+static void
+test_backend_snapshot(void)
+{
+	plan(20);
+	const struct ann_backend_ops *ops = ann_backend_find("hnsw");
+	struct owner owner = {0}, views = {0};
+	struct ann_memory memory = owner_memory(&owner);
+	struct ann_memory view_memory = owner_memory(&views);
+	struct ann_config config = {2, ANN_L2, NULL};
+	struct ann_backend *backend = NULL, *before = NULL, *during = NULL;
+	is(ops->create(&config, &memory, &backend), ANN_OK,
+	   "create CoW source");
+	float original[] = {1, 0}, replacement[] = {9, 0}, query[] = {0, 0};
+	is(insert(ops, backend, 1, original), ANN_OK, "insert original vector");
+	int calls = owner.allocations;
+	is(ops->snapshot(backend, &view_memory, &before), ANN_OK,
+	   "freeze an immutable root");
+	is(owner.allocations, calls,
+	   "snapshot does not walk or copy source nodes");
+	struct ann_change *change = NULL;
+	bool retired = ops->prepare(backend, ANN_RETIRE, 1, NULL, 0, &change) ==
+		ANN_OK && ops->apply(change, NULL) == ANN_OK;
+	ops->finish(change);
+	ok(retired && ops->reclaim(backend, 1) == ANN_OK, "reclaim live slot");
+	is(ops->prepare(backend, ANN_INSERT, 2, replacement, 2, &change),
+	   ANN_OK,
+	   "prepare physical slot reuse");
+	is(ops->apply(change, NULL), ANN_OK, "publish the reused row");
+	is(ops->snapshot(backend, &view_memory, &during), ANN_OK,
+	   "freeze applied but unresolved topology");
+	calls = owner.allocations;
+	ops->rollback(change);
+	ops->finish(change);
+	is(owner.allocations, calls, "pointer undo allocates nothing");
+	struct ann_candidate found[2];
+	uint32_t count;
+	struct ann_search_control control = search_control(1000000);
+	struct ann_filter filter = {accept_any_label, NULL};
+	struct ann_search_opts opts = {2, 2, &filter, &control, NULL, NULL};
+	is(ops->search(before, query, &opts, found, &count), ANN_OK,
+	   "search the original frozen topology");
+	ok(count == 1 && found[0].label == 1 && found[0].distance == 1,
+	   "reuse and rollback preserve original coordinates and label");
+	is(ops->search(during, query, &opts, found, &count), ANN_OK,
+	   "search a snapshot made before rollback");
+	ok(count == 1 && found[0].label == 2 && found[0].distance == 81,
+	   "undo does not write through the newer snapshot");
+	ops->destroy(backend);
+	is(ops->search(before, query, &opts, found, &count), ANN_OK,
+	   "snapshot outlives source graph destruction");
+	ops->destroy(during);
+	ops->destroy(before);
+	ok(owner.live == 0 && views.live == 0 && owner.wrong_free == 0 &&
+	   views.wrong_free == 0, "shared storage uses its original allocator");
+	bool failures = true, unchanged = true, clean = true;
+	unsigned failed = 0;
+	for (int nth = 1; nth <= 80; ++nth) {
+		owner = (struct owner){0};
+		views = (struct owner){0};
+		ops->create(&config, &memory, &backend);
+		insert(ops, backend, 1, original);
+		ops->snapshot(backend, &view_memory, &before);
+		ops->prepare(backend, ANN_INSERT, 2, replacement, 2, &change);
+		owner.fail_at = owner.allocations + nth;
+		enum ann_status status = ops->apply(change, NULL);
+		if (status != ANN_OK) {
+			++failed;
+			failures &= status == ANN_OUT_OF_MEMORY;
+			calls = owner.allocations;
+			ops->rollback(change);
+			failures &= owner.allocations == calls;
+		}
+		ops->finish(change);
+		owner.fail_at = 0;
+		control = search_control(1000000);
+		unchanged &= ops->search(before, query, &opts, found, &count) ==
+			ANN_OK && count == 1 && found[0].label == 1;
+		ops->destroy(backend);
+		ops->destroy(before);
+		clean &= owner.live == 0 && views.live == 0 &&
+			 owner.wrong_free == 0 && views.wrong_free == 0;
+	}
+	ok(failed > 10, "exercise entry, row, directory and scratch failures");
+	ok(failures, "every failed write has allocation-free undo");
+	ok(unchanged, "every injected failure preserves the frozen graph");
+	ok(clean, "every failure releases all snapshot and source storage");
+	views.fail_at = views.allocations + 1;
+	ops->create(&config, &memory, &backend);
+	is(ops->snapshot(backend, &view_memory, &before), ANN_OUT_OF_MEMORY,
+	   "snapshot creation reports OOM");
+	ops->destroy(backend);
+	check_plan();
+}
+
 int
 main(void)
 {
-	plan(7);
+	plan(9);
 	test_numeric();
 	test_lifecycle();
 	test_control();
@@ -663,5 +758,7 @@ main(void)
 	test_compound_undo();
 	test_failure();
 	test_backend_contract("flat");
+	test_backend_contract("hnsw");
+	test_backend_snapshot();
 	return check_plan();
 }

@@ -8,11 +8,14 @@
 #include <string.h>
 
 extern const struct ann_backend_ops ann_flat_ops;
+extern const struct ann_backend_ops ann_usearch_ops;
 
 const struct ann_backend_ops *
 ann_backend_find(const char *name)
 {
 	if (name != NULL && strcmp(name, ann_flat_ops.name) == 0)
 		return &ann_flat_ops;
+	if (name != NULL && strcmp(name, "hnsw") == 0)
+		return &ann_usearch_ops;
 	return NULL;
 }

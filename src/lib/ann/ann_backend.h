@@ -47,7 +47,7 @@ struct ann_config {
 struct ann_memory {
 	/** Allocator owner supplied by the caller. */
 	void *ctx;
-	/** Allocate exactly size bytes, returning NULL on failure. */
+	/** Allocate size bytes with max_align_t alignment, or return NULL. */
 	void *(*alloc)(void *ctx, size_t size);
 	/** Release a block previously charged for size bytes. */
 	void (*free)(void *ctx, void *ptr, size_t size);
