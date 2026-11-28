@@ -7,3 +7,5 @@
 - Charge graph storage and cooperative rebuilds to memtx quota. Reuse
   slots once tuple versions are safe to collect. Expose memory, slot,
   search, and rebuild counters through `index:stat()`.
+  The single-layer graph reports expanded nodes and traversal restarts.
+  Search statistics expose computed distances and consumed budget units.

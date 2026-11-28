@@ -25,6 +25,11 @@ enum ann_status
 ann_vector_validate_f32(const float *vector, uint32_t dimension,
 			enum ann_metric metric);
 
+/** Validate a query while charging components to the operation budget. */
+enum ann_status
+ann_query_validate(const float *query, uint32_t dimension,
+		   enum ann_metric metric, struct ann_search_control *control);
+
 /** Read a possibly unaligned little-endian IEEE 754 float32 component. */
 float
 ann_f32le_load(const void *data, uint32_t index);

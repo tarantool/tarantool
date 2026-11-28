@@ -413,6 +413,8 @@ ann_flat_search(struct ann_backend *backend, const float *query,
 {
 	if (out_count != NULL)
 		*out_count = 0;
+	if (opts != NULL && opts->stats != NULL)
+		memset(opts->stats, 0, sizeof(*opts->stats));
 	if (backend == NULL || query == NULL || opts == NULL ||
 	    out_count == NULL || opts->control == NULL ||
 	    opts->query_dimension != backend->config.dimension ||
@@ -420,23 +422,11 @@ ann_flat_search(struct ann_backend *backend, const float *query,
 	    (opts->filter != NULL && opts->filter->accept == NULL) ||
 	    opts->algorithm != NULL)
 		return ANN_INVALID;
-	enum ann_status status = ann_search_control_poll(opts->control);
+	enum ann_status status = ann_query_validate(
+		query, backend->config.dimension, backend->config.metric,
+		opts->control);
 	if (status != ANN_OK)
 		return status;
-	double query_norm2 = 0;
-	for (uint32_t i = 0; i < backend->config.dimension; ++i) {
-		status = ann_search_control_step(opts->control);
-		if (status != ANN_OK)
-			return status;
-		if (!isfinite(query[i]))
-			return ANN_INVALID;
-		if (backend->config.metric == ANN_COSINE) {
-			double x = query[i];
-			query_norm2 += x * x;
-		}
-	}
-	if (backend->config.metric == ANN_COSINE && query_norm2 == 0)
-		return ANN_INVALID;
 	if (opts->candidate_limit == 0)
 		return ann_search_control_poll(opts->control);
 	uint32_t count = 0;
@@ -461,6 +451,8 @@ ann_flat_search(struct ann_backend *backend, const float *query,
 					  &distance);
 		if (status != ANN_OK)
 			return status;
+		if (opts->stats != NULL)
+			++opts->stats->computed_distances;
 		struct ann_candidate candidate = {
 			entry->label, distance, entry->shared,
 		};

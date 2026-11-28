@@ -87,8 +87,14 @@ struct memtx_vector_index {
 	uint64_t search_timeouts;
 	/** Cumulative time in admitted local searches, including failures. */
 	uint64_t search_duration_ns;
-	/** Cumulative backend work units visited by searches. */
+	/** Cumulative candidates scored by searches. */
 	uint64_t visited_candidates;
+	/** Cumulative budget units spent in searches. */
+	uint64_t search_work;
+	/** Cumulative adjacency lists expanded by searches. */
+	uint64_t expanded_nodes;
+	/** Cumulative reseedings after the search frontier emptied. */
+	uint64_t search_restarts;
 	/** Cumulative predicate rejections, including visibility. */
 	uint64_t filtered_candidates;
 	/** Estimated peak temporary bytes allocated by this layer. */
@@ -575,6 +581,7 @@ memtx_vector_index_search(struct index *base,
 	struct ann_search_control control = {};
 	struct ann_hnsw_search_opts algorithm = {};
 	struct ann_search_opts opts = {};
+	struct ann_search_stats search_stats = {};
 	uint32_t count = 0;
 	struct errinj *work_inj = NULL;
 	uint64_t temporary_bytes = 0;
@@ -666,11 +673,14 @@ memtx_vector_index_search(struct index *base,
 	opts.filter = &filter;
 	opts.control = &control;
 	opts.algorithm = &algorithm;
+	opts.stats = &search_stats;
 	status = index->ops->search(index->backend, query, &opts,
 					&candidates[0], &count);
 	if (filter_ctx.status != ANN_OK)
 		status = filter_ctx.status;
-	index->visited_candidates += control.work_done;
+	index->visited_candidates += search_stats.computed_distances;
+	index->expanded_nodes += search_stats.expanded_nodes;
+	index->search_restarts += search_stats.restarts;
 	if (status == ANN_TIMEOUT &&
 	    vector_index_check_deadline(deadline) != 0)
 		goto fail;
@@ -696,6 +706,7 @@ memtx_vector_index_search(struct index *base,
 			distances[i] = candidates[i].distance;
 	}
 	region_truncate(region, svp);
+	index->search_work += control.work_done;
 	index->search_duration_ns += vector_index_now_ns(NULL) - started;
 	return 0;
 fail:
@@ -704,6 +715,7 @@ fail:
 	    ER_VECTOR_TIMEOUT)
 		++index->search_timeouts;
 	region_truncate(region, svp);
+	index->search_work += control.work_done;
 	index->search_duration_ns += vector_index_now_ns(NULL) - started;
 	return -1;
 }
@@ -1342,6 +1354,7 @@ memtx_vector_index_stat(struct index *base, struct info_handler *handler)
 	info_append_int(handler, "duration_ns", index->search_duration_ns);
 	info_append_int(handler, "visited_candidates",
 			index->visited_candidates);
+	info_append_int(handler, "work", index->search_work);
 	info_append_int(handler, "filtered_candidates",
 			index->filtered_candidates);
 	info_table_end(handler);
@@ -1354,6 +1367,9 @@ memtx_vector_index_stat(struct index *base, struct info_handler *handler)
 			index->builder_insert_limit);
 	info_table_end(handler);
 	info_table_begin(handler, "hnsw");
+	info_append_int(handler, "layers", stats.graph_layers);
+	info_append_int(handler, "expanded_nodes", index->expanded_nodes);
+	info_append_int(handler, "restarts", index->search_restarts);
 	info_append_int(handler, "generation", index->generation);
 	info_append_int(handler, "m", base->def->opts.vector_m);
 	info_append_int(handler, "ef_construction",

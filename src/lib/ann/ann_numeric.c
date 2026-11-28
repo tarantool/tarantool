@@ -43,14 +43,22 @@ ann_f32_from_double(double value, float *out)
 		ANN_OK : ANN_INVALID;
 }
 
-enum ann_status
-ann_vector_validate_f32(const float *vector, uint32_t dimension,
-			enum ann_metric metric)
+/** Validate native coordinates under the optional operation budget. */
+static enum ann_status
+ann_vector_validate_f32_impl(const float *vector, uint32_t dimension,
+			     enum ann_metric metric,
+			     struct ann_search_control *control)
 {
 	if (vector == NULL || dimension == 0 || (unsigned)metric > ANN_IP)
 		return ANN_INVALID;
 	double norm2 = 0;
 	for (uint32_t i = 0; i < dimension; ++i) {
+		if (control != NULL) {
+			enum ann_status status =
+				ann_search_control_step(control);
+			if (status != ANN_OK)
+				return status;
+		}
 		if (!isfinite(vector[i]))
 			return ANN_INVALID;
 		if (metric == ANN_COSINE) {
@@ -61,6 +69,23 @@ ann_vector_validate_f32(const float *vector, uint32_t dimension,
 	if (metric == ANN_COSINE && norm2 == 0)
 		return ANN_INVALID;
 	return ANN_OK;
+}
+
+enum ann_status
+ann_vector_validate_f32(const float *vector, uint32_t dimension,
+			enum ann_metric metric)
+{
+	return ann_vector_validate_f32_impl(vector, dimension, metric, NULL);
+}
+
+enum ann_status
+ann_query_validate(const float *query, uint32_t dimension,
+		   enum ann_metric metric, struct ann_search_control *control)
+{
+	enum ann_status status = ann_search_control_poll(control);
+	if (status != ANN_OK)
+		return status;
+	return ann_vector_validate_f32_impl(query, dimension, metric, control);
 }
 
 enum ann_status

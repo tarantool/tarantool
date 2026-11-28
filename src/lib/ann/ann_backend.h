@@ -93,6 +93,16 @@ struct ann_search_control {
 	void *ctx;
 };
 
+/** Traversal counters for one request, including work before failure. */
+struct ann_search_stats {
+	/** Candidates whose distances were computed. */
+	uint64_t computed_distances;
+	/** Graph nodes whose adjacency lists were expanded. */
+	uint64_t expanded_nodes;
+	/** Traversals restarted after the frontier ran out of candidates. */
+	uint64_t restarts;
+};
+
 /** Backend-independent search parameters. */
 struct ann_search_opts {
 	/** Capacity of out and maximum candidate count. */
@@ -107,6 +117,8 @@ struct ann_search_opts {
 	const void *algorithm;
 	/** Optional request-local allocator for frozen graph search buffers. */
 	const struct ann_memory *memory;
+	/** Optional request-local output, reset at the start of search. */
+	struct ann_search_stats *stats;
 };
 
 /** Type of a prepared logical mutation. */
@@ -133,6 +145,8 @@ struct ann_backend_stats {
 	uint64_t lookup_bytes;
 	/** Graph and backend metadata within resident_bytes. */
 	uint64_t graph_bytes;
+	/** Number of graph layers, or zero for a flat scan. */
+	uint32_t graph_layers;
 };
 
 /**

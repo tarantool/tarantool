@@ -245,7 +245,7 @@ test_lifecycle(void)
 	ok(stats.live == 3 && stats.retired == 0 && stats.capacity >= 3,
 	   "stats describe retained entries");
 	struct ann_search_control control = search_control(100);
-	struct ann_search_opts opts = {3, 2, NULL, &control, NULL, NULL};
+	struct ann_search_opts opts = {3, 2, NULL, &control, NULL, NULL, NULL};
 	struct ann_candidate out[3];
 	uint32_t count = UINT32_MAX;
 	float query[] = {0, 0};
@@ -332,10 +332,10 @@ test_lifecycle(void)
 }
 
 static void
-test_control(void)
+test_control(const char *algorithm)
 {
 	plan(14);
-	const struct ann_backend_ops *ops = ann_backend_find("flat");
+	const struct ann_backend_ops *ops = ann_backend_find(algorithm);
 	struct owner owner = {0};
 	struct ann_memory memory = owner_memory(&owner);
 	struct ann_config config = {2, ANN_L2, NULL};
@@ -347,7 +347,7 @@ test_control(void)
 	struct ann_candidate out[1];
 	uint32_t count = 9;
 	struct ann_search_control control = search_control(1);
-	struct ann_search_opts opts = {1, 2, NULL, &control, NULL, NULL};
+	struct ann_search_opts opts = {1, 2, NULL, &control, NULL, NULL, NULL};
 	is(ops->search(backend, query, &opts, out, &count), ANN_WORK_LIMIT,
 	   "query validation obeys work budget");
 	is(count, 0, "work error has no successful result");
@@ -405,7 +405,7 @@ test_metric_search(void)
 	is(insert(ops, backend, 2, backward), ANN_OK,
 	   "cosine backward inserted");
 	struct ann_search_control control = search_control(100);
-	struct ann_search_opts opts = {2, 2, NULL, &control, NULL, NULL};
+	struct ann_search_opts opts = {2, 2, NULL, &control, NULL, NULL, NULL};
 	struct ann_candidate out[2];
 	uint32_t count = 0;
 	is(ops->search(backend, forward, &opts, out, &count), ANN_OK,
@@ -592,7 +592,7 @@ test_backend_contract(const char *algorithm)
 	float query[] = {0, 0};
 	struct ann_candidate found[2];
 	uint32_t count = 0;
-	struct ann_search_opts opts = {2, 2, NULL, &control, NULL, NULL};
+	struct ann_search_opts opts = {2, 2, NULL, &control, NULL, NULL, NULL};
 	is(ops->search(backend, query, &opts, found, &count), ANN_OK,
 	   "search borrowed coordinates");
 	ok(count == 1 && found[0].label == 17 && found[0].distance == 5,
@@ -691,7 +691,9 @@ test_backend_snapshot(void)
 	uint32_t count;
 	struct ann_search_control control = search_control(1000000);
 	struct ann_filter filter = {accept_any_label, NULL};
-	struct ann_search_opts opts = {2, 2, &filter, &control, NULL, NULL};
+	struct ann_search_opts opts = {
+		2, 2, &filter, &control, NULL, NULL, NULL,
+	};
 	is(ops->search(before, query, &opts, found, &count), ANN_OK,
 	   "search the original frozen topology");
 	ok(count == 1 && found[0].label == 1 && found[0].distance == 1,
@@ -750,10 +752,11 @@ test_backend_snapshot(void)
 int
 main(void)
 {
-	plan(9);
+	plan(10);
 	test_numeric();
 	test_lifecycle();
-	test_control();
+	test_control("flat");
+	test_control("hnsw");
 	test_metric_search();
 	test_compound_undo();
 	test_failure();

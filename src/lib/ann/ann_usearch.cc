@@ -933,6 +933,8 @@ ann_usearch_search(struct ann_backend *backend, const float *query,
 {
 	if (out_count != nullptr)
 		*out_count = 0;
+	if (opts != nullptr && opts->stats != nullptr)
+		*opts->stats = {};
 	if (backend == nullptr || query == nullptr || opts == nullptr ||
 	    opts->control == nullptr || out_count == nullptr ||
 	    (opts->candidate_limit != 0 && out == nullptr) ||
@@ -940,8 +942,9 @@ ann_usearch_search(struct ann_backend *backend, const float *query,
 	    (opts->filter != nullptr && opts->filter->accept == nullptr) ||
 	    (backend->view && opts->filter == nullptr))
 		return ANN_INVALID;
-	enum ann_status status = ann_vector_validate_f32(
-		query, backend->config.dimension, backend->config.metric);
+	enum ann_status status = ann_query_validate(
+		query, backend->config.dimension, backend->config.metric,
+		opts->control);
 	if (status != ANN_OK)
 		return status;
 	struct ann_usearch_control state = {opts->control};
@@ -1005,6 +1008,13 @@ ann_usearch_search(struct ann_backend *backend, const float *query,
 	const status_t result = graph.search(
 		ann_coordinate_ref{query, false}, opts->candidate_limit, metric,
 		scratch, options, predicate);
+	if (opts->stats != nullptr) {
+		*opts->stats = {
+			scratch.telemetry.computed_distances,
+			scratch.telemetry.visited_members,
+			scratch.telemetry.restarts,
+		};
+	}
 	if (result != status_t::success_k)
 		return ann_usearch_status(result, state);
 	if (!ordered) {
@@ -1030,6 +1040,7 @@ ann_usearch_stat(const struct ann_backend *backend,
 {
 	memset(out, 0, sizeof(*out));
 	out->resident_bytes = backend->retained_bytes;
+	out->graph_layers = 1;
 	if (backend->graph) {
 		out->capacity = backend->capacity;
 		out->live = backend->live_count;
