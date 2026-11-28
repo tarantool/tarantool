@@ -31,12 +31,16 @@ end
 -- 3. It receives a new transaction from the old leader, while the elections are
 --   already ongoing.
 -- 4. It receives votes and wins the elections.
--- 5. It waits for a quorum on both txns.
--- 6. It writes PROMOTE and becomes a true leader.
+-- 5. It writes PROMOTE right away, covering the transactions it has, and waits
+--   for a quorum on the PROMOTE.
+-- 6. It receives one more transaction from the old leader, while the PROMOTE
+--   is pending.
+-- 7. The PROMOTE gains the quorum and takes effect.
 --
--- The expected behaviour is that the node will wait for both transactions to
--- gain the quorum. Not like it would only collect quorum for whatever
--- transaction was the last at the moment of elections start.
+-- The expected behaviour is that the PROMOTE commits everything it covered,
+-- and rolls back the transactions of the old leader received after it was
+-- written. They are accepted into the queue while the PROMOTE is pending, but
+-- can't outlive its confirmation.
 --
 
 g.before_each(function(cg)
@@ -248,23 +252,24 @@ g.test_new_synchronous_transactions_appeared_while_wait_quorum = function(cg)
         end)
     end, {wait_timeout})
     --
-    -- The voters send their votes to node2, which in turn wins the elections.
-    -- But it can't be promoted yet, because it needs to gain a quorum on the
-    -- txn1. This won't happen, because the voter nodes download nothing from
-    -- node2 and won't ack txn1. Only node1 downloads from the voters, not vice
-    -- versa.
+    -- The voters send their votes to node2, which in turn wins the elections
+    -- and writes PROMOTE covering txn1. But the PROMOTE can't take effect yet,
+    -- because it confirms txn1 and hence needs the synchro quorum on itself.
+    -- This won't happen, because the voter nodes download nothing from node2
+    -- and won't ack it. Only node1 downloads from the voters, not vice versa.
     --
     cg.node2:update_box_cfg({replication = cfg_replication_234})
     cg.node2:exec(function(timeout)
         t.helpers.retrying({timeout = timeout}, function()
             t.assert_equals(box.info.election.state, 'leader')
+            t.assert_not_equals(box.info.synchro.own_promote, nil)
         end)
-        -- Promotion isn't done yet, although the elections are won.
+        -- The PROMOTE is pending, although the elections are won.
         t.assert_lt(box.info.synchro.queue.term, box.info.election.term)
     end, {wait_timeout})
     --
     -- While waiting, node2 receives the txn2 from node1. This txn was received
-    -- after winning the elections, but before writing PROMOTE.
+    -- after the PROMOTE was written, while it is still pending.
     --
     cg.node2:update_box_cfg({replication = cg.test_fullmesh_replication})
     cg.node2:exec(function(timeout)
@@ -281,14 +286,26 @@ g.test_new_synchronous_transactions_appeared_while_wait_quorum = function(cg)
         cg[name]:update_box_cfg({replication = cg.test_fullmesh_replication})
     end
     --
-    -- The node2 must wait for the last txn (txn2) to gain the quorum and write
-    -- PROMOTE including this txn. Even though it was received after winning the
-    -- elections.
+    -- The PROMOTE gains the quorum and takes effect. It commits txn1 and rolls
+    -- txn2 back - the PROMOTE was written before txn2 was received, so txn2 is
+    -- beyond its confirm boundary.
     --
     cg.node2:exec(function(timeout)
         t.assert((_G.f_promote:join(timeout)))
         t.assert_equals(box.info.election.state, 'leader')
         t.assert_equals(box.info.synchro.queue.term, box.info.election.term)
-        t.assert_equals(box.space.test:select(), {{1}, {2}})
+        t.assert_equals(box.info.synchro.queue.len, 0)
+        t.assert_equals(box.space.test:select(), {{1}})
     end, {wait_timeout})
+    --
+    -- The rollback reaches the old leader too, as everybody applies the new
+    -- leader's PROMOTE and its CONFIRM.
+    --
+    for _, name in pairs(cg.test_all_names) do
+        cg[name]:wait_for_vclock_of(cg.node2)
+        cg[name]:exec(function()
+            t.assert_equals(box.info.synchro.queue.len, 0)
+            t.assert_equals(box.space.test:select(), {{1}})
+        end)
+    end
 end

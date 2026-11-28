@@ -1,6 +1,7 @@
 local replica_set = require('luatest.replica_set')
 local server = require('luatest.server')
 local t = require('luatest')
+local qsync = require('test.replication-luatest.lib.qsync_tools')
 
 local g = t.group()
 
@@ -23,6 +24,13 @@ g.before_each(function(cg)
         box_cfg = cg.box_cfg,
     }
     cg.replica_set:start()
+    cg.replica_set:wait_for_fullmesh()
+    -- The WAL hold spans several steps, the silence must not break a
+    -- connection.
+    qsync.reconnect_fullmesh({cg.master, cg.replica}, {
+        timeout = 1000,
+        reconnect_timeout = cg.box_cfg.replication_timeout,
+    })
     cg.replica_set:wait_for_fullmesh()
     cg.master:exec(function()
         rawset(_G, 'fiber', require('fiber'))
@@ -61,23 +69,23 @@ g.test_limbo_in_rollback_confirm_not_written = function(cg)
         t.helpers.retrying({timeout = 120}, function()
             t.assert_equals(box.info.synchro.queue.len, 1)
         end)
-        box.cfg{replication_synchro_timeout = 0.01}
         box.ctl.promote()
     end)
 
-    cg.master:exec(function(fid)
-        t.helpers.retrying({timeout = 120}, function()
-            t.assert(box.error.injection.get('ERRINJ_WAL_DELAY'))
-        end)
-        t.assert(box.info.synchro.queue.busy)
+    -- Let the writes through one by one until the PROMOTE holds the queue.
+    cg.master:play_wal_until_synchro_queue_is_busy()
 
+    cg.master:exec(function(fid)
+        -- The counter is bumped at the submission: a CONFIRM the worker
+        -- shouldn't write would show up even with the WAL blocked.
         local write_count = box.error.injection.get('ERRINJ_WAL_WRITE_COUNT')
         box.error.injection.set('ERRINJ_TXN_LIMBO_WORKER_DELAY', false)
         _G.fiber.sleep(0.1)
+        t.assert_equals(box.error.injection.get('ERRINJ_WAL_WRITE_COUNT'),
+                        write_count)
         t.assert_equals(box.info.synchro.queue.len, 1)
         box.error.injection.set('ERRINJ_WAL_DELAY', false)
         t.assert(_G.fiber.find(fid):join())
-        -- Check that CONFIRM request was not written to the WAL.
-        t.assert(box.error.injection.get('ERRINJ_WAL_WRITE_COUNT'), write_count)
+        t.assert_equals(box.space.s:get{0}, {0})
     end, {fid})
 end
