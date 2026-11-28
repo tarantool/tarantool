@@ -243,6 +243,16 @@ create_unit_test(PREFIX bps_tree_inner_child_cards
                  LIBRARIES unit small misc
                  COMPILE_DEFINITIONS TEST_INNER_CHILD_CARDS
 )
+create_unit_test(PREFIX bps_tree_time_series_optimized
+                 SOURCES bps_tree.cc
+                 LIBRARIES unit small misc
+                 COMPILE_DEFINITIONS TEST_TIME_SERIES_OPTIMIZED
+)
+create_unit_test(PREFIX bps_tree_time_series_optimized_inner_card
+                 SOURCES bps_tree.cc
+                 LIBRARIES unit small misc
+                 COMPILE_DEFINITIONS TEST_TIME_SERIES_OPTIMIZED_INNER_CARD
+)
 create_unit_test(PREFIX bps_tree_iterator
                  SOURCES bps_tree_iterator.cc
                  LIBRARIES unit small misc
@@ -258,6 +268,16 @@ create_unit_test(PREFIX bps_tree_iterator_inner_child_cards
                  LIBRARIES unit small misc
                  COMPILE_DEFINITIONS TEST_INNER_CHILD_CARDS
 )
+create_unit_test(PREFIX bps_tree_iterator_time_series_optimized
+                 SOURCES bps_tree_iterator.cc
+                 LIBRARIES unit small misc
+                 COMPILE_DEFINITIONS TEST_TIME_SERIES_OPTIMIZED
+)
+create_unit_test(PREFIX bps_tree_iterator_time_series_optimized_inner_card
+                 SOURCES bps_tree_iterator.cc
+                 LIBRARIES unit small misc
+                 COMPILE_DEFINITIONS TEST_TIME_SERIES_OPTIMIZED_INNER_CARD
+)
 create_unit_test(PREFIX bps_tree_view
                  SOURCES bps_tree_view.c
                  LIBRARIES small unit
@@ -272,6 +292,16 @@ create_unit_test(PREFIX bps_tree_view_inner_child_cards
                  SOURCES bps_tree_view.c
                  LIBRARIES small unit
                  COMPILE_DEFINITIONS TEST_INNER_CHILD_CARDS
+)
+create_unit_test(PREFIX bps_tree_view_time_series_optimized
+                 SOURCES bps_tree_view.c
+                 LIBRARIES small unit
+                 COMPILE_DEFINITIONS TEST_TIME_SERIES_OPTIMIZED
+)
+create_unit_test(PREFIX bps_tree_view_time_series_optimized_inner_card
+                 SOURCES bps_tree_view.c
+                 LIBRARIES small unit
+                 COMPILE_DEFINITIONS TEST_TIME_SERIES_OPTIMIZED_INNER_CARD
 )
 create_unit_test(PREFIX bps_tree_offset_api_inner_card
                  SOURCES bps_tree_offset_api.cc

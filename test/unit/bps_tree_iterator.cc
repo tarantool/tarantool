@@ -7,10 +7,15 @@
 /* Select the tree flavor to test. */
 #if defined(TEST_INNER_CARD)
 # define BPS_INNER_CARD
+#elif defined(TEST_TIME_SERIES_OPTIMIZED)
+# define BPS_TIME_SERIES_OPTIMIZED
+#elif defined(TEST_TIME_SERIES_OPTIMIZED_INNER_CARD)
+# define BPS_TIME_SERIES_OPTIMIZED
+# define BPS_INNER_CARD
 #elif defined(TEST_INNER_CHILD_CARDS)
 # define BPS_INNER_CHILD_CARDS
 #elif !defined(TEST_DEFAULT)
-# error "Please define TEST_DEFAULT, TEST_INNER_CARD or TEST_INNER_CHILD_CARDS."
+# error "Please define a TEST_* tree flavor."
 #endif
 
 #define UNIT_TAP_COMPATIBLE 1
