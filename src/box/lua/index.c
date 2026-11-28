@@ -448,6 +448,22 @@ lbox_index_stat(lua_State *L)
 
 /* }}} */
 
+/** Lua C entry because generation rebuild can yield. */
+static int
+lbox_index_rebuild(lua_State *L)
+{
+	if (lua_gettop(L) != 2 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2)) {
+		diag_set(IllegalParams,
+			 "Usage: box.internal.vector_rebuild(space_id, index_id)");
+		return luaT_error(L);
+	}
+	uint32_t space_id = lua_tonumber(L, 1);
+	uint32_t index_id = lua_tonumber(L, 2);
+	if (box_index_rebuild(space_id, index_id) != 0)
+		return luaT_error(L);
+	return 0;
+}
+
 static int
 lbox_index_compact(lua_State *L)
 {
@@ -515,6 +531,7 @@ box_lua_index_init(struct lua_State *L)
 		{"info", lbox_index_info},
 		{"stat", lbox_index_stat},
 		{"compact", lbox_index_compact},
+		{"vector_rebuild", lbox_index_rebuild},
 		{"insert_arrow", lbox_insert_arrow},
 		{NULL, NULL}
 	};

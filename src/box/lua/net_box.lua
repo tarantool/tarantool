@@ -14,6 +14,7 @@ local max               = math.max
 local fiber_clock       = fiber.clock
 
 local check_select_opts   = box.internal.check_select_opts
+local check_vector_select_opts = box.internal.check_vector_select_opts
 local check_index_arg     = box.internal.check_index_arg
 local check_space_arg     = box.internal.check_space_arg
 local check_primary_index = box.internal.check_primary_index
@@ -1254,6 +1255,9 @@ index_metatable = function(remote)
 
     function methods:select(key, opts)
         check_index_arg(self, 'select')
+        if self.type == 'VECTOR' then
+            check_vector_select_opts(opts, REQUEST_OPTION_TYPES)
+        end
         check_param_table(opts, REQUEST_OPTION_TYPES)
         local key_is_nil = (key == nil or
                             (type(key) == 'table' and #key == 0))

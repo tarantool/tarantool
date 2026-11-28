@@ -159,6 +159,9 @@ struct errinj {
 	_(ERRINJ_TT_SORT_CHECK_PRESORTED_DELAY, ERRINJ_DOUBLE, {.dparam = 0}) \
 	_(ERRINJ_TUPLE_ALLOC, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VECTOR_ALLOC, ERRINJ_INT, {.iparam = -1}) \
+	_(ERRINJ_VECTOR_REBUILD_DELAY, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_VECTOR_REBUILD_GC_DELAY, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_VECTOR_WORK_LIMIT, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_TUPLE_ALLOC_COUNTDOWN, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_TUPLE_FIELD, ERRINJ_BOOL, {.bparam = false}) \
         _(ERRINJ_TUPLE_FIELD_COUNT_LIMIT, ERRINJ_INT, {.iparam = -1}) \

@@ -10,6 +10,7 @@ local check_param_table = utils.check_param_table
 local check_primary_index = box.internal.check_primary_index
 local check_iterator_type = box.internal.check_iterator_type
 local check_select_opts = box.internal.check_select_opts
+local check_vector_select_opts = box.internal.check_vector_select_opts
 local check_pairs_opts = box.internal.check_pairs_opts
 local check_space_arg = box.internal.check_space_arg
 
@@ -688,6 +689,20 @@ function read_view_index_methods_ffi:count(key, opts)
     return count
 end
 
+local function check_vector_read_view_select_opts(index, opts)
+    if not index._is_vector then
+        return
+    end
+    local iterator = check_iterator_type(opts, false, 3)
+    if iterator % 1 ~= 0 or iterator < box.index.EQ or
+       iterator > box.index.PP then
+        box.error(box.error.ITERATOR_TYPE, tostring(iterator), 3)
+    end
+    if iterator == box.index.NEIGHBOR then
+        check_vector_select_opts(opts, nil, 3, box.error.VECTOR_UNSUPPORTED)
+    end
+end
+
 --
 -- Selects tuples matching a key from an index read view.
 --
@@ -702,6 +717,7 @@ end
 function read_view_index_methods_luac:select(key, opts)
     check_index_arg(self, 'select', 2)
     check_index_read_view_is_open(self)
+    check_vector_read_view_select_opts(self, opts)
     key = keify(key)
     local key_is_nil = #key == 0
     local iterator, offset, limit, after, fetch_pos =
@@ -713,6 +729,7 @@ end
 function read_view_index_methods_ffi:select(key, opts)
     check_index_arg(self, 'select', 2)
     check_index_read_view_is_open(self)
+    check_vector_read_view_select_opts(self, opts)
     local region_svp = builtin.box_region_used()
     local ibuf = cord_ibuf_take()
     local raw_key, raw_key_end = tuple_encode(ibuf, key)

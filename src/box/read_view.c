@@ -23,6 +23,7 @@
 #include "index.h"
 #include "iterator_type.h"
 #include "msgpuck.h"
+#include "memtx_vector.h"
 #include "port.h"
 #include "salad/grp_alloc.h"
 #include "small/region.h"
@@ -171,6 +172,9 @@ space_read_view_new(struct space *space, const struct read_view_opts *opts)
 		if (space_rv->index_map[i] == NULL)
 			goto fail;
 		space_rv->index_map[i]->space = space_rv;
+		if (index->def->type == VECTOR)
+			memtx_vector_read_view_set_space(
+				space_rv->index_map[i], space_rv);
 		space_rv->index_count++;
 	}
 	return space_rv;
@@ -513,6 +517,10 @@ box_index_read_view_tuple_position(
 {
 	assert(space->owner == cord());
 	struct index_read_view *index = space->ptr->index_map[index_id];
+	if (index->def->type == VECTOR) {
+		diag_set(ClientError, ER_VECTOR_UNSUPPORTED);
+		return -1;
+	}
 	return box_iterator_position_from_tuple(tuple, tuple_end,
 						index->def->cmp_def,
 						packed_pos, packed_pos_end);
@@ -625,10 +633,18 @@ box_index_read_view_select(
 					 type, &pos, &pos_end) != 0)
 		return -1;
 	struct index_read_view_iterator it;
-	if (index_read_view_create_iterator_with_offset(index, type, key,
-							part_count, pos,
-							offset, &it) != 0)
+	if (index->def->type == VECTOR && type == ITER_NEIGHBOR) {
+		if (pos != NULL || offset != 0 || update_pos) {
+			diag_set(ClientError, ER_VECTOR_UNSUPPORTED);
+			return -1;
+		}
+		if (memtx_vector_read_view_select(index, key, part_count,
+						  limit, &it) != 0)
+			return -1;
+	} else if (index_read_view_create_iterator_with_offset(
+		index, type, key, part_count, pos, offset, &it) != 0) {
 		return -1;
+	}
 	int rc = 0;
 	uint32_t found = 0;
 	port_c_create(port);

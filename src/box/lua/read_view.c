@@ -125,6 +125,10 @@ lbox_push_index_read_view(struct lua_State *L,
 	lua_setfield(L, -2, "id");
 	lua_pushstring(L, index->def->name);
 	lua_setfield(L, -2, "name");
+	if (index->def->type == VECTOR) {
+		lua_pushboolean(L, true);
+		lua_setfield(L, -2, "_is_vector");
+	}
 
 	*(struct space_read_view_handle **)luaL_pushcdata(
 		L, CTID_STRUCT_SPACE_READ_VIEW_HANDLE) = space;

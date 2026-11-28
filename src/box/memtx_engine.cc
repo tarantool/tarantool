@@ -825,6 +825,17 @@ memtx_engine_prepare(struct engine *engine, struct txn *txn)
 	return 0;
 }
 
+/** Without MVCC, tuple bindings can be retired after the statement decision. */
+static void
+memtx_engine_gc_vector_tuple(struct space *space, struct tuple *tuple)
+{
+	for (uint32_t i = 0; i < space->index_count; ++i) {
+		struct index *index = space->index[i];
+		if (index->def->type == VECTOR)
+			memtx_index_gc_tuple(index, tuple);
+	}
+}
+
 static void
 memtx_engine_commit(struct engine *engine, struct txn *txn)
 {
@@ -842,6 +853,10 @@ memtx_engine_commit(struct engine *engine, struct txn *txn)
 			struct space *space = stmt->space;
 			struct tuple *old_tuple;
 			memtx_tuple_list_foreach(undo->old_tuples, old_tuple, {
+				if (!memtx_tx_manager_use_mvcc_engine &&
+				    old_tuple != undo->new_tuple)
+					memtx_engine_gc_vector_tuple(space,
+								     old_tuple);
 				if (space->upgrade != NULL)
 					memtx_space_upgrade_untrack_tuple(
 						space->upgrade, old_tuple);
@@ -917,6 +932,8 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 		tuple_ref(old_tuple);
 	});
 	if (new_tuple != NULL) {
+		if (old_tuples == NULL || old_tuples->tuple != new_tuple)
+			memtx_engine_gc_vector_tuple(space, new_tuple);
 		memtx_space_update_tuple_stat(space, new_tuple, NULL);
 		tuple_unref(new_tuple);
 	}

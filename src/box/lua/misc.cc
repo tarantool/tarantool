@@ -41,6 +41,7 @@
 #include "box/errcode.h"
 #include "box/lua/tuple.h"
 #include "box/memtx_tx.h"
+#include "box/memtx_vector.h"
 #include "box/port.h"
 #include "box/space_cache.h"
 #include "box/tuple.h"
@@ -55,6 +56,7 @@
 #include "mpstream/mpstream.h"
 #include "small/region.h"
 #include "small/rlist.h"
+#include "lib/ann/ann_numeric.h"
 
 /** {{{ Miscellaneous utils **/
 
@@ -428,6 +430,64 @@ lbox_prepare_auth(lua_State *L)
 
 /** {{{ Lua/C implementation of index:select(): used only by Vinyl **/
 
+/** Lua C entry for rich VECTOR search and parallel distance results. */
+static int
+lbox_vector_search(lua_State *L)
+{
+	if (lua_gettop(L) != 9 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
+	    !lua_isnumber(L, 4) || !lua_isnumber(L, 5) || !lua_isnumber(L, 6) ||
+	    !lua_isnumber(L, 7) || !lua_isboolean(L, 9)) {
+		return luaL_error(L,
+				  "Usage: box.internal.vector_search(space_id, "
+				  "index_id, key, limit, timeout, ef_search, "
+				  "filter_fieldno, filter_values, with_distance)");
+	}
+	uint32_t space_id = lua_tonumber(L, 1);
+	uint32_t index_id = lua_tonumber(L, 2);
+	bool with_distance = lua_toboolean(L, 9);
+	struct memtx_vector_search_opts opts = {};
+	opts.limit = lua_tonumber(L, 4);
+	opts.timeout = lua_tonumber(L, 5);
+	opts.ef_search = lua_tonumber(L, 6);
+	opts.filter_fieldno = lua_tonumber(L, 7);
+	struct region *region = &fiber()->gc;
+	size_t svp = region_used(region);
+	size_t size;
+	struct port port;
+	double *distances = NULL;
+	uint32_t count;
+	opts.key = lbox_encode_tuple_on_gc(L, 3, &size);
+	if (opts.key == NULL)
+		goto fail;
+	opts.key_end = opts.key + size;
+	if (!lua_isnil(L, 8)) {
+		opts.filter = lbox_encode_tuple_on_gc(L, 8, &size);
+		if (opts.filter == NULL)
+			goto fail;
+		opts.filter_end = opts.filter + size;
+	}
+	if (with_distance && opts.limit > 0 && opts.limit <= 1024)
+		distances = xregion_alloc_array(region, double, opts.limit);
+	if (box_vector_search(space_id, index_id, &opts, &port, distances) != 0)
+		goto fail;
+	count = ((struct port_c *)&port)->size;
+	port_dump_lua(&port, L, PORT_DUMP_LUA_MODE_TABLE);
+	port_destroy(&port);
+	if (with_distance) {
+		lua_pushnil(L);
+		lua_createtable(L, count, 0);
+		for (uint32_t i = 0; i < count; ++i) {
+			lua_pushnumber(L, distances[i]);
+			lua_rawseti(L, -2, i + 1);
+		}
+	}
+	region_truncate(region, svp);
+	return with_distance ? 3 : 1;
+fail:
+	region_truncate(region, svp);
+	return luaT_error(L);
+}
+
 static int
 lbox_select(lua_State *L)
 {
@@ -572,6 +632,7 @@ box_lua_misc_init(struct lua_State *L)
 	static const struct luaL_Reg boxlib_internal[] = {
 		{"prepare_auth", lbox_prepare_auth},
 		{"select", lbox_select},
+		{"vector_search", lbox_vector_search},
 		{"txn_set_isolation", lbox_txn_set_isolation},
 		{"generate_space_id", lbox_generate_space_id},
 		{"generate_func_id", lbox_generate_func_id},

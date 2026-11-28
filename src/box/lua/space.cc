@@ -619,7 +619,8 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 		if (index_def->type == HASH || index_def->type == TREE) {
 			lua_pushboolean(L, index_opts->is_unique);
 			lua_setfield(L, -2, "unique");
-		} else if (index_def->type == RTREE) {
+		} else if (index_def->type == RTREE ||
+			   index_def->type == VECTOR) {
 			lua_pushnumber(L, index_opts->dimension);
 			lua_setfield(L, -2, "dimension");
 		}

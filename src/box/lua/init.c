@@ -33,6 +33,7 @@
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
+#include <unicode/uversion.h>
 
 #include "lib/core/fiber.h"
 #include "lib/core/say.h"
@@ -1005,9 +1006,22 @@ static const struct luaL_Reg boxlib_backup[] = {
 	{NULL, NULL}
 };
 
+/** Report the ICU version used for primary-key collation. */
+static int
+lbox_vector_icu_version(struct lua_State *L)
+{
+	UVersionInfo version;
+	char value[U_MAX_VERSION_STRING_LENGTH];
+	u_getVersion(version);
+	u_versionToString(version, value);
+	lua_pushstring(L, value);
+	return 1;
+}
+
 static const struct luaL_Reg boxlib_internal[] = {
 	{"backup_info", lbox_backup_info},
 	{"recovery_point_create", lbox_recovery_point_create},
+	{"vector_icu_version", lbox_vector_icu_version},
 	{NULL, NULL}
 };
 

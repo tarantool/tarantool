@@ -24,6 +24,7 @@ local check_primary_index = box.internal.check_primary_index
 local check_iterator_type = box.internal.check_iterator_type
 local check_pairs_opts = box.internal.check_pairs_opts
 local check_select_opts = box.internal.check_select_opts
+local check_vector_select_opts = box.internal.check_vector_select_opts
 local normalize_txn_isolation_level = box.internal.normalize_txn_isolation_level
 local normalize_constraint = box.internal.tuple_format.normalize_constraint
 local normalize_foreign_key = box.internal.tuple_format.normalize_foreign_key
@@ -1134,6 +1135,8 @@ local index_options = {
     unique = 'boolean',
     dimension = 'number',
     distance = 'string',
+    algorithm = 'string',
+    opts = 'table',
     run_count_per_level = 'number',
     run_size_ratio = 'number',
     range_size = 'number',
@@ -1332,6 +1335,8 @@ box.schema.index.create = atomic_wrapper(function(space_id, name, options)
             dimension = options.dimension,
             unique = options.unique,
             distance = options.distance,
+            algorithm = options.algorithm,
+            opts = options.opts,
             page_size = options.page_size,
             range_size = options.range_size,
             run_count_per_level = options.run_count_per_level,
@@ -1495,8 +1500,25 @@ box.schema.index.alter = atomic_wrapper(function(space_id, index_id, options)
         options.type = tuple.type
     end
     for k, _ in pairs(index_options) do
-        if options[k] ~= nil then
-            index_opts[k] = options[k]
+        local value = options[k]
+        if value ~= nil then
+            if k == 'opts' and string.upper(options.type) == 'VECTOR' then
+                local merged = {}
+                local overrides = {}
+                for name, setting in pairs(value) do
+                    merged[name] = setting
+                    if type(name) == 'string' then
+                        overrides[string.lower(name)] = true
+                    end
+                end
+                for name, setting in pairs(index_opts.opts or {}) do
+                    if not overrides[string.lower(name)] then
+                        merged[name] = setting
+                    end
+                end
+                value = merged
+            end
+            index_opts[k] = value
         end
     end
     if options.hint and options.func then
@@ -2068,6 +2090,9 @@ end
 -- iteration
 base_index_mt.pairs_ffi = function(index, key, opts)
     check_index_arg(index, 'pairs', 2)
+    if index.type == 'VECTOR' then
+        box.error(box.error.VECTOR_UNSUPPORTED, 2)
+    end
     -- Encode the key on cord ibuf. Note, since the ibuf may be
     -- reallocated when we encode iterator_pos, we can't use the pointers
     -- returned by tuple_encode(). Instead we remember the key size
@@ -2096,6 +2121,9 @@ base_index_mt.pairs_ffi = function(index, key, opts)
 end
 base_index_mt.pairs_luac = function(index, key, opts)
     check_index_arg(index, 'pairs', 2)
+    if index.type == 'VECTOR' then
+        box.error(box.error.VECTOR_UNSUPPORTED, 2)
+    end
     key = keify(key)
     local itype, after, offset = check_pairs_opts(opts, #key == 0, 2)
     local keymp = msgpack.encode(key)
@@ -2169,11 +2197,109 @@ base_index_mt.get_luac = function(index, key)
     return internal.get(index.space_id, index.id, key)
 end
 
+base_index_mt.search = function(index, query, opts)
+    check_index_arg(index, 'search', 2)
+    local function invalid(message)
+        box.error({code = box.error.VECTOR_INVALID, reason = message}, 3)
+    end
+    local function unsupported(message)
+        box.error({code = box.error.VECTOR_UNSUPPORTED, reason = message}, 3)
+    end
+    if index.type ~= 'VECTOR' then
+        unsupported('Search requires a VECTOR index')
+    end
+    if type(query) ~= 'table' and not require('embedding').is(query) then
+        invalid('VECTOR query must be a dense numeric array or embedding')
+    end
+    if opts == nil then
+        opts = {}
+    end
+    if type(opts) ~= 'table' then
+        invalid('VECTOR search options must be a table')
+    end
+    for name in pairs(opts) do
+        if name ~= 'limit' and
+           name ~= 'with_distance' and name ~= 'timeout' and
+           name ~= 'filter' and name ~= 'opts' then
+            invalid('Unknown VECTOR search option: ' .. tostring(name))
+        end
+    end
+    local limit = opts.limit
+    if type(limit) ~= 'number' or limit % 1 ~= 0 or
+       limit < 0 or limit > 1024 then
+        invalid('VECTOR limit must be an integer from 0 to 1024')
+    end
+    if opts.with_distance ~= nil and type(opts.with_distance) ~= 'boolean' then
+        invalid('VECTOR with_distance must be boolean')
+    end
+    local timeout = opts.timeout
+    if timeout == nil then
+        timeout = 1
+    end
+    if type(timeout) ~= 'number' or timeout ~= timeout or
+       timeout <= 0 or timeout > 30 then
+        invalid('VECTOR timeout must be in (0, 30]')
+    end
+    local ef_search = 0
+    if opts.opts ~= nil then
+        if type(opts.opts) ~= 'table' then
+            invalid('VECTOR opts must be a table')
+        end
+        for name in pairs(opts.opts) do
+            if name ~= 'ef_search' then
+                invalid('Unknown VECTOR search option: ' .. tostring(name))
+            end
+        end
+        ef_search = opts.opts.ef_search
+        if ef_search == nil then
+            invalid('VECTOR opts requires ef_search')
+        end
+        if type(ef_search) ~= 'number' or ef_search % 1 ~= 0 or
+           ef_search < 1 or ef_search > 8192 then
+            invalid('VECTOR ef_search must be in [1, 8192]')
+        end
+    end
+    local filter_fieldno = 0
+    local filter_values
+    if opts.filter ~= nil then
+        local filter = opts.filter
+        if type(filter) ~= 'table' or type(filter.field) ~= 'string' or
+           type(filter.values) ~= 'table' then
+            invalid('VECTOR filter requires field and values')
+        end
+        for name in pairs(filter) do
+            if name ~= 'field' and name ~= 'values' then
+                invalid('Unknown VECTOR filter option: ' .. tostring(name))
+            end
+        end
+        local format = box.space[index.space_id]:format()
+        for i, field in ipairs(format) do
+            if field.name == filter.field and field.type == 'unsigned' then
+                filter_fieldno = i
+                break
+            end
+        end
+        if filter_fieldno == 0 then
+            invalid('VECTOR filter field must be an unsigned field')
+        end
+        filter_values = filter.values
+        if #filter_values > 65536 then
+            invalid('Too many VECTOR filter values')
+        end
+    end
+    return internal.vector_search(index.space_id, index.id, {query}, limit,
+                                  timeout, ef_search, filter_fieldno,
+                                  filter_values, opts.with_distance or false)
+end
+
 base_index_mt.select_ffi = function(index, key, opts)
+    check_index_arg(index, 'select', 2)
     if builtin.box_read_ffi_is_disabled then
         return base_index_mt.select_luac(index, key, opts)
     end
-    check_index_arg(index, 'select', 2)
+    if index.type == 'VECTOR' then
+        check_vector_select_opts(opts, nil, 2)
+    end
     -- Encode the key on cord ibuf. Note, since the ibuf may be
     -- reallocated when we encode iterator_pos, we can't use the pointers
     -- returned by tuple_encode(). Instead we remember the key size
@@ -2218,6 +2344,9 @@ end
 
 base_index_mt.select_luac = function(index, key, opts)
     check_index_arg(index, 'select', 2)
+    if index.type == 'VECTOR' then
+        check_vector_select_opts(opts, nil, 2)
+    end
     local key = keify(key)
     local key_is_nil = #key == 0
     local iterator, offset, limit, after, fetch_pos =
@@ -2252,6 +2381,14 @@ end
 
 base_index_mt.compact = function(index)
     return internal.compact(index.space_id, index.id)
+end
+
+base_index_mt.rebuild = function(index)
+    check_index_arg(index, 'rebuild', 2)
+    if index.type ~= 'VECTOR' then
+        box.error(box.error.VECTOR_UNSUPPORTED, 2)
+    end
+    return internal.vector_rebuild(index.space_id, index.id)
 end
 
 base_index_mt.drop = function(index)

@@ -453,6 +453,7 @@ static const struct memtx_index_vtab memtx_rtree_index_vtab = {
 	/* .reserve = */ memtx_rtree_index_reserve,
 	/* .build_next = */ generic_memtx_index_build_next,
 	/* .end_build = */ generic_memtx_index_end_build,
+	/* .gc_tuple = */ NULL,
 };
 
 struct index *

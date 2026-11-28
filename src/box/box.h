@@ -578,6 +578,14 @@ box_iterator_position_unpack(const char *packed_pos,
 int
 box_make_bootstrap_leader(bool graceful);
 
+struct memtx_vector_search_opts;
+
+/** Run rich VECTOR search with the ordinary SELECT statement checks. */
+int
+box_vector_search(uint32_t space_id, uint32_t index_id,
+		  const struct memtx_vector_search_opts *opts,
+		  struct port *port, double *distances);
+
 /**
  * Select data, satisfying filters (key and iterator), and dump it to port.
  * If packed_pos is not NULL and *packed_pos is not NULL, selection begins
