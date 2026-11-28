@@ -29,6 +29,7 @@ local CLIENT2_CERT_FILE = fio.pathjoin(CERT_DIR, 'client2.crt')
 local CLIENT2_KEY_FILE = fio.pathjoin(CERT_DIR, 'client2.key')
 local TMP_CERT_FILE = fio.pathjoin(VARDIR, 'tmp.crt')
 local TMP_KEY_FILE = fio.pathjoin(VARDIR, 'tmp.key')
+local TMP_CA_FILE = fio.pathjoin(VARDIR, 'tmp.ca')
 local GOST_KEY_FILE = fio.pathjoin(CERT_DIR, 'gost.key')
 local GOST_CERT_FILE = fio.pathjoin(CERT_DIR, 'gost.crt')
 local SENSITIVE_SSL_DATA = {
@@ -949,6 +950,151 @@ g.test_reload_listen = function()
     c:close()
     -- Connection with the new CA should succeed.
     uri.params.ssl_ca_file = CA2_FILE
+    c = net.connect(uri)
+    t.assert_equals(c.state, 'active')
+    t.assert_equals(c:eval('return true'), true)
+    c:close()
+end
+
+g.before_test('test_reload_listen_keep_alive', function()
+    t.assert(fio.copyfile(CA_FILE, TMP_CA_FILE))
+    t.assert(fio.copyfile(SERVER_CERT_FILE, TMP_CERT_FILE))
+    t.assert(fio.copyfile(SERVER_KEY_FILE, TMP_KEY_FILE))
+    g.server = server:new()
+    g.server:start()
+    g.server:exec(function(uri, ca_file, cert_file, key_file)
+        box.cfg({listen = {
+            uri = uri,
+            params = {
+                transport = 'ssl',
+                ssl_ca_file = ca_file,
+                ssl_cert_file = cert_file,
+                ssl_key_file = key_file,
+            }
+        }})
+    end, {g.server.net_box_uri, TMP_CA_FILE, TMP_CERT_FILE, TMP_KEY_FILE})
+end)
+
+g.after_test('test_reload_listen_keep_alive', function()
+    g.server:stop()
+    g.server = nil
+    fio.unlink(TMP_CA_FILE)
+    fio.unlink(TMP_CERT_FILE)
+    fio.unlink(TMP_KEY_FILE)
+end)
+
+--
+-- Checks that an already established client connection stays alive
+-- after client certificate invalidates. Server CA rotation used
+-- for invalidation.
+--
+g.test_reload_listen_keep_alive = function()
+    local uri = {
+        uri = g.server.net_box_uri,
+        params = {transport = 'ssl'},
+    }
+    local c
+
+    -- 1. Reload with the same listen URIs: the certificate files are
+    -- replaced in place.
+
+    -- Connect with old certificate.
+    uri.params.ssl_ca_file = CA_FILE
+    uri.params.ssl_cert_file = CLIENT_CERT_FILE
+    uri.params.ssl_key_file = CLIENT_KEY_FILE
+    c = net.connect(uri)
+    t.assert_equals(c.state, 'active')
+    t.assert_equals(c:eval('return true'), true)
+
+    -- Rotate the server's CA, certificate, and key in place.
+    t.assert(fio.copyfile(CA2_FILE, TMP_CA_FILE))
+    t.assert(fio.copyfile(SERVER2_CERT_FILE, TMP_CERT_FILE))
+    t.assert(fio.copyfile(SERVER2_KEY_FILE, TMP_KEY_FILE))
+    g.server:exec(function()
+        box.cfg({listen = box.cfg.listen})
+    end)
+
+    -- The old connection stays alive after the CA rotation and remains
+    -- usable until the client closes it below.
+    t.assert_equals(c.state, 'active')
+    t.assert_equals(c:eval('return true'), true)
+    c:close()
+
+    -- A reconnect with the new CA and the old client certificate fails.
+    -- The client verifies the server with the new CA, so the only
+    -- reason for the failure is the client certificate.
+    uri.params.ssl_ca_file = CA2_FILE
+    c = net.connect(uri)
+    t.assert_equals(c.state, 'error')
+    t.assert_str_contains(c.error, 'decrypt error')
+    c:close()
+    t.assert(g.server:grep_log(
+           '.*:SSL routines:.*:certificate verify failed:.*') ~= nil,
+        "no error 'certificate verify failed' in server's log")
+
+    -- A reconnect with the new client certificate is accepted.
+    uri.params.ssl_cert_file = CLIENT2_CERT_FILE
+    uri.params.ssl_key_file = CLIENT2_KEY_FILE
+    c = net.connect(uri)
+    t.assert_equals(c.state, 'active')
+    t.assert_equals(c:eval('return true'), true)
+    c:close()
+
+    -- 2. Reload with the listen URIs changed: point listen to other
+    -- certificate files.
+
+    -- Restore the old certs.
+    g.server:exec(function(uri, ca_file, cert_file, key_file)
+        box.cfg({listen = {
+            uri = uri,
+            params = {
+                transport = 'ssl',
+                ssl_ca_file = ca_file,
+                ssl_cert_file = cert_file,
+                ssl_key_file = key_file,
+            }
+        }})
+    end, {g.server.net_box_uri, CA_FILE, SERVER_CERT_FILE, SERVER_KEY_FILE})
+
+    -- Connect with old certificate.
+    uri.params.ssl_ca_file = CA_FILE
+    uri.params.ssl_cert_file = CLIENT_CERT_FILE
+    uri.params.ssl_key_file = CLIENT_KEY_FILE
+    c = net.connect(uri)
+    t.assert_equals(c.state, 'active')
+    t.assert_equals(c:eval('return true'), true)
+
+    -- Rotate the server's CA, certificate, and key by pointing listen
+    -- to other files (the URI params change).
+    g.server:exec(function(uri, ca_file, cert_file, key_file)
+        box.cfg({listen = {
+            uri = uri,
+            params = {
+                transport = 'ssl',
+                ssl_ca_file = ca_file,
+                ssl_cert_file = cert_file,
+                ssl_key_file = key_file,
+            }
+        }})
+    end, {g.server.net_box_uri, CA2_FILE, SERVER2_CERT_FILE,
+          SERVER2_KEY_FILE})
+
+    -- The old connection stays alive after the CA rotation and remains
+    -- usable until the client closes it below.
+    t.assert_equals(c.state, 'active')
+    t.assert_equals(c:eval('return true'), true)
+    c:close()
+
+    -- A reconnect with the new CA and the old client certificate fails.
+    uri.params.ssl_ca_file = CA2_FILE
+    c = net.connect(uri)
+    t.assert_equals(c.state, 'error')
+    t.assert_str_contains(c.error, 'decrypt error')
+    c:close()
+
+    -- A reconnect with the new client certificate is accepted.
+    uri.params.ssl_cert_file = CLIENT2_CERT_FILE
+    uri.params.ssl_key_file = CLIENT2_KEY_FILE
     c = net.connect(uri)
     t.assert_equals(c.state, 'active')
     t.assert_equals(c:eval('return true'), true)
