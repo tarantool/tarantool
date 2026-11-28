@@ -35,6 +35,7 @@
 #include "index_def.h"
 #include "func.h"
 #include "func_def.h"
+#include "index.h"
 #include "fiber.h"
 #include "key_def.h"
 #include "port.h"
@@ -156,6 +157,8 @@ key_list_iterator_next(struct key_list_iterator *it, struct tuple **value)
 			 it->index_def->name, it->index_def->space_name,
 			 tt_sprintf(tnt_errcode_desc(ER_EXACT_MATCH),
 				   key_def->part_count, part_count));
+		error_set_key(diag_last_error(diag_get()), "key", rptr,
+			      part_count);
 		return -1;
 	}
 	if (key_validate_parts(key_def, rptr, part_count, true,
@@ -167,6 +170,8 @@ key_list_iterator_next(struct key_list_iterator *it, struct tuple **value)
 		diag_add(ClientError, ER_FUNC_INDEX_FORMAT,
 			 it->index_def->name, it->index_def->space_name,
 			 "key does not follow functional index definition");
+		error_set_key(diag_last_error(diag_get()), "key", rptr,
+			      part_count);
 		return -1;
 	}
 out:

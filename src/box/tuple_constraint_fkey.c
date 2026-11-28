@@ -120,22 +120,28 @@ fkey_update_local_index(struct tuple_constraint *constr)
 }
 
 /**
- * Set diag error ER_FIELD_FOREIGN_KEY_FAILED with given message.
+ * Set diag error ER_FIELD_FOREIGN_KEY_FAILED with given message. If @a key
+ * is not NULL, it is attached to the error as @a part_count MsgPack values
+ * without the array header.
  */
 static void
 field_foreign_key_failed(const struct tuple_constraint *constr,
 			 const struct tuple_field *field,
-			 const char *message)
+			 const char *message, const char *key,
+			 uint32_t part_count)
 {
 	const char *field_path = NULL;
+	struct error *e;
 	if (field != NULL) {
 		field_path = tuple_field_path(field, constr->space->format);
-		diag_set(ClientError, ER_FIELD_FOREIGN_KEY_FAILED,
-			 constr->def.name, field_path, message, field->id);
+		e = diag_set(ClientError, ER_FIELD_FOREIGN_KEY_FAILED,
+			     constr->def.name, field_path, message, field->id);
 	} else {
-		diag_set(ClientError, ER_COMPLEX_FOREIGN_KEY_FAILED,
-			 constr->def.name, message);
+		e = diag_set(ClientError, ER_COMPLEX_FOREIGN_KEY_FAILED,
+			     constr->def.name, message);
 	}
+	if (key != NULL)
+		error_set_key(e, "key", key, part_count);
 }
 
 /**
@@ -283,13 +289,15 @@ tuple_constraint_fkey_check(const struct tuple_constraint *constr,
 
 	if (constr->fkey->foreign_index < 0) {
 		field_foreign_key_failed(constr, field,
-					 "foreign index was not found");
+					 "foreign index was not found", NULL,
+					 0);
 		return -1;
 	}
 	for (uint32_t i = 0; i < constr->fkey->field_count; i++) {
 		if (constr->fkey->data[i].local_field_no < 0) {
 			field_foreign_key_failed(constr, field,
-						 "wrong local field name");
+						 "wrong local field name", NULL,
+						 0);
 			return -1;
 		}
 	}
@@ -303,7 +311,8 @@ tuple_constraint_fkey_check(const struct tuple_constraint *constr,
 	int key_rc = get_or_extract_key_mp(constr, key_def, &key_buffer, &key,
 					   mp_data);
 	if (key_rc == -1) {
-		field_foreign_key_failed(constr, field, "extract key failed");
+		field_foreign_key_failed(constr, field, "extract key failed",
+					 NULL, 0);
 		return -1;
 	}
 
@@ -313,17 +322,20 @@ tuple_constraint_fkey_check(const struct tuple_constraint *constr,
 	int rc = -1;
 	const char *unused;
 	if (key_validate_parts(key_def, key, part_count, false, &unused) != 0) {
-		field_foreign_key_failed(constr, field, "wrong key type");
+		field_foreign_key_failed(constr, field, "wrong key type", key,
+					 part_count);
 		goto done;
 	}
 	struct tuple *tuple = NULL;
 	if (index_get(index, key, part_count, &tuple) != 0) {
-		field_foreign_key_failed(constr, field, "index get failed");
+		field_foreign_key_failed(constr, field, "index get failed", key,
+					 part_count);
 		goto done;
 	}
 	if (tuple == NULL) {
 		field_foreign_key_failed(constr, field,
-					 "foreign tuple was not found");
+					 "foreign tuple was not found", key,
+					 part_count);
 		goto done;
 	}
 	rc = 0;
@@ -334,15 +346,20 @@ done:
 }
 
 /**
- * Set diag error ER_FOREIGN_KEY_INTEGRITY with given message.
+ * Set diag error ER_FOREIGN_KEY_INTEGRITY with given message. If @a key is
+ * not NULL, it is attached to the error as @a part_count MsgPack values
+ * without the array header.
  */
 static void
 foreign_key_integrity_failed(const struct tuple_constraint *constr,
-			     const char *message)
+			     const char *message, const char *key,
+			     uint32_t part_count)
 {
 	struct error *err = diag_set(ClientError, ER_FOREIGN_KEY_INTEGRITY,
 				     constr->def.name, message);
 	error_set_str(err, "name", constr->def.name);
+	if (key != NULL)
+		error_set_key(err, "key", key, part_count);
 }
 
 /**
@@ -409,7 +426,7 @@ tuple_constraint_fkey_check_delete(const struct tuple_constraint *constr,
 		if (constr->fkey->data[i].foreign_field_no < 0) {
 			foreign_key_integrity_failed(constr,
 						     "wrong foreign "
-						     "field name");
+						     "field name", NULL, 0);
 			return -1;
 		}
 	}
@@ -445,7 +462,8 @@ tuple_constraint_fkey_check_delete(const struct tuple_constraint *constr,
 	}
 
 	if (constr->fkey->local_index < 0) {
-		foreign_key_integrity_failed(constr, "index was not found");
+		foreign_key_integrity_failed(constr, "index was not found",
+					     NULL, 0);
 		return -1;
 	}
 
@@ -466,7 +484,8 @@ tuple_constraint_fkey_check_delete(const struct tuple_constraint *constr,
 
 	const char *unused;
 	if (key_validate_parts(key_def, key, part_count, false, &unused) != 0) {
-		foreign_key_integrity_failed(constr, "wrong key type");
+		foreign_key_integrity_failed(constr, "wrong key type", key,
+					     part_count);
 		goto done;
 	}
 
@@ -476,7 +495,8 @@ tuple_constraint_fkey_check_delete(const struct tuple_constraint *constr,
 	    index_min(index, key, part_count, &found_tuple) != 0)
 		goto done;
 	if (found_tuple != NULL) {
-		foreign_key_integrity_failed(constr, "tuple is referenced");
+		foreign_key_integrity_failed(constr, "tuple is referenced", key,
+					     part_count);
 		goto done;
 	}
 	rc = 0;
