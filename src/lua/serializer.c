@@ -39,6 +39,7 @@
 #include "trigger.h"
 #include "lib/core/decimal.h" /* decimal_t */
 #include "lib/core/mp_extension_types.h"
+#include "lib/core/mp_embedding.h"
 #include "lua/error.h"
 #include "lua/decimal.h"
 
@@ -900,7 +901,18 @@ luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg, int index,
 				return 0;
 			}
 			field->type = MP_EXT;
-			if (ctypeid == CTID_DECIMAL) {
+			if (ctypeid == CTID_EMBEDDING) {
+				field->ext_type = MP_EMBEDDING;
+				field->sval.data = luaT_toembedding(
+					L, index, &field->sval.len);
+				uint32_t len = field->sval.len;
+				if (mp_validate_embedding(field->sval.data,
+							  len) != 0) {
+					diag_set(LuajitError,
+						 "invalid embedding");
+					return -1;
+				}
+			} else if (ctypeid == CTID_DECIMAL) {
 				field->ext_type = MP_DECIMAL;
 				field->decval = (decimal_t *) cdata;
 			} else if (ctypeid == CTID_UUID) {

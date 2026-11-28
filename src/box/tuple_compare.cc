@@ -87,6 +87,9 @@ static enum mp_class mp_ext_classes[] = {
 	/* .MP_DATETIME		 = */ MP_CLASS_DATETIME,
 	/* .MP_COMPRESSION	 = */ mp_class_max,
 	/* .MP_INTERVAL		 = */ MP_CLASS_INTERVAL,
+	/* .MP_TUPLE		 = */ mp_class_max,
+	/* .MP_ARROW		 = */ mp_class_max,
+	/* .MP_EMBEDDING		 = */ mp_class_max,
 };
 
 static enum mp_class

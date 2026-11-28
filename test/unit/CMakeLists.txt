@@ -98,6 +98,10 @@ endfunction()
 
 add_library(unit STATIC unit.c)
 
+create_unit_test(PREFIX embedding
+                 SOURCES embedding.c
+                 LIBRARIES mp_embedding unit)
+
 create_unit_test(PREFIX ann
                  SOURCES ann.c
                  LIBRARIES ann unit)

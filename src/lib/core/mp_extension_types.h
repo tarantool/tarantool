@@ -49,6 +49,7 @@ enum mp_extension_type {
     MP_INTERVAL = 6,
     MP_TUPLE = 7,
     MP_ARROW = 8,
+    MP_EMBEDDING = 9,
     mp_extension_type_MAX,
 };
 

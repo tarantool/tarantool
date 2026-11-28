@@ -36,6 +36,7 @@
  *       difficult to know object/array sizes ahead of time.
  */
 
+#include "mp_embedding.h"
 #include "trivia/util.h"
 
 #include <assert.h>
@@ -403,6 +404,17 @@ static void json_append_data(lua_State *l, struct luaL_serializer *cfg,
     return;
     case MP_EXT:
         switch (field.ext_type) {
+        case MP_EMBEDDING:
+        {
+            lua_createtable(l, field.sval.len / 4, 0);
+            for (uint32_t i = 0; i < field.sval.len / 4; ++i) {
+                lua_pushnumber(l, embedding_f32le_load(field.sval.data, i));
+                lua_rawseti(l, -2, i + 1);
+            }
+            json_append_data(l, cfg, current_depth, json);
+            lua_pop(l, 1);
+            return;
+        }
         case MP_DECIMAL:
         {
             const char *str = decimal_str(field.decval);

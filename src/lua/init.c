@@ -183,6 +183,7 @@ extern char minifio_lua[],
 	table_lua[],
 	string_lua[],
 	varbinary_lua[],
+	embedding_lua[],
 	swim_lua[],
 	jit_p_lua[], /* LuaJIT 2.1 profiler */
 	jit_zone_lua[], /* LuaJIT 2.1 profiler */
@@ -231,6 +232,7 @@ static const char * const lua_modules_minimal[] = {
 	"uri", uri_lua,
 	"uuid", uuid_lua,
 	"varbinary", varbinary_lua,
+	"embedding", embedding_lua,
 	"timezones", timezones_lua,
 	"datetime", datetime_lua,
 	"msgpackffi", msgpackffi_lua,

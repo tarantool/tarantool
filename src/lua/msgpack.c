@@ -48,6 +48,7 @@
 #include "core/tweaks.h"
 #include "lua/decimal.h" /* luaT_newdecimal() */
 #include "mp_extension_types.h"
+#include "mp_embedding.h"
 #include "mp_uuid.h" /* mp_decode_uuid() */
 #include "mp_datetime.h"
 #include "mp_interval.h"
@@ -339,6 +340,14 @@ restart: /* used by MP_EXT of unidentified subtype */
 	case MP_EXT:
 		type = MP_EXT;
 		switch (field->ext_type) {
+		case MP_EMBEDDING: {
+			uint32_t dimension = field->sval.len / 4;
+			uint32_t size = mp_sizeof_embedding(dimension);
+			char *data = mpstream_reserve(stream, size);
+			mp_encode_embedding(data, field->sval.data, dimension);
+			mpstream_advance(stream, size);
+			break;
+		}
 		case MP_DECIMAL:
 			mpstream_encode_decimal(stream, field->decval);
 			break;
@@ -506,6 +515,12 @@ luamp_decode_with_ctx(struct lua_State *L, struct luaL_serializer *cfg,
 		const char *svp = *data;
 		uint32_t len = mp_decode_extl(data, &ext_type);
 		switch (ext_type) {
+		case MP_EMBEDDING:
+			if (mp_validate_embedding(*data, len) != 0)
+				luaL_error(L, "invalid embedding");
+			luaT_pushembedding(L, *data, len);
+			*data += len;
+			return;
 		case MP_DECIMAL:
 		{
 			decimal_t *dec = luaT_newdecimal(L);

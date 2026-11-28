@@ -383,7 +383,8 @@ index_def_check_field_types(struct index_def *index_def, const char *space_name)
 		enum field_type type = key_def->parts[i].type;
 
 		if (type == FIELD_TYPE_ANY || type == FIELD_TYPE_INTERVAL ||
-		    type == FIELD_TYPE_ARRAY || type == FIELD_TYPE_MAP) {
+		    type == FIELD_TYPE_ARRAY || type == FIELD_TYPE_MAP ||
+		    type == FIELD_TYPE_EMBEDDING) {
 			diag_set(ClientError, ER_MODIFY_INDEX,
 				 index_def->name, space_name,
 				 tt_sprintf("field type '%s' is not supported",

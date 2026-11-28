@@ -857,7 +857,8 @@ key_def_incomparable_type(const struct key_def *key_def)
 	for (uint32_t i = 0; i < key_def->part_count; ++i) {
 		if (key_def->parts[i].type == FIELD_TYPE_ANY ||
 		    key_def->parts[i].type == FIELD_TYPE_ARRAY ||
-		    key_def->parts[i].type == FIELD_TYPE_MAP) {
+		    key_def->parts[i].type == FIELD_TYPE_MAP ||
+		    key_def->parts[i].type == FIELD_TYPE_EMBEDDING) {
 			/* Tuple comparators don't support these types. */
 			return key_def->parts[i].type;
 		}

@@ -5,8 +5,7 @@
  */
 #include "ann_numeric.h"
 
-#include <fenv.h>
-#include <float.h>
+#include "mp_embedding.h"
 #include <math.h>
 #include <string.h>
 
@@ -40,21 +39,8 @@ ann_search_control_step(struct ann_search_control *control)
 enum ann_status
 ann_f32_from_double(double value, float *out)
 {
-	if (out == NULL || !isfinite(value) || fabs(value) > FLT_MAX)
-		return ANN_INVALID;
-	int old_round = fegetround();
-	if (old_round < 0)
-		return ANN_INVALID;
-	if (old_round != FE_TONEAREST && fesetround(FE_TONEAREST) != 0)
-		return ANN_INVALID;
-	/* Keep the cast inside the temporary rounding mode. */
-	__asm__ volatile("" : "+m"(value) : : "memory");
-	float rounded = (float)value;
-	__asm__ volatile("" : "+m"(rounded) : : "memory");
-	if (old_round != FE_TONEAREST && fesetround(old_round) != 0)
-		return ANN_INVALID;
-	*out = rounded;
-	return ANN_OK;
+	return embedding_f32_from_double(value, out) == 0 ?
+		ANN_OK : ANN_INVALID;
 }
 
 enum ann_status
@@ -95,12 +81,7 @@ ann_vector_from_double(const double *input, uint32_t dimension,
 float
 ann_f32le_load(const void *data, uint32_t index)
 {
-	const unsigned char *p = (const unsigned char *)data + index * 4;
-	uint32_t bits = (uint32_t)p[0] | (uint32_t)p[1] << 8 |
-			(uint32_t)p[2] << 16 | (uint32_t)p[3] << 24;
-	float value;
-	memcpy(&value, &bits, sizeof(value));
-	return value;
+	return embedding_f32le_load(data, index);
 }
 
 enum ann_status
