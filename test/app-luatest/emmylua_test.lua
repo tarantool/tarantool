@@ -31,9 +31,9 @@ local modules = {
             {
                 fixture = 'object.lua',
                 type_name = 'iconv.converter',
-                fields = {
-                    __tostring = 'Returns a string representation',
-                },
+                fields = {},
+                forbidden_fields = {'__tostring'},
+                description = 'converter object that converts a string',
             },
         },
     },
@@ -89,9 +89,9 @@ local modules = {
             {
                 fixture = 'object.lua',
                 type_name = 'varbinary_object',
-                fields = {
-                    __tostring = 'Returns the binary data',
-                },
+                fields = {},
+                forbidden_fields = {'__tostring'},
+                description = 'variable-length binary object',
             },
         },
     },
@@ -148,9 +148,9 @@ local modules = {
             {
                 fixture = 'object.lua',
                 type_name = 'decimal',
-                fields = {
-                    __tostring = 'Return the decimal as a string',
-                },
+                fields = {},
+                forbidden_fields = {'__tostring'},
+                description = 'A decimal number',
             },
         },
     },
@@ -224,6 +224,33 @@ local modules = {
                     result = 'Return final chunk',
                     free = 'Free the cipher context',
                 },
+            },
+        },
+    },
+    {
+        name = 'uuid',
+        source = 'src/lua/uuid.lua',
+        fixtures = 'test/app-luatest/emmylua/uuid',
+        fields = {
+            NULL = 'A nil UUID object',
+            new = 'Create a UUID',
+            fromstr = 'Create a UUID from a 36-byte hexadecimal string',
+            frombin = 'Create a UUID from a 16-byte binary string',
+            bin = 'Create a UUID and return its 16-byte binary form',
+            str = 'Create a UUID and return its 36-byte hexadecimal form',
+            is_uuid = 'Check if the specified value has the UUID type',
+        },
+        objects = {
+            {
+                fixture = 'object.lua',
+                type_name = 'uuid',
+                fields = {
+                    bin = 'Return the UUID as a 16-byte binary string',
+                    str = 'Return the UUID as a 36-byte hexadecimal string',
+                    isnil = 'Check if the UUID is an all-zero value',
+                },
+                forbidden_fields = {'__tostring'},
+                description = 'A UUID object',
             },
         },
     },
@@ -319,6 +346,18 @@ local function assert_fields(client, items, fields, context)
     end
 end
 
+local function assert_forbidden_fields(items, names, context)
+    local labels = {}
+    for _, item in ipairs(items) do
+        labels[item.label] = true
+    end
+
+    for _, name in ipairs(names) do
+        t.assert(labels[name] == nil,
+            ('%s: completion has %s'):format(context, name))
+    end
+end
+
 local function run_module_test(spec)
     local binary = os.getenv('EMMYLUA_LS')
     t.skip_if(binary == nil or binary == '',
@@ -402,17 +441,47 @@ local function run_module_test(spec)
                     ('%s: object type contains %s: %s'):format(
                         object.type_name, forbidden, header))
             end
+            if object.description ~= nil then
+                t.assert(
+                    object_type:find(object.description, 1, true) ~= nil,
+                    ('%s: hover has no description %q: %s'):format(
+                        object.type_name, object.description,
+                        object_type))
+            end
 
-            local object_items = client:request_until(
-                'textDocument/completion', {
-                    textDocument = {uri = object_uri},
-                    position = emmylua.marker_position(
-                        object_text, 'object_fields'),
-                }, function(result)
-                    return has_any_label(result, object.fields)
-                end, 30)
-            assert_fields(client, object_items, object.fields,
-                object.type_name)
+            local object_items = nil
+            if next(object.fields) ~= nil then
+                object_items = client:request_until(
+                    'textDocument/completion', {
+                        textDocument = {uri = object_uri},
+                        position = emmylua.marker_position(
+                            object_text, 'object_fields'),
+                    }, function(result)
+                        return has_any_label(result, object.fields)
+                    end, 30)
+                assert_fields(client, object_items, object.fields,
+                    object.type_name)
+            end
+            if object.forbidden_fields ~= nil then
+                if object_items == nil then
+                    -- The object may have no members of its own: the
+                    -- conversion hooks (such as `__tostring`) belong to
+                    -- the metatable and are not exposed as fields. The
+                    -- hover check above has already warmed up the
+                    -- analysis, so a single request is enough here.
+                    object_items = client:request(
+                        'textDocument/completion', {
+                            textDocument = {uri = object_uri},
+                            position = emmylua.marker_position(
+                                object_text, 'object_fields'),
+                        }, 30)
+                    if type(object_items) ~= 'table' then
+                        object_items = {}
+                    end
+                end
+                assert_forbidden_fields(object_items,
+                    object.forbidden_fields, object.type_name)
+            end
         end
     end, debug.traceback)
 

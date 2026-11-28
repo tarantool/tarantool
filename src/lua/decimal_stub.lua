@@ -32,10 +32,9 @@ local decimal = {}
 
 ---@alias decimal_like decimal|string|number
 
----A decimal number.
+---A decimal number. The `__tostring` metamethod converts it to a
+---string, so `tostring(d)` returns the number as a string.
 ---@class decimal: ffi.cdata*
----@field __tostring fun(self: decimal): string Return the decimal as a
----    string.
 ---@operator unm: decimal
 ---@operator add(decimal_like): decimal
 ---@operator sub(decimal_like): decimal

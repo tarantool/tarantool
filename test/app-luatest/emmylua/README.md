@@ -44,9 +44,9 @@ looks like this:
         {
             fixture = 'object.lua',
             type_name = 'varbinary_object',
-            fields = {
-                __tostring = 'Returns the binary data',
-            },
+            fields = {},
+            forbidden_fields = {'__tostring'},
+            description = 'variable-length binary object',
         },
     },
 }
@@ -65,14 +65,23 @@ For each specification the test:
    documentation contains the expected phrase.
 6. Repeats the field and documentation checks for every object
    fixture of the module.
+7. Checks that the class description of the object, declared with
+   comment lines before `---@class`, contains the phrase from the
+   `description` field of the specification.
+8. Checks that the object members listed in `forbidden_fields` are
+   not offered in completion.
 
 An object fixture obtains the object type either with the module's
 constructor, for example `varbinary.new('data')`, or from a value
 returned by a module function, for example `xlog.pairs()`.
 
-Only `---@field` annotations are checked. Metamethods declared with
-`---@operator` are not class members, so they do not show up in
-completion and are not covered by these checks.
+Only `---@field` annotations are checked as object members. Metamethods
+are not class members: the ones declared with `---@operator` do not show
+up in completion, and a hook such as `__tostring` must not be annotated
+with `---@field`, so `forbidden_fields` verifies that it is not offered.
+A class description is rendered only when it is written before the
+`---@class` tag: the text after the tag is used neither in hover nor in
+the generated documentation.
 
 ## Markers
 
