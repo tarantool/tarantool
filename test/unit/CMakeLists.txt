@@ -98,6 +98,10 @@ endfunction()
 
 add_library(unit STATIC unit.c)
 
+create_unit_test(PREFIX ann
+                 SOURCES ann.c
+                 LIBRARIES ann unit)
+
 if(TARGET_OS_DARWIN AND ENABLE_BACKTRACE)
     add_library(dladdr_no_symbol SHARED dladdr_no_symbol.c)
     # The first function precedes every exported symbol and has no local symbol.
